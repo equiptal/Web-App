@@ -2,6 +2,90 @@
 
 ## Change log
 
+- **2026-09-21 - A multi-item circle draws EVERY machine, and a double press opens them big.**
+  Owner, on a rail tile whose group holds a Spider Lift and a Crawler Excavator but drew only the
+  first: *"for multi item requests we put the image of first item in the request in the top circule,
+  but cant we make the multi item take multi equipmet images small in this circule? and clicking
+  double on the circule open the circule image big on the screen (still take me to the request
+  clicked) but we will see the zoomed in image"*.
+  **The montage**, inside the same 52px circle: one picture fills it exactly as before; two are
+  halves; THREE is one tall cell and two short, which is the only 2x2 arrangement with no empty
+  quarter; four are quarters; more than four is three machines and «+N», because a fifth 26px cell
+  says less than the number does.
+  🔴 **It montages only what it can DRAW.** A group whose second line has no artwork keeps the
+  single picture rather than setting one machine beside a grey glyph: the montage is worth its loss
+  of size only when every cell carries a machine, and how many LINES the request holds is the
+  badge's job, which is on the tile either way.
+  🔴 **A cell takes `object-contain` and NO scale, where the whole circle still takes 1.34.** Looked
+  at both ways at the real 26px before choosing, and the pictures are in the log of this session:
+  the 1.34 exists to hide a drawing's own letterbox band against the circle's CURVE, and a cell's
+  neighbour is a hairline and another machine. Scaled, a 26px cell shows the middle third of an
+  excavator and reads as a smudge; unscaled it is small and whole, which is the most a cell that
+  size can be.
+  ⚠️ **The hairline between cells is the GRID's own ground showing through a 1px gap**, never a
+  border on each cell - a border would be drawn inside the round clip on the outer cells too and
+  would ring the circle.
+  **The zoom**: a double press opens every machine large, each named and with its unit count, and
+  still picks the request. `onClick` has already fired twice by then, and picking the same request
+  twice changes nothing - so the selection stays the single press's job and the double press only
+  adds the view. Withheld when the group has no artwork at all: a dialog of grey glyphs is not a
+  zoomed picture.
+  ⚠️ **The zoomed view lists a machine whose picture never loaded**, named, with the glyph. That
+  line is still part of the request, and a view holding fewer machines than the ITEMS tabs would
+  repeat the montage's compromise where there is room not to.
+  ⚠️ **`object-contain` and no scale in the zoom either**, whatever kind of picture it is: the crop
+  and the 1.34 both exist to fill a 52px ROUND hole, and in a square box with room to spare they
+  would only throw the machine's edges away again.
+  🔴 **`broken` is keyed by URL now, not by tile.** Its old note argued for by-tile *"because the
+  same subtype can appear on several rows and they fail together"* - true while a tile held ONE
+  picture, and wrong the moment it holds four: one 403 would blank every machine in the group. By
+  URL the same subtype failing on five rows still costs only that subtype, which is what the old
+  note was actually after, and it is the ruling the workspace's context bar and the dashboard's bid
+  rail already take. **Not the edge case**: the taxonomy objects are not all public-read - of three
+  assets pulled by hand today, `mobile-crane-all-terrain` answered 403 and two answered 200.
+  Files: `src/lib/contract/workspace.ts` (`RailMachine`, `RailTile.machines`; `railTiles` takes the
+  locale), `src/components/workspace/RequestRail.tsx` (`fitOf`, `CircleArt`, `CircleZoom`),
+  `src/components/workspace/RequestsWorkspace.tsx`, `tests/unit/workspace.test.ts` (3 new cases),
+  `tests/unit/rail-circle-art.test.ts` (new, 10), `tests/unit/request-rail-fit.test.ts`.
+  ⚠️ **`imageUrl` is KEPT beside `machines`** and both are derived in one pass. A one-machine
+  request is the ordinary case and drawing it through the montage code would be a grid of one; the
+  single pass is what stops the two describing different machines.
+  ⚠️ **`request-rail-fit.test.ts` was re-pointed, not weakened.** It read the tile's inline
+  `imageIsPhoto` ternary, which is now `fitOf`; the RULE is unchanged and the expression moved,
+  because a rail that draws several pictures must not hold two answers to one question.
+  ⚠️ Verified: `NODE_OPTIONS= npx next build` clean, typecheck clean, lint 0 errors, **212 files /
+  3582 passing, 7 skipped** serially, and two rulings break-checked (the cell scaled like the whole
+  circle, then the montage threshold moved) - each went red alone. The 2 remaining failures are
+  PRE-EXISTING: `cancel-confirmation` (the CRLF vacuous-slice trap reported on 2026-09-20) and
+  `ui-pins` (the CRLF staleness - re-running the generator produces NO content diff, only line
+  endings, so the docs were left alone).
+  ⚠️ **SEEN RENDERED** at the real 52px, all six states side by side - one, two, three, four, six
+  and a closed one - with the compiled stylesheet and the live taxonomy assets. That is how the
+  cell's scale was decided: the scaled and unscaled versions were photographed at 26px and compared.
+  🔴 **NOT seen on the real rail**, which needs a signed-in renter with a multi-item request, so
+  the double press and the dialog are pinned by cases rather than watched.
+
+- **2026-09-21 - The bid strip is NOT centred: withdrawn two days after it landed.**
+  Owner, on a 1920 screenshot of one bid card floating in the middle of the panel: *"why this
+  cewntered? revert it back"*.
+  🔴 **This withdraws 2026-09-19's `justify-center-safe`**, which was his own pick from four options
+  put to him at the time. The card sits at the READING START again, which is where every other band
+  on the page begins, and a lone bid on a wide screen simply has white after it.
+  ⚠️ **The measurement behind the withdrawn version is kept, in the component and in the test**,
+  because it is what will be reached for again: the gutters WERE equal and were measured so - 37px
+  of grey on the leading edge, 39px on the trailing - and what was unequal was the CONTENT, a 344px
+  card with ~1480px of white after it, because `PAGE_MAX` became `max-w-none` the same morning and
+  this container went 1360 -> 1840 while the card did not grow with it.
+  🔴 **If it is ever centred again it must be `center-safe`, and the test now says so as an
+  assertion rather than as prose.** This is an `overflow-x-auto` scroller: plain centring overflows
+  at BOTH ends, and the overflow past the start edge cannot be scrolled to, so on a request with six
+  bids the FIRST one becomes unreachable. That is the whole reason the withdrawn version carried the
+  suffix.
+  Files: `src/components/workspace/BidCards.tsx`, `tests/unit/bid-cards-rail.test.ts` (1 case
+  rewritten to the withdrawal).
+  ⚠️ Verified: typecheck clean, lint 0 errors, 6 passing in the strip's own suite. Not photographed:
+  it is the removal of one utility, and the state it restores is the one that shipped for weeks.
+
 - **2026-09-20 - The machine panel's empty part is painted the photographs' OWN ground, so the picture reads as filling it.**
   Owner, on a crop of the panel's foot showing a beige block, then a pale strip with the «Diesel» and
   «2024» chips sitting on it: *"why the image doesnt exist for margins and padding, keep it 100%

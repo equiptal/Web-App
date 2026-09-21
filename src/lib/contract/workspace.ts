@@ -25,6 +25,18 @@ export interface WorkspaceBid {
 }
 
 /** One circle in the top rail. */
+/** One machine of a group, as the rail's circle and its zoomed view need it. */
+export interface RailMachine {
+  /** The fanned-out request's own id — so the zoomed view can say which line it belongs to. */
+  id: string;
+  /** What to call it. The group's own wording, already localised by the caller. */
+  name: string;
+  url: string | null;
+  isPhoto: boolean;
+  /** Units asked for on that line. */
+  qty: number;
+}
+
 export interface RailTile {
   /** The group's id — what a selection stores. */
   key: string;
@@ -55,6 +67,20 @@ export interface RailTile {
   /** True when `imageUrl` is a PHOTOGRAPH rather than a drawn icon — the two need opposite fits
    *  inside a round mask. See `RequestListItem.item`. */
   imageIsPhoto: boolean;
+  /**
+   * EVERY machine in the group, in the group's own order, for the circle's montage and for the
+   * picture it opens (owner, 2026-09-21: *"cant we make the multi item take multi equipmet images
+   * small in this circule?"*).
+   *
+   * ⚠️ `imageUrl` above is the FIRST of these that has a picture, and it stays: a one-machine
+   * request is the ordinary case and drawing it through the montage code would be a grid of one.
+   * Both are derived in the same pass, so they cannot describe different machines.
+   *
+   * ⚠️ A line whose picture never loaded is kept here WITH a null `url`. It is still a machine the
+   * request asked for, it still has a name, and the zoomed view names it — dropping it would make
+   * the montage disagree with the ITEMS tabs about how many machines this request holds.
+   */
+  machines: RailMachine[];
   /** Greyed and captioned in the rail; still selectable, because its bids are still worth reading. */
   closed: boolean;
 }
@@ -85,7 +111,7 @@ export function isClosedGroup(group: RequestGroup): boolean {
 }
 
 /** The rail, in the order `groupRequests` produced (newest first). */
-export function railTiles(groups: RequestGroup[]): RailTile[] {
+export function railTiles(groups: RequestGroup[], ar = false): RailTile[] {
   return groups.map((g) => ({
     key: g.id,
     // The RFQ code is the group's own name; a lone request has none and answers to its REQ id.
@@ -94,10 +120,21 @@ export function railTiles(groups: RequestGroup[]): RailTile[] {
     items: g.items.length,
     units: g.totalUnits,
     bids: g.totalBids,
-    // One lookup for both, so the flag can never describe a different item's picture than the URL.
+    // One lookup for all three, so the flag can never describe a different item's picture than the
+    // URL, and the montage can never disagree with the single picture it replaces.
     ...(() => {
       const withPic = g.items.find((i) => i.item?.imageUrl)?.item ?? null;
-      return { imageUrl: withPic?.imageUrl ?? null, imageIsPhoto: withPic?.imageIsPhoto ?? false };
+      return {
+        imageUrl: withPic?.imageUrl ?? null,
+        imageIsPhoto: withPic?.imageIsPhoto ?? false,
+        machines: g.items.map((i) => ({
+          id: i.id,
+          name: (ar ? i.item?.nameAr || i.item?.name : i.item?.name) ?? i.displayId,
+          url: i.item?.imageUrl ?? null,
+          isPhoto: i.item?.imageIsPhoto ?? false,
+          qty: i.item?.qty ?? 1,
+        })),
+      };
     })(),
     closed: isClosedGroup(g),
   }));

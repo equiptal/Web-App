@@ -24,15 +24,30 @@ import { readFileSync } from "node:fs";
  */
 const SRC = readFileSync("src/components/workspace/RequestRail.tsx", "utf8");
 
-/** The `className={…}` ternary that decides the fit, isolated from the rest of the file. */
+/**
+ * The rule that decides the fit.
+ *
+ * ⚠️ It was an inline ternary on the tile's own `<img>`; on 2026-09-21 it became `fitOf`, because a
+ * multi-item circle draws several pictures and the rail must not hold two answers to one question.
+ * The RULE is unchanged — the expression moved — and this reads it where it now lives.
+ */
 const fitRule = (() => {
-  const at = SRC.indexOf("tile.imageIsPhoto");
-  return SRC.slice(at, SRC.indexOf("}", SRC.indexOf("object-contain", at)));
+  const at = SRC.indexOf("const fitOf =");
+  return SRC.slice(at, SRC.indexOf("\n", at));
+})();
+
+/** The single-picture path — the whole circle, which is what the measurements below were taken in. */
+const wholeCircle = (() => {
+  const at = SRC.indexOf("if (art.length < 2) {");
+  return SRC.slice(at, SRC.indexOf("}", SRC.indexOf("fallbackIsPhoto ?", at)));
 })();
 
 describe("the request rail's tile artwork", () => {
   it("fills the circle for a photograph, by covering it", () => {
-    expect(fitRule).toContain('"h-[52px] w-[52px] rounded-full object-cover"');
+    expect(fitRule).toContain("object-cover");
+    // The mask is round, so a covered photograph is rounded with it.
+    expect(wholeCircle).toContain('fallbackIsPhoto ? "rounded-full" : ""');
+    expect(wholeCircle).toContain("h-[52px] w-[52px]");
   });
 
   it("fills the circle for a DRAWING by scaling a contain fit, never by cropping it", () => {

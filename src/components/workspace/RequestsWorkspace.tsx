@@ -394,7 +394,7 @@ export function RequestsWorkspace() {
   const hide = useCallback((key: string) => setHidden(hideRequest(key)), []);
 
   const tiles = useMemo(() => {
-    const all = railTiles(groups ?? []);
+    const all = railTiles(groups ?? [], ar);
     /* A hidden request whose circle is nonetheless the one being READ stays on the rail: taking the
        page's own subject out from under it would leave the workspace showing a request the renter
        cannot see the tile for. The demo filter below follows the same rule, for the same reason. */
@@ -408,7 +408,7 @@ export function RequestsWorkspace() {
        would fall through to «create your first request» over an account that has several. */
     if (!HIDE_BIDLESS_REQUESTS || !kept.some((tl) => tl.bids > 0)) return kept;
     return kept.filter((tl) => tl.bids > 0 || tl.key === resolved.groupId);
-  }, [groups, hidden, resolved.groupId]);
+  }, [groups, hidden, resolved.groupId, ar]);
 
   /**
    * Bids the renter has taken off the comparison. Owned here rather than inside the matrix so the

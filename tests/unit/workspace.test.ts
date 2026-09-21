@@ -127,6 +127,49 @@ describe("railTiles", () => {
     expect(multiUnit.items).toBe(1);
     expect(multiUnit.units).toBe(4);
   });
+
+  /**
+   * **The circle carries every machine, not just the first** (owner, 2026-09-21: *"for multi item
+   * requests we put the image of first item in the request in the top circule, but cant we make the
+   * multi item take multi equipmet images small in this circule?"*).
+   */
+  it("carries EVERY machine, in the group's own order, beside the first picture", () => {
+    const tile = railTiles([
+      group("g1", [item("a", "OPEN", 2, "one.png"), item("b", "OPEN", 1, "two.png")]),
+    ])[0];
+    // `imageUrl` is unchanged — a one-machine request still draws through it, and the two are
+    // derived in one pass so they can never describe different machines.
+    expect(tile.imageUrl).toBe("one.png");
+    expect(tile.machines.map((m) => m.url)).toEqual(["one.png", "two.png"]);
+    expect(tile.machines.map((m) => m.qty)).toEqual([2, 1]);
+    expect(tile.machines.map((m) => m.id)).toEqual(["a", "b"]);
+  });
+
+  it("keeps a machine whose picture is missing, because it is still a machine", () => {
+    /**
+     * ⚠️ Dropping it would make the zoomed view disagree with the ITEMS tabs about how many
+     * machines the request holds. The montage's own «can I draw this» test is a RENDER decision and
+     * lives in the component; the data keeps the line either way.
+     */
+    const tile = railTiles([group("g1", [item("a", "OPEN", 1, null), item("b", "OPEN", 1, "two.png")])])[0];
+    expect(tile.machines).toHaveLength(2);
+    expect(tile.machines[0].url).toBeNull();
+    // Named by its own line, so the zoomed view can caption it.
+    expect(tile.machines[0].name).toBe("item a");
+  });
+
+  it("names the machines in the reader's language, falling back to the request's id", () => {
+    const g = group("g1", [item("a", "OPEN", 1, "one.png")]);
+    g.items[0].item = { ...g.items[0].item!, name: "Crawler Excavator", nameAr: "حفارة زاحفة" };
+    expect(railTiles([g], false)[0].machines[0].name).toBe("Crawler Excavator");
+    expect(railTiles([g], true)[0].machines[0].name).toBe("حفارة زاحفة");
+    // ⚠️ Arabic falls back to the English name rather than to the id — an untranslated machine is
+    // still a named one, and «REQ-a» in a caption says nothing about the picture above it.
+    g.items[0].item = { ...g.items[0].item!, nameAr: "" };
+    expect(railTiles([g], true)[0].machines[0].name).toBe("Crawler Excavator");
+    g.items[0].item = null;
+    expect(railTiles([g], true)[0].machines[0].name).toBe("REQ-a");
+  });
 });
 
 describe("resolveSelection", () => {

@@ -6,7 +6,8 @@ import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { PAGE_X } from "@/components/AppShell";
 import { publicTaxonomyUrl } from "@/lib/contract/requests";
-import type { RailTile } from "@/lib/contract/workspace";
+import { Dialog } from "@/components/Dialog";
+import type { RailMachine, RailTile } from "@/lib/contract/workspace";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -26,8 +27,141 @@ import { pin } from "@/lib/uiPins";
  * A closed request keeps its place until the renter takes it off himself — the × on its circle hides
  * it on this device and touches nothing else.
  */
-/** Tiles whose artwork answered an error, so the next render draws the glyph instead. Keyed by tile
- *  rather than by URL because the same subtype can appear on several rows and they fail together. */
+/**
+ * How a machine's picture fills its hole - the rail's own ruling, in one place now that three
+ * surfaces in this file draw one.
+ *
+ * ⚠️ A PHOTOGRAPH reaches its own edges and takes the crop; a taxonomy DRAWING carries its own
+ * transparent margin, so cropping it enlarges the margin rather than the machine. 1.34 is
+ * arithmetic, not taste: `contain` draws the catalogue's 1.34:1 artwork at 1/1.34 of the box's
+ * height, and this puts it back. At a SQUARE source it becomes 1 - see the long note below.
+ */
+const fitOf = (isPhoto: boolean) => (isPhoto ? "object-cover" : "scale-[1.34] object-contain");
+
+/**
+ * **The circle draws EVERY machine the request asks for** (owner, 2026-09-21: *"for multi item
+ * requests we put the image of first item in the request in the top circule, but cant we make the
+ * multi item take multi equipmet images small in this circule?"*).
+ *
+ * One picture -> the whole circle, exactly as before. Two -> halves. Three -> one tall and two
+ * short, which is the shape that leaves no empty cell. Four -> quarters. More than four -> three
+ * machines and «N more», because a fifth 26px cell says less than the number does.
+ *
+ * 🔴 **It montages only what it can actually DRAW.** A group whose second line has no artwork
+ * gets the single picture, not a picture beside a grey glyph: a montage is worth its loss of size
+ * only when every cell carries a machine. How many lines the request holds is the badge's job, and
+ * the badge is on every tile whatever this decides.
+ *
+ * ⚠️ At 52px a quarter is 26px, which is smaller than these drawings were ever cut for. It reads
+ * as «several machines» rather than as four identifiable ones, and that is the honest ceiling of
+ * the idea - the zoomed view below exists because of it.
+ */
+function CircleArt({
+  machines,
+  fallback,
+  fallbackIsPhoto,
+  onBroken,
+}: {
+  machines: RailMachine[];
+  fallback: string | null;
+  fallbackIsPhoto: boolean;
+  onBroken: (url: string) => void;
+}) {
+  const art = machines.filter((m) => m.url);
+  if (art.length < 2) {
+    if (!fallback) return <Icon name="precision_manufacturing" size={20} className="text-muted" />;
+    return (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img
+        src={fallback}
+        alt=""
+        draggable={false}
+        onError={(e) => { e.currentTarget.style.display = "none"; onBroken(fallback); }}
+        className={`h-[52px] w-[52px] ${fitOf(fallbackIsPhoto)} ${fallbackIsPhoto ? "rounded-full" : ""}`}
+      />
+    );
+  }
+  const shown = art.slice(0, art.length > 4 ? 3 : 4);
+  const extra = art.length - shown.length;
+  /* ⚠️ The hairline between cells is the GRID's own background showing through a 1px gap, never a
+     border on each cell: a border would be drawn inside the round clip on the outer cells too, and
+     would ring the circle. */
+  return (
+    <span className="grid h-[52px] w-[52px] grid-cols-2 gap-px overflow-hidden rounded-full bg-border"
+      style={{ gridTemplateRows: shown.length === 2 ? "1fr" : "1fr 1fr" }}
+    >
+      {shown.map((m, i) => (
+        <span
+          key={`${m.id}-${i}`}
+          /* Three machines and nothing held back: the first takes the whole leading column, so
+             there is no empty quarter to explain. */
+          className={`relative grid place-items-center overflow-hidden bg-surface3 ${
+            shown.length === 3 && extra === 0 && i === 0 ? "row-span-2" : ""
+          }`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={publicTaxonomyUrl(m.url) ?? ""}
+            alt=""
+            draggable={false}
+            onError={(e) => { e.currentTarget.style.display = "none"; onBroken(m.url as string); }}
+            /* ── NO scale in a cell, unlike the whole circle ──────────────────────────
+               🔴 Looked at both ways at the real 26px before choosing. 1.34 exists to hide the
+               drawing own letterbox band against the CIRCLE curve; in a cell the neighbour is a
+               hairline and another machine, so the band costs almost nothing while the crop costs
+               the machine: scaled, a 26px cell shows the middle third of an excavator and reads as
+               a smudge. Unscaled it is small and whole, which is the only thing a cell this size
+               can usefully be. */
+            className={`h-full w-full ${m.isPhoto ? "object-cover" : "object-contain"}`}
+          />
+        </span>
+      ))}
+      {extra > 0 && (
+        <span className="grid place-items-center bg-surface2 text-label font-extrabold leading-none text-muted-dark">
+          +{extra}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * **The circle, big** (owner, 2026-09-21: *"clicking double on the circule open the circule image
+ * big on the screen (still take me to the request clicked) but we will see the zoomed in image"*).
+ *
+ * ⚠️ It lists EVERY machine, including one whose picture never loaded: that line is still part
+ * of the request and still has a name, and a zoomed view holding fewer machines than the ITEMS tabs
+ * would repeat the montage's own compromise where there is room not to.
+ *
+ * ⚠️ `object-contain` and NO scale here, whatever kind of picture it is. The crop and the 1.34
+ * both exist to fill a 52px ROUND hole; in a square box with room to spare they would only throw
+ * the machine's edges away again.
+ */
+function CircleZoom({ title, machines, onClose }: { title: string; machines: RailMachine[]; onClose: () => void }) {
+  return (
+    <Dialog open onClose={onClose} size={machines.length > 1 ? "lg" : "md"} title={title}>
+      <div className={`grid gap-4 ${machines.length > 1 ? "sm:grid-cols-2" : ""}`}>
+        {machines.map((m, i) => (
+          <figure key={`${m.id}-${i}`} className="m-0">
+            <span className="grid aspect-square w-full place-items-center overflow-hidden rounded-md bg-surface2">
+              {m.url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={publicTaxonomyUrl(m.url) ?? ""} alt="" className="h-full w-full object-contain" />
+              ) : (
+                <Icon name="precision_manufacturing" size={64} className="text-muted" />
+              )}
+            </span>
+            <figcaption className="mt-2 text-body font-semibold text-navy">
+              {m.qty > 1 && <span className="tabular text-muted-dark">{m.qty} × </span>}
+              {m.name}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </Dialog>
+  );
+}
+
 export function RequestRail({
   tiles,
   activeKey,
@@ -48,7 +182,19 @@ export function RequestRail({
   const ar = locale === "ar";
   const scroller = useRef<HTMLDivElement>(null);
   /** Tiles whose artwork failed to load — see the note on the `<img>` below. */
+  /**
+   * Artwork that answered an error, so the next render draws the glyph instead.
+ *
+   * 🔴 **Keyed by URL.** ~~By TILE, "because the same subtype can appear on several rows and they
+   * fail together".~~ True while a tile held one picture; from 2026-09-21 a multi-item circle holds up
+   * to four, and by-tile would blank every machine in the group because one of them 403'd. By URL the
+   * same subtype failing on five rows still only costs that subtype - which is what the old note was
+   * really after - and it is the ruling the workspace's context bar and the dashboard's bid rail both
+   * already take.
+   */
   const [broken, setBroken] = useState<Set<string>>(() => new Set());
+  /** The circle a double-press opened, drawn large. Null when none is. */
+  const [zoom, setZoom] = useState<RailTile | null>(null);
 
   // Roughly three tiles a press — far enough to feel like progress, short enough to keep your place.
   const scrollBy = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * 300, behavior: "smooth" });
@@ -140,7 +286,10 @@ export function RequestRail({
       >
         {tiles.map((tile) => {
           const active = tile.key === activeKey;
-          const img = broken.has(tile.key) ? null : publicTaxonomyUrl(tile.imageUrl);
+          /* Both the single picture and the montage drop what has already failed, and they drop
+             it by URL - see the note on `broken`. */
+          const img = tile.imageUrl && broken.has(tile.imageUrl) ? null : publicTaxonomyUrl(tile.imageUrl);
+          const machines = tile.machines.map((m) => (m.url && broken.has(m.url) ? { ...m, url: null } : m));
           /* ── There is no ring (owner, 2026-08-27: "remove all outlines even grey") ───────────────
              It was three colours — brand for the one being read, green for one with bids waiting,
              grey for closed. Then it was grey alone. Now it is nothing: a row of pictures rather
@@ -157,6 +306,13 @@ export function RequestRail({
               key={tile.key}
               type="button"
               onClick={() => onPick(tile.key)}
+              /* 🔴 **A double press opens the picture AND still picks the request** (owner,
+                 2026-09-21: *"still take me to the request clicked"*). `onClick` has already fired
+                 twice by the time this runs, and picking the same request twice changes nothing -
+                 so the selection is the single press's job and this only adds the view.
+                 ⚠️ Withheld when there is nothing to enlarge: a group whose every line lost its
+                 artwork would open a dialog of grey glyphs. */
+              onDoubleClick={() => { if (machines.some((m) => m.url)) setZoom(tile); }}
               aria-current={active ? "true" : undefined}
               title={raised ? `${tile.label} · ${raised}` : tile.label}
               className={`flex max-w-[104px] flex-none flex-col items-center gap-1 text-center transition ${dim}`}
@@ -190,99 +346,49 @@ export function RequestRail({
               <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full border border-border bg-surface p-px">
                 <span className="relative h-[52px] w-[52px] rounded-full">
                   <span className={`grid h-[52px] w-[52px] place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
-                    {img ? (
-                      /* ── `contain`, not `cover` (owner, 2026-08-25: "the circles must fit any icon
-                         + why some have floating icons") ──────────────────────────────────────────
-                         The taxonomy artwork is not one kind of picture. Some files are photographs
-                         that reach their own edges; others are drawings with transparent margins
-                         built in. `cover` filled the circle with the first kind by cropping it and
-                         left the second kind floating in the middle — one rule producing two
-                         different results, which is exactly what the rail looked like.
+                    {/* ── The picture, or the pictures (owner, 2026-08-25 → 2026-09-21) ─────────────
+                        The markup moved into {@link CircleArt}, which is where the one-or-many
+                        decision now lives. Nothing about the FIT changed and the reasoning behind
+                        it is worth keeping here, because it is the thing most likely to be
+                        "simplified" back into one rule:
 
-                         `contain` shows every machine whole and inset the same way, so the circles
-                         read as one set. A photograph gives up a little size for that; a drawing
-                         stops rattling around inside its ring.
+                        ── Which fit, decided by which PICTURE it is (owner, 2026-08-31) ──────────
+                        *"I want it zoomed in so it fits in a circle."* A photograph reaches its own
+                        edges, so `contain` left it as a 3:2 band across a round hole with tinted
+                        crescents above and below. `cover` fills the mask and crops the sides, which
+                        is what a photograph wants. An ICON is a drawing carrying its own transparent
+                        margin, and cropping one enlarges the margin rather than the machine - so
+                        each takes the fit it needs instead of one rule being wrong for half the
+                        catalogue. `imageIsPhoto` is what tells them apart.
 
-                         The 3px inset is geometry, not taste — do not take it out again. `contain`
-                         fits the picture inside its BOX; the mask over it is a CIRCLE, and a
-                         rectangle that fits the box still pokes out of the circle. Most of this
-                         artwork is landscape, so scaled to the full 36px width it stands about 24
-                         tall — and a 36px circle is only 27 wide at that height, so its left and
-                         right tips get cut by the round mask. That is the machine the owner saw
-                         crossing the ring (2026-08-25), and it appeared the moment the inset was
-                         removed in the name of filling more of the circle.
+                        ── The DRAWING fills its circle too (owner, 2026-09-12) ───────────────
+                        *"make sure all photos fit well in the circle, as some have squared edges and
+                        some fit well."* The drawings are WIDE, so `contain` in a 52px box drew them
+                        52×28 - a letterbox whose straight top and bottom edge showed through the
+                        round hole. That edge is the «squared» one. `p-1` made it worse by shrinking
+                        the box first; the padding is gone and the drawing is scaled to the circle's
+                        diameter.
 
-                         Inscribing a 3:2 rectangle in a circle of radius 18 gives 30 × 20, which is
-                         what a 36px box less 3px a side is. So 3 is the largest inset that shows
-                         every machine whole. Reaching further needs a bigger circle, not less
-                         padding. */
-                      /* ── A URL that fails falls back to the glyph (owner, 2026-08-31) ─────────
-                         The tile now prefers the equipment PHOTOGRAPH over the flat icon, and a
-                         photograph is the one of the two that can be absent from storage while its
-                         key is present in the row: the taxonomy's equipment objects are not
-                         public-read on staging, so the URL is well-formed and answers 403.
+                        ⚠️ **RE-MEASURED 2026-09-14: the whole catalogue is 2400×1792 (1.34:1)** - all
+                        94 illustrated nodes, one size, checked against the live tree. 1.34 survives
+                        by arithmetic rather than by luck: `contain` draws a 1.34:1 picture 52×38.8
+                        in this box, and 52 ÷ 38.8 = 1.34. Anyone re-cutting the assets must
+                        recompute it; at a SQUARE source it is 1.
+                        ⚠️ 2400×1792 for a 52px circle is ~2,100× the pixels this tile can show. The
+                        ideal source here is **square, 104×104** (52 at 2×).
+                        ⚠️ It is NOT switched to `object-cover` for drawings: tried on the live rail
+                        and the crop cut the machine into an unreadable jumble.
 
-                         Without this the circle drew a broken-image glyph — strictly worse than the
-                         icon it replaced. `onError` is the only signal available: nothing on the
-                         client can know an object is unreadable before asking for it. The backend
-                         names the same trap on its own helper: *"an `<img>` absorbs a 403 as 'no
-                         artwork'"* — which is true only where something catches it, as here. */
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={img}
-                        alt=""
-                        draggable={false}
-                        onError={(e) => { e.currentTarget.style.display = "none"; setBroken((b) => new Set(b).add(tile.key)); }}
-                        /* ── Which fit, decided by which PICTURE it is (owner, 2026-08-31) ────────
-                           *"I want it zoomed in so it fits in a circle."*
-
-                           A photograph reaches its own edges, so `contain` left it as a 3:2 band
-                           across the middle of a round hole with tinted crescents above and below —
-                           the machine tiny, the circle mostly empty. `cover` fills the mask and crops
-                           the sides, which is what a photograph wants.
-
-                           The note above still holds for the OTHER kind, and this does not reverse
-                           it: an icon is a drawing carrying its own transparent margin, and cropping
-                           one enlarges the margin rather than the machine. What changed is that the
-                           two are now distinguishable — `imageIsPhoto` is set where the payload gave
-                           an equipment photograph — so each takes the fit it needs instead of one
-                           rule being wrong for half the catalogue.
-
-                           ── The DRAWING fills its circle too (owner, 2026-09-12) ─────────────────
-                           *"make sure all photos fit well in the circle, as some have squared edges
-                           and some fit well."* Measured on staging: the taxonomy drawings are WIDE —
-                           `spider-crane.png` is 1024×559, 1.83:1, the same shape as the photographs —
-                           so `contain` inside a 52px box drew them 52×28, a letterbox with its own
-                           straight top and bottom edge showing through a round hole. That edge is the
-                           «squared» one; the photographs beside them, on `cover`, filled properly.
-                           `p-1` made it worse by shrinking the box first.
-
-                           The padding is gone and the drawing is scaled to cover the circle's
-                           diameter — 1.34 ≈ 52 ÷ 28, the exact factor that turns that letterbox into
-                           a filled round tile.
-
-                           ⚠️ **RE-MEASURED 2026-09-14, and the ratio above is now stale: the whole
-                           catalogue is 2400×1792 (1.34:1).** All 94 illustrated nodes, one size —
-                           checked against the live tree, not assumed. The scale survives by
-                           coincidence and is still exactly right: `contain` draws a 1.34:1 picture
-                           52×38.8 in this box, and 52 ÷ 38.8 = 1.34. Anyone re-cutting the assets
-                           must recompute it; at a SQUARE source it would have to be 1.
-                           ⚠️ 2400×1792 for a 52px circle is ~2,100× the pixels this tile can show.
-                           The ideal source here is **square, 104×104** (52 at 2×).
-
-                           It is NOT switched to `object-cover`: tried on the
-                           live rail and the crop cut the machine into an unreadable jumble, which is
-                           what the note above predicted. `contain` keeps the whole machine and the
-                           scale gives it the circle. */
-                        className={
-                          tile.imageIsPhoto
-                            ? "h-[52px] w-[52px] rounded-full object-cover"
-                            : "h-[52px] w-[52px] scale-[1.34] object-contain"
-                        }
-                      />
-                    ) : (
-                      <Icon name="precision_manufacturing" size={20} className="text-muted" />
-                    )}
+                        ⚠️ `onError` is the only signal available and it is load-bearing, not
+                        defensive: the taxonomy objects are not public-read on staging, so a
+                        well-formed URL answers 403 and an `<img>` absorbs that as «no artwork» -
+                        drawing a broken-image glyph, which is worse than the icon it replaced. */}
+                    <CircleArt
+                      machines={machines}
+                      fallback={img}
+                      fallbackIsPhoto={tile.imageIsPhoto}
+                      onBroken={(url) => setBroken((b) => new Set(b).add(url))}
+                    />
                   </span>
                   {/* ── The unit count, and nothing else (owner, 2026-08-25) ─────────────────────
                       A bid count used to sit here and outrank the units, on the reasoning that a
@@ -411,6 +517,17 @@ export function RequestRail({
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>
     </div>
+    {/* ⚠️ Mounted at the rail's ROOT, outside the scroller and outside the 96px band. That band is
+        `overflow-hidden`; a `position: fixed` layer escapes an overflow clip (only a transformed
+        or filtered ancestor would trap it, and this one has neither), but a dialog rendered inside
+        a horizontally scrolling strip would also travel with it, which is the real reason. */}
+    {zoom && (
+      <CircleZoom
+        title={zoom.label}
+        machines={zoom.machines.map((m) => (m.url && broken.has(m.url) ? { ...m, url: null } : m))}
+        onClose={() => setZoom(null)}
+      />
+    )}
     </div>
   );
 }
