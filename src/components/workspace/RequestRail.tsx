@@ -47,29 +47,41 @@ const MAX_IN_CIRCLE = 3;
 const fitOf = (isPhoto: boolean) => (isPhoto ? "object-cover" : "scale-[1.34] object-contain");
 
 /**
- * **What dissolves one picture's edge into the next** (owner, 2026-09-22, on the shipped montage:
- * *"cant we merge them in one background? not shown as 2 seperate imeages"*).
+ * **What dissolves one picture's edge into the next** (owner, 2026-09-22, twice: *"cant we merge
+ * them in one background? not shown as 2 seperate imeages"*, and then *"still in the images the
+ * same"* against the first attempt).
  *
- * 🔴 The ground colour alone was not enough, and the reason is the assets. Every render shares
- * one beige sweep - that is what `--photo-ground` matches - but each carries a VIGNETTE: measured
- * on `taxonomy-icons/spider-lift`, the corners are #d8d4cd against a disc of #e3ded7, eleven levels
- * darker. `object-contain` draws the whole file, vignette included, so each machine arrived inside
- * a faintly darker RECTANGLE with hard edges. Two of them side by side read as two pasted pictures,
- * which is exactly what he saw.
+ * 🔴 Matching the disc to the assets' ground was not enough, and the reason took two goes to
+ * find. Every render shares one beige sweep - `--photo-ground` is its measured value - but the
+ * sweep is not FLAT: it is dark at the very edge and lighter through the middle. Measured on
+ * `taxonomy-icons/spider-lift`: corners #d8d4cd, mid-edge #e6e1da, centre #ddd9d2, against a disc
+ * of #e3ded7. `object-contain` draws the whole file, so each machine arrived inside a rectangle
+ * whose middle is paler than the disc around it - and two of those read as two pasted pictures.
  *
- * A soft radial mask takes each picture's own edge out of the render, so what remains is the
- * machine and the middle of its ground - and the middle is flat. Solid to 55%, gone by 100%.
+ * 🔴 **The first mask did nothing to the top and bottom, and that is the trap worth naming.** A
+ * CSS mask is sized to the ELEMENT BOX, not to the picture inside it. With `height: 100%` the box
+ * was 26x52 while `contain` drew the picture 26x19.4, so the mask's solid core spanned +/-17.9px
+ * vertically and the picture only +/-9.7px: every pixel of it sat inside the solid part and its
+ * horizontal edges were never touched. Measured in a browser, which is the only way to see it -
+ * the source reads as though it is fading something.
  *
- * ⚠️ **Looked at against the two alternatives at the real 52px, magnified 7x.** `object-cover`
- * removes the rectangles by filling each half, and the crop that costs is brutal - a 1.34:1 source
- * into a 26x52 cell is 2.7x, so each machine is a fragment, and the two crops meet on a hard
- * vertical seam. Fading only top and bottom leaves the left and right edges standing. The radial
- * mask is the one that leaves the machines whole AND the ground continuous.
+ * So the element must BE the picture: `height: auto` makes the box 26x19.4, and `closest-side`
+ * then puts the gradient's end exactly on the picture's own edges whatever its aspect. Solid to
+ * 68%, gone at the edge.
  *
- * ⚠️ `black` rather than a hex: a mask reads ALPHA, never hue, so the colour is arbitrary - and
- * a hex here would be a paint value to `palette-drift` that never paints anything.
+ * ⚠️ **68 was chosen against 40 and 55 at the real size, magnified 9x.** All three remove the
+ * rectangle; the lower two also fade the machine's extremities - the crawler's counterweight, the
+ * spider lift's outriggers - for nothing.
+ *
+ * ⚠️ **Compared against the two alternatives at 14x** before taking the mask at all.
+ * `object-cover` fills each half and so has no rectangle, at the cost of a 2.7x crop that leaves a
+ * fragment of each machine and a hard vertical seam where the two meet. A top-and-bottom fade
+ * closes the horizontal edges and leaves the vertical ones standing.
+ *
+ * ⚠️ `black` rather than a hex: a mask reads ALPHA and never hue, so the colour is arbitrary -
+ * and a hex here would be a paint value to `palette-drift` that paints nothing.
  */
-const CELL_MASK = "radial-gradient(ellipse 62% 62% at 50% 50%, black 55%, transparent 100%)";
+const CELL_MASK = "radial-gradient(closest-side, black 68%, transparent 100%)";
 
 /**
  * **The circle draws the request's machines on ONE ground** (owner, 2026-09-21: *"cant u merge
@@ -131,13 +143,14 @@ function CircleArt({
           alt=""
           draggable={false}
           onError={(e) => { e.currentTarget.style.display = "none"; onBroken(m.url as string); }}
-          /* ⚠️ `contain` and NO scale, unlike the single picture. The 1.34 exists to hide one
-             drawing's letterbox band against the round edge; here the neighbours ARE the rest of the
-             band, and scaling would crop each machine to its middle third for nothing. */
-          className={`h-full ${m.isPhoto ? "object-cover" : "object-contain"}`}
-          /* ⚠️ The mask is what makes several pictures read as ONE - see {@link CELL_MASK}. It is
-             applied per CELL and never to the disc: the disc's own edge is the circle, which is
-             already a clean shape, and fading that would grey the rim. */
+          /* ⚠️ **`h-auto`, so the ELEMENT IS THE PICTURE** - which is what makes the mask work at
+             all (see {@link CELL_MASK}) and is why there is no `object-fit` here: at its own aspect
+             there is nothing to fit. NO scale either, unlike the single picture: the 1.34 exists to
+             hide one drawing's letterbox band against the round edge, and here the neighbours are
+             the rest of the band.
+             ⚠️ The mask is per CELL and never on the disc: the disc's own edge is the circle,
+             which is already a clean shape, and fading that would grey the rim. */
+          className="h-auto"
           style={{ width: `${100 / shown.length}%`, maskImage: CELL_MASK, WebkitMaskImage: CELL_MASK }}
         />
       ))}

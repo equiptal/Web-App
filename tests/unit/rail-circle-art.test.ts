@@ -75,7 +75,10 @@ describe("one machine or many, in one 52px circle", () => {
      * top-and-bottom fade leaves the left and right edges standing.
      */
     expect(code).toContain("const CELL_MASK =");
-    expect(code).toContain("radial-gradient(ellipse 62% 62% at 50% 50%, black 55%, transparent 100%)");
+    /* 🔴 `closest-side`, and the element must BE the picture - see the case below. An
+       ellipse sized in PERCENTAGES is sized to the BOX, and with a box taller than the picture the
+       solid core swallowed it whole and faded nothing. */
+    expect(code).toContain("radial-gradient(closest-side, black 68%, transparent 100%)");
     const rowImg = art.slice(art.indexOf("{shown.map("));
     expect(rowImg).toContain("maskImage: CELL_MASK");
     expect(rowImg).toContain("WebkitMaskImage: CELL_MASK");
@@ -98,14 +101,22 @@ describe("one machine or many, in one 52px circle", () => {
     expect(code).toContain('img ? "bg-photo-ground" : "bg-surface3"');
   });
 
-  it("Given a machine in the row, Then the drawing is contained and NOT scaled", () => {
+  it("Given a machine in the row, Then the ELEMENT IS THE PICTURE, and is not scaled", () => {
     /**
-     * ⚠️ The single picture scales a drawing by 1.34 to hide its letterbox band against the round
-     * edge. In the row the neighbours ARE the rest of the band, so scaling would crop each machine
-     * to its middle third for nothing.
+     * 🔴 `h-auto` is load-bearing, not tidiness: a CSS mask is sized to the ELEMENT BOX, never
+     * to the picture inside it. With `h-full` the box was 26x52 while `contain` drew the picture
+     * 26x19.4, so the mask's solid core spanned +/-17.9px and the picture only +/-9.7px - every
+     * pixel of it inside the solid part, horizontal edges untouched, rectangle intact. Measured in
+     * a browser; the source reads as though it is fading something.
+     *
+     * ⚠️ No `object-fit` follows from it: at its own aspect there is nothing to fit. And no
+     * scale, unlike the single picture - the 1.34 exists to hide one drawing's letterbox band
+     * against the round edge, and here the neighbours are the rest of the band.
      */
     const rowImg = art.slice(art.indexOf("{shown.map("));
-    expect(rowImg).toContain('m.isPhoto ? "object-cover" : "object-contain"');
+    expect(rowImg).toContain('className="h-auto"');
+    expect(rowImg).not.toContain("object-contain");
+    expect(rowImg).not.toContain("object-cover");
     expect(rowImg).not.toContain("scale-[1.34]");
     // …and the single-picture path keeps it, so the two cases have not been collapsed.
     expect(code).toContain('const fitOf = (isPhoto: boolean) => (isPhoto ? "object-cover" : "scale-[1.34] object-contain");');

@@ -2,50 +2,59 @@
 
 ## Change log
 
-- **2026-09-22 - The montage's pictures lose their own EDGES, because matching the ground was not enough: the assets carry a vignette.**
-  Owner, on the shipped merged-ground circle: *"cant we merge them in one background? not shown as 2
-  seperate imeages"*.
-  🔴 **Yesterday's entry claimed the merge was seamless on the ground colour alone. That was
-  incomplete, and this is the correction.** The twelve samples behind `--photo-ground` were taken at
-  the CORNERS of two assets and agreed to 4/255, which is true and hid the thing that matters: the
-  renders are shot with a VIGNETTE. Measured on `taxonomy-icons/spider-lift` - corners **#d8d4cd**
-  against a disc of **#e3ded7**, eleven levels darker. `object-contain` draws the whole file,
-  vignette included, so each machine arrived inside a faintly darker RECTANGLE with hard edges. Two
-  of those side by side are two pasted pictures, which is exactly what he was looking at.
-  **`CELL_MASK`**: a radial mask on each cell's `<img>`, solid to 55% and gone by 100%. What is left
-  is the machine and the MIDDLE of its ground, and the middle is flat - so the pictures dissolve
-  into the disc and into each other.
-  ⚠️ **Compared against both alternatives at the real 52px, magnified 7x**, which is the only way
-  this could be judged:
-   · `object-cover` - fills each half, so no rectangle; and a 1.34:1 source into a 26x52 cell is a
-     **2.7x crop**, leaving a fragment of each machine and a hard vertical seam where the two meet.
-   · a top-and-bottom fade - closes the horizontal edges and leaves the left and right ones standing.
-   · the radial mask - the only one that keeps the machines WHOLE and the ground continuous.
-  ⚠️ **Per CELL, never on the disc.** The disc's own edge is the circle, which is already a clean
-  shape; fading that would grey the rim. A case pins both halves.
-  ⚠️ **`black` rather than a hex.** A mask reads ALPHA and never hue, so the colour is arbitrary - and
-  a hex here would be a paint value to `palette-drift` that paints nothing, which is the exemption
-  list that guard already keeps for mask gradients.
+- **2026-09-22 - The montage's pictures lose their own EDGES, and the first attempt at it masked nothing.**
+  Owner, twice: *"cant we merge them in one background? not shown as 2 seperate imeages"*, then, on
+  the first fix shipped and deployed, *"still in the images the same"*.
+  🔴 **Yesterday's entry claimed the merge was seamless on the ground colour alone. It was not, and
+  the reason took two goes to find.** The twelve samples behind `--photo-ground` were taken at the
+  CORNERS of two assets and agreed to 4/255 - true, and it hid the thing that matters: the studio
+  sweep is not FLAT. Measured on `taxonomy-icons/spider-lift`: corners **#d8d4cd**, mid-edge
+  **#e6e1da**, centre **#ddd9d2**, against a disc of **#e3ded7**. `object-contain` draws the whole
+  file, so each machine arrived inside a rectangle whose middle is paler than the disc around it,
+  and two of those read as two pasted pictures.
+  🔴 **THE FIRST MASK DID NOTHING TO THE TOP AND BOTTOM, and that is the trap worth naming.** A
+  CSS mask is sized to the ELEMENT BOX, never to the picture inside it. With `h-full` the box was
+  **26x52** while `contain` drew the picture **26x19.4** - measured in the browser - so an
+  `ellipse 62% 62%` put its solid core at +/-17.9px vertically while the picture spanned only
+  +/-9.7px. Every pixel of it sat inside the solid part; its horizontal edges were never touched.
+  It shipped, it deployed, and it changed nothing, which is exactly what he reported.
+  **The element must BE the picture.** `h-auto` makes the box 26x19.4, and `closest-side` then puts
+  the gradient's end on the picture's own edges whatever its aspect. `object-fit` goes with it: at
+  its own aspect there is nothing to fit.
+  ⚠️ **68% solid was chosen against 40 and 55 at the real size, magnified 9x.** All three remove
+  the rectangle; the lower two also fade the crawler's counterweight and the spider lift's
+  outriggers for nothing.
+  ⚠️ **Compared against the two alternatives at 14x** before reaching for a mask at all:
+  `object-cover` fills each half so has no rectangle, at the cost of a **2.7x crop** that leaves a
+  fragment of each machine and a hard vertical seam where the two meet; a top-and-bottom fade
+  closes the horizontal edges and leaves the vertical ones standing.
+  ⚠️ Per CELL, never on the disc: the disc's own edge is the circle, already a clean shape, and
+  fading that greys the rim. A case pins both halves.
+  ⚠️ `black` rather than a hex - a mask reads ALPHA and never hue, so the colour is arbitrary,
+  and a hex here would be a paint value to `palette-drift` that paints nothing.
   ⚠️ The SINGLE-picture path is untouched: `contain` at 1.34 fills the circle, so that asset's
-  vignette becomes the disc's own edge and there is no rectangle to dissolve.
-  Files: `src/components/workspace/RequestRail.tsx` (`CELL_MASK`),
-  `tests/unit/rail-circle-art.test.ts` (1 new case; 11 passing).
-  ⚠️ **Three doc comments had been orphaned by two days of successive insertions** - `fitOf`'s note
-  sat above `MAX_IN_CIRCLE`, and `CircleArt`'s above `CELL_MASK`. Re-attached to what they describe.
-  A comment one declaration away from its subject is read as describing the wrong thing.
-  ⚠️ Verified: `.next` deleted, `NODE_OPTIONS= npx next build` clean from scratch, the mask present
-  in the built chunk, typecheck clean, lint 0 errors, **212 files / 3585 passing, 7 skipped**
-  serially. The 2 failures are the same PRE-EXISTING pair (`cancel-confirmation`'s CRLF
-  vacuous-slice trap, `ui-pins`'s CRLF staleness).
-  ⚠️ **SEEN RENDERED** at the real 52px and at 7x: the shipped version beside `cover`, the radial
-  mask and the vertical fade, on the two assets whose vignettes differ most.
-  🔴 **AWS is reachable from this machine after all, under the `moedatech` PROFILE** - `aws sts
+  edge becomes the disc's own and there is no rectangle to dissolve.
+  Files: `src/components/workspace/RequestRail.tsx` (`CELL_MASK`, `h-auto`),
+  `tests/unit/rail-circle-art.test.ts` (1 new case, 1 rewritten; 11 passing).
+  ⚠️ **Three doc comments had been orphaned by two days of successive insertions** - `fitOf`'s
+  note sat above `MAX_IN_CIRCLE`, and `CircleArt`'s above `CELL_MASK`. Re-attached. A comment one
+  declaration away from its subject describes the wrong thing.
+  ⚠️ Verified: `.next` deleted, `NODE_OPTIONS= npx next build` clean from scratch, the mask
+  present in the built chunk, typecheck clean, lint 0 errors, **212 files / 3585 passing, 7
+  skipped** serially, and the box-is-the-picture rule break-checked (`h-full object-contain` put
+  back - one case went red). The 2 failures are the same PRE-EXISTING pair
+  (`cancel-confirmation`'s CRLF vacuous-slice trap, `ui-pins`'s CRLF staleness).
+  ⚠️ **SEEN RENDERED at 9x and 14x**, which is the only way any of this could be judged: the
+  shipped-and-wrong version beside `cover`, beside the corrected geometry, on the two assets whose
+  sweeps differ most. The DOM was also measured rather than eyeballed - the 26x52 box against the
+  26x19.4 picture is what identified the fault.
+  🔴 **AWS is reachable from this machine, under the `moedatech` PROFILE.** `aws sts
   get-caller-identity` alone answers `NoCredentials` because there is no DEFAULT profile, which is
   what the 2026-09-19 entry recorded as "no credentials". `--profile moedatech` (eu-central-1,
   `user/fadwaali`) reads Amplify: `aws amplify list-jobs --app-id dgdtg4fmrwwfn --branch-name
-  staging`. That is how this session proved job **782** SUCCEEDED and that the branch's active job
-  was the commit in question - rather than guessing at a failed build, which is what the earlier
-  entry had to do.
+  staging`. That is how this session proved jobs **782** and **783** SUCCEEDED and that the branch's
+  active job was the commit in question - so «it looks unchanged» could be traced to the code rather
+  than blamed on a build nobody could see.
 
 - **2026-09-21 - A multi-item circle stands its machines on ONE ground, three at most, and a double press opens them big.**
   Owner, on a rail tile whose group holds a Spider Lift and a Crawler Excavator but drew only the
