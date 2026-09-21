@@ -28,6 +28,14 @@ import { pin } from "@/lib/uiPins";
  * it on this device and touches nothing else.
  */
 /**
+ * How many machines a 52px circle may show (owner, 2026-09-21: *"show 3 items at most"*).
+ *
+ * ⚠️ A fourth is 13px wide, which is a mark rather than a machine - and the count badge already
+ * states how many lines the request really holds, so nothing is hidden by stopping here.
+ */
+const MAX_IN_CIRCLE = 3;
+
+/**
  * How a machine's picture fills its hole - the rail's own ruling, in one place now that three
  * surfaces in this file draw one.
  *
@@ -36,15 +44,32 @@ import { pin } from "@/lib/uiPins";
  * arithmetic, not taste: `contain` draws the catalogue's 1.34:1 artwork at 1/1.34 of the box's
  * height, and this puts it back. At a SQUARE source it becomes 1 - see the long note below.
  */
-/**
- * How many machines a 52px circle may show (owner, 2026-09-21: *"show 3 items at most"*).
- *
- * ⚠️ A fourth is 13px wide, which is a mark rather than a machine - and the count badge already
- * states how many lines the request really holds, so nothing is hidden by stopping here.
- */
-const MAX_IN_CIRCLE = 3;
-
 const fitOf = (isPhoto: boolean) => (isPhoto ? "object-cover" : "scale-[1.34] object-contain");
+
+/**
+ * **What dissolves one picture's edge into the next** (owner, 2026-09-22, on the shipped montage:
+ * *"cant we merge them in one background? not shown as 2 seperate imeages"*).
+ *
+ * 🔴 The ground colour alone was not enough, and the reason is the assets. Every render shares
+ * one beige sweep - that is what `--photo-ground` matches - but each carries a VIGNETTE: measured
+ * on `taxonomy-icons/spider-lift`, the corners are #d8d4cd against a disc of #e3ded7, eleven levels
+ * darker. `object-contain` draws the whole file, vignette included, so each machine arrived inside
+ * a faintly darker RECTANGLE with hard edges. Two of them side by side read as two pasted pictures,
+ * which is exactly what he saw.
+ *
+ * A soft radial mask takes each picture's own edge out of the render, so what remains is the
+ * machine and the middle of its ground - and the middle is flat. Solid to 55%, gone by 100%.
+ *
+ * ⚠️ **Looked at against the two alternatives at the real 52px, magnified 7x.** `object-cover`
+ * removes the rectangles by filling each half, and the crop that costs is brutal - a 1.34:1 source
+ * into a 26x52 cell is 2.7x, so each machine is a fragment, and the two crops meet on a hard
+ * vertical seam. Fading only top and bottom leaves the left and right edges standing. The radial
+ * mask is the one that leaves the machines whole AND the ground continuous.
+ *
+ * ⚠️ `black` rather than a hex: a mask reads ALPHA, never hue, so the colour is arbitrary - and
+ * a hex here would be a paint value to `palette-drift` that never paints anything.
+ */
+const CELL_MASK = "radial-gradient(ellipse 62% 62% at 50% 50%, black 55%, transparent 100%)";
 
 /**
  * **The circle draws the request's machines on ONE ground** (owner, 2026-09-21: *"cant u merge
@@ -110,7 +135,10 @@ function CircleArt({
              drawing's letterbox band against the round edge; here the neighbours ARE the rest of the
              band, and scaling would crop each machine to its middle third for nothing. */
           className={`h-full ${m.isPhoto ? "object-cover" : "object-contain"}`}
-          style={{ width: `${100 / shown.length}%` }}
+          /* ⚠️ The mask is what makes several pictures read as ONE - see {@link CELL_MASK}. It is
+             applied per CELL and never to the disc: the disc's own edge is the circle, which is
+             already a clean shape, and fading that would grey the rim. */
+          style={{ width: `${100 / shown.length}%`, maskImage: CELL_MASK, WebkitMaskImage: CELL_MASK }}
         />
       ))}
     </span>

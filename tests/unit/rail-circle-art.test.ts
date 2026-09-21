@@ -59,6 +59,31 @@ describe("one machine or many, in one 52px circle", () => {
     expect(art).toContain("width: `${100 / shown.length}%`");
   });
 
+  it("Given each picture, Then its own EDGE is masked away so the grounds merge", () => {
+    /**
+     * Owner, 2026-09-22, on the shipped montage: *"cant we merge them in one background? not shown
+     * as 2 seperate imeages"*.
+     *
+     * The ground colour alone was not enough. Every render shares one beige sweep, which is what
+     * `--photo-ground` matches, but each carries a VIGNETTE - measured on `taxonomy-icons`
+     * spider-lift, corners #d8d4cd against a disc of #e3ded7, eleven levels darker. `object-contain`
+     * draws the whole file, vignette included, so each machine sat inside a faintly darker rectangle
+     * with hard edges, and two of those read as two pasted pictures.
+     *
+     * Compared at the real 52px, magnified 7x, against both alternatives: `object-cover` fills the
+     * half and shreds the machine (2.7x crop, hard vertical seam where the two meet), and a
+     * top-and-bottom fade leaves the left and right edges standing.
+     */
+    expect(code).toContain("const CELL_MASK =");
+    expect(code).toContain("radial-gradient(ellipse 62% 62% at 50% 50%, black 55%, transparent 100%)");
+    const rowImg = art.slice(art.indexOf("{shown.map("));
+    expect(rowImg).toContain("maskImage: CELL_MASK");
+    expect(rowImg).toContain("WebkitMaskImage: CELL_MASK");
+    // ⚠️ Per CELL, never on the disc: the disc's own edge is the circle, and fading that greys the rim.
+    const disc = art.slice(art.indexOf("flex h-[52px]"), art.indexOf("{shown.map("));
+    expect(disc).not.toContain("maskImage");
+  });
+
   it("Given the disc under them, Then it is the PHOTOGRAPHS' own ground", () => {
     /**
      * 🔴 This is what makes the merge seamless rather than merely tidy. The renders share one beige
