@@ -158,7 +158,7 @@ export const PIN_REGISTRY = {
   "equipment-tab": { n: "17.5", label: "Equipment tabs — one equipment", file: "src/components/create/EquipmentTabs.tsx" },
   "equipment-tabs-add": { n: "17.6", label: "Equipment tabs — the + that adds one", file: "src/components/create/EquipmentTabs.tsx" },
   "equipment-tab-remove": { n: "17.7", label: "Equipment tabs — the ✕ that removes one", file: "src/components/create/EquipmentTabs.tsx" },
-  "equipment-chooser-row": { n: "17.8", label: "Machine card — the escape row («Can't find the equipment you want?»)", file: "src/components/create/MachineCard.tsx" },
+  "equipment-chooser-row": { n: "17.8", label: "Machine card — the escape row («Not the equipment you want?»)", file: "src/components/create/MachineCard.tsx" },
   "equipment-chooser-panel": { n: "17.9", label: "Machine card — the equipment chooser panel", file: "src/components/create/MachineCard.tsx" },
   "equipment-chooser-list": { n: "17.10", label: "Machine card — the chooser's catalogue list", file: "src/components/create/MachineCard.tsx" },
   "locked-for-request": { n: "16.2", label: "Create — site + schedule locked strip (with «Change»)", file: "src/components/create/Canvas.tsx" },

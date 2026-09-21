@@ -38,6 +38,10 @@ const BIDS_SHOWN = 5;
 /** How many of the renter's request groups the rail reads shared-link bids for — see the effect. */
 const LINK_FANOUT_MAX = 20;
 
+/** «Crawler Excavator · 20 ton» — and just the subtype when the request named no size. */
+const machineWords = (subtype: string | null, size: string | null): string =>
+  [subtype, size].filter(Boolean).join(" · ");
+
 /** One off-platform bid, as the rail needs it: the card the workspace builds, plus the one fact the
  *  submission cannot know about itself — which request it answers. ~~Its machine and its site.~~
  *  Both went with the row's second line (owner, 2026-09-19). */
@@ -49,12 +53,19 @@ interface LinkRailBid {
 /**
  * A row of the rail, from EITHER source — see the merge below.
  *
- * **THREE facts now, not five** (owner, 2026-09-19, on a screenshot of the rail: *"here only show
- * supplier name and price nothing more with one small pill for «offline», «via app» and the
- * initials of the supplier must be the supplier logo in this circle"*). ~~The machine and the
- * site.~~ Both were a second line of grey under every row, and neither is what the renter is
- * scanning a rail of incoming bids for: he is reading WHO and HOW MUCH, and the request he is
- * reading them against is the table beside it.
+ * **TWO LINES: who and how much, then what for** (owner, 2026-09-20, on the one-line rail: *"show
+ * the name and price in one row then below it in small font is it offline or via app - unit*
+ * equipment name and size"*).
+ *
+ * 🔴 This PARTLY reverses 2026-09-19, which cut the row to *"supplier name and price nothing
+ * more"* and deleted the machine with the site. What comes back is the machine, now carrying its
+ * UNIT COUNT, and what stays gone is the SITE — the deletion was right about the site (the renter
+ * knows where his own job is) and wrong about the machine on an account with several requests
+ * open, where «28,900 / month» says nothing until you know what it is for.
+ *
+ * ⚠️ The SOURCE pill moves down with it. It is a small grey qualifier on the offer, not a fact
+ * ranked beside the firm's name — and line one is now exactly two things, which is what makes the
+ * price land on the same vertical down the whole rail.
  */
 interface RailBid {
   key: string;
@@ -63,6 +74,9 @@ interface RailBid {
   priceUnit: string | null;
   /** The firm's mark, when the projection carries one — null falls back to the initial. */
   logo: string | null;
+  /** The machine as the REQUEST names it — «Crawler Excavator · 20 ton» — with the units asked for. */
+  machine: string | null;
+  units: number | null;
   /** Arrived through the renter's shared link rather than through an account. */
   offPlatform: boolean;
   at: string | null;
@@ -405,30 +419,71 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
      `at` sorts them: an off-platform bid submitted this morning belongs above an app bid from
      Tuesday. A row with no date sorts last rather than first, so a missing timestamp cannot push a
      bid to the top of the renter's attention. */
-  const railRow = (b: InboxBid): RailBid => ({
-    key: `app:${b.bidId}`,
-    name: b.supplierName,
-    price: b.currentPrice,
-    priceUnit: b.priceUnit,
-    logo: b.supplierLogoUrl,
-    offPlatform: false,
-    at: b.createdAt,
-    // Every app bid opens the workspace; `r` names the request so it lands on the right one.
-    href: b.request.id ? `/requests?r=${encodeURIComponent(b.request.id)}` : "/requests",
-  });
-  const linkRow = (b: LinkRailBid): RailBid => ({
-    key: `link:${b.card.id}`,
-    name: b.card.supplierName,
-    price: b.card.price,
-    priceUnit: b.card.priceUnit,
-    /* An off-platform submission has NO supplier mark and cannot have one: the firm was typed into
-       the renter's own list, so there is no account behind it to carry a logo. Such a row keeps the
-       initial, which is the whole reason the fallback is not decoration. */
-    logo: null,
-    offPlatform: true,
-    at: b.card.submittedAt,
-    href: `/requests?r=${encodeURIComponent(b.requestId)}`,
-  });
+  /**
+   * The machine a rail row is ABOUT, read off the renter's own request list.
+   *
+   * 🔴 ONE source for both kinds of bid, and it is the REQUEST rather than the offer. An app bid
+   * carries the subtype and size on its own projection; an off-platform submission carries only the
+   * label the form showed the supplier, and `numberOfUnits` is on neither. The request list holds
+   * all three (`item.name` / `item.qty`), it is already loaded for the table beside this rail, and
+   * reading it means two rows answering the same request can never describe it differently.
+   *
+   * ⚠️ Null until `groups` lands, and the row simply draws no machine rather than a placeholder —
+   * the bids read resolves before the requests read on a cold load, and «—» under every row for a
+   * beat reads as an account with nothing in it.
+   */
+  const requestLine = (requestId: string | null, fallback: string | null = null): { machine: string | null; units: number | null } => {
+    for (const g of groups ?? []) {
+      const it = g.items.find((x) => x.id === requestId);
+      if (!it) continue;
+      const named = (ar ? it.item?.nameAr || it.item?.name : it.item?.name) ?? null;
+      return { machine: named || fallback, units: it.item?.qty ?? null };
+    }
+    return { machine: fallback, units: null };
+  };
+
+  const railRow = (b: InboxBid): RailBid => {
+    /* The machine the REQUEST names, not the model the supplier listed (owner, 2026-09-05: *"show
+       equipment subtype and size, not model and year"*) — «Caterpillar 320» answers which machine he
+       is offering, where the renter scanning a rail of incoming bids is reading which machine was
+       ASKED for. The bid's own pair is the fallback, since it says the same thing and arrives first. */
+    const own = machineWords(
+      ar ? b.equipment.subtypeAr ?? b.equipment.subtype : b.equipment.subtype,
+      ar ? b.equipment.sizeAr ?? b.equipment.size : b.equipment.size,
+    ) || b.request.equipmentSummary || b.equipmentName;
+    const line = requestLine(b.request.id || null, own || null);
+    return {
+      key: `app:${b.bidId}`,
+      name: b.supplierName,
+      price: b.currentPrice,
+      priceUnit: b.priceUnit,
+      logo: b.supplierLogoUrl,
+      machine: line.machine,
+      units: line.units,
+      offPlatform: false,
+      at: b.createdAt,
+      // Every app bid opens the workspace; `r` names the request so it lands on the right one.
+      href: b.request.id ? `/requests?r=${encodeURIComponent(b.request.id)}` : "/requests",
+    };
+  };
+  const linkRow = (b: LinkRailBid): RailBid => {
+    const line = requestLine(b.requestId);
+    return {
+      key: `link:${b.card.id}`,
+      name: b.card.supplierName,
+      price: b.card.price,
+      priceUnit: b.card.priceUnit,
+      /* An off-platform submission has NO supplier mark and cannot have one: the firm was typed into
+         the renter's own list, so there is no account behind it to carry a logo. Such a row keeps the
+         initial, which is the whole reason the fallback is not decoration. */
+      logo: null,
+      machine: line.machine,
+      units: line.units,
+      offPlatform: true,
+      at: b.card.submittedAt,
+      href: `/requests?r=${encodeURIComponent(b.requestId)}`,
+    };
+  };
   const bidList: RailBid[] = [...appBids.map(railRow), ...linkBids.map(linkRow)].sort(
     (x, y) => (y.at ?? "").localeCompare(x.at ?? ""),
   );
@@ -834,28 +889,45 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
                     b.name.trim().charAt(0) || "?"
                   )}
                 </span>
-                {/* TWO facts, one line: who bid and for how much (owner, 2026-09-19). The price is
-                    the only thing that never yields — a number cut in half is a wrong number, so it
-                    keeps its width and the NAME truncates beside it — and it carries its UNIT,
-                    because 500 a day and 500 a month are not comparable figures.
+                {/* TWO LINES (owner, 2026-09-20): who bid and for how much, then what the bid is
+                    FOR — «Offline · 2 × Crawler Excavator · 20 ton».
 
-                    ~~The machine, and the site under it.~~ Both went with the second line; the rail
-                    stands beside the table of requests that names them.
+                    Line one is exactly two things, which is what puts the price on the same vertical
+                    down the whole rail. It is the only element that never yields — a number cut in
+                    half is a wrong number, so it keeps its width and the NAME truncates beside it —
+                    and it carries its UNIT, because 500 a day and 500 a month are not comparable.
 
-                    The SOURCE is one small pill and it is drawn on every row, not only an
-                    off-platform one: a mark that appears on some rows reads as a warning about those
-                    rows, where the question it answers — did this come through an account or through
-                    my own link — is asked of every bid. It takes the SOURCE FILTER's two words, so
-                    the rail and the tab above the bid cards cannot drift apart. */}
-                <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="min-w-0 truncate text-body font-extrabold text-navy">{b.name}</span>
-                  <span className="flex-none rounded-sm bg-surface2 px-1.5 text-label font-semibold text-muted-dark">
-                    {b.offPlatform ? t.workspace.sourceOffline : t.workspace.sourceApp}
+                    The SOURCE is one small pill, drawn on EVERY row and not only an off-platform one
+                    (owner, 2026-09-19): a mark that appears on some rows reads as a warning about
+                    those rows, where the question it answers — did this come through an account or
+                    through my own link — is asked of every bid. It takes the SOURCE FILTER's two
+                    words, so the rail and the tab above the bid cards cannot drift apart. It sits on
+                    line TWO because it qualifies the offer; it is not a fact ranked beside the firm.
+
+                    The COUNT is on every row, one included (the intake rail's ruling of
+                    2026-09-17): a column of counts that skips some of its rows is harder to scan
+                    than one that repeats a 1, because the eye reads down the number rather than
+                    down the presence of it. ~~The site, under the machine.~~ Still gone: the renter
+                    knows where his own job is, and the table beside this rail names it. */}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="min-w-0 truncate text-body font-extrabold text-navy">{b.name}</span>
+                    <span className="ms-auto flex-none whitespace-nowrap text-body font-semibold tabular text-navy">
+                      {money(b.price)}
+                      {b.price != null && priceUnitWord(b.priceUnit) && (
+                        <span className="text-label font-semibold text-muted"> {priceUnitWord(b.priceUnit)}</span>
+                      )}
+                    </span>
                   </span>
-                  <span className="ms-auto flex-none whitespace-nowrap text-body font-semibold tabular text-navy">
-                    {money(b.price)}
-                    {b.price != null && priceUnitWord(b.priceUnit) && (
-                      <span className="text-label font-semibold text-muted"> {priceUnitWord(b.priceUnit)}</span>
+                  <span className="mt-0.5 flex items-center gap-1.5 text-label text-muted">
+                    <span className="flex-none rounded-sm bg-surface2 px-1.5 font-semibold text-muted-dark">
+                      {b.offPlatform ? t.workspace.sourceOffline : t.workspace.sourceApp}
+                    </span>
+                    {b.machine && (
+                      <span className="min-w-0 truncate">
+                        {b.units != null && <span className="tabular">{b.units} × </span>}
+                        {b.machine}
+                      </span>
                     )}
                   </span>
                 </span>
@@ -866,9 +938,14 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
               Array.from({ length: BIDS_SHOWN }, (_, i) => (
                 <div key={`skb-${i}`} className={cx(ROW_H, "flex items-center gap-2.5 border-b border-border px-3 last:border-b-0")}>
                   <span className="size-7 flex-none animate-pulse rounded-full bg-surface2" />
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="block h-3 w-28 animate-pulse rounded-sm bg-surface2" />
-                    <span className="ms-auto block h-3 w-16 animate-pulse rounded-sm bg-surface2" />
+                  {/* Two bars for two lines: a skeleton that draws one row where the real one draws
+                      two is a layout that jumps the moment the read lands. */}
+                  <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <span className="flex items-center gap-2">
+                      <span className="block h-3 w-28 animate-pulse rounded-sm bg-surface2" />
+                      <span className="ms-auto block h-3 w-16 animate-pulse rounded-sm bg-surface2" />
+                    </span>
+                    <span className="block h-2.5 w-40 animate-pulse rounded-sm bg-surface2" />
                   </span>
                 </div>
               ))}

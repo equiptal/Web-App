@@ -94,6 +94,20 @@
   --brand-fg: #ffffff;
   --gold: #b8860b;           /* the mark's own colour — not a UI state, and not in the OS set */
 
+  /* ── The taxonomy photographs' own studio ground ─────────────────────────────────────────────
+     NOT a UI colour and not in the OS set: it is the beige those renders are shot on, so that the
+     machine-card panel has nothing to letterbox against and the picture reads as filling it.
+
+     🔴 MEASURED, not picked (owner, 2026-09-20: *"why the image doesnt exist for margins and
+     padding, keep it 100% fit"*). Twelve samples — four corners and two edge midpoints of two
+     assets from the batch, `crawler-excavator` and `wheel-loader`, decoded and read pixel by pixel:
+     every one lands between #e1dcd5 and #e6dfd7, a spread of 4/255 per channel. This is their mean.
+
+     ⚠️ It is a property of the ASSET BATCH, not of this design system, so it belongs to whoever
+     re-cuts those renders. If the masters are ever re-shot on a different ground — or given
+     transparency, which is the real fix and would retire this — re-measure it or delete it. */
+  --photo-ground: #e3ded7;
+
   /* ── Status ──────────────────────────────────────────────────────────────────────────────────
      Three tiers each, and the same fill/text split the brand has: `--warn` fills at 2.97:1 and
      `--warn-deep` is the amber that may carry text. */
@@ -273,6 +287,7 @@
   --color-brand-soft: var(--brand-soft);
   --color-brand-fg: var(--brand-fg);
   --color-gold: var(--gold);
+  --color-photo-ground: var(--photo-ground);
   /* The National Day skin. Mirrored here for the same reason every other token is: a colour
      `:root` defines and `@theme` does not is a colour half the app cannot reach. */
   --color-nd-ground: var(--nd-ground);

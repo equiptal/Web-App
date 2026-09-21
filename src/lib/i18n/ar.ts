@@ -2026,7 +2026,9 @@ export const ar: Dictionary = {
       selectFromList: "اختر من قائمتنا",
       addCustomType: "أضف نوع معدّة مخصّصاً",
       hatchMatched: "ليست المعدة التي تريدها؟",
-      hatchNoMatch: "لا تجد المعدة التي تريدها؟",
+      /* ⚠️ Shortened with its English twin (owner, 2026-09-20): this row CLIPS, so the sentence's
+         length is a layout constraint. */
+      hatchNoMatch: "لا تجد معدتك؟",
       panelChange: "كيف تريد تغييرها؟",
       panelWiden: "وسّع البحث",
       doorSearch: "ابحث في قائمتنا",

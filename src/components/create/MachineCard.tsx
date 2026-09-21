@@ -245,7 +245,30 @@ export function MachineCard({
             ⚠️ **The taller it grows the more `object-cover` crops** - the fit below is measured
             against the 450 case. Raising this ceiling without re-measuring that crop is how the
             «three wheels» of 2026-09-13 comes back. */}
-        <div {...pin("machine-card-image")} className="relative min-h-[450px] max-h-[640px] w-full min-w-0 overflow-hidden rounded-md bg-surface2">
+        {/* ── The GROUND under the picture is the picture's own (owner, 2026-09-20) ───────────
+            *"why the image doesnt exist for margins and padding, keep it 100% fit"*.
+
+            🔴 **The image was there all along; what he was looking at was the LETTERBOX.** The
+            beige in his screenshot is the photograph's own studio sweep, and the paler strip under
+            it — with the «Diesel» and «2024» chips sitting on it — was this panel's `surface2`
+            showing through where `contain` had nothing left to draw. Read as «the image doesn't
+            exist», which is exactly how it looks.
+
+            ⚠️ **No fit can close that gap**, and the file has now said so three times: `cover`,
+            `contain` and `scale` all clip from one 1.34 source into one 0.81 box, and only move
+            WHERE the loss lands (`cover` at 366x450 takes the bucket and the counterweight, which
+            is the complaint of 2026-09-15). So this does not change the fit at all — it changes
+            what the unfilled part is PAINTED, to the beige the renders are shot on, and the band
+            stops existing to look at.
+
+            🔴 **`--photo-ground` is MEASURED off the assets** (twelve samples across two of them,
+            spread 4/255) and is a fact about that render batch rather than a colour of ours; see
+            its note in `globals.css`. It is applied ONLY under a real photograph: behind the glyph
+            fallback a beige panel with a grey drawing on it reads as a picture that failed to load.
+
+            ⚠️ **CONTENT, still the real fix and still owed**: masters cut 4:5 for this box, or shot
+            on transparency. Either retires both this token and the `scale-[1.2]` below. */}
+        <div {...pin("machine-card-image")} className={`relative min-h-[450px] max-h-[640px] w-full min-w-0 overflow-hidden rounded-md ${photo && !photoBroken ? "bg-photo-ground" : "bg-surface2"}`}>
           {/* ── The subtype's own photograph, where the admin panel has one (owner, 2026-08-31) ──
               The panel drew a Material Symbol chosen by matching the subtype's NAME against a list of
               words — «excavator» → the agriculture glyph — which is a reasonable guess and never the

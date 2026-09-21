@@ -465,6 +465,36 @@ describe("the whole machine is visible, and the zoom only eats the margin", () =
     expect(code.slice(pAt, pAt + 240)).toMatch(/overflow-hidden/);
   });
 
+  it("Given a real photograph, Then the panel is painted the photograph's OWN ground", () => {
+    /**
+     * Owner, 2026-09-20: *"why the image doesnt exist for margins and padding, keep it 100% fit"*.
+     *
+     * 🔴 The image was there; what he was reading as its absence was the LETTERBOX — this panel's
+     * `surface2` showing through under the picture, with two of the four chips sitting on it. The
+     * band above is unfixable by any fit and this does not try: it paints the unfilled part the
+     * beige these renders are shot on, so there is no band left to look at.
+     *
+     * ⚠️ MEASURED off the assets — twelve samples across `crawler-excavator` and `wheel-loader`,
+     * decoded pixel by pixel, all within 4/255 of #e3ded7 — and therefore a fact about that render
+     * batch rather than a colour of ours. It lives in `globals.css` with that note.
+     */
+    const pAt = code.indexOf('pin("machine-card-image")');
+    const panel = code.slice(pAt, pAt + 260);
+    expect(panel).toContain("bg-photo-ground");
+    // 🔴 Only under a real photograph: behind the glyph fallback a beige panel with a grey drawing
+    // on it reads as a picture that failed to load, which is the state it would be imitating.
+    expect(panel).toContain('photo && !photoBroken ? "bg-photo-ground" : "bg-surface2"');
+  });
+
+  it("Given the ground colour, Then it is a TOKEN and the stylesheet carries the measurement", () => {
+    // `palette-drift` forbids a raw hex in a component, and a colour `:root` defines that `@theme`
+    // does not is a colour half the app cannot reach — so both halves are asserted.
+    const css = readFileSync("src/app/globals.css", "utf8");
+    expect(css).toContain("--photo-ground: #e3ded7;");
+    expect(css).toContain("--color-photo-ground: var(--photo-ground);");
+    expect(SRC).not.toContain("#e3ded7");
+  });
+
   it("Given the ROW thumbnail, Then it is contained too, at its own size", () => {
     const rowAt = code.indexOf("h-full w-full object-contain p-0.5");
     expect(rowAt).toBeGreaterThan(0);

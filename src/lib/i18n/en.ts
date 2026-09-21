@@ -2531,9 +2531,14 @@ export const en = {
          cases, user see them in 2"*, *"the cta instead of describe so he dont feel he is writing
          again"*, *"many extra text everywhere no need"*.
          ⚠️ ONE sentence per state on the row, and it must never wrap — the control is sized to the
-         sentence, not the sentence to the column. */
+         sentence, not the sentence to the column.
+         🔴 Their LENGTH is a layout constraint, not a free choice (owner, 2026-09-20, on a shot of
+         the row reading «Can't find the equipment you ...»): the row clips rather than wrapping, so
+         a sentence that outgrows its column does not get smaller — it disappears. ~~«Can't find the
+         equipment you want?»~~ is cut to the shorter question it was already asking, and both now
+         fit the cell at its narrowest. */
       hatchMatched: "Not the equipment you want?",
-      hatchNoMatch: "Can't find the equipment you want?",
+      hatchNoMatch: "Can't find your equipment?",
       /* A label, not a question: the row he just pressed asked the question, and asking again a
          centimetre below it is the extra text this pass exists to remove. */
       panelChange: "How do you want to change it?",

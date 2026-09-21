@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
+import { en } from "@/lib/i18n/en";
+import { ar } from "@/lib/i18n/ar";
 
 /**
  * The canvas with off-catalogue equipment ON (the default): the renter NAMES the machine the
@@ -187,14 +189,14 @@ describe("the escape, and the panel behind it", () => {
       resolved: false,
     });
     await renderCanvas(<Canvas />, { draft: makeAgentDraft({ items: [barge], project: confirmedProject() }) });
-    return screen.getByRole("button", { name: /find the equipment you want/i });
+    return screen.getByRole("button", { name: /find your equipment/i });
   };
 
   it("stays on screen while its own panel is open", async () => {
     const row = await open();
     fireEvent.click(row);
     // 🔴 It does NOT disappear behind its panel (owner: *"keep them shown as the prototype"*).
-    expect(screen.getByRole("button", { name: /find the equipment you want/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /find your equipment/i })).toBeTruthy();
     expect(screen.getByText("Widen the search")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Search our catalogue/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Keep my own words/i })).toBeTruthy();
@@ -267,8 +269,30 @@ describe("the escape, and the panel behind it", () => {
     const row = await open();
     expect(row.className).toContain("whitespace-nowrap");
     expect(row.className).not.toContain("min-h-");
-    expect(row.getAttribute("title")).toMatch(/find the equipment you want/i);
+    expect(row.getAttribute("title")).toMatch(/find your equipment/i);
   }, 20_000);
+
+  it("and the sentence is therefore a LAYOUT constraint, not a free choice", () => {
+    /**
+     * Owner, 2026-09-20, on a shot of the row reading «Can't find the equipment you ...»:
+     * *"always keep it not the equipment you want unless no taxonamy detected say it cant find your
+     * equipment? so it fit not clipped or stripped"*.
+     *
+     * 🔴 The clip above is the rule and is not in question; what it COSTS is that a sentence
+     * outgrowing its cell does not get smaller, it disappears. Measured in a browser at the row's
+     * narrowest — the three columns at their `minmax` minima, 454px — on the compiled stylesheet:
+     *   · «Not the equipment you want?»           149px in a 150px box — fits, and always did
+     *   · «Can't find your equipment?»             135px — fits, 14px of headroom over the above
+     *   · ~~«Can't find the equipment you want?»~~ 178px in a 150px box — **28px clipped**
+     *
+     * jsdom lays nothing out, so what is assertable is the RULE that measurement produced: the
+     * no-match question may never be longer than the matched one, which is the one already proven
+     * to fit. That survives a re-word of either; a pixel budget copied into a test would not.
+     */
+    for (const d of [en, ar]) {
+      expect(d.create.machineCard.hatchNoMatch.length).toBeLessThanOrEqual(d.create.machineCard.hatchMatched.length);
+    }
+  });
 
   it("shows the family with ONE search box over it, and the rest of the catalogue at its foot", async () => {
     /**

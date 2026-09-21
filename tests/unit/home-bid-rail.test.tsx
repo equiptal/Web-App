@@ -10,14 +10,19 @@ import { groupRequests } from "@/lib/contract/requests";
 /**
  * The bids rail on the dashboard — one row per bid.
  *
- * ── TWO facts and a pill (owner, 2026-09-19) ────────────────────────────────────────
- * *"here only show supplier name and price nothing more with one small pill for offline, via app
- * and the initials of the supplier must be the supplier logo in this circle"*.
+ * ── TWO LINES: who and how much, then what for (owner, 2026-09-20) ─────────────────────────────
+ * *"show the name and price in one row then below it in small font is it offline or via app - unit*
+ * equipment name and size"*.
  *
- * ~~Four facts on two lines (owner, 2026-09-04).~~ The machine and the site are gone: the rail
- * stands beside the TABLE of requests that names both, and what the renter scans a rail of incoming
- * bids for is who offered and how much. The source moved from a sentence under the name to one pill
- * beside it, drawn on EVERY row — a mark on some rows only reads as a warning about those rows.
+ * 🔴 This PARTLY reverses 2026-09-19 (*"here only show supplier name and price nothing more with one
+ * small pill for offline, via app…"*), which had cut the row to one line and deleted the machine
+ * with the site. The MACHINE comes back, now carrying its unit count; the SITE stays gone. The
+ * deletion was right about the site — the renter knows where his own job is, and the table beside
+ * this rail names it — and wrong about the machine on an account with several requests open, where
+ * «28,900 / month» says nothing until you know what it is for.
+ *
+ * ⚠️ The source pill moved DOWN to line two with it. Drawn on EVERY row still: a mark on some rows
+ * only reads as a warning about those rows.
  *
  * ── Why a class is asserted here, which these tests otherwise avoid ─────────────────────────────
  * The horizontal scrollbar was not the content's fault and no query can see it: the column was
@@ -134,15 +139,26 @@ const draw = () =>
 const scroller = () => document.querySelector(".overflow-y-auto") as HTMLElement;
 
 describe("one bid, one card", () => {
-  it("states the bidder and the price, and NOTHING else", async () => {
+  it("states the bidder and the price on line one, and the machine with its units under them", async () => {
     draw();
     const row = (await screen.findByText("Al Faisal Heavy Equipment Rentals")).closest("button")!;
     expect(within(row).getByText("48,500")).toBeTruthy();
-    // The machine and the site were the second line, and the second line is gone. The supplier own
-    // model number was never drawn here and still is not.
-    expect(within(row).queryByText(/Crawler excavator/)).toBeNull();
-    expect(within(row).queryByText(/Caterpillar|320/)).toBeNull();
+    /* The machine as the REQUEST names it, with the count the request asked for — read off the
+       renter own request list (`item.name` / `item.qty`), never off the supplier own listing. */
+    expect(within(row).getByText(/Crawler excavator · 20 ton/)).toBeTruthy();
+    expect(within(row).getByText("2 ×")).toBeTruthy();
+    // ⚠️ The SITE stays gone, and the supplier own model number was never drawn here.
     expect(within(row).queryByText(/King Khalid International Airport/)).toBeNull();
+    expect(within(row).queryByText(/Caterpillar|30 ton/)).toBeNull();
+  });
+
+  it("shows the count even at ONE, because the eye reads down the number", async () => {
+    // The intake rail ruling of 2026-09-17: a column of counts that skips some of its rows is
+    // harder to scan than one that repeats a 1.
+    api.requests = [{ ...(request() as unknown as Record<string, unknown>), item: { name: "Wheel loader · 3 m³", nameAr: "لودر", qty: 1, imageUrl: null, imageIsPhoto: false, categoryId: "c1" } } as unknown as Parameters<typeof groupRequests>[0][number]];
+    draw();
+    const row = (await screen.findByText("Al Faisal Heavy Equipment Rentals")).closest("button")!;
+    expect(within(row).getByText("1 ×")).toBeTruthy();
   });
 
   it("wears the firm MARK when the projection carries one", async () => {
@@ -219,12 +235,17 @@ describe("the bids that came through the shared link", () => {
     expect(screen.getByText(/2 new bids/)).toBeTruthy();
   });
 
-  it("states the same two facts as an app bid", async () => {
+  it("states the same facts as an app bid, machine and count included", async () => {
+    /* 🔴 The machine and the count come from the REQUEST for BOTH sources, not from the offer. An
+       off-platform submission carries only the label its form showed the supplier and no unit count
+       at all, so resolving it here is what stops two rows answering one request from describing it
+       differently. */
     draw();
     const row = (await screen.findByText("Najd Equipment Est.")).closest("button")!;
     expect(within(row).getByText("21,000")).toBeTruthy();
     expect(within(row).getByText("/ month")).toBeTruthy();
-    expect(within(row).queryByText(/Crawler excavator/)).toBeNull();
+    expect(within(row).getByText(/Crawler excavator · 20 ton/)).toBeTruthy();
+    expect(within(row).getByText("2 ×")).toBeTruthy();
   });
 
   it("carries a source pill, and so does the app bid beside it", async () => {
@@ -252,7 +273,9 @@ describe("the bids that came through the shared link", () => {
     // The submission is from 4 Sept and the app bid from 3 Sept.
     draw();
     await screen.findByText("Najd Equipment Est.");
-    const names = [...scroller().querySelectorAll("button")].map((b) => b.querySelector("span.truncate")?.textContent);
+    /* ⚠️ `span.truncate` now matches the MACHINE line too, so the name is taken by its own class —
+       a selector that matches two elements silently reads whichever comes first. */
+    const names = [...scroller().querySelectorAll("button")].map((b) => b.querySelector("span.font-extrabold.truncate")?.textContent);
     expect(names).toEqual(["Najd Equipment Est.", "Al Faisal Heavy Equipment Rentals"]);
   });
 });

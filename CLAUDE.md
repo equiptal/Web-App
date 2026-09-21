@@ -2,6 +2,150 @@
 
 ## Change log
 
+- **2026-09-20 - The machine panel's empty part is painted the photographs' OWN ground, so the picture reads as filling it.**
+  Owner, on a crop of the panel's foot showing a beige block, then a pale strip with the «Diesel» and
+  «2024» chips sitting on it: *"why the image doesnt exist for margins and padding, keep it 100%
+  fit"*.
+  🔴 **The image was there, and reading the screenshot as a missing image is the mistake to avoid
+  repeating.** The beige IS the photograph - these renders are shot on a beige studio sweep - and
+  the paler strip under it was this panel's own `surface2` showing through where `contain` had
+  nothing left to draw. A band with two chips floating on it does look like a picture that failed.
+  🔴 **No fit closes that gap, and this file has now said so three times.** `cover`, `contain` and
+  `scale` all clip from one **1.34** source into one **0.81** box and only move WHERE the loss
+  lands: `cover` at 366x450 takes 39% of the width, which is the bucket and the counterweight, and
+  is the complaint of 2026-09-15. So the FIT is untouched - `contain` at 1.2, unchanged - and what
+  changed is the COLOUR of the part it does not reach.
+  **`--photo-ground: #e3ded7`, and it is MEASURED rather than picked.** The two assets that are
+  publicly readable (`crawler-excavator`, `wheel-loader`, both 2400x1792) were downloaded, decoded
+  and read pixel by pixel at four corners and two edge midpoints each: all twelve samples land
+  between `#e1dcd5` and `#e6dfd7`, a spread of **4/255 per channel**. This is their mean, and at
+  that spread the join is not visible.
+  ⚠️ **It is a fact about the RENDER BATCH, not a colour of this design system**, and the token's
+  own note says so: the whole set shares one filename stamp and one sweep. Re-shoot them on another
+  ground and this must be re-measured or deleted. It sits beside `--gold` and the `--shop-*` values,
+  which are already recorded as outside the OS palette.
+  ⚠️ **Applied ONLY under a real photograph.** Behind the glyph fallback a beige panel carrying a
+  grey drawing reads as exactly the failure it would be imitating, so that state keeps `surface2`.
+  A case pins the ternary rather than the class alone.
+  ⚠️ **Mirrored into `ds-colors.ts`, which is the only reason it is there**: `ds-colors.test.ts`
+  requires every colour `:root` defines to be named in both places. No standalone document (the
+  quotation, the printed comparison, the pasted cards) has any use for it.
+  Files: `src/app/globals.css` (`--photo-ground` + its `@theme` mirror),
+  `src/lib/ds-colors.ts`, `src/components/create/MachineCard.tsx`,
+  `tests/unit/machine-card.test.tsx` (2 new cases; 35 passing).
+  🔴 **CONTENT, still the real fix and still owed, third time of asking**: masters cut **4:5** for
+  this box, or shot on transparency. Either retires this token AND the `scale-[1.2]` beside it, and
+  stops every surface choosing between a band and a crop. **78 of the taxonomy's subtypes now carry
+  a photograph** (it was 1 on 2026-09-13), so the cost of re-cutting has gone up and will keep going
+  up.
+  ⚠️ **The S3 objects are still not all public-read**: `mobile-crane-all-terrain` answers **403**
+  where the other two answer 200, which is exactly why `onError` on this `<img>` is load-bearing and
+  not defensive. Unchanged by this, and worth a look on the bucket policy.
+  ⚠️ Verified: `NODE_OPTIONS= npx next build` clean, typecheck clean, lint 0 errors, **211 files /
+  3572 passing, 7 skipped** serially, the ground break-checked (reverted to `bg-surface2` - the new
+  case went red), and the compiled utility confirmed to exist and resolve
+  (`.bg-photo-ground{background-color:var(--photo-ground)}` -> `rgb(227,222,215)` measured in the
+  page, so the token is not one `@theme` failed to publish).
+  ⚠️ **SEEN RENDERED** at the panel's real 366x450 and at its 620px ceiling, both assets, beside the
+  untreated panel for comparison: the ground reaches all four edges, the whole machine survives and
+  the four chips sit on the photograph rather than on a strip.
+  🔴 **NOT seen on the real card**: the canvas needs a session. The photograph above was taken with
+  the hex written by hand; the compiled class was then confirmed to resolve to the same value by
+  measurement rather than by a second picture, because the browser window on this machine reported
+  a 0px viewport for the rest of the session and every screenshot after that point failed.
+
+- **2026-09-20 - The escape row's question is CUT to fit, because that row clips and a sentence too long for it disappears.**
+  Owner, on a shot of it reading «Can't find the equipment you ...»: *"always keep it not the
+  equipment you want unless no taxonamy detected say it cant find your equipment? so it fit not
+  clipped or stripped"*.
+  🔴 **The rule he is protecting is his own of 2026-09-15** (*"dont ever wrap this not in the
+  equipment card"*), and this is what it costs: the row is `whitespace-nowrap` + `truncate` at a
+  fixed height, so a sentence that outgrows its cell does not get smaller, it goes missing. The COPY
+  is therefore a layout constraint rather than a free choice.
+  ~~«Can't find the equipment you want?»~~ -> **«Can't find your equipment?»** / «لا تجد معدتك؟».
+  ⚠️ **MEASURED at the row's narrowest** - the three columns at their `minmax` minima, 454px, on the
+  compiled stylesheet at `text-label` semibold:
+   · «Not the equipment you want?»           **149px in a 150px box** - fits, and always did, which
+     is why he only ever saw the other one cut;
+   · «Can't find your equipment?»             **135px** - fits, with 14px more headroom than the above;
+   · ~~«Can't find the equipment you want?»~~ **178px in a 150px box - 28px clipped**, which is his
+     screenshot exactly;
+   · Arabic **65px**, never close.
+  ⚠️ **The BRANCH is unchanged and is what he asked for**: `item.ref.subcategoryId` picks the matched
+  question, its absence the other. That is the same test `isCustomLine` reads, so the row and the
+  line's own off-catalogue state cannot disagree about which question is being asked.
+  Files: `src/lib/i18n/{en,ar}.ts` (`machineCard.hatchNoMatch`), `src/lib/uiPins.ts` (17.8's label
+  quoted the retired sentence), `docs/ui-{pins,surface-map}.md` (regenerated),
+  `tests/unit/custom-equipment-canvas.test.tsx` (3 queries re-pointed, 1 new case).
+  🔴 **Three test queries broke on the rename and a `grep` for the string did not find them**: they
+  read `/find the equipment you want/i` - lower case, no apostrophe - so searching for
+  `hatchNoMatch` or for the sentence as written in the dictionary came back empty and the suite went
+  red on the next run. **Grep the FRAGMENT, not the string.**
+  ⚠️ **The new case pins the RULE, not a pixel budget**: the no-match question may never be longer
+  than the matched one, which is the one already proven to fit. jsdom lays nothing out, and a width
+  copied into a test would go stale the first time the face or the padding moved. Break-checked by
+  lengthening the sentence - it went red.
+  ⚠️ Verified: `NODE_OPTIONS= npx next build` clean, typecheck clean, lint 0 errors, 11 passing in
+  the card's own suite and 89 across the nine card / rail / dashboard / wording / pins suites.
+  **SEEN RENDERED**: all three sentences side by side at 454px and at 700px, plus the Arabic, as
+  static markup carrying the real class names and the compiled tokens - which is how the 28px
+  overflow was measured rather than estimated.
+
+- **2026-09-20 - The dashboard's bid rail is TWO LINES again: who and how much, then what for.**
+  Owner, on the one-line rail: *"show the name and price in one row then below it in small font is
+  it offline or via app - unit* equipment name and size"*.
+  🔴 **This PARTLY reverses 2026-09-19**, which cut the row to *"supplier name and price nothing
+  more"* and deleted the machine along with the site. What comes back is the MACHINE, now carrying
+  its unit count; what stays gone is the SITE. That split is the whole of the judgement: the
+  deletion was right about the site - the renter knows where his own job is, and the table beside
+  this rail names it - and wrong about the machine on an account with several requests open, where
+  «28,900 / month» says nothing until you know what it is for.
+  ⚠️ **The SOURCE pill moved DOWN with it**, and line one is now exactly two things. That is what
+  puts the price on the same vertical down the whole rail; the pill is a small grey qualifier on the
+  offer, not a fact ranked beside the firm's name. It is still drawn on EVERY row (2026-09-19's own
+  rule) and still takes the SOURCE FILTER's two words, so the rail and the tab above the bid cards
+  cannot drift apart.
+  🔴 **The machine and the count come from the REQUEST for BOTH sources, not from the offer**, and
+  that is the only reason the count exists at all: `numberOfUnits` is on NEITHER bid projection. An
+  app bid carries the subtype and size on its own payload; an off-platform submission carries only
+  the label its form showed the supplier. The renter's own request list holds all three
+  (`item.name` / `item.qty`), it is already loaded for the table beside this rail, and reading it
+  means two rows answering one request can never describe it differently. **No new fetch, no
+  backend change.**
+  ⚠️ **The count is on every row, ONE included**, which is the intake rail's ruling of 2026-09-17:
+  a column of counts that skips some of its rows is harder to scan than one that repeats a 1,
+  because the eye reads down the number rather than down the presence of it.
+  ⚠️ **Null until `groups` lands, and the row then draws no machine rather than a placeholder.** The
+  bids read resolves before the requests read on a cold load, and «—» under every row for a beat
+  reads as an account with nothing in it.
+  ⚠️ The loading skeleton grew its second bar in the same pass: a skeleton drawing one line where
+  the real row draws two is a layout that jumps the moment the read lands.
+  Files: `src/components/home/HomeRequests.tsx` (`machineWords` restored, `requestLine` new,
+  `RailBid.machine` / `.units`), `tests/unit/home-bid-rail.test.tsx` (2 cases rewritten, 1 new).
+  ⚠️ **A test anchored on `span.truncate` had to be re-anchored**: the machine line carries that
+  class too now, so `querySelector` would silently have read whichever came first. It takes
+  `span.font-extrabold.truncate`.
+  ⚠️ Verified: `NODE_OPTIONS= npx next build` clean, typecheck clean, lint 0 errors, **211 files /
+  3567 passing, 7 skipped** serially, and two rulings break-checked one at a time (the count hidden
+  at 1, then the units dropped from the request lookup) - each went red alone. The 2 remaining
+  failures are PRE-EXISTING on a clean staging tree, confirmed by stashing: `ui-pins` (the CRLF
+  staleness, and now green again because this change regenerated those docs) and
+  `cancel-confirmation` - see below. Two canvas suites timed out in the serial run and passed alone;
+  that is the contention this log already records for them.
+  ⚠️ **SEEN RENDERED**: the rail at 300px (its width beside the table on a desktop) and at 380px
+  (full width on a phone), plus the Arabic mirror, as static markup carrying the real class names
+  and the compiled stylesheet. The RTL order was MEASURED rather than eyeballed - the count's box
+  sits at the machine span's trailing edge, so it reads «pill · 2 × حفارة زاحفة» right to left with
+  no bidi fault and no rule of its own.
+  🔴 **NOT seen on the real dashboard**: the rail needs a signed-in renter with bids, which this
+  machine has no session for.
+  🔴 **Reported, NOT fixed - `tests/unit/cancel-confirmation.test.ts` is RED on a clean staging tree
+  and it is a VACUOUS-SLICE trap.** It slices on
+  `modal.indexOf("return (\\n    <Dialog open onClose={onClose}")` while `RequestEditModals.tsx` is
+  **CRLF on disk**, so that `indexOf` returns -1, `slice(start, -1)` runs to the end of the file, and
+  the assertion then reads the whole component. It is one anchor, and it is somebody's to fix
+  deliberately rather than smuggled into a copy change.
+
 - **2026-09-19 - The negotiation sheet has NO column cap: its cards run the screen inside one gutter, equal on both sides.**
   Owner, on the capped build: *"undo what did u centralize? i mean centralize the parent cards across
   the screen so it has equal margin on right and on left"*.

@@ -68,6 +68,10 @@ export const COLORS = {
   brandSoft: "#fef1e8",
   brandFg: "#ffffff",
   gold: "#b8860b",
+  /* The taxonomy renders' own studio ground — MEASURED off the assets, not a UI colour. See its
+     note in `globals.css`; it is mirrored here only because this file must name every colour
+     `:root` defines, and no standalone document has any use for it. */
+  photoGround: "#e3ded7",
   ok: "#1d9e55",
   okSoft: "#e2efe7",
   okDeep: "#1d7a45",
@@ -211,6 +215,7 @@ export const CSS_VAR_NAME: Record<keyof typeof COLORS, string> = {
   brandSoft: "--brand-soft",
   brandFg: "--brand-fg",
   gold: "--gold",
+  photoGround: "--photo-ground",
   ok: "--ok",
   okSoft: "--ok-soft",
   okDeep: "--ok-deep",
