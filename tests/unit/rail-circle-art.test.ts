@@ -55,8 +55,31 @@ describe("one machine or many, in one 52px circle", () => {
     expect(art).not.toContain("bg-border");
     expect(art).not.toContain("gap-px");
     expect(art).not.toContain("row-span-2");
-    // Each takes its share of the width, which is what «zoom them out» means here.
-    expect(art).toContain("width: `${100 / shown.length}%`");
+    // Each is drawn off its share of the width, which is what «zoom them out» means here.
+    expect(art).toContain("width: `${SPREAD / shown.length}%`");
+  });
+
+  it("Given the row, Then each machine is BIGGER than its share and overlaps the next", () => {
+    /**
+     * Owner, 2026-09-22: *"u can make them a little bigger and closer"*.
+     *
+     * ⚠️ The two numbers are ONE decision and the test says so rather than restating them: the
+     * row's total width is `SPREAD - OVERLAP` at ANY count, because the boost is `SPREAD / n` and
+     * the pull-back `OVERLAP / (n - 1)`. Two machines at 66% overlap by 16 and three at 44% by 8,
+     * and either way the row oversails the disc by the same amount, which the round clip takes.
+     * Pinning «66» and «16» instead would go stale the first time the cap moved.
+     */
+    expect(code).toContain("const SPREAD = 132;");
+    expect(code).toContain("const OVERLAP = 16;");
+    expect(art).toContain("marginInlineStart: `-${OVERLAP / (shown.length - 1)}%`");
+    // ⚠️ Only AFTER the first, or the row is pushed off its own leading edge.
+    expect(art).toContain("...(i > 0 ?");
+    /* 🔴 `flex-none` is what makes the boost survive: the row is deliberately wider than the
+       disc, and a flex item that may shrink is shrunk straight back to fit. */
+    const rowImg = art.slice(art.indexOf("{shown.map("));
+    expect(rowImg).toContain("flex-none");
+    // ⚠️ LOGICAL, never `marginLeft`: the rail mirrors whole under `dir="rtl"`.
+    expect(art).not.toContain("marginLeft");
   });
 
   it("Given each picture, Then its own EDGE is masked away so the grounds merge", () => {
@@ -114,7 +137,7 @@ describe("one machine or many, in one 52px circle", () => {
      * against the round edge, and here the neighbours are the rest of the band.
      */
     const rowImg = art.slice(art.indexOf("{shown.map("));
-    expect(rowImg).toContain('className="h-auto"');
+    expect(rowImg).toContain('className="h-auto flex-none"');
     expect(rowImg).not.toContain("object-contain");
     expect(rowImg).not.toContain("object-cover");
     expect(rowImg).not.toContain("scale-[1.34]");
@@ -147,9 +170,42 @@ describe("a double press opens the picture and still picks the request", () => {
     expect(zoom).toContain("machines.map((m, i) =>");
     expect(zoom).toContain("precision_manufacturing");
     expect(zoom).toContain("{m.name}");
-    // ⚠️ No crop and no scale with room to spare: both exist to fill a 52px ROUND hole.
-    expect(zoom).toContain('className="h-full w-full object-contain"');
+  });
+
+  it("Given the zoomed view, Then the MACHINES name it and the RFQ code does not", () => {
+    /**
+     * Owner, 2026-09-22: *"show their names at top instead of the rfq"*. He opened it by pressing
+     * a picture, so the reference answered a question he had not asked.
+     *
+     * ⚠️ The caller therefore hands it `machines` ALONE. Leaving `title` on the props and simply
+     * not rendering it is how a dialog quietly goes back to showing the code.
+     */
+    const zoom = code.slice(code.indexOf("function CircleZoom"), code.indexOf("export function RequestRail"));
+    expect(zoom).toContain("const title = machines.map((m) => m.name).join(");
+    expect(zoom).toContain("title={title}");
+    expect(code).not.toContain("title={zoom.label}");
+    // ⚠️ The Arabic list separator, or the names read with a Latin comma inside an RTL block.
+    expect(zoom).toContain('locale === "ar" ? "، " : ", "');
+  });
+
+  it("Given a zoomed picture, Then it sits on the circle's own ground with no band", () => {
+    /**
+     * Owner, same note: *"the images must show like in the circule with the merged background"*.
+     *
+     * 🔴 ~~A square `surface2` tile with the picture contained inside it.~~ That drew grey bands
+     * above and below every machine and a hard edge where the picture's own beige met them, which
+     * is the circle's own fault on a bigger canvas. The tile IS the picture now: `--photo-ground`
+     * under it and the height its own, so there is nothing left to band.
+     *
+     * ⚠️ `aspect-square` survives on the GLYPH arm alone - a fallback has no picture to take its
+     * height from, and a 1px tall grey box is not a tile.
+     */
+    const zoom = code.slice(code.indexOf("function CircleZoom"), code.indexOf("export function RequestRail"));
+    expect(zoom).toContain('m.url ? "bg-photo-ground" : "aspect-square bg-surface2"');
+    expect(zoom).toContain('className="h-auto w-full"');
     expect(zoom).not.toContain("object-cover");
+    expect(zoom).not.toContain("object-contain");
+    expect(zoom).not.toContain("scale-[1.34]");
   });
 
   it("Given the dialog, Then it is mounted OUTSIDE the scrolling strip", () => {

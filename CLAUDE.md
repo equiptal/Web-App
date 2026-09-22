@@ -2,6 +2,47 @@
 
 ## Change log
 
+- **2026-09-22 - The circle's machines are bigger and overlap; the zoomed view is named by them and drawn on their own ground.**
+  Owner, on the montage and on the dialog it opens: *"u can make them a little bigger and closer and
+  when openin them show their names at top instead of the rfq and the images must show like in the
+  circule with the merged background"*.
+  (1) **`SPREAD` 132 and `OVERLAP` 16, and they are ONE decision.** Each machine is drawn at
+  `SPREAD / n` of the width and every one after the first pulled back by `OVERLAP / (n - 1)`, so the
+  row is `SPREAD - OVERLAP` = **116%** wide at any count: two at 66% overlapping 16, three at 44%
+  overlapping 8. The row therefore oversails the disc by the same 8% a side whatever the group holds,
+  which the round clip takes and the mask has already faded.
+  ⚠️ **Why an even share read small**: each asset is shot with its own margin either side, so half a
+  circle of PICTURE is appreciably less than half a circle of MACHINE. The boost eats the margin and
+  the pull-back closes the gap where two margins met.
+  🔴 **`flex-none` on each picture is load-bearing.** The row is deliberately wider than the disc,
+  and a flex item that may shrink is shrunk straight back to fit - which would undo the whole of
+  this, silently, and look like the boost never applied.
+  ⚠️ `marginInlineStart`, never `marginLeft`: the rail mirrors whole under `dir="rtl"`.
+  ⚠️ **Chosen at the real 52px magnified 6x**, against an even share and against 72/22: the wider
+  pair pushes the outer machines into the rim and the deeper overlap eats the excavator's bucket.
+  (2) **The dialog is titled by the MACHINES.** ~~The RFQ code.~~ He opened it by pressing a
+  picture, so the reference answered a question he had not asked. `CircleZoom` takes `machines`
+  alone now and builds the title itself - leaving `title` on the props and merely not rendering it
+  is how a dialog quietly goes back to showing the code.
+  ⚠️ The separator is «، » in Arabic: a Latin comma between two Arabic names inside an RTL block
+  reorders at the join.
+  (3) 🔴 **The zoomed tile IS the picture, on `--photo-ground`.** ~~A square `surface2` tile with
+  the picture `object-contain`ed inside it.~~ That drew grey bands above and below every machine and
+  a hard edge where the picture's own beige met them: the circle's own fault of yesterday, on a
+  bigger canvas. No fit and no scale either - both exist to fill a 52px ROUND hole, and a box that
+  takes the picture's own height has nothing to fit.
+  ⚠️ **`aspect-square` survives on the GLYPH arm alone.** A fallback has no picture to take its
+  height from, and a 1px-tall grey box is not a tile.
+  Files: `src/components/workspace/RequestRail.tsx` (`SPREAD`, `OVERLAP`, `CircleArt`,
+  `CircleZoom`), `tests/unit/rail-circle-art.test.ts` (3 cases re-pointed, 3 new; 14 passing).
+  ⚠️ Verified: typecheck clean, lint 0 errors, the suite, and the boost break-checked by dropping
+  `flex-none` - the row collapsed back to an even share, and the case went red.
+  ⚠️ **SEEN RENDERED** at the real 52px and at 6x, two machines and three, and the zoomed pair
+  photographed BESIDE the old square tile - which is how the grey bands were judged rather than
+  argued.
+  🔴 **NOT seen on the real rail**, which needs a signed-in renter with a multi-item request, so
+  the dialog's title and its grid are pinned by cases rather than watched.
+
 - **2026-09-22 - The montage's pictures lose their own EDGES, and the first attempt at it masked nothing.**
   Owner, twice: *"cant we merge them in one background? not shown as 2 seperate imeages"*, then, on
   the first fix shipped and deployed, *"still in the images the same"*.

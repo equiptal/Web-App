@@ -36,6 +36,25 @@ import { pin } from "@/lib/uiPins";
 const MAX_IN_CIRCLE = 3;
 
 /**
+ * **How much bigger than its share each machine is drawn, and how far the next one is pulled back
+ * over it** (owner, 2026-09-22: *"u can make them a little bigger and closer"*).
+ *
+ * At an even share the machines were small and stood apart, because each asset is shot with its own
+ * margin either side - so half a circle of picture is rather less than half a circle of machine.
+ * Drawing each at 132/n of the width and pulling the next back closes that gap from both ends.
+ *
+ * ⚠️ The two numbers are ONE decision: `SPREAD - OVERLAP` is the row's total width, 116%, at any
+ * count - the boost is `SPREAD / n` and the pull-back `OVERLAP / (n - 1)`, so two machines at 66%
+ * overlap by 16 and three at 44% by 8. The row therefore always oversails the disc by the same 8%
+ * a side, which the round clip takes and the mask has already faded.
+ *
+ * ⚠️ Chosen at the real 52px, magnified 6x, against an even share and against 72/22: the wider
+ * pair pushes the outer machines into the rim and the deeper overlap eats the excavator's bucket.
+ */
+const SPREAD = 132;
+const OVERLAP = 16;
+
+/**
  * How a machine's picture fills its hole - the rail's own ruling, in one place now that three
  * surfaces in this file draw one.
  *
@@ -91,8 +110,8 @@ const CELL_MASK = "radial-gradient(closest-side, black 68%, transparent 100%)";
  * 🔴 ~~A grid of cells with a hairline between them and each on its own grey tile.~~ That was
  * the first cut, hours earlier, and he is right about it: four framed thumbnails in a 52px circle
  * read as four broken pictures rather than as one request holding four machines. The machines now
- * stand side by side on a single continuous ground, each contained and scaled to its share of the
- * width - which is what «zoom them out» asks for, and what makes each one whole.
+ * stand side by side on a single continuous ground, each whole and each at its own aspect - which
+ * is what «zoom them out» asks for. How WIDE each is drawn is {@link SPREAD}'s decision.
  *
  * 🔴 **The ground is `--photo-ground`, and that is what makes the merge SEAMLESS rather than
  * merely tidy.** These renders are all shot on one beige studio sweep - measured earlier today
@@ -134,6 +153,8 @@ function CircleArt({
   }
   const shown = art.slice(0, MAX_IN_CIRCLE);
   return (
+    /* ⚠️ `flex-none` on each picture below: the row is deliberately WIDER than the disc
+       (see {@link SPREAD}), and without it flexbox would shrink every machine back to fit. */
     <span className="flex h-[52px] w-[52px] items-center justify-center overflow-hidden rounded-full">
       {shown.map((m, i) => (
         /* eslint-disable-next-line @next/next/no-img-element */
@@ -150,8 +171,13 @@ function CircleArt({
              the rest of the band.
              ⚠️ The mask is per CELL and never on the disc: the disc's own edge is the circle,
              which is already a clean shape, and fading that would grey the rim. */
-          className="h-auto"
-          style={{ width: `${100 / shown.length}%`, maskImage: CELL_MASK, WebkitMaskImage: CELL_MASK }}
+          className="h-auto flex-none"
+          style={{
+            width: `${SPREAD / shown.length}%`,
+            ...(i > 0 ? { marginInlineStart: `-${OVERLAP / (shown.length - 1)}%` } : null),
+            maskImage: CELL_MASK,
+            WebkitMaskImage: CELL_MASK,
+          }}
         />
       ))}
     </span>
@@ -166,26 +192,38 @@ function CircleArt({
  * of the request and still has a name, and a zoomed view holding fewer machines than the ITEMS tabs
  * would repeat the montage's own compromise where there is room not to.
  *
- * ⚠️ `object-contain` and NO scale here, whatever kind of picture it is. The crop and the 1.34
- * both exist to fill a 52px ROUND hole; in a square box with room to spare they would only throw
- * the machine's edges away again.
+ * ⚠️ **The tile is the PICTURE, on the circle's own ground**, so the two read as one thing
+ * (owner, 2026-09-22: *"the images must show like in the circule with the merged background"*).
+ * No fit and no scale: the crop and the 1.34 both exist to fill a 52px ROUND hole, and a box that
+ * takes the picture's own height has nothing to fit and nothing left to band.
  */
-function CircleZoom({ title, machines, onClose }: { title: string; machines: RailMachine[]; onClose: () => void }) {
+function CircleZoom({ machines, onClose }: { machines: RailMachine[]; onClose: () => void }) {
+  const { locale } = useLocale();
+  /* 🔴 **The MACHINES name the dialog, not the RFQ code** (owner, 2026-09-22: *"show their names
+     at top instead of the rfq"*). He opened it by pressing a picture, so «RFQ-00137» answered a
+     question he had not asked; what the circle holds is the thing he is looking at. */
+  const title = machines.map((m) => m.name).join(locale === "ar" ? "، " : ", ");
   return (
     <Dialog open onClose={onClose} size={machines.length > 1 ? "lg" : "md"} title={title}>
       <div className={`grid gap-4 ${machines.length > 1 ? "sm:grid-cols-2" : ""}`}>
         {machines.map((m, i) => (
           <figure key={`${m.id}-${i}`} className="m-0">
-            <span className="grid aspect-square w-full place-items-center overflow-hidden rounded-md bg-surface2">
+            {/* ⚠️ **The same ground as the circle** (owner, same note: *"the images must show like
+                in the circule with the merged background"*). ~~A square `surface2` tile with the
+                picture contained inside it.~~ That drew grey bands above and below every machine
+                and a visible edge where the picture's own beige met them - the circle's fault, on a
+                bigger canvas. The tile is the PICTURE now: `--photo-ground` under it and the height
+                its own, so there is nothing left to band. */}
+            <span className={`grid w-full place-items-center overflow-hidden rounded-md ${m.url ? "bg-photo-ground" : "aspect-square bg-surface2"}`}>
               {m.url ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={publicTaxonomyUrl(m.url) ?? ""} alt="" className="h-full w-full object-contain" />
+                <img src={publicTaxonomyUrl(m.url) ?? ""} alt="" className="h-auto w-full" />
               ) : (
                 <Icon name="precision_manufacturing" size={64} className="text-muted" />
               )}
             </span>
             <figcaption className="mt-2 text-body font-semibold text-navy">
-              {m.qty > 1 && <span className="tabular text-muted-dark">{m.qty} × </span>}
+              {m.qty > 1 && <span className="tabular text-muted-dark">{m.qty} \u00d7</span>}
               {m.name}
             </figcaption>
           </figure>
@@ -566,7 +604,6 @@ export function RequestRail({
         a horizontally scrolling strip would also travel with it, which is the real reason. */}
     {zoom && (
       <CircleZoom
-        title={zoom.label}
         machines={zoom.machines.map((m) => (m.url && broken.has(m.url) ? { ...m, url: null } : m))}
         onClose={() => setZoom(null)}
       />
