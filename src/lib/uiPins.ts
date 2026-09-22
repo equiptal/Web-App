@@ -144,6 +144,7 @@ export const PIN_REGISTRY = {
   "intake-rail-group": { n: "15.2", label: "Intake rail — one project", file: "src/components/create/RequestsRail.tsx" },
   "intake-rail-row": { n: "15.3", label: "Intake rail — one machine", file: "src/components/create/RequestsRail.tsx" },
   "intake-pick-pill": { n: "15.4", label: "Intake — the chosen project and its machines, on the floor", file: "src/components/create/RequestsRail.tsx" },
+  "intake-caret": { n: "15.5", label: "Intake — Mansour, riding the caret", file: "src/components/screens/Intake.tsx" },
   "create-canvas": { n: "16", label: "Create canvas (3 columns)", file: "src/components/create/Canvas.tsx" },
   "machine-card": { n: "17", label: "Machine card", file: "src/components/create/MachineCard.tsx" },
   "machine-card-head": { n: "17.1", label: "Machine card — head row", file: "src/components/create/MachineCard.tsx" },

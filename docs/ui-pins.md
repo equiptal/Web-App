@@ -64,6 +64,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**15.2** | Intake rail — one project | `src/components/create/RequestsRail.tsx` |
 | &nbsp;&nbsp;**15.3** | Intake rail — one machine | `src/components/create/RequestsRail.tsx` |
 | &nbsp;&nbsp;**15.4** | Intake — the chosen project and its machines, on the floor | `src/components/create/RequestsRail.tsx` |
+| &nbsp;&nbsp;**15.5** | Intake — Mansour, riding the caret | `src/components/screens/Intake.tsx` |
 | **16** | Create canvas (3 columns) | `src/components/create/Canvas.tsx` |
 | &nbsp;&nbsp;**16.1** | Create — «leave this request?» confirm | `src/components/create/CreateBack.tsx` |
 | &nbsp;&nbsp;**16.2** | Create — site + schedule locked strip (with «Change») | `src/components/create/Canvas.tsx` |

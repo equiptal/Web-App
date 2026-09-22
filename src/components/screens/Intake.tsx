@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { RequestsRail, ProjectFloorChips, useRequestRail } from "@/components/create/RequestsRail";
@@ -77,11 +77,41 @@ function sizeOf(dataUrl: string | undefined): string {
  */
 const FIELD_TEXT = "px-5 pb-2 pt-5 text-subhead leading-relaxed";
 
+/**
+ * Mansour's size on the caret, in px.
+ *
+ * \u26a0\ufe0f ONE number, read by the element AND by the gap that keeps him off the letter just typed \u2014 a
+ * second copy is how he comes to sit half a character into the word after somebody resizes him.
+ * 22 beside 15px type: the kit sizes him from 20px up, and at the text's own size he reads as a
+ * letter in the sentence rather than as somebody standing in it.
+ */
+const MANSOUR_CARET = 22;
+
 export function Intake() {
   const t = useT();
 
   const { state, actions } = useRfq();
   const mirror = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  const well = useRef<HTMLDivElement>(null);
+
+  /**
+   * Where Mansour stands: the insertion point, in the well's own coordinates. Null draws nothing.
+   *
+   * 🔴 **HE IS THE CARET** (owner, 2026-09-22, with a picture of the box reading «5 dump trucks in
+   * NEOM for 6 weeks» and his head sitting after the last word): *"can u show this mansour icon as our
+   * cursor when typing in the text box"*. ~~A PERCH: a fixed spot on the box's rim, held only while
+   * the AGENT typed.~~ That ruling (2026-09-13) rested on a measurement claim - *"this field is a
+   * mirrored textarea whose glyphs are transparent, there is no element to measure against"* - and
+   * the claim was FALSE about this file even then: the mirror below renders the full text at the
+   * field's own metrics, so the caret's rectangle is one `Range` away.
+   *
+   * ⚠️ The kit's own warning is the thing to respect here, not to ignore: *"a FIXED spot, not a
+   * moving one: his original complaint was that he drifted while you typed"*. Drift is LAG, so there
+   * is no transition on his position and the measurement runs in a LAYOUT effect - he is placed in
+   * the same frame as the character that moved him, and never eases toward it.
+   */
+  const [caret, setCaret] = useState<{ x: number; y: number } | null>(null);
 
   /* Split the box's text around the line the site typed — see `projectTypedLine` in the store.
      `lastIndexOf`, because the template appends: if the same machine name also appears in something
@@ -160,6 +190,133 @@ export function Intake() {
     timer = setTimeout(tick, 400);
     return () => clearTimeout(timer);
   }, [examples, state.text.length]);
+
+  /**
+   * Measure the caret off the MIRROR, with a `Range` and no injected node.
+   *
+   * 🔴 A zero-width `<span>` at the caret offset is the usual trick and is WRONG here. The mirror
+   * wraps on `break-words`, an inline-block is an atomic inline, and one dropped between two letters
+   * is a break opportunity the textarea does not have - so the two copies of the text would wrap
+   * differently, which is the double-vision this technique fails as, and the one risk the block below
+   * already warns about. A `Range` reads the same layout and adds nothing to it.
+   *
+   * ⚠️ The rect comes off the character BEFORE the caret rather than off a collapsed range: a
+   * collapsed range at a soft wrap reports the END of the line it just left in Chrome, so he would
+   * stand off the right edge for the first letter of every wrapped line. At offset 0 there is no
+   * preceding character, so it takes the leading edge of the first one instead.
+   */
+  const place = useCallback(() => {
+    const box = well.current;
+    const mir = mirror.current;
+    const ta = field.current;
+    if (!box || !mir || !ta) return;
+    // Nothing to ride: the placeholder is not the renter's words, and standing on its first letter
+    // would read as him writing the example.
+    if (!state.text) {
+      setCaret(null);
+      return;
+    }
+    const at = Math.max(0, Math.min(ta.selectionStart ?? state.text.length, state.text.length));
+
+    /* WHICH CHARACTER he is measured against, and which side of it he stands on.
+
+       \u26a0\ufe0f Normally the one BEFORE the caret, on its trailing side - that is the letter just typed,
+       and he follows it. But when that character is a SPACE he is measured against the one AFTER
+       instead, on its leading side, so he stands IN the gap between two words rather than on top of
+       one. That is also what fixes a SOFT WRAP: the caret at the start of a wrapped line follows the
+       space that ended the line above, and anchoring to it would leave him at the end of the previous
+       line, a whole row away from where the next letter will appear. */
+    const prev = at > 0 ? state.text[at - 1] : "";
+    const useNext = (prev === "" || /\s/.test(prev)) && at < state.text.length;
+    const idx = useNext ? at : at - 1;
+    if (idx < 0) {
+      setCaret(null);
+      return;
+    }
+
+    const walker = document.createTreeWalker(mir, NodeFilter.SHOW_TEXT);
+    let seen = 0;
+    let node: Text | null = null;
+    let offset = 0;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const len = (n as Text).length;
+      // `>`, not `>=`: the character at index `idx` lives in the node that CONTAINS it, and an index
+      // sitting exactly on a boundary belongs to the node that starts there.
+      if (seen + len > idx) {
+        node = n as Text;
+        offset = idx - seen;
+        break;
+      }
+      seen += len;
+    }
+    if (!node) {
+      setCaret(null);
+      return;
+    }
+
+    const range = document.createRange();
+    /* 🔴 A DECORATION MUST NEVER TAKE THE SCREEN DOWN. jsdom implements `Range` WITHOUT
+       `getBoundingClientRect`, so this threw inside a LAYOUT effect and the whole intake failed to
+       render - two `canvas-history` cases went red on a change that only moves an icon. Anywhere
+       with no layout engine simply gets no rider, which is the honest answer there anyway. */
+    if (typeof range.getBoundingClientRect !== "function") {
+      setCaret(null);
+      return;
+    }
+    range.setStart(node, offset);
+    range.setEnd(node, offset + 1);
+    const r = range.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    // Out of the scrolled view: he would otherwise be drawn against the card's clipped edge.
+    if (!r.width && !r.height) {
+      setCaret(null);
+      return;
+    }
+    if (r.bottom < b.top || r.top > b.bottom) {
+      setCaret(null);
+      return;
+    }
+
+    /* \U0001f534 He stands BESIDE the character, never on it - half his own width plus a letter of air.
+       Centred on the insertion point his disc covered the character just typed, which is the one the
+       renter is looking at; the reference picture shows daylight between the last word and his head.
+       Seen rendered, not reasoned about.
+
+       \U0001f534 The side is decided by the RUN, not by the page. ~~`getComputedStyle(box).direction`.~~ An
+       English sentence typed into the Arabic build is an LTR run inside an RTL box, and signing the
+       gap by the box put him back on top of «tankers» - the same overlap, arrived at from the other
+       side. Seen on screen. A neutral character (a space, a digit, punctuation) carries no direction
+       of its own, so THAT is the one case the container answers. */
+    const RTL_LETTER = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFE]/;
+    const LTR_LETTER = /[A-Za-z\u00C0-\u024F]/;
+    const ch = state.text[idx];
+    const rtlRun = RTL_LETTER.test(ch)
+      ? true
+      : LTR_LETTER.test(ch)
+        ? false
+        : getComputedStyle(box).direction === "rtl";
+
+    const gap = MANSOUR_CARET / 2 + 3;
+    // The edge he hangs off: the character's trailing side when he follows it, its leading side when
+    // he is standing in the space before it. In an RTL run both are mirrored.
+    const rightSide = rtlRun === useNext;
+    const edge = rightSide ? r.right : r.left;
+    const x = edge - b.left + (rightSide ? gap : -gap);
+    setCaret({ x, y: r.top - b.top + r.height / 2 });
+  }, [state.text]);
+
+  /* A LAYOUT effect, not a passive one: he is painted in the same frame as the character that moved
+     him. Keyed on the text, which is what BOTH writers change - the renter's keystroke and the
+     agent's typewriter alike. */
+  useLayoutEffect(() => {
+    place();
+  }, [place, state.projectTypedLine]);
+
+  useEffect(() => {
+    const onResize = () => place();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [place]);
 
   // Server-side guest cap backstop: if localStorage was cleared, the client gate below lets the run
   // through but the BFF blocks it → the store sets guestLimit → open the SAME account modal (no error).
@@ -317,7 +474,7 @@ export function Intake() {
             The mirror always renders the FULL text. When the marked line is not found — the renter
             edited it, which is exactly when it stops being the site's words — it renders everything
             in the ordinary colour, which is byte for byte what this box looked like before. */}
-        <div className="relative flex min-h-[96px] w-full flex-1">
+        <div ref={well} className="relative flex min-h-[96px] w-full flex-1">
           <div
             aria-hidden
             ref={mirror}
@@ -329,40 +486,62 @@ export function Intake() {
           </div>
 
           <textarea
+            ref={field}
             value={state.text}
             onChange={(e) => actions.setText(e.target.value)}
+            /* ⚠️ `onSelect` is the one that fires for a caret MOVE - an arrow key, a click into the
+               middle of a word, a selection - and not only for a selection, despite its name. Without
+               it he would follow typing and then stay behind the moment the renter went back to fix a
+               word. `onScroll` and `onBlur` re-place him because both change where that offset SITS. */
+            onSelect={place}
+            onFocus={place}
+            onBlur={place}
             onScroll={(e) => {
               if (mirror.current) mirror.current.scrollTop = e.currentTarget.scrollTop;
+              place();
             }}
             placeholder={typed}
             aria-label={t.intake.pasteLabel}
-            /* `text-transparent` with `caret-navy`: the mirror below draws the glyphs, this draws the
-               caret and owns every interaction. The placeholder stays visible — it is the element's
-               own, not text, so transparency does not reach it. */
-            className={`${FIELD_TEXT} relative w-full flex-1 resize-none border-0 bg-transparent text-transparent caret-navy outline-none placeholder:text-muted/70 focus-visible:outline-none`}
+            /* `text-transparent`: the mirror below draws the glyphs, this owns every interaction.
+               The placeholder stays visible — it is the element's own, not text, so transparency does
+               not reach it.
+
+               🔴 `caret-transparent`, and MANSOUR is the caret (owner, 2026-09-22, choosing it over
+               keeping the bar beside him). The cost, stated: the blink is gone, so nothing but the
+               focus ring says the box is focused, and an empty box shows no insertion point at all.
+               He is drawn on every caret move, including one made with the arrow keys, so the
+               POSITION the bar used to report is not lost - only its blink. */
+            className={`${FIELD_TEXT} relative w-full flex-1 resize-none border-0 bg-transparent text-transparent caret-transparent outline-none placeholder:text-muted/70 focus-visible:outline-none`}
           />
 
-          {/* ── Mansour, while he is the one writing (owner, 2026-09-13) ───────────────────────
-              *"use it here for typing when u select a project and it auto fills the equipment name,
-              make it like this mansour is writing it"*.
+          {/* ── Mansour, ON THE CARET (owner, 2026-09-22) ──────────────────────────────
 
-              Picking a template has typed its machine into this box, a character at a time, since
-              2026-08-31 - *"I want it shown as typed, like someone is really typing this item"*.
-              That answered HOW and left WHO unsaid, so the line still arrived from nowhere. He
-              stands on the box for the length of the run, `is-live`, and goes.
+              ~~A PERCH on the box's trailing corner, held only while the AGENT typed (2026-09-13).~~
+              He rides the insertion point now, for the renter's own words as much as for the ones a
+              template writes in - which is what the reference picture shows: a sentence the renter
+              typed, with his head immediately after the last word.
 
-              ⚠️ **A PERCH, not a caret.** The kit's own note says he leaves the box and watches
-              from a fixed spot on its rim while somebody else's words go in, *"a FIXED spot, not a
-              moving one: his original complaint was that he drifted while you typed"*. Being the
-              caret needs a measured x for every character, and this field is a mirrored textarea
-              whose glyphs are transparent - there is no element to measure against. The trailing
-              corner is a spot he never leaves.
+              ⚠️ **`translate(-50%, -50%)` on the measured point**, so what lands on the caret is his
+              CENTRE. Anchored by his corner he would sit a third of a character low and to the right
+              of every letter, which reads as a mark that has not quite caught up - the drift the kit
+              complains about, arrived at by geometry rather than by lag.
 
-              ⚠️ `pointer-events-none`: he sits over a field the renter may be typing in, and a
-              decoration that swallows a click on the text is worse than no decoration. */}
-          {state.agentTyping && (
-            <span className="pointer-events-none absolute end-3 top-2.5 z-10">
-              <Mansour size={34} state="live" />
+              ⚠️ **22px** beside 15px type: the kit sizes him from 20px up, and at the text's own size
+              he reads as a letter in the sentence rather than as somebody standing in it.
+
+              ⚠️ `is-live` whoever is writing. The kit's three states are about what he is DOING, and
+              on the caret he is doing the same thing either way.
+
+              ⚠️ `pointer-events-none`: he sits over a field the renter is typing in, and a decoration
+              that swallows a click on the text is worse than no decoration. */}
+          {caret && (
+            <span
+              {...pin("intake-caret")}
+              aria-hidden
+              className="pointer-events-none absolute z-10"
+              style={{ left: caret.x, top: caret.y, transform: "translate(-50%, -50%)" }}
+            >
+              <Mansour size={MANSOUR_CARET} state="live" />
             </span>
           )}
         </div>

@@ -137,16 +137,97 @@ describe("where he is used", () => {
     expect(h1).toMatch(/flex-none/);
   });
 
-  it("the intake perches him on the box while the template is being written", () => {
-    expect(INTAKE).toMatch(/state\.agentTyping/);
-    expect(INTAKE).toMatch(/<Mansour size=\{34\} state="live" \/>/);
+  /** The body of `place`, sliced once: four cases read it, and four `indexOf` calls is four
+   *  chances for one of them to slice nothing and pass vacuously. */
+  const placeBody = () => {
+    const at = INTAKE.indexOf("const place = useCallback");
+    expect(at).toBeGreaterThan(-1);
+    const end = INTAKE.indexOf("}, [state.text]);", at);
+    expect(end).toBeGreaterThan(at);
+    return INTAKE.slice(at, end);
+  };
+
+  /* 🔴 HE IS THE CARET (owner, 2026-09-22: *"can u show this mansour icon as our cursor when typing
+     in the text box"*). ~~A PERCH on the box's trailing corner, drawn only while `agentTyping`.~~ */
+  it("rides the insertion point, for whoever is writing", () => {
+    expect(INTAKE).toMatch(/\{caret && \(/);
+    expect(INTAKE).toMatch(/<Mansour size=\{MANSOUR_CARET\} state="live" \/>/);
+    expect(INTAKE).toMatch(/const MANSOUR_CARET = 22;/);
+    // Not gated on the agent any more: the reference picture is a sentence the RENTER typed.
+    const at = INTAKE.indexOf("{caret && (");
+    expect(INTAKE.slice(at, at + 400)).not.toMatch(/agentTyping/);
+  });
+
+  /* 🔴 He stands BESIDE the character, never on it: centred on the insertion point his disc covered
+     the character just typed, which is the one the renter is looking at.
+
+     🔴 And the side is decided by the RUN, not by the page. ~~The container's `direction`.~~ An English
+     sentence typed into the Arabic build is an LTR run inside an RTL box, and signing the gap by the
+     box put him straight back on top of the last word - the same overlap from the other side. A
+     NEUTRAL character carries no direction of its own, and that is the one case the container answers. */
+  it("keeps clear of the letter just typed, in either script", () => {
+    const body = placeBody();
+    expect(body).toMatch(/const gap = MANSOUR_CARET \/ 2 \+ 3;/);
+    expect(body).toMatch(/RTL_LETTER\.test\(ch\)/);
+    expect(body).toMatch(/LTR_LETTER\.test\(ch\)/);
+    // The container decides ONLY when the character is neutral - it is the fallback arm, never the test.
+    expect(body).toMatch(/: getComputedStyle\(box\)\.direction === "rtl"/);
+  });
+
+  /* ⚠️ A caret that follows a SPACE is measured against the character AFTER it, so he stands in the
+     gap between two words rather than on one - and so a SOFT WRAP puts him at the start of the new
+     line instead of stranding him at the end of the line above. */
+  it("stands in the space rather than on the word, and follows a wrap", () => {
+    const body = placeBody();
+    expect(body).toMatch(/const useNext = \(prev === "" \|\| \/\\s\/\.test\(prev\)\) && at < state\.text\.length;/);
+  });
+
+  /* ⚠️ His CENTRE lands on the measured point. Anchored by a corner he sits low and to the right of
+     every letter, which reads as a mark that has not caught up - the kit's own «he drifted while you
+     typed» complaint, arrived at by geometry instead of by lag. */
+  it("centres on the caret rather than hanging off it", () => {
+    const at = INTAKE.indexOf("{caret && (");
+    expect(INTAKE.slice(at, at + 400)).toMatch(/translate\(-50%, -50%\)/);
+  });
+
+  /* 🔴 The bar is GONE - he is the only insertion point now, which is the owner's own pick over
+     keeping both. A `caret-navy` here would put two carets in one box. */
+  it("leaves no native caret beside him", () => {
+    expect(INTAKE).toMatch(/caret-transparent/);
+    expect(INTAKE).not.toMatch(/caret-navy/);
+  });
+
+  /* ⚠️ Measured with a `Range` over the MIRROR, never with a span injected into it: the mirror wraps
+     on `break-words`, and a zero-width inline-block between two letters is a break opportunity the
+     textarea does not have - the two copies would then wrap differently, which is the double-vision
+     this whole technique fails as. */
+  it("measures the caret without adding anything to the mirror", () => {
+    expect(INTAKE).toMatch(/document\.createRange\(\)/);
+    expect(INTAKE).toMatch(/createTreeWalker/);
+    const body = placeBody();
+    expect(body).not.toMatch(/appendChild|insertBefore/);
+  });
+
+  /* ⚠️ `onSelect` fires for a caret MOVE, not only for a selection. Without it he follows typing and
+     then stays behind the moment the renter goes back to fix a word. */
+  it("follows the caret when it is moved rather than typed", () => {
+    expect(INTAKE).toMatch(/onSelect=\{place\}/);
+    expect(INTAKE).toMatch(/onFocus=\{place\}/);
+  });
+
+  /* A LAYOUT effect: he is placed in the same frame as the character that moved him. A passive one
+     paints him a frame late, which is the drift by another name. */
+  it("places him in the same frame, and never eases toward it", () => {
+    expect(INTAKE).toMatch(/useLayoutEffect\(\(\) => \{\s*place\(\);/);
+    const at = INTAKE.indexOf("{caret && (");
+    expect(INTAKE.slice(at, at + 400)).not.toMatch(/transition/);
   });
 
   it("he cannot swallow a click on the field he stands over", () => {
     // He sits above a textarea the renter may be typing in. A decoration that eats the caret is
     // worse than no decoration.
-    const at = INTAKE.indexOf("state.agentTyping");
-    expect(INTAKE.slice(at, at + 260)).toMatch(/pointer-events-none/);
+    const at = INTAKE.indexOf("{caret && (");
+    expect(INTAKE.slice(at, at + 400)).toMatch(/pointer-events-none/);
   });
 
   it("the typewriter raises and LOWERS the flag, whatever happens", () => {

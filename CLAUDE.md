@@ -2,6 +2,79 @@
 
 ## Change log
 
+- **2026-09-22 - MANSOUR IS THE CARET: he rides the insertion point in the intake box, and the blinking bar is gone.**
+  Owner, with a picture of the box reading «5 dump trucks in NEOM for 6 weeks» and his gear head sitting
+  just after the last word: *"can u show this mansour icon as our cursor when typing in the text bix"*.
+  Asked WHEN and whether the bar stays, he chose **whenever there is text** (the renter's own words as
+  much as the agent's) and **hide the bar - he IS the caret**.
+  🔴 **This REVERSES 2026-09-13's «A PERCH, not a caret»**, and the half of that ruling which blocked
+  it was simply WRONG about this file: *"this field is a mirrored textarea whose glyphs are transparent
+  - there is no element to measure against"*. `Intake.tsx` has rendered a MIRROR since 2026-08-31 - the
+  full text, `whitespace-pre-wrap break-words`, sharing one `FIELD_TEXT` string with the textarea so the
+  two cannot drift - which is exactly the element to measure against. **Checked before building rather
+  than taken on trust**, which is the only reason this was a half-hour's work instead of a refusal.
+  ⚠️ **The kit's own warning is respected rather than ignored.** It says a FIXED spot, *"his original
+  complaint was that he drifted while you typed"*. Drift is LAG: there is no transition on his position
+  and the measurement runs in a **layout** effect, so he is painted in the same frame as the character
+  that moved him. A case pins both.
+  🔴 **Measured with a `Range`, never with a span injected into the mirror.** The usual trick is a
+  zero-width marker at the caret offset, and it is wrong here: the mirror wraps on `break-words`, an
+  inline-block is an ATOMIC INLINE, and one dropped between two letters is a break opportunity the
+  textarea does not have - so the two copies of the text would wrap differently, which is the
+  double-vision this whole technique fails as and the one risk the block already warned about.
+  🔴 **He stands BESIDE the character, never on it** - half his width plus a letter of air. Centred on
+  the insertion point his disc covered the character just typed, which is the one the renter is looking
+  at. Seen rendered, not reasoned about.
+  🔴 **The side is decided by the RUN, not by the page**, and the first cut got this wrong in the way
+  that only a picture finds. ~~`getComputedStyle(box).direction`.~~ An English sentence typed into the
+  ARABIC build is an LTR run inside an RTL box, and signing the gap by the box put him straight back on
+  top of «tankers» - the same overlap, arrived at from the other side. A neutral character (a space, a
+  digit, punctuation) carries no direction of its own, and that is the ONE case the container answers.
+  ⚠️ **A caret that follows a SPACE is measured against the character AFTER it**, so he stands in the
+  gap between two words rather than on one - and that is also what makes a SOFT WRAP land correctly:
+  the caret at the start of a wrapped line follows the space that ended the line above, and anchoring
+  to it would strand him at the end of the previous row.
+  ⚠️ **An EMPTY box draws nothing.** The placeholder types a real request through its examples, and
+  him standing on its first letter would read as him writing the example.
+  🔴 **THE COST, and it is his to overturn in one line.** With the bar hidden he is the only insertion
+  point, so **mid-sentence he covers a letter or two** - a 22px mark cannot stand in a 4px word gap, and
+  no placement fixes that. At the END of the text, which is the picture and the overwhelmingly common
+  case, there is room and he is clear. If it grates: keep `caret-navy` while the caret is not at the
+  end, and he appears only when appending. One condition, in one class string.
+  ⚠️ **MIXED SCRIPT in one box is NOT solved**, and was not before either: English typed into the
+  Arabic build is bidi-reordered by the browser (the leading `5` jumps to the far end), so the visual
+  caret position is genuinely ambiguous and he follows the reordering. Both single-script cases are
+  correct, which is what a renter actually types.
+  Files: `src/components/screens/Intake.tsx` (`place`, `MANSOUR_CARET`, the caret state),
+  `src/lib/uiPins.ts` (**15.5**, new), `docs/ui-{pins,surface-map}.md` (regenerated),
+  `tests/unit/mansour.test.tsx` (the two perch cases rewritten, 6 new; 25 passing).
+  ⚠️ **One `MANSOUR_CARET`, read by the element AND by the gap that keeps him off the letter** - a
+  second copy is how he comes to sit half a character into the word the day somebody resizes him.
+  ⚠️ `onSelect` is what catches a caret MOVE - an arrow key, a click into the middle of a word - and
+  not only a selection, despite its name. Without it he follows typing and then stays behind the moment
+  the renter goes back to fix a word. Pinned, because it reads like a redundant handler.
+  🔴 **My own edit script wrote `\u26A0` into the test file as LITERAL TEXT** rather than as the
+  character, for the fourth time this repo has logged that family. Repaired, and the rule stands: an
+  escape that passes through a script layer is an escape that arrives as prose.
+  ⚠️ The four cases that slice `place`'s body now share ONE helper that asserts its own anchors, so a
+  rename cannot silently slice nothing and pass four assertions vacuously.
+  🔴 **A DECORATION TOOK THE SCREEN DOWN, and only the full suite found it.** jsdom implements
+  `Range` WITHOUT `getBoundingClientRect`, so the measurement threw inside a LAYOUT effect and the
+  whole intake failed to render - two `canvas-history` cases went red on a change that only moves an
+  icon. Guarded: anywhere with no layout engine gets no rider, which is the honest answer there. The
+  rule is the general one, not the jsdom one - a mark that follows the caret must never be able to
+  stop a renter typing.
+  ⚠️ Verified: typecheck clean, lint 0 errors, 82 passing across the six intake, pin and palette
+  suites, and **214 files / 3625 passing, 7 skipped** serially once the guard landed. The one
+  remaining failure is `cancel-confirmation`, PRE-EXISTING and another session’s to fix (its CRLF
+  vacuous-slice anchor, logged 2026-09-20); `ui-pins` went GREEN with this batch, because registering
+  15.5 regenerated the two tables it had been failing on as stale.
+  ⚠️ **SEEN RENDERED on a real dev build at 1568px**, which is how BOTH faults above were found: the
+  reference sentence in English with daylight after «weeks»; a caret moved by arrow keys, which he
+  follows; a wrapped two-line request, where he lands on the second row; the Arabic sentence in the
+  Arabic build, where he sits to the LEFT of the run; and the English-in-Arabic case that caught the
+  container-direction bug.
+
 - **2026-09-22 - The deal room is read off the APP again: the sheet's header, its footer, its terms page and its compare card, plus a contact guard on the chat and TWO term predicates that were silently wrong.**
   Owner: *"can u check the deal room in the app, it has some changes in the ui - in behaviours - terms
   etc can u follow it exactly and align here"*, then, on the scope question, **"all but with web

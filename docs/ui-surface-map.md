@@ -67,7 +67,7 @@ Two things it does not hold, on purpose:
 | `src/components/requests/ShareForBidsSheet.tsx` | 38 Share-for-bids sheet (`share-for-bids`) |
 | `src/components/requests/TermsPanel.tsx` | 36 Terms panel (`terms-panel`) |
 | `src/components/screens/Confirmation.tsx` | 22 Create — confirmation screen (`create-confirmation`) |
-| `src/components/screens/Intake.tsx` | 15 Create — intake screen (`create-intake`) |
+| `src/components/screens/Intake.tsx` | 15 Create — intake screen (`create-intake`) · 15.5 Intake — Mansour, riding the caret (`intake-caret`) |
 | `src/components/screens/Processing.tsx` | 24 Create — processing screen (`create-processing`) |
 | `src/components/stores/BrowsePage.tsx` | 10.5 Browse — banner + supplier directory (`browse-page`) |
 | `src/components/stores/BrowseSurface.tsx` | 61 Browse stores (`browse-surface`) · 61.1 Browse — heading + search + city, one row (`browse-controls`) · 61.2 Browse — category rail (`browse-categories`) · 61.3 Browse — page arrows (`browse-pager`) |
