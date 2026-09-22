@@ -371,6 +371,15 @@ function BidCardTile({
   /** The count actually taken, once a bid is accepted — the app's `agreedUnits ?? unitsOfferedCount`,
    *  which is what turns the units badge from "offers 3" into "2 of 3 accepted". Null before then. */
   const acceptedUnits = accepted ? (card.agreedUnits ?? unitsOffered) : null;
+  /** ⚠️ What the bid COVERS, for the subtext under the firm's name - `null` on a single-unit
+   *  request, where every bid covers all of it. It reads the OFFERED count, never the priced one
+   *  the totals multiply by: they are separate questions and the card keeps them apart. */
+  const unitsLine =
+    card.numberOfUnits > 1
+      ? acceptedUnits != null
+        ? fmt(t.workspace.acceptedUnits, { accepted: String(acceptedUnits), offered: String(unitsOffered) })
+        : fmt(t.workspace.offersUnits, { n: String(unitsOffered) })
+      : null;
   const submitted = card.submittedAt
     ? new Date(card.submittedAt).toLocaleString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : null;
@@ -467,17 +476,28 @@ function BidCardTile({
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-subhead font-extrabold leading-[1.15] text-navy">{card.supplierName}</div>
-          {/* «Supplier · Riyadh», as the app's own card reads (owner, 2026-08-25). The city was on the
-              wire the whole time — the bid-list `supplierProfile` carries it, and `mapBid` was already
-              reading it into the composed national address. The distance keeps its place after it. */}
+          {/* 🔴 **THE CITY, AND WHAT THE BID COVERS** (owner, 2026-09-23, on «Supplier · Riyadh
+              · 8 km»: *"make it, only city and offers x units if multi unit instead of this 2 units
+              badge"*).
+              ~~«Supplier», the city, then the distance.~~ Two of the three earned nothing on a card
+              in a column of bids: every row here IS a supplier, so the word was a caption on the
+              obvious; and the distance is the YARD's, which the equipment map states per machine
+              with its own «not confirmed» qualifier - one rounded figure here implied a precision
+              about a fleet that the map spends a whole surface refusing to claim.
+              ⚠️ **The count moved here FROM the pill column** (below), so the card says it once.
+              Same gate as the badge had - `numberOfUnits > 1`, the app's own: where the renter asked
+              for one machine every bid covers all of it and the line states nothing.
+              ⚠️ **The ACCEPTED shape survives with it.** «2 of 3 units accepted» is a partial
+              award, and it is the one fact the removed badge held that nothing else on the card
+              carries - the green band says THAT it was accepted, never how much of it. */}
           <div className="truncate text-label font-semibold text-muted">
-            {L("Supplier", "مؤجّر")}
-            {card.supplierCity ? ` · ${card.supplierCity}` : ""}
-            {card.distanceKm != null ? ` · ${Math.round(card.distanceKm)} ${L("km", "كم")}` : ""}
+            {[card.supplierCity || null, unitsLine].filter(Boolean).join(" · ")}
           </div>
         </div>
         {/* ── The pill column, as the app builds it (`v3_bid_card._pillColumn`) ─────────────────
-            The control on top, the units badge under it, both against the card's trailing edge. */}
+            The chat control, against the card's trailing edge.
+            🔴 ~~The units badge sat under it.~~ Its count is in the SUBTEXT now (owner,
+            2026-09-23), so the column holds one thing again. */}
         <div className="flex flex-none flex-col items-end gap-1.5">
           {/* ~~«Not on the app», as a pill in the control's place on an off-platform card.~~ Removed
               (owner, 2026-08-31): *"it is already labeled in the card header."* It is — the header
@@ -516,7 +536,6 @@ function BidCardTile({
 
               Gated on the REQUEST being multi-unit, the app's own gate: where the renter asked for
               one machine every bid covers all of it and the badge states nothing. */}
-          {card.numberOfUnits > 1 && <OffersUnitsBadge offered={unitsOffered} accepted={acceptedUnits} />}
         </div>
       </div>
 
@@ -924,30 +943,13 @@ function LegRow({ label, amount, excluded, onRentee }: { label: string; amount: 
   );
 }
 
-/**
- * **The units badge** — the app's `_OffersUnitsBadge`, in the web card's own type scale.
- *
- * Blue and a crate while the offer is open; green and a tick once it is accepted, when it states how
- * much of the offer was actually taken rather than how much was on the table. It reports the OFFER,
- * so it stays put when the deal room negotiates the priced count down — that count is the totals'
- * business, and the note under them says when the two diverge.
- */
-function OffersUnitsBadge({ offered, accepted }: { offered: number; accepted: number | null }) {
-  const t = useT();
-  const isAccepted = accepted != null;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-sm px-2 py-0.5 text-label font-extrabold ${
-        isAccepted ? "bg-ok-soft text-ok" : "bg-info-soft text-info"
-      }`}
-    >
-      <Icon name={isAccepted ? "check_circle" : "inventory_2"} size={12} />
-      {isAccepted
-        ? fmt(t.workspace.acceptedUnits, { accepted: String(accepted), offered: String(offered) })
-        : fmt(t.workspace.offersUnits, { n: String(offered) })}
-    </span>
-  );
-}
+/* 🔴 ~~`OffersUnitsBadge` — the app's `_OffersUnitsBadge`, a pill under the chat control.~~
+   **Deleted** (owner, 2026-09-23: *"offers x units if multi unit instead of this 2 units badge"*).
+   Both of its shapes moved into the subtext under the firm's name, which is where the card's other
+   facts about the offer already live. Deleted rather than left unrendered: a component nothing
+   imports is one edit away from coming back beside the line that replaced it, and then the card
+   states its count twice. `t.workspace.offersUnits` and `acceptedUnits` survive - the subtext is
+   their only reader now. */
 
 /** One slice of a dial: a colour, and the share of the circle it holds (0–1). */
 type DialSlice = { colour: string; share: number };

@@ -7,6 +7,205 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-23 - The term card is read off the app BEHAVIOUR FIRST: the two positions get their own line, the panel carries the colour, the menu replaces the acts, and every settled row can be re-opened.**
+  Owner, on a card reading «Fuel Responsibility  Your choice: not set · Supplier: 24 hours»: *"even
+  these make it middle and more visible + add borders to the buttons and make the red or the gree on
+  the panel iteslf like the app"*, then *"follow the app behavioru when u finish one term the other
+  then opend and u can open it by yourself but now i clciked on conflict it doesnt open"*, *"also
+  allow edit on the terms like the app too. so check if we dont differ on anything in behaviour from
+  the app"*, *"for log use it proper modal not very small. show it like real modal"*, and *"also the
+  buttons language of keep mine, choose another etc, they have some conditions"*.
+  Read against `counter_offer_flow/{term_cards,negotiate_tones,counter_offer_terms_page}.dart`.
+  **FOUR of the nine are BEHAVIOUR**, and they are the ones worth reading.
+  (1) 🔴 **PRESSING A SECTION OPENED AN EMPTY BODY, which is his «i clicked on conflict it doesnt
+  open».** A section draws ONLY the active card, and the active card is the first unanswered row of
+  the WALK - so a conflict that was not next in the walk rendered nothing at all, and its header
+  expanded onto white. The app never meets this because its walk reaches conflicts after the pending
+  rows and the reader arrives at an open one. `openSection(rows)` sets `forcedTerm` to that
+  section's own first unanswered term. ⚠️ **The SAME lever a press on a settled row uses**, never a
+  second one: `activeKey` still falls back to the first unanswered row, so the walk carries on by
+  itself once the forced term is answered.
+  (2) 🔴 **THE OPTIONS REPLACE THE TWO ACTS; they were standing beside them.** The app is an
+  `if/else` (`if (!optionsOpen) _ActionRow(...) else _OptionsPanel(...)`). Drawn together, the
+  button that just opened the menu stands there inviting a second press and «Accept» sits beside a
+  list of values as if it were one of them.
+  (3) 🔴 **THE PICKER PRE-TICKED THE SUPPLIER'S VALUE**, which the app forbids in its own words:
+  the panel opens because the reader wants a DIFFERENT value, so ticking the one on file *"answered
+  the question before they had"* - and a tick meaning «what you have now» sat a row under a tick
+  meaning «agreed». ⚠️ **`myVal` is NOT the right value either, and that is the trap.** Re-opening
+  clears the resolution, after which `myVal` falls back to `renteePreference` - what she asked for on
+  the REQUEST, not the answer she gave on this card. `reopenedVals` remembers the cleared answer (the
+  app's `_reopenedValues`) and `pickedVal` reads that or the standing resolution, nothing else.
+  (4) 🔴 **A TERM THE SERVER SETTLED HAD NO WAY BACK** (*"allow edit on the terms like the app
+  too"*). The ↻ button was drawn only where the renter had a resolution of her OWN, so an agreed
+  term was final on the web and re-openable in the app. It is a **pencil glyph** now, on every
+  editable settled row, and the WHOLE ROW is the target - the app's own note: *"the pencil IS the
+  reopen affordance … a settled term a reader cannot re-open is a decision they cannot take back"*.
+  ⚠️ `onReopenLocal` runs BEFORE `setForcedTerm`: forcing a term that still carries its answer
+  opens the card with the answer already given, which is the state she is trying to leave.
+  **THE SKIN, sampled rather than eyeballed:**
+  (5) **The two positions take their own centred line.** ~~At the end of the NAME's row, so the
+  longer the term's name the smaller its two answers, and the values ellipsised before the label
+  did.~~ 12.5px with values at 14px/800. The app moved the same line for the same reason
+  (`NegSidesLine`); the CENTRING is where this departs from it, on his word.
+  (6) **The panel carries the colour and the button keeps its own**, which are NOT the same value.
+  ~~The clash card wore `--danger-soft` flat, the exact fill «Choose another» wears, so the button
+  vanished into its own card.~~ The app's note says why it keeps two: *"the ground is PALER than
+  kNegRedBg on purpose - the «تغيير» button IS #FDECEC, and a button the same colour as the card it
+  sits on stops looking like a button."*
+  ⚠️ **The percentages are SAMPLED from the app's hexes over white**, not chosen: `kNegRedTint`
+  (#FEF8F7) is the danger token at ~4% and `kNegRedBorder` (#F6D2CE) at ~26%; `kNegBlueBg`
+  (#EAF2FB) is ~10% with `kNegBlueBorder` (#CFE1F5) at ~20%. A pending card is a full BG where a
+  conflict card is a TINT - the app's own asymmetry, because pending holds no open menu to stay
+  readable over.
+  (7) 🔴 **A PENDING CARD TURNS RED WHILE ITS OPTIONS ARE OPEN**, which restores the app's rule and
+  ~~withdraws this log's own of 2026-09-22 («`.picking` follows whichever state the card is in
+  rather than forcing red»)~~. Opening the menu IS choosing to disagree.
+  (8) **A SETTLED ROW IS GREEN, and RED when she countered** (`differs ? kNegRedBg : kNegGreenBg`).
+  The ✓ and the ✎ at 11.5px were the only thing separating «I took his value» from «I refused it»,
+  so a page of answered terms said nothing about which way any of them went. ⚠️ The FULL soft fill
+  here, not the pale tint the live cards wear: a settled row holds no button to stay readable.
+  (9) **The buttons take the app's `btn()` metrics**: a real `BorderSide`, radius 10, 8px vertical,
+  14px/700 centred, each half `flex: 1`. ⚠️ The border is what lets them sit on a tinted card at
+  all. The option pills take theirs too (12/7, full round, 13px/700).
+  (10) **The log is a real modal**: ~~460px and only as tall as its content~~, now 760 x
+  `min(78vh, 700px)`. ⚠️ A stated HEIGHT, not a cap - `max-height` alone lets a short log collapse
+  under its own tabs, and the empty state then has no panel to be centred in.
+  ⚠️ **The button LABELS were checked and are already right**, which is the answer to *"they have
+  some conditions"*: the app's three flags are `changeIsChooseAnother` (pending - nothing of mine
+  stated), `changeIsKeepMine` (`_twoValued`, a conflict whose menu holds only the two values on the
+  card) and neither (a real menu). The web's `changeLabel` is the same three tests. Nothing changed;
+  said out loud rather than silently skipped.
+  Files: `src/components/deal-room/DealRoom.tsx`, `src/components/deal-room/deal-room-proto.css`,
+  `tests/unit/negotiation-sheet.test.ts` (8 new cases, 2 re-pointed; 37 passing).
+  ⚠️ Verified: typecheck clean, lint 0 errors, 37 passing in the sheet's own suite and 130 across
+  the five deal-room / chat / pin suites, and four rulings break-checked one at a time (the picking
+  red removed, the centring removed, the acts drawn beside the menu, the supplier's value pre-ticked
+  again) - each went red alone.
+  🔴 **`sed -i` STRIPPED EVERY CR FROM `DealRoom.tsx`**, converting 2,812 lines to LF in one
+  command - the fourth time this repo has logged that trap and the first time inside `src/`.
+  Caught and restored before the gate. **Use the file tools or a Python rewrite that opens with
+  `newline=""`; `sed` on this machine is not safe on a CRLF file.**
+  🔴 **NOT SEEN RENDERED.** Every one of these needs a signed-in renter with a live deal room and a
+  supplier's standing round, so the colours are argued from the app's own sampled hexes and the
+  behaviours are pinned by cases rather than watched. The first thing to look at is the tinted card
+  with its two bordered buttons on it: the whole of ruling (6) is that those three tones stay apart.
+
+- **2026-09-23 - PENDING terms are the SLATE, not the mustard, and the pair they replace never passed AA.**
+  Owner: *"pending terms in the terms modal must be grey or light blue not this yellow"*.
+  ~~`--warn` on `--warn-soft`.~~ **`--info` on `--info-soft`** in `BidTermsModal`'s `TONE` map, which
+  is read by the bucket header, its dot, its count, the progress bar's segment and the summary chip —
+  so one line moves all five and they cannot drift.
+  🔴 **The old pair FAILED contrast, and nobody had measured it.** `--warn` (#b98a1d) on
+  `--warn-soft` (#f7edd8) is **2.69:1**, under the 4.5 a normal-size label needs; `--info` on
+  `--info-soft` is **6.46:1**. So this was an accessibility fix wearing a colour change's clothes.
+  ⚠️ **Two reasons beyond the instruction**, and both are ones this repo has already written down:
+  `--warn` in this palette is a MUSTARD rather than the amber the app draws — the same mismatch
+  corrected on the canvas's provenance ring (2026-09-08) and the off-catalogue box (2026-09-12) —
+  and it is a FILL token, where `--warn-deep` is the one that may carry text. And **pending is not a
+  WARNING**: it is the ABSENCE of a verdict, and painted the colour of caution it read as a problem
+  beside the red bucket directly above it.
+  ⚠️ **`--info` is this palette's slate, in the ink family.** It has no true blue by design
+  (2026-09-06), and the COMPARISON's terms band already uses it (2026-09-13) — so a term awaiting an
+  answer is one colour across the two surfaces that count them.
+  ⚠️ The other two buckets are untouched: red still means a clash, green still means settled.
+  Files: `src/components/requests/BidTermsModal.tsx`,
+  `tests/unit/bid-terms-panel.test.ts` (3 new cases; 22 passing).
+  ⚠️ **The contrast case COMPUTES from the tokens** rather than asserting a number in prose, so
+  re-tinting either token re-runs the sum instead of leaving a stale claim behind. It also pins that
+  the replaced pair was below the bar, as the record of why.
+  ⚠️ Verified: typecheck clean of this work, 158 passing across the panel, palette and ds-colour
+  suites, and break-checked — the mustard put back, one case went red.
+  🔴 **NOT seen rendered**: the modal needs a signed-in renter with a bid, and the browser extension
+  is still disconnected. The tones are tokens and the contrast is arithmetic, so what wants a look is
+  only whether the slate reads as «light blue» to him or as grey.
+  🔴 **Another session's breakage, unchanged and NOT mine**: `DealRoom.tsx:1546` (`nothingSent`
+  unused) now joins `ProfileView` / `CompanyHub`'s `onViewDetails` and the unparseable
+  `tests/unit/bid-cards-rail.test.ts`.
+
+- **2026-09-23 - A link to a conversation now OPENS it, the request strip leaves every chat, and the price bar takes its place under the header.**
+  Owner, with a staging URL that showed nothing: *"https://webstaging.moedatech.net/inbox?bid=… doesnt show chat in inbox"*, then, on the
+  strip naming the request: *"for the price header of the chat make it in place of [it] — this one
+  can be removed from any chat surface and here in the inbox replace it with price header and make
+  the show details beside it not below the number"*.
+  (1) 🔴 **`/inbox?bid=<id>` opened nothing, and there were TWO causes — either alone enough.**
+  The pane was keyed on a row found in the received-bids feed this screen holds, so a bid off that
+  page had no pane at all; and the card behind it was read with `fetchBids(requestId)`, **which
+  answers EXACT-SIZE bids only** (`sizeMatch` defaults to exact, 2026-09-08), so a bid on a larger
+  machine could never be in the answer and the pane waited on a card that would not arrive. A
+  permanent spinner, from a link.
+  **`fetchBidDetail(openBidId)`** now reads the bid by the id the URL carries — whatever its size,
+  wherever it sits in the feed. That is what makes a pasted link, a notification and a Back from the
+  equipment map all land on the conversation.
+  ⚠️ **It hands back the REQUEST too**, so the price bar is priced without the list having to load
+  first. `openRow` survives for the LIST's highlight alone and nothing the pane draws depends on it.
+  ⚠️ **`RequestRecord` carries the RAW `estimatedDurationDays`**, never `RequestListItem`'s derived
+  `durationDays` — which typecheck caught as `{} | null`. The fallback is `durationDaysBetween`,
+  the same helper the list mapper uses at its own call, because two derivations of one window is how
+  a bid comes to read as two totals on two surfaces.
+  ⚠️ **A failed read SAYS so.** A bid that is gone or a dropped request used to spin for ever.
+  (2) 🔴 **`.bm-chat-req` is REMOVED from every chat surface** — the `assignment` chip carrying the
+  request's short code, its machine and its site. On the MAP it restated the panel beside it, which
+  is the request's own surface; in the INBOX the row that opened the conversation names the same
+  machine under the same RFQ code, one column to the left. A band that repeats its neighbour costs
+  height on the one element with none to spare. Markup and rules both, rather than left inert.
+  (3) **The price bar moved INTO the slot it vacated.** It was above the whole dock, which put it
+  over the counterparty's own name; it now sits directly under the identity band, where the renter
+  reads it before the conversation.
+  ⚠️ **A SLOT (`belowHeader?: ReactNode`), not a prop the dock interprets.** The dock neither prices
+  a bid nor knows what a counter is; handing it a node keeps the money with `PriceFooter`, which owns
+  the `?act=` hand-off into the negotiation sheet, and leaves the dock responsible only for where it
+  sits. The map passes nothing and draws nothing there.
+  (4) **«Show details» sits BESIDE the figure** in the slim bar. The full-height bar stacks the rate
+  over its link because it has 58px to do it in; at 46 that second line is what made the slab feel
+  tall. `.bm-foot-figs` is a baseline ROW under `.is-slim`.
+  Files: `src/components/inbox/InboxView.tsx`, `src/components/map/ChatDock.tsx`,
+  `src/components/map/map-proto.css`, `tests/unit/inbox-two-pane.test.ts` (3 cases re-pointed,
+  5 new; 33 passing).
+  ⚠️ **`reqTerms` was swept rather than left**: the price bar reads the detail's own request now, so
+  the map it was building had no reader. Lint caught it.
+  ⚠️ Verified: typecheck clean OF THIS WORK, lint 0 errors, **387 passing across eight inbox, dock,
+  map and palette suites**.
+  🔴 **NOT seen rendered**, which is the gap that matters here: the bug was reported FROM staging
+  and the fix is argued from the two call signatures rather than watched. The browser extension has
+  been disconnected since the previous batch.
+  🔴 **ANOTHER SESSION IS COMMITTING THIS TREE.** `08114c92` carries my inbox work, pushed by them
+  — which is how a staging URL for it existed at all. `npm run typecheck` currently reports their
+  `onViewDetails` across `ProfileView` / `CompanyHub`, and `tests/unit/bid-cards-rail.test.ts` does
+  not PARSE: a regex literal opened at line 139 runs across a line break. Reported, NOT fixed.
+
+- **2026-09-23 - The company logo is matched to the app: it is the mark on the company card, and it can be changed and removed.**
+  Owner: *"now users can upload a logo to their companies right?"*, then *"match it"* once the answer
+  turned out to be only half yes. Read off `company_logo_editor.dart` and `company_page.dart:765`.
+  🔴 **The web could SET a logo once and never touch it again.** `PUT /api/me/profile` wrote the
+  key behind `if (str(body.companyLogoKey))`, which drops an EMPTY string, and an empty key is the
+  backend's own clear (`input.companyLogoKey || null`, exactly what the app sends from
+  `_save(kind, key: '')`). So remove could not be built at all, and the only two links to the logo
+  dialog (`?logo=1`, from the quotation and the deal room) both carry `!companyLogoUrl` - they vanish
+  once a mark exists. A renter with a logo had no door anywhere in the web. Three states now: absent
+  leaves it alone, empty removes it, a key sets it.
+  🔴 **The mark is the company card's avatar**, which is where the app puts it. The generic
+  `business_center` disc said «a company» on a row that already names which one, while the logo the
+  renter uploads was printed on his quotations, his shared link and the bid form suppliers open and
+  was invisible to him. Owner taps it to add, change or remove; initials while there is none.
+  ⚠️ **Owner-gated, and withheld rather than disabled** (`CompanyLogoEditor.isOwner`). A member
+  sees the same mark with no press and no dashed edge: an «add» affordance a member cannot use reads
+  as a fault, not as a rule.
+  ⚠️ **A half-filled profile is told, not refused.** `updateProfileSchema` extends
+  `completeProfileSchema` and makes all four names `min(2)`, and there is no logo-only PUT, so the
+  four ride every call including the clear. Without the app's `_blockedReason` a renter who verified
+  a company before finishing his profile taps an ordinary-looking control and gets a raw 422.
+  ⚠️ **Remove asks first, in the same box.** It takes the mark off three documents at once,
+  and the app confirms too. One dialog, two states, never a second layer.
+  Files: `src/app/api/me/profile/route.ts`, `src/components/company/CompanyLogoModal.tsx`,
+  `src/components/company/CompanyHub.tsx`, `src/components/profile/ProfileView.tsx`,
+  `src/lib/i18n/en.ts`, `src/lib/i18n/ar.ts`, `tests/unit/company-logo.test.ts`,
+  `tests/unit/profile-company.test.tsx`. Copy is the app's own, string for string.
+  ⚠️ Still divergent, reported not fixed: the app's control is role-aware and edits the STORE
+  logo for an active supplier (`PUT /suppliers/me/store`), deliberately giving a supplier no separate
+  company logo. The web is renter-side only, so it keeps `companyLogoKey` and has no store to hang a
+  mark on. `CompanyDetails` still maps `logoUrl` and never draws it; the card is where the app shows it.
+
 - **2026-09-23 - The profile shows every field the form collects, and the company's papers have a door again.**
   Owner, with a screenshot: *"first i must view all fields here, why the company name not shown, also
   for company entity in the app he can view its details and edit, use the same endpoints here"*.
@@ -414,6 +613,46 @@ reversal, or the reason an odd-looking line is load-bearing.
   shared link and have no Stream channel, so there is nothing to open beside the list. They live
   per-request, as the empty state says.
 
+- **2026-09-23 - Intake: the project panel's machines are 24px circles; processing: the machine circle is 184px with a halo ring.**
+  Owner: *"show the equipment images as circles not squares and make them a little bit bigger"* and
+  *"make the circle of image bigger and more visible and catchy"*. `MachineArt` (the panel rows and the
+  floor chips) went from an 18px `rounded-sm` square to a 24px bordered circle, same 1.34 fill; the
+  glyph fallback sits in the same circle. Processing: 144/134 to 184/172, a 4px ring, a pale brand ring
+  10px outside it, Mansour 72 to 92 and his corner 38 to 46. ⚠️ A RING, not a shadow (shadows were taken
+  off the product on 2026-08-26). Tests updated to the new sizes in his words.
+  Files: `src/components/create/RequestsRail.tsx`, `src/components/screens/Processing.tsx`,
+  `tests/unit/{intake-rail.test.ts,mansour.test.tsx}`.
+- **2026-09-23 - The bid map is white, opens close on the project and its machines, and every machine picture fills its circle and its card cell.**
+  Owner: *"the map looks weird, can't it be white and more zoomed in… make the equipment image full fit
+  in the circle like the requests strip and even the image in the equipment card"*.
+  The opening fit was capped at `SITE_ZOOM` (11), the right view of a site alone, so a machine 7.5 km
+  out sat in a whole-city view; `FIT_MAX_ZOOM` 15 now (`fitBounds` still widens for a far machine).
+  Google gets a white style (`WHITE_MAP`, palette literals from `ds-colors`); the Esri fallback is its
+  Light Grey canvas plus labels, ~~World Street Map~~ whose tan relief read as desert.
+  🔴 The 9px inscribed-square inset for catalogue drawings (2026-09-22) is withdrawn: every picture is
+  `cover`, which is the requests strip's own ×1.34 fit stated directly. ⚠️ A wide machine's tracks can
+  be clipped at the rim; that is the trade the owner chose. The card cell is `cover` too, and a machine
+  with no photo shows the request's catalogue picture instead of the grey placeholder, the same
+  fallback its circle takes.
+  Files: `src/components/map/{MapCanvas,EquipmentList,BidMapWorkspace}.tsx`, `src/components/map/map-proto.css`.
+- **2026-09-23 - Negotiation parity with the app: read receipts, accept sends the live figures, full history, the reopen warning, the unit-change check.**
+  Owner, after an app-vs-web audit: *"fix them here to match the app"*.
+  🔴 **Unread never cleared from the web.** The badges are Stream's read state (`getUnreadCounts`), and
+  no web code called `markRead`; the app does on connect and on each new message. `ChatDock` now marks
+  the shown tab read while OPEN (a shut dock still watches the anchor's channel; that is not reading).
+  🔴 **Accept sent the last agreement, not the live position.** `doAccept` sent
+  `room.agreedUnits ?? room.numberOfUnits` and no leg fields while the price bar priced the latest
+  round, so accepting a counter of 2 units with delivery removed could record 3 with delivery on. It
+  now sends the live round's units, leg counts and exclusions, as the app's `_accept` sends its draft;
+  an excluded leg sends no count.
+  **Full history**: `loadFullHistory` pages back up to 5 pages (the app's `_ensureRoundsLoaded` cap)
+  before the rounds are built; `watch()` returns only the newest page.
+  **Reopen** now says it frees the equipment and reopens the request (the app's `dealReleaseMessage`,
+  and what the backend's `releaseDeal` does). **Units**: the first change of any of the three counts
+  asks once, showing 3 → 2, in the app's words.
+  ⚠️ Not seen running; reasoned from both codebases and pinned by the existing 964 cases only.
+  Files: `src/components/map/ChatDock.tsx`, `src/components/deal-room/DealRoom.tsx`,
+  `src/lib/chat/stream-connection.ts`.
 - **2026-09-23 - The bid map draws GOOGLE's map through the Maps JavaScript API; the Map Tiles attempt is withdrawn.**
   Owner: *"why we cant use this"*. 🔴 ~~Map Tiles API (`createSession` + `2dtiles`)~~, the entry below:
   every Google key we hold refuses it (web key and two app keys `API_KEY_SERVICE_BLOCKED`, the fourth

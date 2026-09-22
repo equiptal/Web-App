@@ -111,7 +111,8 @@ describe("where he is used", () => {
      * own drawing of a real machine, and he takes it only when there is no drawing to hold — an
      * off-catalogue line, or a taxonomy that failed to load.
      */
-    expect(PROCESSING).toMatch(/<Mansour size=\{72\} state="live" \/>/);
+    // 92 since the disc grew to 172 (owner, 2026-09-23: *"make the circle of image bigger"*).
+    expect(PROCESSING).toMatch(/<Mansour size=\{92\} state="live" \/>/);
     // ⚠️ The ELEMENT, not the word: the note above that line still names the glyph it replaced, so
     // a bare search would fail on the file's own explanation of itself.
     expect(PROCESSING).not.toMatch(/<Icon name="precision_manufacturing"/);
@@ -120,7 +121,7 @@ describe("where he is used", () => {
   it("and keeps the corner whenever the ring holds a machine", () => {
     // The machine is the subject and he is the one who found it — the slot the old screen's «it is
     // running» dot used to hold, now saying WHO as well as whether.
-    expect(PROCESSING).toMatch(/<Mansour size=\{30\} state="live" \/>/);
+    expect(PROCESSING).toMatch(/<Mansour size=\{36\} state="live" \/>/);
   });
 
   it("the intake seats him BEFORE the question, on the heading's own line", () => {

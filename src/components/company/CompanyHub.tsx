@@ -54,6 +54,8 @@ export function CompanyHub({
   onCompany,
   onCreateCompany,
   onViewDetails,
+  logoUrl = null,
+  onEditLogo,
 }: {
   embedded?: boolean;
   /** Reports the firm (or its absence) to the page around it — the profile prints one name, not two. */
@@ -77,6 +79,14 @@ export function CompanyHub({
    * submission gets both presses, as it does in the app.
    */
   onViewDetails?: () => void;
+  /** The firm mark on file, presigned by `/api/me` (`companyLogoUrl`). */
+  logoUrl?: string | null;
+  /**
+   * Open the logo dialog. Withheld for a MEMBER, which is the app own gate
+   * (`CompanyLogoEditor.isOwner`): this card is the firm identity, and only its owners act on it.
+   * A member sees the same mark with no picker.
+   */
+  onEditLogo?: () => void;
 } = {}) {
   const t = useT();
   const c = t.company;
@@ -230,6 +240,8 @@ export function CompanyHub({
           embedded={embedded}
           busy={busy}
           onViewDetails={onViewDetails}
+          logoUrl={logoUrl}
+          onEditLogo={onEditLogo}
           onApprove={(m) => void run(() => approveMember(m.userId))}
           onRemove={(m) => void run(() => removeMember(m.userId))}
           onPromote={(m) => setConfirm(promoteSpec(m))}
@@ -516,6 +528,43 @@ function PendingPanel({
 
 // ── States 3 & 4: active member / owner ──────────────────────────────────────
 
+/**
+ * The firm mark: its logo, or its initials while it has none.
+ *
+ * ⚠️ **`object-contain` on a SQUARE, never `cover`.** A logo is artwork with its own margins,
+ * and most of them are wordmarks: `cover` crops one to its middle third and shows a firm two
+ * letters of its own name at random. The app makes the same call for the same reason.
+ *
+ * ⚠️ **The dashed edge is drawn only for someone who can act on it.** An «add» affordance a
+ * member cannot use is a control that looks broken; a member gets the plain monogram.
+ */
+function CompanyMark({ name, logoUrl, onEdit }: { name: string; logoUrl: string | null; onEdit?: () => void }) {
+  const t = useT();
+  const p = t.verify.pile;
+  const monogram = (name || "?").trim().slice(0, 2).toUpperCase();
+  const inner = logoUrl ? (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img src={logoUrl} alt="" className="h-full w-full object-contain" />
+  ) : (
+    <span className="text-meta font-extrabold">{monogram}</span>
+  );
+  const base =
+    "grid size-9 flex-none place-items-center overflow-hidden rounded-sm border bg-surface text-brand";
+  if (!onEdit) return <span className={`${base} border-border`}>{inner}</span>;
+  const label = logoUrl ? p.logoChange : p.logoAdd;
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      title={label}
+      aria-label={label}
+      className={`${base} transition hover:border-brand ${logoUrl ? "border-border" : "border-dashed border-brand/45"}`}
+    >
+      {inner}
+    </button>
+  );
+}
+
 function ActiveCompany({
   company,
   embedded,
@@ -527,6 +576,8 @@ function ActiveCompany({
   onExit,
   onCopied,
   onViewDetails,
+  logoUrl,
+  onEditLogo,
 }: {
   company: MyCompany;
   /** Inside the profile: no masthead, and one column — the profile's own is already narrow. */
@@ -540,6 +591,8 @@ function ActiveCompany({
   onCopied: () => void;
   /** Open the firm's particulars. Absent when nothing has been submitted — see `CompanyHub`. */
   onViewDetails?: () => void;
+  logoUrl?: string | null;
+  onEditLogo?: () => void;
 }) {
   const t = useT();
   const c = t.company;
@@ -656,9 +709,18 @@ function ActiveCompany({
           this shape has to beat if the firm ever gets a page again. */}
       {embedded ? (
         <div className="flex flex-wrap items-center gap-2.5 rounded-sm border border-border bg-surface2 px-4 py-3">
-          <span className="grid size-8 flex-none place-items-center rounded-full bg-brand-soft text-brand">
-            <Icon name="business_center" size={17} />
-          </span>
+          {/* 🔴 **The firm mark, where the app puts it** (owner, 2026-09-23: *"match it"*).
+              ~~A generic `business_center` disc.~~ It said «a company» on a row that already names
+              which one, and the logo the renter uploads had nowhere on this page to be seen at
+              all: it was collected by the verification form, printed on the quotation and the bid
+              form, and invisible to the person who owns it. In the app the mark IS this avatar
+              (`company_logo_editor.dart`, in the My Company header) and tapping it is how a logo
+              is added, changed or removed. */}
+          <CompanyMark
+            name={company.name}
+            logoUrl={logoUrl ?? null}
+            onEdit={company.isOwner ? onEditLogo : undefined}
+          />
           <span className="min-w-0">
             <span className="block truncate text-body font-extrabold text-navy">{company.name}</span>
             <span className="block text-meta text-muted">{company.isOwner ? c.roleOwner : c.roleMember}</span>

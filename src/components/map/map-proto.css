@@ -344,7 +344,10 @@
   line-height: 1;
   color: color-mix(in srgb, var(--navy-deep) 50%, transparent);
 }
-/* 🔴 **The drawing is inset to the circle's INSCRIBED SQUARE** (owner, 2026-09-22, on a marker
+/* 🔴🔴 **WITHDRAWN 2026-09-23, below: every picture now FILLS the circle.** The inset note is kept as
+   the record of why a drawing once sat small inside it.
+
+   ~~🔴 **The drawing is inset to the circle's INSCRIBED SQUARE**~~ (owner, 2026-09-22, on a marker
    whose excavator ran past the rim: *"make sure the images fit the circule or the side rectangle"*).
 
    `contain` fits a drawing to the BOX, and the box here is the circle's bounding square — so a wide
@@ -360,17 +363,20 @@
    ⚠️ The PHOTO arm is untouched and must stay `inset: 0` with `cover`: a photograph has no
    transparent ground, so filling the disc and cropping to it is what makes it read as a picture
    rather than as a stamp floating in a ring. Same split the request rail's `fitOf` makes. */
+/* **FULL FIT, photo or drawing** (owner, 2026-09-23: *"make the equipment image full fit in the
+   circle like the requests strip… without margins or padding"*). The requests strip draws the
+   catalogue art at `contain` scaled ×1.34 (`CircleArt.tsx` `fitOf`), and 1.34 is that artwork's own
+   aspect, so the drawing's height meets the circle and its sides are cut by the round clip: that is
+   `cover`, stated directly. ⚠️ The price, and the reason the inset existed: a wide machine's tracks or
+   boom tip can be clipped at the rim. The owner chose the fill. */
 .bm-pin .bm-pin-img {
   position: absolute;
-  inset: 9px;
+  inset: 0;
   background-color: transparent;
   background-position: center;
   background-repeat: no-repeat;
-  /* `contain` for the taxonomy cut-out, which carries its own transparent ground. */
-  background-size: contain;
+  background-size: cover;
 }
-/* The supplier's PHOTO fills the circle and is cropped to it, as the fleet card crops it. */
-.bm-pin .bm-pin-art.is-photo .bm-pin-img { inset: 0; background-size: cover; background-position: center; }
 /* Anchored to the STAGE, not to the object: the object carries a `filter`, which would make it the
    containing block and drag the tick around with the lift. */
 .bm-pin .bm-pin-tick {
@@ -1254,7 +1260,7 @@ main:has(.bidmap) > .page-back-bar {
    intrinsic height: a portrait photo made its card 225px tall while its neighbours stayed 120. Placed
    absolutely, the TEXT column alone decides the card's height and the photo is cropped to it. The
    placeholder `Photo` draws on a missing picture is an `img` too, so the same rule holds it. */
-.bidmap .bm-eq .bm-eq-photo > img { position: absolute; inset: 0; }
+.bidmap .bm-eq .bm-eq-photo > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; padding: 0; }
 .bidmap .bm-eq .bm-eq-art { width: 100%; height: 100%; object-fit: cover; transition: transform 0.35s cubic-bezier(0.22, 0.9, 0.3, 1); }
 .bidmap .bm-eq:hover .bm-eq-art { transform: scale(1.06); }
 .bidmap .bm-eq .bm-eq-nophoto { font-size: 9.5px; font-weight: 600; color: var(--muted); text-align: center; padding: 0 6px; }
@@ -2277,7 +2283,12 @@ main:has(.bidmap) > .page-back-bar {
    is still the largest thing on the row, which is the only property that matters. */
 .bidmap .bm-foot.is-slim .bm-foot-amt { font-size: 17px; }
 .bidmap .bm-foot.is-slim .bm-foot-unit { font-size: 10.5px; }
-.bidmap .bm-foot.is-slim .bm-foot-meta { margin-top: 1px; }
+/* 🔴 **BESIDE the figure, not under it** (owner, 2026-09-23: *"make the show details beside
+   it not below the number"*). The full bar stacks the rate over its link because it has 58px to do
+   it in; at 46 that second line is what makes the slab feel tall. `.bm-foot-figs` becomes a ROW and
+   the link sits on the figure's own baseline. */
+.bidmap .bm-foot.is-slim .bm-foot-figs { display: flex; align-items: baseline; gap: 10px; }
+.bidmap .bm-foot.is-slim .bm-foot-meta { margin-top: 0; }
 .bidmap .bm-foot.is-slim .bm-foot-cta { padding: 6px 12px; font-size: 11.5px; }
 /* The breakdown opens DOWNWARD out of a bar at the top, so its rule sits above it rather than
    below — the same edge-flip as the slab's own border. */
@@ -3109,32 +3120,359 @@ main:has(.bidmap) > .page-back-bar {
 .bidmap .bm-chat-menu button.danger .material-icons-outlined { color: var(--danger); }
 .bidmap .bm-chat-menu button.danger:hover { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 
-/* What the conversation is ABOUT — the room's `assignment` chip as a quiet strip under the identity
-   band. It STATES and does not navigate (see the component), so it carries no chevron and no hover:
-   a strip that looked pressable and was not is worse than one that plainly is not. */
-.bidmap .bm-chat-req {
+/* 🔴 ~~`.bm-chat-req` — the `assignment` strip naming the request under the identity band.~~
+   REMOVED (owner, 2026-09-23: *"this one can be removed from any chat surface"*). It restated the
+   panel beside it on the map and the row beside it in the inbox, and cost the conversation a band
+   of height to do it. The slot is the dock's `belowHeader` now, which the inbox fills with the
+   price bar. Deleted rather than left inert — the ruling this repo took on the dune sweep. */
+
+.bidmap .bm-chat-tabs { flex-shrink: 0; display: flex; gap: 6px; padding: 8px 18px; overflow-x: auto; background: var(--surface); border-bottom: 1px solid var(--surface2); }
+.bidmap .bm-chat-tab {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--navy);
+  cursor: pointer;
+  max-width: 160px;
+}
+.bidmap .bm-chat-tab.is-on { background: color-mix(in srgb, var(--action) 10%, transparent); border-color: color-mix(in srgb, var(--action) 30%, transparent); color: var(--action); }
+.bidmap .bm-chat-tab-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bidmap .bm-chat-tab-n { flex-shrink: 0; min-width: 15px; height: 15px; border-radius: var(--radius-sm); background: var(--brand-light); color: var(--warn-deep); font-size: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+/* The stream's own values, from `pChat` (prototype 05:28): `padding: 16px`, `gap: 8px`, and a TINTED
+   ground — the prototype's own `var(--surface3)`, not the panel's white and not the blue-leaning `var(--surface2)`
+   this carried. The tint is what separates the conversation from the chrome around it; on white the
+   bubbles had nothing to sit on and the stream ran into the composer. */
+.bidmap .bm-chat-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--surface2); }
+.bidmap .bm-chat-note { margin: auto 0; text-align: center; font-size: 10.5px; font-weight: 600; color: var(--muted); line-height: 1.8; padding: 14px 6px; }
+/* ── The bubbles moved to the BASE (owner, 2026-08-19) ───────────────────────────────────────────
+   *"we have now 2 chats style… i want both to be the same, the style i want is the one in the map."*
+
+   This block held the dock's whole bubble treatment as an override, and its own comment defended the
+   fork: *"that surface has its own spec and its own prototype… none of it may move for this one."*
+   The owner has ruled the other way, so the values are now `deal-room-proto.css`'s own `.dlproto .msg`
+   rules — which this dock already reads, since its root is `bm-chat dlproto` (`ChatDock.tsx:743`).
+
+   Nothing here renders differently. The dock kept exactly these numbers; the deal room gained them.
+   Restoring a difference means editing the base and accepting that BOTH routes move. */
+/* ── A card is a message, so it takes a side (`chatMsg`, prototype 05:140–141) ────────────────────
+   The AUTHOR's own card on his side, the other party's on theirs, at the prototype's 86% — and the
+   component decides which by reading the Stream author rather than the card's type, so the same
+   channel sides correctly for the renter and for the supplier (owner, 2026-08-11: *"make these cards
+   appear like messages sent by the other side or by me"*).
+
+   THE WIDTH IS ON THIS WRAPPER, and it is a ceiling as well as a share. It used to be 86% of the
+   column with the card itself a 376px block INSIDE it, which — now that the drawer fills the canvas
+   rather than being a 436px panel — parked every card 14% in from the edge with white on both sides:
+   the floating-in-the-middle the owner reported. Sided, capped, and the card fills its wrapper. */
+.bidmap .bm-chat-card { max-width: min(86%, 376px); width: 86%; }
+/* The request card is HORIZONTAL since 2026-09-08, so the wrapper that sides it gives it the room:
+   376px was the stacked card's width and would squeeze the two columns back into one. It applies to
+   `.bm-chat-card` holding a `.bm-rq` only — a negotiation `.chatcard` keeps its own width. */
+.bidmap .bm-chat-card:has(> .bm-rq) { max-width: min(92%, 520px); }
+.bidmap .bm-chat-card.is-mine { align-self: flex-end; }
+.bidmap .bm-chat-card.is-them { align-self: flex-start; }
+/* The card fills the wrapper that took the side. A width of its own here is a second opinion about
+   the same geometry, and the disagreement is what left it floating. Both cards this stream sides are
+   named: the renter loop's own `.bm-rq`, and the deal room's `.chatcard`, whose `min(340px, 92%)` is
+   right on a full-width route and leaves a gap at the edge of a sided bubble here. */
+.bidmap .bm-chat-card .bm-rq,
+.bidmap .bm-chat-card .chatcard { width: 100%; max-width: none; margin: 0; }
+/* The negotiation vocabulary is NOT sided — a rate, a counter, an acceptance is an event in the room
+   rather than either party's remark.
+   ~~`.bm-chat-event`, a centred wrapper around a full `ChatCard`.~~ A GREY PILL, the app's
+   `DealSystemEvent` (owner, 2026-09-22): centred, `muted` at 20% with a 30% ring, fully round,
+   `7px 12px`, a 14px muted icon and one 12px navy line, two lines at most. The weight is the design
+   system's 600 rather than the app's w700, whose Inter this surface does not draw at 700. */
+.bidmap .bm-chat-pill {
+  align-self: center;
+  max-width: 85%;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--muted) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+  border-radius: 999px;
+}
+.bidmap .bm-chat-pill .material-icons-outlined { flex-shrink: 0; font-size: 14px; color: var(--muted); }
+.bidmap .bm-chat-pill-t {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--navy);
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* ── The composer (`05-chat-and-requests.js:42–45`) ───────────────────────────────────────────────
+   The prototype's own numbers, which ours ran a size under across the board: a 32px send, r18,
+   `8px 12px`, 11.5px ink and a WHITE field inside `var(--surface3)`. At that size the row read as a search
+   box bolted under a conversation rather than as the place you write in it — and the pale field on
+   white had no edge of its own at all. r20 · `10px 14px` · 12.5px on `var(--surface)` inside `var(--border-strong)`, and
+   a 40px send, are what the prototype draws. */
+.bidmap .bm-chat-compose {
+  flex-shrink: 0;
+  /* 76px and `0 18px` — `pChat`'s own words: *"same footer geometry as the panels"*. It is the price
+     bar's height, so the two columns end on one line the way they start on one. */
+  min-height: 76px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 18px;
-  border-bottom: 1px solid var(--surface2);
+  padding: 0 18px;
   background: var(--surface);
-  min-width: 0;
+  border-top: 1px solid var(--border);
 }
-.bidmap .bm-chat-req .material-icons-outlined { flex-shrink: 0; font-size: 16px; color: var(--muted); }
-.bidmap .bm-chat-req-t {
-  min-width: 0;
+.bidmap .bm-chat-input { flex: 1; min-width: 0; border: 1px solid var(--border-strong); border-radius: 999px; /* a capsule: this control is round by shape, not by scale */ padding: 10px 14px; font: inherit; font-size: 12.5px; color: var(--navy); background: var(--surface2); }
+.bidmap .bm-chat-input:disabled { opacity: 0.65; }
+.bidmap .bm-chat-send { flex-shrink: 0; background: var(--action); border: 0; color: var(--surface); border-radius: 50%; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.bidmap .bm-chat-send:disabled { opacity: 0.5; cursor: default; }
+.bidmap .bm-chat-send .material-icons-outlined { font-size: 18px; }
+/* The send glyph points the way the message travels, so it mirrors with the script. */
+.bidmap[dir="rtl"] .bm-chat-send .material-icons-outlined, [dir="rtl"] .bidmap .bm-chat-send .material-icons-outlined { transform: scaleX(-1); }
+/* ── Attach + mic (owner, 2026-08-11) ─────────────────────────────────────────────────────────────
+   `.ib` is the class `VoiceRecorder` already renders — the deal room styles it under `.composer`, a
+   selector that does not reach here, so the component is mounted UNCHANGED and dressed for this
+   surface instead. The prototype's 38px, restored: these were held at 34 only because the dock was
+   `min(360px, 100% - 60px)` wide and two round controls at 38 left the input no room for a phrase.
+   The drawer is now the width of the canvas beside the panel, so the constraint that shrank them is
+   gone and the prototype's own size stands. */
+.bidmap .bm-chat-compose .ib {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.bidmap .bm-chat-compose .ib:disabled { opacity: 0.5; cursor: default; }
+.bidmap .bm-chat-compose .ib .material-icons-outlined { font-size: 17px; }
+/* The recorder's own send, while it holds the row. Same fill as the composer's, so "send" is one
+   colour on this surface whatever is being sent. */
+.bidmap .bm-chat-compose .ib.send { background: var(--action); border-color: var(--action); color: var(--surface); }
+.bidmap[dir="rtl"] .bm-chat-compose .ib.send .material-icons-outlined, [dir="rtl"] .bidmap .bm-chat-compose .ib.send .material-icons-outlined { transform: scaleX(-1); }
+/* The recorder's running row — `VoiceRecorder` sizes itself inline; this only keeps its text from
+   overflowing a card this narrow. */
+.bidmap .bm-chat-compose .vn-rec { min-width: 0; }
+.bidmap .bm-chat-compose .vn-rec > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A refused or failed attachment. Its own row ABOVE the composer, not inside it: a message squeezed
+   into a 340px flex row would take the width the input needs, and it is not part of the
+   conversation, so it must not go in the stream and scroll away. */
+.bidmap .bm-chat-err {
+  flex-shrink: 0;
+  padding: 7px 18px;
+  border-top: 1px solid var(--danger-border);
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+  color: var(--danger-press);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* A card LOOSE in the stream — one that reached the body without the sided wrapper above. It keeps
+   the same ceiling, and nothing else: the `align-self: flex-end` that used to live here pinned every
+   card to the outgoing edge whoever wrote it, which is precisely the reading the author-sided
+   wrapper replaced (owner, 2026-08-11). Side is the wrapper's business now, in one place. */
+/* 520px, up from 376 (owner, 2026-09-08). The card is a ROW now — counterparty on the leading edge,
+   the ask beside it — and 376px was the width of the stacked version. */
+.bidmap .bm-chat-body > .bm-rq { width: 100%; max-width: min(86%, 520px); }
+/* The draft sits between the stream and the composer, pinned, exactly where `rPendingCard` puts it —
+   it must not scroll away with the conversation it is about to join. */
+.bidmap .bm-chat-draft { flex-shrink: 0; padding: 12px 18px; border-top: 1px solid var(--surface2); }
+/* The card itself keeps the stream's ceiling — pinned, but still one message's width. */
+.bidmap .bm-chat-draft .bm-rq { width: 100%; max-width: 520px; }
+
+/* Prototype keyframes — `design.md` §5 plus `design-v3.md` §7, verbatim. All disabled under
+   `prefers-reduced-motion`. */
+/* `dpPulse` is deliberately NOT here. It exists in the prototype's stylesheet, but on this surface it
+   only ever drove the project pin's ring — and the prototype's project pin is a silent teardrop. A
+   keyframe kept for completeness is a keyframe the next reader goes looking for a user of. */
+@keyframes dpFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes dpPing {
+  0% { outline: 0 solid color-mix(in srgb, var(--brand-light) 50%, transparent); outline-offset: 0; }
+  70% { outline: 8px solid color-mix(in srgb, var(--brand-light) 0%, transparent); outline-offset: 0; }
+  100% { outline: 0 solid color-mix(in srgb, var(--brand-light) 0%, transparent); outline-offset: 0; }
+}
+/* Cards arrive in sequence rather than all at once — the list reads as being built in distance order,
+   not dumped. */
+@keyframes dpCardIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+/* The photo placeholder, travelling under a decoding image. */
+@keyframes dpShimmer { 0% { background-position: 120% 0; } 100% { background-position: -120% 0; } }
+/* An unanswered question is live: the unconfirmed chip's dot breathes. */
+@keyframes dpDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.72); } }
+/* Selection on the map: the focused machine lifts off the ground, settles, and keeps a slow halo
+   pulsing on its ground disc. */
+@keyframes dpLift {
+  0% { transform: translateY(0); }
+  45% { transform: translateY(-13px); }
+  70% { transform: translateY(-4px); }
+  100% { transform: translateY(-7px); }
+}
+@keyframes dpHalo {
+  0% { transform: translateX(-50%) scaleY(0.32) scale(1); opacity: 0.55; }
+  70% { transform: translateX(-50%) scaleY(0.32) scale(1.75); opacity: 0; }
+  100% { transform: translateX(-50%) scaleY(0.32) scale(1.75); opacity: 0; }
+}
+@keyframes dpTagIn { from { opacity: 0; transform: translateY(-5px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+/* The route from the yard to the project reads as a direction of travel, not a static rule. */
+@keyframes dpDash { to { stroke-dashoffset: -40; } }
+@media (prefers-reduced-motion: reduce) {
+  /* Pseudo-elements too — the site pin's ping is a `::after`, which `*` does not match. The markers and
+     the route live in Leaflet's own panes, OUTSIDE `.bidmap`'s subtree in the DOM the browser walks for
+     `divIcon` HTML, so they are named separately. */
+  .bidmap *, .bidmap *::before, .bidmap *::after,
+  .bm-sitepin, .bm-sitepin *, .bm-sitepin *::before, .bm-sitepin *::after,
+  .bm-pin, .bm-pin *, .bm-flow {
+    animation: none !important;
+  }
+  /* The interaction language is motion too, and the prototype's own kill switch only names
+     `animation`. A control must still ANSWER a press — losing the acknowledgement entirely would make
+     the surface unusable for the reader this setting exists for — so the colour change survives and
+     only the movement is dropped. */
+  .bidmap button, .bidmap .dpRow, .bidmap .dpCell { transition-property: background, border-color, color; }
+  .bidmap button:not(:disabled):active { transform: none; }
+  .bidmap .dpRow:hover, .bidmap .dpCell:hover { transform: none; }
+}
+
+/* ── The dark footer's own ink — DELETED, and deliberately not replaced (owner, 2026-08-11) ──────
+   This block existed to restate, against `var(--navy-deep)`, every colour the footer had first chosen against
+   white. The footer's rules are dark-native now (see §6.10 above), so a second copy of its palette
+   down here could only drift out of step with the first — and, sitting later in the file at equal
+   specificity, it would silently win. Every declaration it carried now lives at the point of use. */
+
+/* ── V18 · the control that reaches past the offer (owner, 2026-08-19) ───────────────────────────
+   The list opens on the machines this bid actually names; the rest of the supplier's matching fleet
+   is one press away.
+
+   ~~When it arrives it arrives BELOW a stated boundary rather than mixed in.~~ The boundary — a
+   ruled «Also in his fleet — not in this offer» — was removed on 2026-08-31 with its `.bm-eqsplit`
+   rule and its string, on the same reasoning that took the «in this offer» badge off the card: the
+   renter chooses on whether a machine can be CONFIRMED for him, and membership was a second sort
+   order competing with that one. The order itself still puts the offer first. */
+/* Rules on BOTH sides, so the label reads as a divider rather than as a heading over the cards below
+   — the machines under it are not a section of the offer, they are outside it. */
+
+/* Solid where `.bm-eqask` is dashed: this reveals machines that are already there, while the ask
+   below it sends a message to a person. Two different kinds of act should not wear one shape. */
+.bidmap .bm-eqmore {
+  flex-shrink: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
-  font-size: 11.5px;
-  font-weight: 800;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
   color: var(--navy);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  border-radius: var(--radius-md);
+  padding: 10px 11px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.bidmap .bm-eqmore .material-icons-outlined { font-size: 17px; color: var(--muted); }
+.bidmap .bm-eqmore.on { background: var(--surface2); }
+
+/* ══════════ V12b · what the dock's header gained from the room (owner, 2026-08-19) ══════════
+   *"did we miss anything — do the header icons all exist in both chats?"* Three of them did not.
+   Every value below is `deal-room-proto.css`'s own, restated at this surface's scale: the room's
+   header is a full-width bar on a page, the dock's is a 64px band in a drawer, so the pill and the
+   round control lose a size while keeping their shape, their ink and their meaning. */
+
+/* The deal's phase, in the room's five words. `--info` and its `var(--info-soft)` keyline are `.tb-phase`'s;
+   a CLOSED room goes green and an ABANDONED one grey, because a finished deal and a dead one are not
+   the same fact and the pill is the only place either is stated here. */
+.bidmap .bm-chat-phase {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--action) 20%, white);
+  color: var(--action);
+  font-size: 10.5px;
+  font-weight: 600;
   white-space: nowrap;
 }
-/* The short code is the thing a renter with three conversations open actually scans for. */
-.bidmap .bm-chat-req-code { flex-shrink: 0; font-family: inherit; /* ~~JetBrains Mono~~: the design system keeps it for ID codes only (owner, 2026-09-22) */ font-size: 10.5px; font-weight: 600; color: var(--muted); }
-.bidmap .bm-chat-req-s { flex-shrink: 0; margin-inline-start: auto; font-size: 10.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.bidmap .bm-chat-phase .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.bidmap .bm-chat-phase.is-done { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 32%, transparent); }
+.bidmap .bm-chat-phase.is-off { color: var(--muted); border-color: var(--border-mid); }
+
+/* The ⋮ — the same 30px round control the close button is, because they sit on one row and a kebab
+   that outweighed the close would read as the louder act. */
+.bidmap .bm-chat-more {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1.5px solid var(--border-strong);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.bidmap .bm-chat-more .material-icons-outlined { font-size: 17px; }
+
+/* The dropdown. `.dr-menu`'s geometry, anchored to `.bm-chat` — which is already positioned, so this
+   needs no new containing block. A sibling of the header rather than a child, for the reason the room
+   records: a 64px row with its own overflow is a row a dropdown cannot escape. */
+.bidmap .bm-chat-menu-scrim { position: fixed; inset: 0; z-index: 60; }
+.bidmap .bm-chat-menu {
+  position: absolute;
+  z-index: 61;
+  top: 58px;
+  inset-inline-end: 10px;
+  min-width: 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+}
+.bidmap .bm-chat-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--navy);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+  cursor: pointer;
+}
+.bidmap .bm-chat-menu button:hover { background: var(--surface2); }
+.bidmap .bm-chat-menu button .material-icons-outlined { font-size: 18px; color: var(--muted); }
+.bidmap .bm-chat-menu button.danger,
+.bidmap .bm-chat-menu button.danger .material-icons-outlined { color: var(--danger); }
+.bidmap .bm-chat-menu button.danger:hover { background: color-mix(in srgb, var(--danger) 7%, transparent); }
+

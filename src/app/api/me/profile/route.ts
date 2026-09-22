@@ -31,8 +31,13 @@ export async function PUT(req: Request) {
       if (str(body.companyName)) payload.companyName = str(body.companyName);
       // The company logo (2026-09-23, the quotation's «Add a logo»). The backend's
       // `updateProfileSchema` takes `companyLogoKey` beside the four names it requires, and writes it
-      // to the profile and the company (`profile.service.ts`). Sent only when the caller sent one.
-      if (str(body.companyLogoKey)) payload.companyLogoKey = str(body.companyLogoKey);
+      // to the profile and the company (`profile.service.ts`).
+      //
+      // 🔴 **Three states, not two** (app parity, `company_logo_editor._save`). ~~`if (str(...))`~~
+      // dropped an EMPTY key, which is the backend's own way of CLEARING the mark
+      // (`input.companyLogoKey || null`), so the web could set a logo and never take one off.
+      // Absent means leave it alone; empty means remove it; a key means set it.
+      if (typeof body.companyLogoKey === "string") payload.companyLogoKey = str(body.companyLogoKey);
 
       const result = await call<{ message?: string; messageAr?: string; tier?: string }>("/profile/me", {
         method: "PUT",

@@ -46,6 +46,7 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
 // which is the shape the dependency should have — the map has no business knowing how a card is made.
 import type { EquipmentCardModel } from "@/components/map/equipment-card-model";
 import { useLocale, useT } from "@/lib/i18n";
+import { COLORS } from "@/lib/ds-colors";
 import { PIN_REGISTRY, pin } from "@/lib/uiPins";
 
 export interface SitePoint {
@@ -104,6 +105,11 @@ export interface MachinePin extends MapPoint {
 const FALLBACK_CENTRE: [number, number] = [24.0, 45.0];
 const FALLBACK_ZOOM = 5;
 const SITE_ZOOM = 11;
+/** How close the opening fit may get when it frames the project AND its machines (owner, 2026-09-23:
+ *  *"more zoomed in to be close to the equipment and the project"*). ~~`SITE_ZOOM`, 11~~, which is the
+ *  right view of a SITE alone and framed a machine 7.5 km away in a whole-city view. 15 still keeps a
+ *  machine 60 km out in frame: `fitBounds` only zooms in as far as every point allows. */
+const FIT_MAX_ZOOM = 15;
 
 /**
  * Where the camera lands when a card is pressed (app parity, `kFocusZoom`).
@@ -173,13 +179,13 @@ function FitView({ site, points }: { site: SitePoint | null; points: MachinePin[
     if (points.length && site) {
       map.fitBounds(L.latLngBounds([[site.lat, site.lng], ...points.map((p) => [p.lat, p.lng] as [number, number])]), {
         padding: [80, 80],
-        maxZoom: SITE_ZOOM,
+        maxZoom: FIT_MAX_ZOOM,
         animate: false,
       });
       return;
     }
     if (points.length) {
-      map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number])), { padding: [80, 80], maxZoom: SITE_ZOOM, animate: false });
+      map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number])), { padding: [80, 80], maxZoom: FIT_MAX_ZOOM, animate: false });
       return;
     }
     if (site) map.setView([site.lat, site.lng], SITE_ZOOM, { animate: false });
@@ -802,6 +808,19 @@ function machineIcon(
  * for a refused key), the caller keeps the keyless Esri layer, so the canvas is never blank.
  */
 const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+/** Google's roadmap, WHITE (owner, 2026-09-23: *"can't it be white"*): pale ground, white roads, no
+ *  shops or businesses competing with the machines. Colours from the palette's literal mirror, since
+ *  Google takes hex and a raw hex here would fail `palette-drift`. */
+const WHITE_MAP = [
+  { elementType: "geometry", stylers: [{ color: COLORS.surface2 }] },
+  { elementType: "labels.text.fill", stylers: [{ color: COLORS.muted }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: COLORS.surface }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: COLORS.surface }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: COLORS.border }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: COLORS.border }] },
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+];
 let mapsJs: Promise<void> | null = null;
 function loadMapsJs(ar: boolean): Promise<void> {
   const w = window as unknown as { google?: { maps?: unknown }; gm_authFailure?: () => void };
@@ -843,7 +862,7 @@ function GoogleBase({ ar, onReady }: { ar: boolean; onReady: (ok: boolean) => vo
       .then(() => {
         if (!live) return;
         const mk = (L.gridLayer as unknown as { googleMutant: (o: object) => L.GridLayer }).googleMutant;
-        layer = mk({ type: "roadmap", maxZoom: 19 }).addTo(map);
+        layer = mk({ type: "roadmap", maxZoom: 19, styles: WHITE_MAP }).addTo(map);
         layer.bringToBack();
         onReady(true);
       })
@@ -970,13 +989,26 @@ export default function MapCanvas({
             **Google first (2026-09-23), Esri until it is ready or if Google refuses**: `GoogleBase`
             above, which carries Google's own logo and attribution inside its layer. */}
         <GoogleBase ar={locale === "ar"} onReady={setGoogleOn} />
+        {/* The fallback is Esri's LIGHT GREY canvas plus its label layer (owner, 2026-09-23: *"the map
+            looks weird, can't it be white"*). ~~World Street Map~~, whose tan relief read as desert
+            under every chip. `maxNativeZoom` 16 is where the canvas's own tiles stop; above it Leaflet
+            enlarges them rather than asking for tiles that do not exist. */}
         {!googleOn && (
-          <TileLayer
-            key="esri"
-            attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, &copy; OpenStreetMap contributors'
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
-            maxZoom={19}
-          />
+          <>
+            <TileLayer
+              key="esri-base"
+              attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, &copy; OpenStreetMap contributors'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              maxNativeZoom={16}
+              maxZoom={19}
+            />
+            <TileLayer
+              key="esri-labels"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+              maxNativeZoom={16}
+              maxZoom={19}
+            />
+          </>
         )}
         {/* Opposite the bid panel, which sits on the inline-START edge (owner, 2026-08-10) — so the
             buttons are top-right in English and top-left in Arabic. Being opposite is the rule, not the

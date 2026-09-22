@@ -43,7 +43,7 @@
  * (RM3-AC-64).
  */
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Channel } from "stream-chat";
 import { CallModal } from "@/components/deal-room/CallModal";
 import { CancelReasonsModal } from "@/components/deal-room/CancelReasonsModal";
@@ -170,6 +170,16 @@ export interface ChatDockProps {
    * at all and is therefore absent on exactly the bids that have never been negotiated.
    */
   onOpenEquipment?: () => void;
+  /**
+   * What sits directly under the identity band — the slot the request strip vacated (owner,
+   * 2026-09-23: *"here in the inbox replace it with price header"*).
+   *
+   * ⚠️ A SLOT rather than a prop the dock interprets: the inbox puts its price bar here, and
+   * this component neither prices a bid nor knows what a counter is. Handing it a `ReactNode`
+   * keeps the money with `PriceFooter`, which owns the hand-off into the negotiation sheet, and
+   * leaves the dock responsible only for where it sits.
+   */
+  belowHeader?: ReactNode;
 
   /** The bid's RFQ group, when the route resolved one. Only used when the received-bids feed does not
    *  contain the anchor bid (paging), so the tab strip degrades to "no siblings" rather than to a
@@ -260,6 +270,7 @@ export function ChatDock({
   embedded = false,
   onClose,
   onOpenEquipment,
+  belowHeader,
   groupKey = null,
   dealRoomId = null,
   typeWord = null,
@@ -475,6 +486,19 @@ export function ChatDock({
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages, open]);
+
+  /* ── READ, when he is looking at it (app parity, `deal_chat_controller.dart` `markRead`) ──────────
+     The unread badges are Stream's own read state (`getUnreadCounts` on the backend), and nothing on
+     the web ever reported a read: a renter who read a whole conversation here still had the badge
+     until he opened it in the app (audit, 2026-09-23). Marked on open and on every message that
+     lands while open, as the app does on connect and on `message.new`. Only while OPEN and only on
+     the tab being shown: a shut dock still watches the anchor's channel, and reading that is not
+     reading it. Best effort: a failed mark leaves the badge, which is the old behaviour. */
+  useEffect(() => {
+    const ch = channelRef.current;
+    if (!open || !ch || !loadedRoomId || loadedRoomId !== activeRoomId) return;
+    void ch.markRead().catch(() => {});
+  }, [open, messages, loadedRoomId, activeRoomId]);
 
   /* A composed ask OPENS the dock and lands on the anchor tab — the prototype's `composeRequest` sets
      `activePanel='chat'; drawerOpen=true` for the same reason. The renter pressed «اطلب…» somewhere in
@@ -1105,24 +1129,20 @@ export function ChatDock({
             </>
           )}
 
-          {/* ── What this conversation is ABOUT (owner, 2026-08-19) ──────────────────────────────
-              The room's `assignment` chip, on the feed row's own `request`. A renter with several
-              conversations open needs to know which request each one settles, and the dock said only
-              who he was talking to.
+          {/* 🔴 ~~What this conversation is ABOUT — the `assignment` chip carrying the
+              request's short code, its machine and its site (owner, 2026-08-19).~~ REMOVED FROM
+              EVERY CHAT SURFACE (owner, 2026-09-23: *"this one can be removed from any chat
+              surface"*).
 
-              A BUTTON in the room, because there it opens the request sheet. Here it is a plain strip:
-              the sheet takes a `DealRoomView` this dock does not fetch, and the panel behind this
-              drawer is already the request's own surface. It states; it does not navigate. */}
-          {activeRow?.request && (activeRow.request.shortCode || activeRow.request.equipmentSummary) && (
-            <div className="bm-chat-req">
-              <span className="material-icons-outlined">assignment</span>
-              <span className="bm-chat-req-t">
-                {activeRow.request.shortCode && <span className="bm-chat-req-code">{activeRow.request.shortCode}</span>}
-                {activeRow.request.equipmentSummary ?? activeRow.equipmentType.name ?? ""}
-              </span>
-              {activeRow.request.location && <span className="bm-chat-req-s">{activeRow.request.location}</span>}
-            </div>
-          )}
+              On the MAP it restated the panel beside it, which is the request's own surface; in
+              the INBOX the row that opened the conversation names the same machine under the
+              same RFQ code, one column to the left. A band that repeats its neighbour costs
+              height on the one element with none to spare — the conversation.
+
+              ⚠️ What stands here instead is whatever the PAGE puts in `belowHeader`, and in
+              the inbox that is the price bar: the renter never reaches the map from there, so
+              the rate and the way into the negotiation had nowhere else to live. */}
+          {belowHeader}
 
           {/* A tab per item — and NO strip at all when this counterparty holds one bid (RM3-AC-44). */}
           {tabs.length > 1 && (
@@ -1452,7 +1472,13 @@ export function ChatDock({
         <Dialog
           open
           onClose={() => setContactAsk(false)}
-          size="sm"
+          /* ⚠️ **`lg`, and the reason is the two sentences, not the weight of the message**
+              (owner, 2026-09-23, with a screenshot: *"keep the title and the subtext each one in
+              1 line, increase width to not wrap the text"*). At `sm` (420px) both broke over two
+              lines, and a warning that wraps mid-clause is read twice before it is understood.
+              The body is the wider of the two: 13px semibold over about 80 characters needs
+              roughly 510px inside the 40px of gutter, which `md` (520px) cannot hold. */
+          size="lg"
           icon={<Icon name="privacy_tip" size={20} className="text-danger" />}
           title={L("Would you like to share your number?", "هل تريد مشاركة رقمك؟")}
           footer={

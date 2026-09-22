@@ -23,6 +23,7 @@ const strip = (t: string) =>
   t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/^\s*\/\/.*$/gm, "");
 
 const SRC = read("components/requests/BidTermsModal.tsx");
+const TOKENS = readFileSync(join(__dirname, "..", "..", "src", "app", "globals.css"), "utf8");
 const CODE = strip(SRC);
 
 describe("the three states are STACKED, not tabbed", () => {
@@ -169,5 +170,58 @@ describe("the two collapsible rows", () => {
   it("Given the operator row, Then it carries the FAT split the request stated", () => {
     expect(CODE).toContain('L("Food"');
     expect(CODE).toContain('L("Accommodation / Transport"');
+  });
+});
+
+describe("the three buckets' tones", () => {
+  /**
+   * 🔴 **PENDING is the SLATE, not the mustard** (owner, 2026-09-23: *"pending terms in the
+   * terms modal must be grey or light blue not this yellow"*).
+   *
+   * Two reasons beyond the instruction:
+   *   · `--warn` in this palette is a MUSTARD (#b98a1d), not the amber the app draws — the same
+   *     mismatch corrected on the canvas ring (2026-09-08) and the off-catalogue box (2026-09-12) —
+   *     and it is a FILL token, where `--warn-deep` is the one that may carry text.
+   *   · Pending is not a WARNING. It is the ABSENCE of a verdict, and painted the colour of caution
+   *     it read as a problem beside the red bucket directly above it.
+   */
+  it("Given the pending bucket, Then it takes `--info`, the palette's slate", () => {
+    expect(CODE).toContain('pending: { c: "var(--info)", soft: "var(--info-soft)" }');
+    expect(CODE).not.toContain("var(--warn)");
+  });
+
+  it("Given the other two, Then they are untouched", () => {
+    // He named one bucket. Red still means a clash and green still means it is settled.
+    expect(CODE).toContain('conflict: { c: "var(--danger)", soft: "var(--danger-soft)" }');
+    expect(CODE).toContain('matched: { c: "var(--ok)", soft: "var(--ok-soft)" }');
+  });
+
+  it("Given the header's label sits ON its own soft ground, Then it passes AA", () => {
+    /**
+     * 🔴 The old pair FAILED it, which nobody had measured: `--warn` on `--warn-soft` is
+     * **2.69:1**, under the 4.5 a normal-size label needs. `--info` on `--info-soft` is **6.46:1**.
+     * So this was an accessibility fix wearing a colour change's clothes.
+     * ⚠️ Measured from the tokens rather than asserted as a number in prose, so re-tinting
+     * either one re-runs the sum instead of leaving a stale claim behind.
+     */
+    const root = TOKENS;
+    const hex = (name: string) => {
+      const m = root.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{3,8})`, "i"));
+      if (!m) throw new Error(`--${name} is not declared in globals.css`);
+      return m[1];
+    };
+    const lum = (h: string) => {
+      const n = parseInt(h.slice(1), 16);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+        .map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; })
+        .reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0);
+    };
+    const ratio = (a: string, b: string) => {
+      const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    expect(ratio(hex("info"), hex("info-soft"))).toBeGreaterThanOrEqual(4.5);
+    // The pair it replaces, kept as the record of why: it never passed.
+    expect(ratio(hex("warn"), hex("warn-soft"))).toBeLessThan(4.5);
   });
 });

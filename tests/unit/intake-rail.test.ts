@@ -112,8 +112,9 @@ describe("a row reads: the count, the picture, then the machine", () => {
        fourth time this repo has met that. */
     const img = rail.slice(rail.indexOf("<img"), rail.indexOf("</span>", rail.indexOf("<img")));
     expect(img).not.toContain("object-cover");
-    // Scaling past the box is only safe because the tile clips.
-    expect(rail).toContain("overflow-hidden rounded-sm");
+    // Scaling past the box is only safe because the tile clips. A CIRCLE since 2026-09-23 (owner:
+    // *"show the equipment images as circles not squares"*); it clips just the same.
+    expect(rail).toContain("overflow-hidden rounded-full");
   });
 
   it("Given a machine, Then its picture comes from the TAXONOMY and not from a past request", () => {

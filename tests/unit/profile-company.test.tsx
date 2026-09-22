@@ -20,6 +20,8 @@ const api = vi.hoisted(() => ({
   company: null as MyCompany | null,
   /** What `/api/me` reports for the verification, so a case can pick the app's status. */
   verification: "none" as string,
+  /** The presigned company mark, as `/api/me` hands it over. */
+  logoUrl: null as string | null,
 }));
 vi.mock("@/lib/api/company-client", () => ({
   fetchMyCompany: () => Promise.resolve(api.company),
@@ -60,12 +62,13 @@ const member = (over: Partial<MyCompany> = {}): MyCompany => ({
 beforeEach(() => {
   api.company = null;
   api.verification = "none";
+  api.logoUrl = null;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       const body = url.includes("/api/me")
-        ? { user: { firstName: "Yara", lastName: "F", city: "Riyadh", jobTitle: "Procurement", email: "yara@moedatech.net", phone: "+966501112233", companyName: "Yesr Test", whatsapp: null }, verification: { status: api.verification } }
+        ? { user: { firstName: "Yara", lastName: "F", city: "Riyadh", jobTitle: "Procurement", email: "yara@moedatech.net", phone: "+966501112233", companyName: "Yesr Test", whatsapp: null, companyLogoUrl: api.logoUrl }, verification: { status: api.verification } }
         : {};
       return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
     }),
@@ -242,5 +245,43 @@ describe("the company's own particulars have a door", () => {
     api.company = null;
     draw();
     expect(await find(en.profile.companyDetails)).toBeTruthy();
+  });
+});
+
+describe("the firm's own mark", () => {
+  /**
+   * 🔴 **The logo had nowhere to be SEEN** (owner, 2026-09-23: *"match it"*). It was collected
+   * by the verification form and printed on the quotation, the shared link and the bid form, and the
+   * renter who uploaded it never saw it again. In the app it is the avatar in the My Company header
+   * (`company_logo_editor.dart`), and tapping it is how a logo is added, changed or removed.
+   */
+  it("Given no logo, Then the firm shows its initials and an owner is offered one", async () => {
+    api.company = member();
+    draw();
+    await find(en.company.team);
+    expect(screen.getByText("MO")).toBeTruthy();
+    expect(screen.getByLabelText(en.verify.pile.logoAdd)).toBeTruthy();
+  });
+
+  it("Given a logo, Then it is drawn and the press offers to CHANGE it", async () => {
+    // The gap this closes: both links to `?logo=1` carry `!companyLogoUrl`, so with a mark on file
+    // there was no door left anywhere in the web.
+    api.company = member();
+    api.logoUrl = "https://example.test/logo.png";
+    draw();
+    await find(en.company.team);
+    const press = screen.getByLabelText(en.verify.pile.logoChange);
+    expect(press.querySelector("img")?.getAttribute("src")).toBe("https://example.test/logo.png");
+  });
+
+  it("Given a MEMBER, Then there is a mark and no way to touch it", async () => {
+    // `CompanyLogoEditor.isOwner`. Stricter than Store Settings on purpose: this is the firm
+    // identity page, so only its owners act on it.
+    api.company = member({ isOwner: false, myRole: "MEMBER" });
+    draw();
+    await find(en.company.team);
+    expect(screen.getByText("MO")).toBeTruthy();
+    expect(screen.queryByLabelText(en.verify.pile.logoAdd)).toBeNull();
+    expect(screen.queryByLabelText(en.verify.pile.logoChange)).toBeNull();
   });
 });

@@ -644,7 +644,9 @@ export function ProjectFloorChips({ rail }: { rail: RequestRail }) {
 }
 
 /**
- * The machine's picture, at 18px.
+ * The machine's picture, in a 24px CIRCLE (owner, 2026-09-23: *"show the equipment images as circles
+ * not squares and make them a little bit bigger"*). ~~An 18px square.~~ A hairline ring on white, so
+ * the circle reads as one whether the drawing fills it or the glyph stands in for it.
  *
  * ⚠️ **One kind of asset, so one fit.** This is the app taxonomy's flat DRAWING, which carries its
  * own transparent margin — so it is `object-contain` scaled to the tile, never `object-cover`:
@@ -659,10 +661,14 @@ export function ProjectFloorChips({ rail }: { rail: RequestRail }) {
 function MachineArt({ url }: { url: string | null }) {
   const [failed, setFailed] = useState(false);
   if (!url || failed) {
-    return <MachineGlyph size={14} className="flex-none text-muted-light" />;
+    return (
+      <span className="grid h-6 w-6 flex-none place-items-center rounded-full border border-border bg-surface">
+        <MachineGlyph size={14} className="text-muted-light" />
+      </span>
+    );
   }
   return (
-    <span className="grid h-[18px] w-[18px] flex-none place-items-center overflow-hidden rounded-sm">
+    <span className="grid h-6 w-6 flex-none place-items-center overflow-hidden rounded-full border border-border bg-surface">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}

@@ -71,7 +71,8 @@ describe("the header", () => {
      on a multi-item room it cannot even say which line is being negotiated. The machine can, and
      the code is still on the log, the quotation and the room behind. */
   it("names the machine and its size under the counterparty, and never the request's code", () => {
-    expect(FLOW).toContain('{machineLine && <span className="ref" title={machineLine}>{machineLine}</span>}');
+    expect(FLOW).toContain('<div className="t" title={room.supplier.name}>{room.supplier.name}</div>');
+    expect(FLOW).toMatch(/\[machineLine, roundLine\]\.filter\(Boolean\)/);
     expect(FLOW).toMatch(/const machineLine = \[/);
     // The size rides the same run: a 20-ton and a 30-ton excavator are two negotiations.
     expect(FLOW).toMatch(/equipmentSizeAr \|\| room\.details\.equipmentSize/);
@@ -156,10 +157,14 @@ describe("the sheet itself", () => {
      paper centred on a grey desk, which is the prototype's own shape.~~ Three greys on a screen
      holding one document; the RULES separate the bands now. The paper COLUMN survives - it is the
      measurement, not the colour. */
-  it("paints the shell and the body white, with no desk behind the paper", () => {
-    expect(CSS).toMatch(/\.ng-shell \{[\s\S]*?background: var\(--surface\);/);
-    expect(CSS).toMatch(/\.ng-body \{[^}]*background: var\(--surface\); \}/);
-    expect(CSS_CODE).not.toMatch(/\.ng-body \{[^}]*background: var\(--surface2\)/);
+  /* 🔴 **THE DESK STAYS and the PAPER is what goes white** (owner, 2026-09-23, asked which of
+     two readings he meant: *"keep the desk, whiten the paper"*). ~~One white surface edge to edge.~~
+     I read «all in white» as the whole screen, and it removed the framing he was pointing at. */
+  it("keeps the grey desk under a white paper", () => {
+    expect(CSS).toMatch(/\.ng-shell \{[\s\S]*?background: var\(--surface2\);/);
+    expect(CSS).toMatch(/\.ng-body \{[^}]*background: var\(--surface2\); \}/);
+    // The cards on it are the white, which is what «all in white» was about.
+    expect(CSS).toMatch(/\.ng-card \{[^}]*background: var\(--surface\)/);
   });
 
   it("holds the cards to a paper column, centred on the desk", () => {
@@ -167,8 +172,11 @@ describe("the sheet itself", () => {
     expect(CSS).toMatch(/\.ng-inner \{ width: 100%; max-width: var\(--ng-paper\); margin-inline: auto; \}/);
     // The gutter SURVIVES the cap: it is what keeps the paper off the window's edge below 940.
     expect(CSS).toMatch(/--ng-gutter: clamp\(/);
-    expect(CSS).toMatch(/\.ng-head \{[^}]*padding: 14px var\(--ng-gutter\)/);
-    expect(CSS).toMatch(/\.ng-foot \{[^}]*padding: 10px var\(--ng-gutter\)/);
+    /* 🔴 **The LIVE sheet's own metrics** (owner, 2026-09-23: *"use same ui as live one in the
+       beta the spacing - size etc same for footer and header"*): `.qp-head-r1` is `7px 18px 6px`
+       and `.qp-foot` is `9px 24px`. ~~14px and 10px, this sheet's own.~~ */
+    expect(CSS).toMatch(/\.ng-head \{[^}]*padding: 7px var\(--ng-gutter\) 6px/);
+    expect(CSS).toMatch(/\.ng-foot \{[^}]*padding: 9px var\(--ng-gutter\)/);
     /* ⚠️ The body's gutter is on the BAND, as it is on the other three — it sat on `.ng-inner`
        here, so that one column measured 940 of CONTENT while the rest measured 940 including their
        padding, and the cards stood 40px inside the header's own verticals. Measured at a 1920
@@ -236,12 +244,14 @@ describe("the sheet itself", () => {
     expect(CSS).toMatch(/\.ng-price input \{[^}]*max-width: 150px/);
   });
 
-  /* 🔴 **The options are always drawn** (same note): a press that reveals three chips buys
-     nothing. Still withheld on «Keep my choice», which has no menu by construction - the only
-     alternative there is the value she already holds. */
-  it("shows the other options without a press, except where there is no menu", () => {
-    expect(FLOW).toMatch(/\{!keepMine && opts\.length > 0 && \(/);
-    expect(FLOW).not.toMatch(/\{open && !keepMine && \(/);
+  /* 🔴 **The options stay BEHIND the press** (owner, 2026-09-23, correcting me: *"now the
+     options appear even if i didnt choose choose another which is different from the live one"*).
+     ~~Drawn unconditionally.~~ His 2026-09-22 note read *"alwasy show other options if he chose
+     'choose another' to be shown horizantaly not vertically"* - I took «always show» as unconditional
+     when the clause after it says WHEN. Only the AXIS was ever his complaint. */
+  it("opens the options on the press, and lays them across", () => {
+    expect(FLOW).toMatch(/\{open && !keepMine && \(/);
+    expect(CSS).toMatch(/\.ng-t \.opts \{[^}]*flex-wrap: wrap/);
   });
 });
 
@@ -358,6 +368,100 @@ describe("the terms sheet", () => {
     expect(step).toContain('key: "awaiting"');
   });
 
+  /* 🔴 **THE TWO POSITIONS TAKE THEIR OWN CENTRED LINE** (owner, 2026-09-23: *"even these make it
+     middle and more visible"*, on «Fuel Responsibility  Your choice: not set · Supplier: 24 hours»).
+     ~~At the end of the term's NAME row, so the longer the name the smaller its two answers, and the
+     values ellipsised before the label did.~~ The app moved the same line for the same reason. */
+  it("gives the two positions a line of their own, centred, above the acts", () => {
+    // Out of the head row entirely — a sibling of it, not a child.
+    expect(FLOW).toMatch(/<\/div>\s*<div className="side">\{L\("Your choice"/);
+    expect(CSS_CODE).toMatch(/\.ng-t\.now \.side \{[^}]*text-align: center/);
+    expect(CSS_CODE).not.toMatch(/\.ng-t\.now \.h \.side/);
+  });
+
+  /* 🔴 **THE PANEL ITSELF CARRIES THE COLOUR, and the button keeps its own** (owner, 2026-09-23:
+     *"make the red or the gree on the panel iteslf like the app"*). The percentages are sampled from
+     the app's own hexes: `kNegRedTint` is the danger token at ~4% and `kNegRedBorder` at ~26%, and
+     the card is deliberately PALER than the «Choose another» sitting on it. */
+  it("tints the card, borders the buttons, and keeps the two steps apart", () => {
+    expect(CSS_CODE).toMatch(/\.ng-t\.now\.clash[^{]*\{[^}]*var\(--danger\) 4%/);
+    expect(CSS_CODE).toMatch(/\.ng-t\.now\.pending \{[^}]*var\(--info\) 10%/);
+    // The acts are bordered at the app's radius and size — 1.5px card, 1px button, radius 10.
+    expect(CSS_CODE).toMatch(/\.ng-t \.acts button \{[^}]*border: 1px solid/);
+    expect(CSS_CODE).toMatch(/\.ng-t \.acts button \{[^}]*border-radius: 10px/);
+    expect(CSS_CODE).toMatch(/\.ng-t \.acts button \{[^}]*font-size: 14px/);
+    // A settled row is green, and red when the renter countered rather than accepted.
+    expect(CSS_CODE).toMatch(/\.ng-t\.done\.countered \{[^}]*--danger-soft/);
+    expect(FLOW).toContain('`ng-t done${countered ? " countered" : ""}`');
+  });
+
+  /* 🔴 **A PENDING CARD TURNS RED WHILE ITS OPTIONS ARE OPEN**, restoring the app's rule and
+     withdrawing this repo's own of 2026-09-22 («`.picking` follows whichever state the card is
+     in»). Owner, 2026-09-23: *"check if we dont differ on anything in behaviour from the app"*.
+     Opening the menu IS choosing to disagree, so the card joins the conflict family while it. */
+  it("paints an open picker the conflict red, whatever state the card was in", () => {
+    expect(CSS_CODE).toMatch(/\.ng-t\.now\.pending\.picking/);
+  });
+
+  /* 🔴 **THE OPTIONS REPLACE THE TWO ACTS.** The app is an `if/else` — `if (!optionsOpen)
+     _ActionRow(...) else _OptionsPanel(...)`. ~~Both at once~~, which left the button that opened
+     the menu standing there inviting a second press, with «Accept» beside a list of values as if it
+     were one of them. */
+  it("swaps the acts for the menu rather than drawing both", () => {
+    expect(FLOW).toContain('{!(open && !keepMine) && <div className="acts">');
+  });
+
+  /* 🔴 **NOTHING IS PRE-TICKED unless it is the reader's OWN answer** (app parity,
+     `NegOptionPills`). ~~The supplier's declared value came up ticked whenever she had stated
+     nothing~~ — which answered the question before she had, and put a tick meaning «what you have
+     now» a row under a tick meaning «agreed». */
+  it("never pre-ticks the supplier's value in the picker", () => {
+    expect(FLOW).toContain('className={pickedVal != null && o.value === pickedVal ? "on" : undefined}');
+    expect(FLOW).not.toContain('o.value === (myVal != null ? String(myVal) : supStr(t))');
+  });
+
+  /* 🔴 **RE-OPENING A ROW SHOWS WHERE SHE LEFT IT** (app parity, `_reopenedValues`; the app's
+     own rule of 2026-09-17: *"when a user set a value then clicks it to edit, it will show his value
+     selected, not empty"*).
+     ⚠️ **`myVal` is NOT that value, which is the trap.** Reopening clears the resolution and
+     `myVal` then falls back to `renteePreference` — what she asked for on the REQUEST, not the answer
+     she gave on this card. Ticking it would mark a value she never chose here. */
+  it("ticks the answer a reopen cleared, and never the request's own preference", () => {
+    expect(FLOW).toContain("const [reopenedVals, setReopenedVals] = useState<Record<string, string>>({})");
+    expect(FLOW).toContain("const reopenTerm = (key: string, previous: unknown)");
+    expect(FLOW).toContain('const pickedVal = mine?.value != null ? String(mine.value) : reopenedVals[t.key] ?? null;');
+  });
+
+  /* 🔴 **A SETTLED TERM IS RE-OPENABLE, and the PENCIL says so** (owner, 2026-09-23: *"allow edit on
+     the terms like the app too"*). ~~A ↻ button drawn only where the renter had a resolution of her
+     own~~, so a term the SERVER settled had no way back at all. The whole row is the target, as the
+     app's own note insists, and the pencil is a glyph rather than a second control inside it. */
+  it("lets every settled row be reopened, and marks it with a pencil", () => {
+    expect(FLOW).toContain('{editable && <span className="material-icons-outlined pen">edit</span>}');
+    expect(FLOW).toContain('{onReopen && <span className="material-icons-outlined pen">edit</span>}');
+    // Cleared BEFORE it is forced open: a forced term still carrying its answer opens already given.
+    expect(FLOW).toContain("reopenTerm(t.key, mine?.value); setForcedTerm(t.key);");
+    expect(FLOW).not.toContain('className="undo"');
+  });
+
+  /* 🔴 **PRESSING A SECTION OPENS ITS FIRST UNANSWERED TERM** (owner, 2026-09-23: *"i clicked on
+     conflict it doesnt open"*). A section draws only the ACTIVE card, so a conflict that was not the
+     active term rendered nothing and its header expanded an empty body. */
+  it("opens a section's first unanswered term when the header is pressed", () => {
+    expect(FLOW).toContain("const openSection = (rows: DealTerm[])");
+    expect(FLOW).toContain("openSection(openPending)");
+    expect(FLOW).toContain("openSection(openConflicts)");
+  });
+
+  /* 🔴 **THE LOG IS A REAL MODAL** (owner, 2026-09-23: *"for log use it proper modal not very small .
+     show it like real modal"*). ~~460px, and only as tall as its content.~~ A fixed height, not a
+     cap: `max-height` alone lets a short log collapse under its own tabs. */
+  it("gives the log a panel to be read in", () => {
+    expect(FLOW).toContain('className="qp-sheet ng-logm"');
+    expect(FLOW).not.toContain("style={{ maxWidth: 460 }}");
+    expect(CSS_CODE).toMatch(/\.qp-sheet\.ng-logm \{[^}]*height: min\(/);
+  });
+
   /* Where a value came from, and the last move on it. The prototype states neither; a renter reading
      «24h» otherwise has no way to tell his own ask from the supplier's declaration. */
   it("keeps the provenance and history lines the prototype has no slot for", () => {
@@ -382,7 +486,7 @@ describe("what the rebuild did NOT change", () => {
   it("still reads a settled room through, and sends nothing from it", () => {
     expect(FLOW).toContain("const settled = settledNote != null");
     expect(FLOW).toContain("const canSubmit = settled ? false");
-    expect(FLOW).toContain('className={`ng-note');
+    expect(FLOW).toContain('className={`ng-hnote');
   });
 
   /* The log is unchanged and still one press away, from every step. */

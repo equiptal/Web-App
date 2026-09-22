@@ -244,11 +244,18 @@ export function ProcessingView({
           is simply more circle.
           ⚠️ `motion-safe`, and the size is the resting state either way — a renter who asked for
           less motion still gets the big machine, just without the travel. */}
+      {/* ── BIGGER and louder (owner, 2026-09-23: *"make the circle of image bigger and more visible
+          and catchy"*) ───────────────────────────────────────────────────────────────────────────
+          ~~144 / 134~~ → 184 / 172, a 4px ring, and a pale brand halo ring standing 10px outside it
+          on both states, so the circle reads from across the room. A RING, not a shadow: the owner
+          took shadows off the whole product on 2026-08-26. Every ratio the notes below measure is
+          unchanged, since the drawing's fit is relative to the disc. */}
       <span
-        className={`relative grid h-[144px] w-[144px] flex-none place-items-center transition-transform duration-500 ease-out motion-reduce:transition-none${
+        className={`relative grid h-[184px] w-[184px] flex-none place-items-center transition-transform duration-500 ease-out motion-reduce:transition-none${
           found ? " motion-safe:scale-[1.14]" : ""
         }`}
       >
+        <span aria-hidden="true" className="pointer-events-none absolute -inset-[10px] rounded-full border-[6px] border-brand/10" />
         {/* ── The ring says which of the two states this is ─────────────────────────────────────
             SEARCHING: a quarter of brand turning through a pale circle — the catalogue being read.
             FOUND: the circle CLOSES, stops, and takes the full brand edge, arriving with the machine
@@ -263,8 +270,8 @@ export function ProcessingView({
           aria-hidden="true"
           className={
             found
-              ? "absolute inset-0 rounded-full border-[3px] border-brand found-ring"
-              : "absolute inset-0 rounded-full border-[3px] border-brand/15 border-t-brand motion-safe:animate-spin"
+              ? "absolute inset-0 rounded-full border-4 border-brand found-ring"
+              : "absolute inset-0 rounded-full border-4 border-brand/15 border-t-brand motion-safe:animate-spin"
           }
           style={found ? undefined : { animationDuration: "1.1s" }}
         />
@@ -289,7 +296,7 @@ export function ProcessingView({
         {found && (
           <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full border-2 border-brand found-halo motion-reduce:hidden" />
         )}
-        <span className="grid h-[134px] w-[134px] place-items-center overflow-hidden rounded-full bg-surface">
+        <span className="grid h-[172px] w-[172px] place-items-center overflow-hidden rounded-full bg-surface">
           {imageUrl ? (
             /* ── A URL that fails falls back to the agent ──────────────────────────────────────
                A plain `<img>`, the same as the requests rail and for the same two reasons. The
@@ -336,7 +343,7 @@ export function ProcessingView({
           ) : (
             /* No drawing — an off-catalogue line, or the tree failed to load. The agent holds the
                ring rather than an empty grey disc. */
-            <Mansour size={72} state="live" />
+            <Mansour size={92} state="live" />
           )}
         </span>
 
@@ -346,8 +353,8 @@ export function ProcessingView({
             This is where the old screen's green «it is running» dot sat, and it does that job with
             something that also says WHO. */}
         {imageUrl && (
-          <span className="absolute -bottom-1 -end-1 grid h-[38px] w-[38px] place-items-center rounded-full border border-border bg-surface">
-            <Mansour size={30} state="live" />
+          <span className="absolute -bottom-1 -end-1 grid h-[46px] w-[46px] place-items-center rounded-full border border-border bg-surface">
+            <Mansour size={36} state="live" />
           </span>
         )}
       </span>

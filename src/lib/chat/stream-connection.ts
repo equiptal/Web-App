@@ -160,6 +160,28 @@ export function leaseStream(): StreamLease {
   };
 }
 
+/**
+ * **Page back until the opening offer is loaded** (audit, 2026-09-23; app `_ensureRoundsLoaded`,
+ * `deal_room_page.dart`). `watch()` returns only the newest page, and the negotiation ROUNDS are
+ * rebuilt from the `rate_proposal` messages in it: in a long chat the opening offer falls out of the
+ * window and the room prices itself, and gates Accept, on a partial history without any sign of it.
+ * Up to five older pages, stopping as soon as Stream returns a short page (the start of history), the
+ * app's own cap. Best effort: a failed page leaves what is already loaded.
+ */
+export async function loadFullHistory(channel: Channel, maxPages = 5): Promise<void> {
+  const PAGE = 100;
+  for (let i = 0; i < maxPages; i++) {
+    const oldest = channel.state.messages[0]?.id;
+    if (!oldest) return;
+    try {
+      const res = await channel.query({ messages: { limit: PAGE, id_lt: oldest } });
+      if ((res.messages?.length ?? 0) < PAGE) return;
+    } catch {
+      return;
+    }
+  }
+}
+
 /** Watch one deal room's channel on the shared client. */
 export async function watchDealRoom(client: StreamChat, dealRoomId: string): Promise<Channel> {
   const channel = client.channel("messaging", dealRoomChannelId(dealRoomId));

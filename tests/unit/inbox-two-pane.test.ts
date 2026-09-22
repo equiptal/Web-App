@@ -39,8 +39,9 @@ describe("two panes, one page", () => {
      * A 360px list beside a conversation is a desktop layout; two panes squeezed into 390px would
      * leave neither readable. The list hides when a row is open, and the pane hides when none is.
      */
-    expect(VIEW).toContain('${openRow ? "hidden" : "flex"}');
-    expect(VIEW).toContain('${openRow ? "flex" : "hidden lg:flex"}');
+    /* ⚠️ Keyed on the URL's own id, not on a row found in the feed — see the by-id case below. */
+    expect(VIEW).toContain('${openBidId ? "hidden" : "flex"}');
+    expect(VIEW).toContain('${openBidId ? "flex" : "hidden lg:flex"}');
   });
 
   it("Given the shell, Then the page is pinned to the viewport", () => {
@@ -64,6 +65,32 @@ describe("which conversation is open", () => {
     // The hook's own rule, relied on here: reading four conversations costs one Back, not four.
     const hook = strip(read("src/lib/nav/useUrlOverlay.ts"));
     expect(hook).toContain("window.history.replaceState");
+  });
+});
+
+describe("a link opens the conversation", () => {
+  it("Given `?bid=<id>`, Then the bid is read BY ID and not found in the feed", () => {
+    /**
+     * \u{1F534} Reported on staging: `/inbox?bid=<id>` showed no conversation at all. TWO causes, and
+     * either alone was enough \u2014 the bid may not be on the received-bids page this screen holds, and
+     * the card was fetched with `fetchBids(requestId)`, which answers EXACT-SIZE bids only, so a bid
+     * on a larger machine could never arrive and the pane waited on it for ever.
+     */
+    expect(VIEW).toContain("fetchBidDetail(openBidId)");
+    expect(VIEW).not.toContain("fetchBids(");
+    expect(VIEW).toContain("}, [openBidId]);");
+  });
+
+  it("Given the read FAILS, Then the pane says so rather than spinning", () => {
+    // A bid that is gone, or a dropped request. A permanent spinner is the state this replaces.
+    expect(VIEW).toContain("setCardFailed(true)");
+    expect(VIEW).toContain("cardFailed ? (");
+  });
+
+  it("Given the row is not in the feed, Then the pane still opens", () => {
+    // `openRow` survives for the LIST's highlight only; nothing the pane draws depends on it.
+    expect(VIEW).toContain("const pane = openBidId ? (");
+    expect(VIEW).toContain("dealRoomId={card.dealRoomId}");
   });
 });
 
@@ -140,18 +167,34 @@ describe("the thin price bar", () => {
      * buttons — no navy slab, no hero figure, no CTAs. It typechecks, it lints, and no case reads a
      * computed style.
      */
-    const pane = VIEW.slice(VIEW.indexOf('pin("inbox-pane")'), VIEW.indexOf("<ChatDock"));
+    const at = VIEW.indexOf('pin("inbox-pane")');
+    const pane = VIEW.slice(at, VIEW.indexOf("belowHeader", at));
+    expect(at).toBeGreaterThan(0);
     expect(pane.length).toBeGreaterThan(120); // positive control on the slice
     expect(pane).toContain('className="bidmap min-h-0 flex-1"');
-    expect(pane).toContain("<PriceFooter");
-    // `.bidmap` is a ROW by default (a panel beside a map); here it is a bar above a conversation.
     expect(pane).toContain('flexDirection: "column"');
+    /* 🔴 The bar moved INSIDE the dock, into the slot the request strip vacated (owner,
+       2026-09-23: *"here in the inbox replace it with price header"*) — it was above the whole dock,
+       which put it over the counterparty's own name. */
+    expect(VIEW).toContain("belowHeader={");
+    expect(VIEW.slice(VIEW.indexOf("belowHeader={"))).toContain("<PriceFooter");
   });
 
   it("Given the bar, Then it is priced off the REQUEST's own two fields", () => {
-    // The same fields the map's footer is handed, so one bid cannot read as two totals.
-    expect(VIEW).toContain("durationDays={reqTerms.get(openRow.request.id)?.durationDays ?? null}");
-    expect(VIEW).toContain("startDate={reqTerms.get(openRow.request.id)?.startDate ?? null}");
+    /**
+     * The same fields the map's footer is handed, so one bid cannot read as two totals — now off the
+     * request `fetchBidDetail` returns beside the bid, rather than out of the list.
+     * ⚠️ `RequestRecord` carries the RAW `estimatedDurationDays`, never the derived `durationDays`
+     * of `RequestListItem`, so the fallback is the same helper the list mapper uses at its own call.
+     */
+    expect(VIEW).toContain("durationDays={cardDurationDays}");
+    expect(VIEW).toContain("startDate={cardReq?.startDate ?? null}");
+    expect(VIEW).toContain("cardReq?.estimatedDurationDays ?? durationDaysBetween(");
+  });
+
+  it("Given «Show details», Then it sits BESIDE the figure", () => {
+    // At 46px the second line is what makes the slab feel tall (owner, 2026-09-23).
+    expect(CSS).toMatch(/\.bidmap \.bm-foot\.is-slim \.bm-foot-figs \{[^}]*align-items: baseline/);
   });
 });
 
@@ -233,6 +276,25 @@ describe("the list keeps itself current", () => {
     // The ids can be identical while every last message has changed, the ordinary case on a busy
     // account, so the tick is what refreshes them rather than the room list changing.
     expect(VIEW).toContain("}, [roomKey, tick]);");
+  });
+});
+
+describe("the request strip", () => {
+  it("Given any chat surface, Then the `assignment` strip is gone", () => {
+    /**
+     * \u{1F534} Owner, 2026-09-23: *"this one can be removed from any chat surface"*. On the MAP it
+     * restated the panel beside it; in the INBOX the row that opened the conversation names the same
+     * machine under the same RFQ code, one column to the left.
+     */
+    expect(DOCK).not.toContain("bm-chat-req");
+    expect(CSS).not.toMatch(/^\.bidmap \.bm-chat-req/m);
+  });
+
+  it("Given the slot it vacated, Then the PAGE decides what stands there", () => {
+    // A `ReactNode`, not a prop the dock interprets: it neither prices a bid nor knows what a
+    // counter is, and the money stays with `PriceFooter`, which owns the hand-off.
+    expect(DOCK).toContain("belowHeader?: ReactNode;");
+    expect(DOCK).toContain("{belowHeader}");
   });
 });
 

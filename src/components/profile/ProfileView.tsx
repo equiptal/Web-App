@@ -50,7 +50,11 @@ export function ProfileView() {
   const [showDelete, setShowDelete] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
-  /** The logo dialog, opened by `?logo=1` (the quotation's «Add a logo», 2026-09-23). */
+  /**
+   * The logo dialog. Two doors: `?logo=1`, which the quotation and the deal room link to when
+   * there is no mark yet, and the mark itself on the company card, which is the app own control
+   * (`CompanyLogoEditor`) and the only one that can CHANGE or REMOVE a logo already on file.
+   */
   const [logoOpen, setLogoOpen] = useState(false);
   /**
    * The company's own particulars, over this page.
@@ -358,6 +362,12 @@ export function ProfileView() {
                    review must not be sent a second time — *"sending again is what stacks a
                    duplicate for the reviewer"*. A rejected one gets both, as it does in the app. */
                 onViewDetails={verification === "none" ? undefined : () => setDetailsOpen(true)}
+                /* 🔴 **The mark, and the only way to change or remove one** (owner, 2026-09-23:
+                   *"match it"*). The quotation red ask carries `!companyLogoUrl`, so before this the
+                   web could SET a logo once and never touch it again. `CompanyHub` withholds the
+                   press from a member, the app own owner gate. */
+                logoUrl={profile?.companyLogoUrl ?? null}
+                onEditLogo={() => setLogoOpen(true)}
               />
             </div>
           )}

@@ -103,3 +103,47 @@ describe("one vertical scroller, and it is the page column", () => {
     expect(classes.filter((c) => c.includes("overflow-y-auto")).length).toBe(1);
   });
 });
+
+/**
+ * 🔴 **The subtext is the CITY and what the bid covers** (owner, 2026-09-23, on «Supplier ·
+ * Riyadh · 8 km»: *"make it, only city and offers x units if multi unit instead of this 2 units
+ * badge"*).
+ *
+ * ~~«Supplier», the city, the distance — and a units BADGE in the pill column beneath the chat
+ * control.~~ Every row in that strip is a supplier, so the word captioned the obvious; the distance
+ * is the YARD's, which the equipment map states per machine with a «not confirmed» qualifier, so one
+ * rounded figure here claimed a precision that surface spends itself refusing.
+ *
+ * ⚠️ The count moved rather than being dropped, so the card says it ONCE - and the accepted
+ * shape came with it, because «2 of 3 units accepted» is a partial award and the green band says
+ * only THAT a bid was accepted, never how much of it.
+ */
+describe("the bid card's subtext", () => {
+  const CARD = readFileSync("src/components/workspace/BidCards.tsx", "utf8");
+  /* Comments stripped: the notes above NAME what they removed, so a bare sweep fails on its own
+     explanation - the tenth time this repo has recorded that. */
+  const CODE = CARD.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("names the city and the units, and nothing else", () => {
+    expect(CODE).toContain('{[card.supplierCity || null, unitsLine].filter(Boolean).join(" · ")}');
+  });
+
+  it("drops the «Supplier» caption and the yard's distance", () => {
+    expect(CODE).not.toContain('L("Supplier", "مؤجّر")');
+    expect(CODE).not.toContain("Math.round(card.distanceKm)");
+  });
+
+  /* The app's own gate: on a single-unit request every bid covers all of it, so the line would be
+     stating nothing. */
+  it("states the count only on a multi-unit request, and reads the OFFERED one", () => {
+    expect(CODE).toMatch(/const unitsLine =[\s\S]{0,40}card\.numberOfUnits > 1/);
+    expect(CODE).toContain("fmt(t.workspace.offersUnits, { n: String(unitsOffered) })");
+    expect(CODE).toContain("fmt(t.workspace.acceptedUnits, { accepted: String(acceptedUnits), offered: String(unitsOffered) })");
+  });
+
+  /* Deleted, not left unrendered: a component nothing imports is one edit away from coming back
+     beside the line that replaced it, and then the card states its count twice. */
+  it("has no units badge left to come back", () => {
+    expect(CODE).not.toContain("OffersUnitsBadge");
+  });
+});

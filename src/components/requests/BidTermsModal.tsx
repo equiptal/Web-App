@@ -46,10 +46,25 @@ export interface TermsAsk {
   fatAccommodation: "supplier" | "me" | null;
 }
 
-/** The app's own tones for the three states (`AppColors.danger` / `.warning` / `.success`). */
+/** The app's own tones for the three states (`AppColors.danger` / `.warning` / `.success`).
+ *
+ * 🔴 **PENDING is the SLATE, not the mustard** (owner, 2026-09-23: *"pending terms in the terms
+ * modal must be grey or light blue not this yellow"*). ~~`--warn` on `--warn-soft`.~~ Two reasons
+ * beyond the instruction, and both matter:
+ *
+ *   · **`--warn` in this palette is a MUSTARD** (#b98a1d), not the amber the app draws — the same
+ *     mismatch the canvas's provenance ring was corrected for on 2026-09-08 and the off-catalogue
+ *     box on 2026-09-12. It is also a FILL token; `--warn-deep` is the one that may carry text.
+ *   · **Pending is not a WARNING.** It is «nobody has answered this yet», which is the absence of a
+ *     verdict rather than a bad one — and painted the colour of caution it read as a problem beside
+ *     the red bucket directly above it.
+ *
+ * ⚠️ `--info` is this palette's slate, in the ink family: it has no true blue by design, which
+ * is the 2026-09-06 ruling. The COMPARISON's terms band already uses it (2026-09-13), so a term
+ * awaiting an answer is one colour across the two surfaces that count them. */
 const TONE: Record<Bucket, { c: string; soft: string }> = {
   conflict: { c: "var(--danger)", soft: "var(--danger-soft)" },
-  pending: { c: "var(--warn)", soft: "var(--warn-soft)" },
+  pending: { c: "var(--info)", soft: "var(--info-soft)" },
   matched: { c: "var(--ok)", soft: "var(--ok-soft)" },
 };
 

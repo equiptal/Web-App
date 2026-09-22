@@ -1189,6 +1189,13 @@ export const en = {
       // The logo dialog the quotation's «Add a logo» opens (2026-09-23).
       logoSave: "Save logo",
       logoSaved: "Logo saved. Open the quotation again to see it on your side",
+      // The mark on the company card, and the way out of it (2026-09-23, app parity with
+      // `company_logo_editor.dart`). Its wording is the app's own, string for string.
+      logoAdd: "Add a logo",
+      logoRemoved: "Logo removed",
+      logoRemoveConfirm:
+        "Your company name will be shown instead, everywhere the logo appears. You can add a new one at any time",
+      logoNeedsProfile: "Add your name, city and job title in your profile first, then you can set a logo",
       continue: "Continue",
       confirmHeadline:
         "Not uploading the required company documents may lead to your registration being rejected",

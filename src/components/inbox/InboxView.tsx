@@ -6,13 +6,15 @@ import { useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { ChatDock } from "@/components/map/ChatDock";
 import { PriceFooter } from "@/components/map/PriceFooter";
-import { fetchBids, fetchReceivedBids, fetchMyRequests, fetchRequestSubmissions, fetchStreamToken } from "@/lib/api/client";
+import { fetchBidDetail, fetchReceivedBids, fetchMyRequests, fetchRequestSubmissions, fetchStreamToken } from "@/lib/api/client";
 import { leaseStream } from "@/lib/chat/stream-connection";
 import { readInboxChatSummaries } from "@/lib/chat/inbox-chat-summary";
 import type { BidCard } from "@/lib/contract/bids";
 import type { InboxBid } from "@/lib/contract/inbox";
+import type { RequestRecord } from "@/lib/contract/requests";
 import { inboxPreview, inboxTimeLabel, type InboxChatSummary } from "@/lib/contract/inbox-chat";
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
+import { durationDaysBetween } from "@/lib/pricing/rental";
 import { pin } from "@/lib/uiPins";
 import "@/components/map/map-proto.css";
 
@@ -86,14 +88,16 @@ export function InboxView() {
   const [groupMap, setGroupMap] = useState<Map<string, string>>(new Map());
   // group key → RFQ short code (RFQ-NNNNN), fetched per group (same source the requests page uses).
   const [groupRefs, setGroupRefs] = useState<Map<string, string>>(new Map());
-  /** requestId → the two figures the price bar prices from, off the renter's own request list — the
-   *  SAME fields the map's footer is handed, so one bid cannot read as two totals. */
-  const [reqTerms, setReqTerms] = useState<Map<string, { durationDays: number | null; startDate: string | null }>>(new Map());
   /** dealRoomId → its last line of conversation. Empty until Stream answers, and empty for ever if
    *  Stream is unreachable: the rows then keep the equipment subtitle, which is the pre-chat row. */
   const [chats, setChats] = useState<Map<string, InboxChatSummary>>(new Map());
-  /** The selected row's full bid, for the price bar and the dock. One read per selection. */
+  /** The selected bid, read by ID. One call per selection, and the pane's only dependency. */
   const [card, setCard] = useState<BidCard | null>(null);
+  /** Its request, for the two fields the price bar prices from. */
+  const [cardReq, setCardReq] = useState<RequestRecord | null>(null);
+  /** The read failed — a bid that is gone, or a dropped request. The pane SAYS so rather than
+   *  spinning for ever, which is what a missing card used to do. */
+  const [cardFailed, setCardFailed] = useState(false);
   /**
    * Ticks on the poll and on a RETURN to this tab — the two moments the app reloads on.
    *
@@ -140,7 +144,6 @@ export function InboxView() {
       .then((req) => {
         if (!active) return;
         setGroupMap(new Map(req.requests.filter((x) => x.requestGroupId).map((x) => [x.id, x.requestGroupId as string])));
-        setReqTerms(new Map(req.requests.map((x) => [x.id, { durationDays: x.durationDays ?? null, startDate: x.startDate ?? null }])));
       });
     return () => { active = false; };
   }, []);
@@ -211,19 +214,35 @@ export function InboxView() {
   }, [roomKey, tick]);
 
   /** The open row, and the bid card behind it. */
+  /**
+   * The row behind the open conversation, for the LIST's highlight only.
+   *
+   * 🔴 **The pane no longer depends on it**, and that was a real bug on staging: a link of the
+   * shape `/inbox?bid=<id>` showed no conversation at all. Two ways it failed, and either alone was
+   * enough — the bid may not be on the received-bids feed this page holds, and the card behind it
+   * was fetched with `fetchBids(requestId)`, which answers EXACT-SIZE bids only, so a bid on a larger
+   * machine was never in the answer and the pane waited on a card that could not arrive.
+   */
   const openRow = useMemo(() => (bids ?? []).find((b) => b.bidId === openBidId) ?? null, [bids, openBidId]);
   const cardBidId = useRef<string | null>(null);
   useEffect(() => {
-    if (!openRow?.request.id) { setCard(null); cardBidId.current = null; return; }
-    if (cardBidId.current === openRow.bidId) return;
-    cardBidId.current = openRow.bidId;
+    if (!openBidId) { setCard(null); setCardReq(null); cardBidId.current = null; return; }
+    if (cardBidId.current === openBidId) return;
+    cardBidId.current = openBidId;
     let active = true;
     setCard(null);
-    fetchBids(openRow.request.id)
-      .then((r) => active && setCard(r.bids.find((x) => x.id === openRow.bidId) ?? null))
-      .catch(() => active && setCard(null));
+    setCardReq(null);
+    setCardFailed(false);
+    /* 🔴 **BY ID, through the bid's own route.** `fetchBidDetail` takes the id the URL carries
+       and answers that bid whatever its size and wherever it sits in the feed — which is what makes a
+       pasted link, a notification and a Back from the equipment map all land on the conversation.
+       ⚠️ It hands back the REQUEST too, so the price bar is priced off the same two fields the
+       map's footer is handed without the list having to be loaded first. */
+    fetchBidDetail(openBidId)
+      .then((r) => { if (!active) return; setCard(r.bid); setCardReq(r.request); })
+      .catch(() => { if (active) setCardFailed(true); });
     return () => { active = false; };
-  }, [openRow]);
+  }, [openBidId]);
 
   const statusLabel = (b: InboxBid) => {
     if (b.supplierStarted) return L("New message", "رسالة جديدة");
@@ -237,9 +256,22 @@ export function InboxView() {
     }
   };
 
+  /**
+   * The billable window the price bar prices from.
+   *
+   * ⚠️ `RequestRecord` carries the RAW `estimatedDurationDays`, not the derived `durationDays`
+   * of `RequestListItem` — so the fallback is `durationDaysBetween`, the same helper the list mapper
+   * uses at its own call. Two derivations of one window is how a bid comes to read as two totals on
+   * two surfaces.
+   */
+  const cardDurationDays = useMemo(
+    () => cardReq?.estimatedDurationDays ?? durationDaysBetween(cardReq?.startDate ?? null, cardReq?.endDate ?? null),
+    [cardReq],
+  );
+
   const openEquipment = useCallback(() => {
-    if (openRow) router.push(`/bids/${encodeURIComponent(openRow.bidId)}/equipment`);
-  }, [openRow, router]);
+    if (openBidId) router.push(`/bids/${encodeURIComponent(openBidId)}/equipment`);
+  }, [openBidId, router]);
 
   if (bids === null) {
     return <div className="mt-10 text-center text-muted"><Icon name="progress_activity" size={26} /></div>;
@@ -435,27 +467,36 @@ export function InboxView() {
    * computed style. `flexDirection: "column"` because `.bidmap` is a ROW by default (it holds a panel
    * beside a map); here it holds a bar above a conversation.
    */
-  const pane = openRow ? (
+  const pane = openBidId ? (
     <div {...pin("inbox-pane")} className="bidmap min-h-0 flex-1" style={{ flexDirection: "column" }}>
-      {card && (
-        <PriceFooter
-          bid={card}
-          slim
-          durationDays={reqTerms.get(openRow.request.id)?.durationDays ?? null}
-          startDate={reqTerms.get(openRow.request.id)?.startDate ?? null}
-        />
-      )}
       <div className="relative min-h-0 flex-1">
         {card ? (
           <ChatDock
             bid={card}
             embedded
             fleet={null}
-            dealRoomId={openRow.dealRoomId}
-            typeWord={ar ? openRow.equipment.subtypeAr : openRow.equipment.subtype}
+            dealRoomId={card.dealRoomId}
+            typeWord={ar ? openRow?.equipment.subtypeAr : openRow?.equipment.subtype}
             onClose={closeBid}
             onOpenEquipment={openEquipment}
+            /* 🔴 **The price bar sits UNDER the identity band**, in the slot the request strip
+               vacated (owner, 2026-09-23: *"here in the inbox replace it with price header"*). It was
+               above the whole dock, which put it over the counterparty's own name — and the renter
+               reaches the map from nowhere here, so this is the only surface carrying the rate and
+               the way into the negotiation. */
+            belowHeader={
+              <PriceFooter
+                bid={card}
+                slim
+                durationDays={cardDurationDays}
+                startDate={cardReq?.startDate ?? null}
+              />
+            }
           />
+        ) : cardFailed ? (
+          <div className="grid h-full place-items-center p-8 text-center text-meta text-muted">
+            {L("That conversation could not be opened.", "تعذّر فتح هذه المحادثة.")}
+          </div>
         ) : (
           <div className="grid h-full place-items-center text-muted"><Icon name="progress_activity" size={24} /></div>
         )}
@@ -484,10 +525,10 @@ export function InboxView() {
       dir={ar ? "rtl" : "ltr"}
       className="flex min-h-0 w-full flex-1"
     >
-      <div className={`min-h-0 w-full flex-col border-border lg:flex lg:w-[360px] lg:flex-none lg:border-e ${openRow ? "hidden" : "flex"}`}>
+      <div className={`min-h-0 w-full flex-col border-border lg:flex lg:w-[360px] lg:flex-none lg:border-e ${openBidId ? "hidden" : "flex"}`}>
         {list}
       </div>
-      <div className={`min-h-0 flex-1 flex-col ${openRow ? "flex" : "hidden lg:flex"}`}>{pane}</div>
+      <div className={`min-h-0 flex-1 flex-col ${openBidId ? "flex" : "hidden lg:flex"}`}>{pane}</div>
     </div>
   );
 }

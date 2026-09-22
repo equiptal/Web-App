@@ -148,6 +148,9 @@ export interface EquipmentListProps {
    *  that opens it sits in the count pills' row, which the workspace draws. */
   filtersOpen: boolean;
   onCloseFilters: () => void;
+  /** The request item's catalogue picture, for a machine with no photo of its own: the same
+   *  fallback its map circle takes, so a card and its circle never show two pictures (2026-09-23). */
+  itemImageUrl?: string | null;
 }
 
 /**
@@ -217,6 +220,7 @@ export function EquipmentList({
   scrollRef,
   filtersOpen,
   onCloseFilters,
+  itemImageUrl = null,
 }: EquipmentListProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -428,6 +432,7 @@ export function EquipmentList({
               onFocusMachine={onFocusMachine}
               onYardPress={onYardPress}
               askPending={askPending}
+              itemImageUrl={itemImageUrl}
             />
             </Fragment>
           ))}
@@ -475,7 +480,9 @@ function EquipmentCard({
   onYardPress,
   askPending,
   request,
+  itemImageUrl,
 }: {
+  itemImageUrl: string | null;
   machine: FleetMachine;
   index: number;
   selected: boolean;
@@ -507,7 +514,9 @@ function EquipmentCard({
   // (AC-19), and the model carries no serial and no capacity for the card to reach for even by
   // accident (AC-12).
   const card = useMemo(() => equipmentCardModel(machine, request), [machine, request]);
-  const { chip, photo, readiness } = card;
+  const { chip, readiness } = card;
+  // Its own photo, else the request's catalogue picture, as its map circle does (2026-09-23).
+  const photo = card.photo ?? itemImageUrl;
   /** Asked, and not yet answered. The workspace decides it — only it can see the conversation — and
    *  the card paints the answer. */
   const pending = askPending?.(machine) ?? false;

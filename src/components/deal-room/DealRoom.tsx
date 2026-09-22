@@ -7,7 +7,7 @@ import { Icon } from "@/components/Icon";
 import { useRouter } from "next/navigation";
 import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
-import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
+import { STREAM_API_KEY, leaseStream, loadFullHistory } from "@/lib/chat/stream-connection";
 import { usePageBack } from "@/components/AppShell";
 import { fetchBids, fetchRequestDetail, fetchRequestGroup, fetchDealRoom, fetchStreamToken, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
 import { counterpartyDisplayName } from "@/lib/contract/counterparty-name";
@@ -447,6 +447,10 @@ export function DealRoom({ id, onTitle, initialFlow }: {
         const ch = client.channel("messaging", tok.channelId);
         await ch.watch();
         if (cancelled) return;
+        // The whole negotiation, not just the newest page: the rounds, the live position and the
+        // accept gate are all rebuilt from these messages (app `_ensureRoundsLoaded`).
+        await loadFullHistory(ch);
+        if (cancelled) return;
         channelRef.current = ch;
         setMessages([...ch.state.messages] as ChatMsg[]);
         setChatReady(true);
@@ -588,7 +592,23 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       // accept. contractType is chosen on the flow's Summary step (defaults to "formal"). Send the
       // accepted rental count as agreedUnits (the app sends it — records the count for multi-unit /
       // partial-fulfilment requests instead of defaulting to the full offer).
-      await acceptDeal(id, contractType, { termResolutions: resolutionUpdates(), agreedUnits: room.agreedUnits ?? room.numberOfUnits });
+      //
+      // 🔴 The LIVE position's figures, all five (audit, 2026-09-23; app `_accept` in
+      // `negotiation_sheet.dart`). ~~`agreedUnits: room.agreedUnits ?? room.numberOfUnits` and no
+      // leg fields.~~ That sent the room's LAST agreement while the price bar above priced the latest
+      // round, and left the transport legs to whatever the server held: a renter accepting a supplier
+      // counter of 2 units with delivery removed could record 3 units with delivery on. The app sends
+      // its draft, which is seeded from this same live round; an excluded leg sends no count, because
+      // exclusion wins server-side and nulls it anyway.
+      const lp = liveRoundOf(room, messages);
+      await acceptDeal(id, contractType, {
+        termResolutions: resolutionUpdates(),
+        agreedUnits: lp?.rentalUnits ?? room.agreedUnits ?? room.numberOfUnits,
+        mobExcluded: lp?.mobExcluded ?? room.mobExcluded,
+        demobExcluded: lp?.demobExcluded ?? room.demobExcluded,
+        mobUnits: (lp?.mobExcluded ?? room.mobExcluded) ? undefined : lp?.mobUnits ?? room.mobUnits ?? undefined,
+        demobUnits: (lp?.demobExcluded ?? room.demobExcluded) ? undefined : lp?.demobUnits ?? room.demobUnits ?? undefined,
+      });
       setResolutions({});
       await loadRoom();
       setFlowMode(null);
@@ -1150,7 +1170,11 @@ export function DealRoom({ id, onTitle, initialFlow }: {
           }
         >
           <p className="text-body text-navy-mid">
-            {L("This reopens negotiation with the supplier. The accepted deal returns to negotiating and the terms/price can change again. A new quotation is issued once you re-confirm.", "يعيد هذا فتح التفاوض مع المؤجّر: تعود الصفقة المقبولة إلى التفاوض ويمكن تغيير الشروط والسعر. يصدر عرض سعر جديد بعد إعادة التأكيد.")}
+            {/* The app's sentence first (`dealReleaseMessage`, audit 2026-09-23): the backend's `releaseDeal`
+                also FREES the reserved equipment and reopens the REQUEST to other suppliers, which is
+                the consequence a renter must not learn after pressing. The web's own second sentence,
+                about the terms and the quotation, stays after it. */}
+            {L("This frees the equipment and reopens the request so another supplier can be selected. The deal returns to negotiating and the terms and price can change again. A new quotation is issued once you re-confirm", "سيؤدي ذلك إلى تحرير المعدة وإعادة فتح الطلب لاختيار مورّد آخر. تعود الصفقة إلى التفاوض ويمكن تغيير الشروط والسعر. يصدر عرض سعر جديد بعد إعادة التأكيد")}
           </p>
           {releaseErr && <p className="mt-2 text-meta font-semibold text-danger">{releaseErr}</p>}
         </Dialog>
@@ -1494,8 +1518,32 @@ function CounterFlow({
    *  a settled row sets this, because a reader who wants to revisit row three should not have to
    *  unanswer rows one and two. */
   const [forcedTerm, setForcedTerm] = useState<string | null>(null);
+  /** 🔴 **THE VALUE A REOPEN THREW AWAY**, so the picker can show where she left it (app
+   *  parity, `_reopenedValues`; the app's own rule of 2026-09-17: *"when a user set a value then
+   *  clicks it to edit, it will show his value selected, not empty"*).
+   *  ⚠️ It is NOT the same question as `myVal`. Reopening clears the resolution, and `myVal`
+   *  then falls back to `renteePreference` - the value she asked for on the REQUEST, which is not
+   *  the answer she just gave on this card. Ticking that would put a mark on a value she never
+   *  chose here, which is the same fault as pre-ticking the supplier's. */
+  const [reopenedVals, setReopenedVals] = useState<Record<string, string>>({});
+  const reopenTerm = (key: string, previous: unknown) => {
+    if (previous != null && String(previous) !== "") setReopenedVals((m) => ({ ...m, [key]: String(previous) }));
+    onReopenLocal(key);
+  };
   // Confirm before a leg (delivery/return) is excluded from the offer — reversible, but the app confirms.
   const [pendingEx, setPendingEx] = useState<null | { title: string; onYes: () => void }>(null);
+  /* ── The count change, confirmed ONCE per negotiation (audit, 2026-09-23; app `_confirmUnitChange`,
+     `negotiation_sheet.dart`) ───────────────────────────────────────────────────────────────────
+     Any of the three steppers, the first time it moves: a sheet showing the actual change (3 → 2)
+     and saying what it does, «Changing the count sends a counter-offer to the other party. The
+     per-unit price is unchanged». Confirmed once, never again in this sheet; «Go back» leaves the
+     count where it was. */
+  const [pendingUnits, setPendingUnits] = useState<null | { from: number; to: number; apply: () => void }>(null);
+  const unitsWarned = useRef(false);
+  const guardQty = (from: number, set: (v: number) => void) => (to: number) => {
+    if (unitsWarned.current || to === from) return set(to);
+    setPendingUnits({ from, to, apply: () => { unitsWarned.current = true; set(to); } });
+  };
   // Quotation-paper UI-only state (spec §6): collapsible دليل البنود categories + the السجل log modal.
   /* 🔴 **The review's term list starts OPEN** (owner, 2026-09-22: *"for the summary and review
      also structure the terms cleanly and make them open at first not closed"*). ~~`{}`, so every
@@ -1795,6 +1843,19 @@ function CounterFlow({
      comparator the price cells paint with, so the bar and the cell cannot disagree about whether
      anything moved. */
   const counterRate = editable && changedFrom(num(rateStr), refRate) ? num(rateStr) : null;
+
+  /** «Round N», the live header's own line - the one fact saying this is a reply rather than an
+   *  opening position. The request's short code is deliberately not beside it (note 7). */
+  const roundLine = flowRounds.length ? L(`Round ${flowRounds.length + 1}`, `الجولة ${flowRounds.length + 1}`) : null;
+
+  /** ⚠️ The arithmetic behind the header's figure (owner, 2026-09-23: *"add details for the
+   *  price as breakdonw"*). Rental first, then each leg that is actually priced - an excluded or
+   *  unpriced leg is left out rather than shown as 0, which would read as «free». */
+  const headBreakdown = [
+    `${nf(num(rateStr) || rate)}×${rNU}`,
+    !mEx && num(mobStr) > 0 ? `+${nf(num(mobStr))}×${mNU}` : null,
+    !dEx && num(demobStr) > 0 ? `+${nf(num(demobStr))}×${dNU}` : null,
+  ].filter(Boolean).join(" ");
   const refMobPrice = supRound?.mobPrice ?? room.mobPrice;
   const refDemobPrice = supRound?.demobPrice ?? room.demobPrice;
   /**
@@ -1962,13 +2023,24 @@ function CounterFlow({
     if (state === "done") {
       const countered = mine?.action === "counter";
       return (
-        <div key={t.key} className="ng-t done" role={editable ? "button" : undefined} tabIndex={editable ? 0 : undefined}
-          onClick={() => editable && setForcedTerm(t.key)}
-          onKeyDown={(e) => { if (editable && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); setForcedTerm(t.key); } }}>
+        <div key={t.key} className={`ng-t done${countered ? " countered" : ""}`} role={editable ? "button" : undefined} tabIndex={editable ? 0 : undefined}
+          onClick={() => { if (!editable) return; reopenTerm(t.key, mine?.value); setForcedTerm(t.key); }}
+          onKeyDown={(e) => { if (editable && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); reopenTerm(t.key, mine?.value); setForcedTerm(t.key); } }}>
           <span className="k">{label}{notes && <span className="why">{notes}</span>}</span>
           <span className={`v${countered ? " changed" : ""}`}>
             {countered ? "✎" : "✓"} {tval(t, d.chosen ?? t.value ?? t.supplierDeclared)}
-            {editable && mine && <button type="button" className="undo" title={L("Reopen", "إعادة فتح")} onClick={(e) => { e.stopPropagation(); onReopenLocal(t.key); }}>↻</button>}
+            {/* 🔴 **THE PENCIL IS THE AFFORDANCE, and the WHOLE ROW is the target** (owner,
+                2026-09-23: *"allow edit on the terms like the app too"*; the app's own note:
+                *"the pencil IS the reopen affordance - the whole row is the target, and a settled
+                term a reader cannot re-open is a decision they cannot take back"*).
+                ~~A ↻ BUTTON, drawn only where the renter had a resolution of her own.~~ Two faults:
+                a term the SERVER settled had no way back at all, and a second press target inside a
+                row that is already one meant a tap could land on either. It is a glyph now, not a
+                control, so there is exactly one thing to press.
+                ⚠️ `onReopenLocal` before `setForcedTerm`: forcing a term that still carries a
+                resolution opens the card with its answer already given, which is the state the
+                reader is trying to leave. Clearing first is what the app's own reopen does. */}
+            {editable && <span className="material-icons-outlined pen">edit</span>}
           </span>
         </div>
       );
@@ -1995,19 +2067,40 @@ function CounterFlow({
     /** «Keep my choice» has no menu to open: it settles on the value already held. */
     const keepMine = conflict && opts.length <= 2;
     const myVal = d.chosen ?? t.renteePreference;
+    /** What the PICKER ticks: her own answer on this card, either still standing or the one the
+     *  reopen just cleared. Never `renteePreference` and never the supplier's. */
+    const pickedVal = mine?.value != null ? String(mine.value) : reopenedVals[t.key] ?? null;
     /* ⚠️ The card names its STATE, so the stylesheet can paint the two apart: red for a clash,
        the app's blue for a term nobody has answered (owner, 2026-09-22, on the app's own
        `negotiate_tones.dart`). `picking` no longer carries a colour of its own - opening the
        options on a pending term does not make it a conflict, which is what the shared red said. */
     return (
       <div key={t.key} {...pin("ng-term-card")} className={`ng-t now${conflict ? " clash" : " pending"}${open ? " picking" : ""}`}>
+        {/* 🔴 **THE TWO POSITIONS GET THEIR OWN LINE** (owner, 2026-09-23: *"even these make it
+            middle and more visible"*, on «Fuel Responsibility  Your choice: not set · Supplier: 24
+            hours»).
+            ~~Squeezed at the end of the name's row, 12px, ellipsising first.~~ That is the app's own
+            fault of 2026-09-17, and its note says why it moved: sharing a row with the term's name
+            meant *"the longer the term's name, the smaller its answers"* - the values, which are
+            the thing being decided, shrank to fit the label. With the full width under the name it
+            can simply BE its size.
+            ⚠️ **Centred**, which is where this departs from the app on his word: the app aligns
+            it to the reading start. He asked for the middle, and the two acts under it are centred
+            too, so the card reads as one column. */}
         <div className="h">
           <span className="k">{label}{notes && <span className="why">{notes}</span>}</span>
-          <span className="side">{L("Your choice", "اختيارك")}: <b>{myVal != null && String(myVal) !== "" ? tval(t, myVal) : L("not set", "غير محدد")}</b> · {L("Supplier", "المورد")}: <b>{tval(t, t.supplierDeclared)}</b></span>
         </div>
+        <div className="side">{L("Your choice", "اختيارك")}: <b>{myVal != null && String(myVal) !== "" ? tval(t, myVal) : L("not set", "غير محدد")}</b> · {L("Supplier", "المورد")}: <b>{tval(t, t.supplierDeclared)}</b></div>
+        {/* 🔴 **THE OPTIONS REPLACE THE TWO ACTS; they never stand beside them** (owner,
+            2026-09-23: *"check if we dont differ on anything in behaviour from the app"*).
+            ~~Both drawn at once, so an open card carried «Choose another», «Accept» and the menu
+            «Choose another» had just opened.~~ The app is an `if/else`: `if (!optionsOpen)
+            _ActionRow(...) else _OptionsPanel(...)`. With both on screen the button that opened the
+            menu is still standing there inviting a second press, and «Accept» sits beside a list of
+            values as if it were one of them. */}
         {editable && (
           <>
-            <div className="acts">
+            {!(open && !keepMine) && <div className="acts">
               <button type="button" className="change" disabled={keepMine && (myVal == null || String(myVal) === "")}
                 onClick={() => { if (keepMine) { onResolveLocal(t.key, "counter", myVal); setOpenTerm(null); setForcedTerm(null); } else setOpenTerm(open ? null : t.key); }}>{changeLabel}</button>
               {/* 🔴 **«Accept», the APP's own word** (owner, 2026-09-22: *"follow the app in the langiage
@@ -2015,18 +2108,29 @@ function CounterFlow({
                   «قبول» - and the Arabic here was ALREADY «قبول», so the two locales were saying
                   different things about one button. */}
               <button type="button" className="take" disabled={supStr(t) == null} onClick={() => { onResolveLocal(t.key, "accept"); setOpenTerm(null); setForcedTerm(null); }}>{L("Accept", "قبول")}</button>
-            </div>
-            {/* 🔴 **The options stand OPEN, and they run ACROSS** (owner, 2026-09-22: *"alwasy
-                show other options if he chose 'choose another' to be shown horizantaly not
-                vertically"*). ~~Hidden until the button was pressed, then a column.~~ A press to
-                reveal a list of three chips is a press that buys nothing, and a column of them
-                made a two-option term as tall as the card it sits in. `.opts` wraps in a row now.
-                ⚠️ Still withheld on «Keep my choice», which has no menu by construction:
-                the only alternative there is the value she already holds. */}
-            {!keepMine && opts.length > 0 && (
+            </div>}
+            {/* 🔴 **BEHIND THE PRESS, and laid out ACROSS** (owner, 2026-09-23, correcting me:
+                *"now the options appear even if i didnt choose choose another which is different
+                from the live one"*).
+                ~~Drawn unconditionally.~~ **That was my misreading of his 2026-09-22 note** - he
+                wrote *"alwasy show other options if he chose 'choose another' to be shown
+                horizantaly not vertically"*, and I took «always show» as unconditional when the
+                clause after it says WHEN: once he has chosen. Only the AXIS was his complaint.
+                ⚠️ So `open` gates it again, exactly as the live sheet does, and the one thing
+                that changed is `flex-wrap: wrap` in place of a column.
+                ⚠️ Withheld on «Keep my choice», which has no menu by construction: the only
+                alternative there is the value she already holds. */}
+            {/* 🔴 **NOTHING IS PRE-TICKED unless it is the reader's OWN answer** (app parity,
+                `NegOptionPills`). ~~The supplier's declared value came up ticked whenever she had
+                stated nothing.~~ The app's note is the argument: the panel opens because the reader
+                wants a DIFFERENT value, so ticking the one on file *"answered the question before
+                they had"* - and a tick meaning «what you have now» sat a row under a tick meaning
+                «agreed». Re-opening a row she answered herself is the opposite case, and that one
+                still shows where she left it. */}
+            {open && !keepMine && (
               <div className="opts">
                 {opts.map((o) => (
-                  <button key={o.value} type="button" className={o.value === (myVal != null ? String(myVal) : supStr(t)) ? "on" : undefined}
+                  <button key={o.value} type="button" className={pickedVal != null && o.value === pickedVal ? "on" : undefined}
                     onClick={() => { pickTerm(t, o.value); setOpenTerm(null); setForcedTerm(null); }}>{o.label}</button>
                 ))}
               </div>
@@ -2048,6 +2152,21 @@ function CounterFlow({
 
   /** One section: a header band carrying its name and `(resolved/total)`, with its rows INSIDE the
    *  same card — one border, one radius (app parity, `_SectionHeader`). */
+  /* 🔴 **PRESSING A SECTION OPENS ITS FIRST UNANSWERED TERM** (owner, 2026-09-23: *"i clicked
+     on conflict it doesnt open"*).
+     The bug: a section draws ONLY the active card, so a conflict that was not the active term
+     rendered NOTHING - pressing its header expanded an empty body and there was no card to press.
+     The app never shows this because its walk reaches conflicts after the pending rows and the
+     reader arrives at an open one; press it out of order here and the section was blank.
+     ⚠️ It sets `forcedTerm`, which is the SAME lever a press on a settled row uses - so
+     opening a section by hand and reopening an answered term are one mechanism, and the walk still
+     carries on by itself once the open one is answered (`activeKey` falls back to the first
+     unanswered). A second mechanism here is how the two come to disagree about which card is open. */
+  const openSection = (rows: DealTerm[]) => {
+    const first = rows.find((t) => !resolutions[t.key]);
+    if (first) setForcedTerm(first.key);
+  };
+
   const section = (o: { key: string; label: string; tone?: "agreed" | "ack"; mark?: string; done: number; total: number; open: boolean; onToggle: () => void; body: React.ReactNode }) =>
     o.total === 0 ? null : (
       <div key={o.key} className={`ng-sect${o.tone ? ` ${o.tone}` : ""}`}>
@@ -2069,7 +2188,12 @@ function CounterFlow({
         onClick={onReopen}
         onKeyDown={(e) => { if (onReopen && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onReopen(); } }}>
         <span className="k">{ar ? t.labelAr : t.label}</span>
-        <span className="v">{tval(t, d.chosen ?? t.value ?? t.supplierDeclared ?? t.renteePreference)}</span>
+        <span className="v">
+          {tval(t, d.chosen ?? t.value ?? t.supplierDeclared ?? t.renteePreference)}
+          {/* The same pencil the price step's settled strip carries - one affordance for «this is
+              decided and you may still undo it», wherever a decided row is drawn. */}
+          {onReopen && <span className="material-icons-outlined pen">edit</span>}
+        </span>
       </div>
     );
   };
@@ -2157,43 +2281,40 @@ function CounterFlow({
             to tell the sheets apart. Under the name, not beside it: the name is looked for first. */}
         <div {...pin("ng-sheet-head")} className="ng-head">
           <div className="ng-inner">
-          {/* 🔴 **The firm, then the MACHINE** (owner, 2026-09-22: *"for the header keep company
-              name of supplier with equuoment name ans size dont mention request id"*).
-              ~~The supplier's name over the request's short code.~~ That code answers a question
-              nobody asks inside a sheet they opened FROM the request: he is negotiating one
-              machine with one firm, and on a multi-item room the code cannot even say which line
-              he is on. The machine and its size can.
-              ⚠️ **This reverses the same morning's «the short code is restored under the
-              name»**, which put it back because the redesign had left no reference anywhere in the
-              sheet. It is still reachable - the log, the quotation and the room behind all carry
-              it - and his instruction is explicit. */}
-          <div className="ng-party">
-            <span className="ng-ava">{room.supplier.name.charAt(0).toUpperCase()}</span>
-            <span className="ng-who">
-              <b title={room.supplier.name}>{room.supplier.name}</b>
-              {machineLine && <span className="ref" title={machineLine}>{machineLine}</span>}
-            </span>
-          </div>
-          <div className="ng-head-l">
-            {/* Money reads left-to-right in both locales. */}
-            {/* 🔴 **BEFORE → AFTER, the way the app's chat counter card reads it** (owner,
-                2026-09-22: *"the price here will take the original bid then if new offer sent will
-                show before and after like the price -counter in the app chat"*).
-                The figure starts as the SUPPLIER's standing rate and stays that until the renter
-                moves it; from then on both are on the bar, his own leading, with the original
-                struck through beside it. One place, always in view while he edits - which is why
-                it is here rather than on each row, where the green/amber «Supplier: N» line
-                already says the same thing per leg. */}
-            <div className="ng-net" dir="ltr">
-              {counterRate != null && <span className="was">{nf(rate)}</span>}
-              {nf(counterRate ?? rate)} <span className="cur">{sar}</span><span className="per">/{periodLabel}</span>
-            </div>
+          {/* 🔴 **THE LIVE SHEET'S HEADER, at its own sizes** (owner, 2026-09-23: *"a but also
+              places and size of the live one + add details for the price as breakdonw"*).
+              ~~An avatar disc, the firm's name at `text-subhead`, the machine under it.~~ The live
+              sheet (`.qp-head-r1`, still what beta and main serve) is a TITLE BLOCK and a TOTAL
+              BLOCK: a 14px/800 title that truncates, a 10.5px/600 line under it, the total pinned
+              to the end with a 9.5px caption over a 16px figure, and a 30px round ✕. This is that,
+              carrying what note 7 asked for.
+              ⚠️ **The firm leads the title and the machine is the line beneath**, which is the
+              live sheet's own division: the title says who, the sub-line says what. The request's
+              code stays out (note 7); the ROUND survives, because «Round 2» is the one fact that
+              says this is a reply rather than a first position. */}
+          <div className="ng-htitle">
+            <div className="t" title={room.supplier.name}>{room.supplier.name}</div>
+            <div className="s">{[machineLine, roundLine].filter(Boolean).join(" · ")}</div>
             {settledNote && (
-              <div className={`ng-note${room.status === "ABANDONED" ? " danger" : ""}`}>
+              <div className={`ng-hnote${room.status === "ABANDONED" ? " danger" : ""}`}>
                 <span className="material-icons-outlined">{room.status === "ABANDONED" ? "cancel" : room.status === "CLOSED" ? "verified" : "schedule"}</span>
                 {settledNote}
               </div>
             )}
+          </div>
+          {/* 🔴 **THE TOTAL, WITH ITS BREAKDOWN** (*"add details for the price as breakdonw"*).
+              The live header shows one figure; a renter reading «2,854» cannot see what moved to
+              make it that. The caption carries the arithmetic - rental, then each leg that is
+              priced - so the number above it can be checked without leaving the header.
+              ⚠️ **Before → after rides the same block** (note 8): the supplier's standing rate
+              struck through, his own after it, and only once `changedFrom` says something moved. */}
+          <div className="ng-htotal">
+            <div className="k">{L("Your offer", "إجمالي عرضك")}</div>
+            <div className="v" dir="ltr">
+              {counterRate != null && <span className="was">{nf(rate)}</span>}
+              {nf(counterRate ?? rate)} <span className="cur">{sar}</span><span className="per">/{periodLabel}</span>
+            </div>
+            {headBreakdown && <div className="bd" dir="ltr">{headBreakdown}</div>}
           </div>
           <button type="button" className="ng-x" onClick={() => !busy && onClose()} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
           </div>
@@ -2244,14 +2365,14 @@ function CounterFlow({
                   // under them so the renter can see where the number came from.
                   durationSub: hasDuration && !rentalCalc.raw ? `${periods} ${L("days, Fridays out", "يوم، دون الجمعة")}` : rentalDivisorNote,
                   qty: rNU, qtyMin: 1, qtyMax: cap,
-                  onQty: (v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); },
+                  onQty: guardQty(rNU, (v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }),
                   val: editable ? rateStr : String(room.rate ?? 0), onVal: setRateStr, refVal: refRate,
                 })}
                 {priceRow({
                   key: "mob",
                   label: L("Delivery to site", "التوصيل إلى الموقع"),
                   duration: L("trip", "رحلة"),
-                  qty: mNU, qtyMin: 0, qtyMax: rNU, onQty: setMobUnitsN,
+                  qty: mNU, qtyMin: 0, qtyMax: rNU, onQty: guardQty(mNU, setMobUnitsN),
                   val: editable ? mobStr : String(room.mobPrice ?? 0), onVal: setMobStr, refVal: refMobPrice,
                   excluded: mEx, onExclude: setMobExcluded,
                   exTitle: L("Cancel delivery to site from the supplier?", "إلغاء التوصيل إلى الموقع من المورد؟"),
@@ -2260,7 +2381,7 @@ function CounterFlow({
                   key: "demob",
                   label: L("Return from site", "الإرجاع من الموقع"),
                   duration: L("trip", "رحلة"),
-                  qty: dNU, qtyMin: 0, qtyMax: rNU, onQty: setDemobUnitsN,
+                  qty: dNU, qtyMin: 0, qtyMax: rNU, onQty: guardQty(dNU, setDemobUnitsN),
                   val: editable ? demobStr : String(room.demobPrice ?? 0), onVal: setDemobStr, refVal: refDemobPrice,
                   excluded: dEx, onExclude: setDemobExcluded,
                   exTitle: L("Cancel the return leg from the supplier?", "إلغاء الإرجاع من الموقع من المورد؟"),
@@ -2330,14 +2451,14 @@ function CounterFlow({
                   {section({
                     key: "pending", label: L("Pending · not specified by you", "قيد الانتظار · لم تحدّده"),
                     done: pendingWalk.length - openPending.length, total: pendingWalk.length,
-                    open: pendOpen, onToggle: () => setPendOpen((o) => !o),
+                    open: pendOpen, onToggle: () => { setPendOpen((o) => !o); openSection(openPending); },
                     body: activeCardIn(openPending),
                   })}
 
                   {section({
                     key: "conflict", label: L("Conflict terms", "بنود التعارض"),
                     done: conflicts.length - openConflicts.length, total: conflicts.length,
-                    open: conflictOpen, onToggle: () => setConflictOpen((o) => !o),
+                    open: conflictOpen, onToggle: () => { setConflictOpen((o) => !o); openSection(openConflicts); },
                     body: activeCardIn(openConflicts),
                   })}
 
@@ -2348,7 +2469,7 @@ function CounterFlow({
                     // Pressing a settled row hands it back to the walk as an open card — the same
                     // reopen the resolved card's ↻ fires.
                     body: [...agreedTerms, ...settledHere].map((t) =>
-                      settledRow(t, "agreed", editable ? () => { onReopenLocal(t.key); setForcedTerm(t.key); setOpenTerm(t.key); } : undefined)),
+                      settledRow(t, "agreed", editable ? () => { reopenTerm(t.key, decide(t).chosen); setForcedTerm(t.key); setOpenTerm(t.key); } : undefined)),
                   })}
 
                   {/* 🔴 **ANSWERED BY ME, WAITING ON HIM.** Listed as a settled row, not a card: there
@@ -2486,23 +2607,30 @@ function CounterFlow({
             go; step ③ says who it goes to, because that is the fact a reader is about to act on.
             ⚠️ Navy, never the accept button's green: green on this sheet means «I take your
             position», and sending a reply is the opposite of that. */}
+        {/* 🔴 **THE LIVE FOOTER'S SHAPE** (owner, 2026-09-23: *"use same ui as live one in the
+            beta the spacing - size etc same for footer and header"*).
+            ~~Log and quotation at the leading edge, the acts at the trailing one.~~ The live sheet
+            (`.qp-foot`, what beta and main still serve) is `[log] [spacer] [the acts] [spacer]`,
+            which CENTRES the acts and pins the references to the edge - and that is the shape in
+            the screenshot he sent, where «إغلاق» and «التالي: الشروط» sit in the middle with
+            «السجل» alone at the far end.
+            ⚠️ **The log is a LABELLED pill, not an icon button** - `.qp-log` carries its word
+            at 12.5px/800 inside a bordered chip. An unlabelled clock was mine, and it is the one
+            control on the bar nobody would guess at.
+            ⚠️ The QUOTATION joins it at that edge (note 14): they are the reference pair, and
+            the acts keep the middle to themselves. */}
         <div {...pin("ng-sheet-foot")} className="ng-foot">
           <div className="ng-inner">
-          <button type="button" className="ng-log" onClick={() => setLogOpen(true)} aria-label={L("Log", "السجل")} title={L("Log", "السجل")}>
-            <span className="material-icons-outlined">history</span>
+          <button type="button" className="ng-log" onClick={() => setLogOpen(true)}>
+            <span className="material-icons-outlined">history</span>{L("Log", "السجل")}
           </button>
-          {/* 🔴 **The quotation sits beside the history, on EVERY step** (owner, 2026-09-22:
-              *"always show the qoutation on the footer of this negotioation beside the history"*).
-              ~~A link at the foot of step ③ only.~~ The paper states the position he is building,
-              so a renter pricing step ① had to walk forward twice to read what he was changing.
-              ⚠️ Both are the footer's REFERENCE pair - what has happened, and what it adds up
-              to - and they sit at the leading edge, away from the acts at the trailing one. */}
           {onOpenQuotation && (
-            <button type="button" className="ng-log ng-quote-btn" onClick={() => onOpenQuotation()}
-              aria-label={L("Read the quotation", "عرض السعر")} title={L("Read the quotation", "عرض السعر")}>
-              <span className="material-icons-outlined">description</span>
+            <button type="button" className="ng-log" onClick={() => onOpenQuotation()}>
+              <span className="material-icons-outlined">description</span>{L("Quotation", "عرض السعر")}
             </button>
           )}
+          <div className="ng-foot-sp" />
+          <div className="ng-foot-main">
           {page > 0 && (
             <button type="button" className="ng-back" disabled={busy} onClick={() => setPage((p) => (p - 1) as 0 | 1 | 2)}>{L("Back", "رجوع")}</button>
           )}
@@ -2531,6 +2659,10 @@ function CounterFlow({
             </button>
           )}
           </div>
+          <div className="ng-foot-sp" />
+          </div>
+          {/* The refusal, under the bar it came from: the send stays PRESSABLE when nothing has
+              moved, so the press is what says why. */}
           {nothingSent && page === 2 && !hasSomethingToSend && (
             <p className="ng-err ng-foot-err">{L("Nothing has changed since your last reply, change a price or answer a term first", "لم يتغيّر شيء منذ ردّك الأخير، غيّر سعراً أو أجب عن بند أولاً")}</p>
           )}
@@ -2556,9 +2688,42 @@ function CounterFlow({
           </div>
         )}
 
+        {pendingUnits && (
+          <div className="qp-scrim" style={{ zIndex: 75 }} dir={ar ? "rtl" : "ltr"} onClick={() => setPendingUnits(null)}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400, background: "var(--surface)", borderRadius: "var(--radius-lg)", overflow: "hidden", padding: "22px 22px 20px", textAlign: "start" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <h3 style={{ fontSize: 16.5, fontWeight: 900, color: "var(--navy)", margin: 0, lineHeight: 1.45 }}>{L("Change Offered Quantity", "تغيير كمية العرض")}</h3>
+                <span style={{ flexShrink: 0, display: "inline-flex", width: 42, height: 42, borderRadius: "var(--radius-md)", background: "var(--surface2)", color: "var(--navy)", alignItems: "center", justifyContent: "center" }}>
+                  <span className="material-icons-outlined" style={{ fontSize: 24 }}>swap_horiz</span>
+                </span>
+              </div>
+              {/* The actual change, as the app shows it (`before` → `after` + «units»). */}
+              <p dir="ltr" style={{ fontSize: 22, fontWeight: 800, color: "var(--navy)", margin: "12px 0 4px", textAlign: ar ? "right" : "left" }}>
+                {pendingUnits.from} → {pendingUnits.to} <span style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)" }}>{L("units", "وحدة")}</span>
+              </p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)", lineHeight: 1.7, margin: "6px 0 18px" }}>
+                {L("Changing the count sends a counter-offer to the other party. The per-unit price is unchanged", "تغيير العدد يُرسل عرضاً مضاداً للطرف الآخر. السعر لكل وحدة لا يتغيّر")}
+              </p>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setPendingUnits(null)} style={{ flex: "0 0 auto", padding: "13px 22px", borderRadius: "var(--radius-lg)", border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Go back", "تراجع")}</button>
+                <button onClick={() => { pendingUnits.apply(); setPendingUnits(null); }} style={{ flex: 1, padding: "13px 12px", borderRadius: "var(--radius-lg)", border: "none", background: "var(--navy)", color: "var(--surface)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>{L("Confirm", "تأكيد")}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🔴 **THE LOG IS A REAL MODAL, not a strip** (owner, 2026-09-23: *"for log use it proper
+            modal not very small . show it like real modal"*).
+            ~~460px wide and only as tall as its content, so a room with two rounds opened a panel a
+            few lines deep floating in the middle of a dimmed screen.~~ It holds the WHOLE history of
+            a negotiation - every round, its rate, its legs and its total, plus the room's own
+            narration - and at that size a reader scrolled a letterbox to read it.
+            ⚠️ The height is FIXED rather than capped, which is the whole of the fix: `max-height`
+            alone lets a short log collapse, and the tabs then sit over a body with nothing under
+            them. A stated height means the empty state has a panel to be centred in. */}
         {logOpen && (
           <div className="qp-scrim" style={{ zIndex: 70 }} onClick={() => setLogOpen(false)}>
-            <div className="qp-sheet" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+            <div className="qp-sheet ng-logm" onClick={(e) => e.stopPropagation()}>
               <div className="qp-head-r1"><div className="qp-htitle"><div className="t">{L("Negotiation log", "سجل التفاوض")}</div></div><button className="qp-x" onClick={() => setLogOpen(false)}><span className="material-icons-outlined">close</span></button></div>
               <div className="qp-log-tabs">
                 {([["all", L("All", "الكل")], ["price", L("Price", "السعر")], ["terms", L("Terms", "الشروط")]] as const).map(([k, lbl]) => (

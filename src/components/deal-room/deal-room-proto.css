@@ -419,12 +419,15 @@
    ⚠️ It slides UP rather than fading in, which is what a sheet does and what the wizard did. */
 .ng-shell {
   position: fixed; inset: 0; z-index: 61; display: flex; flex-direction: column;
-  /* 🔴 **ALL WHITE** (owner, 2026-09-22: *"show the sheet alll in white"*).
-     ~~`--surface2`, the grey desk the white paper was centred on.~~ That is the prototype's own
-     shape and it cost the sheet its calm: a grey band either side of the column, a white card in
-     the middle and a third tone inside the cards made three greys on a screen holding one
-     document. One surface now, and the RULES do the separating. */
-  background: var(--surface); overflow: hidden;
+  /* 🔴 **THE DESK STAYS; the PAPER is what goes white** (owner, 2026-09-23, asked which of
+     the two readings he meant: *"keep the desk, whiten the paper"*).
+     ~~One white surface edge to edge.~~ I read *"show the sheet alll in white"* as the whole
+     screen and it removed the framing he was pointing AT - the live sheet is a white paper card
+     centred on a grey page, and without the desk there is no card. «All in white» is about what is
+     INSIDE the paper: no grey caption band, no grey term cards, no third tone.
+     ⚠️ The shell itself is the desk, so it keeps `--surface2`; `.ng-body` carries it too and
+     the CARDS are what turn white. */
+  background: var(--surface2); overflow: hidden;
   font-family: var(--font-sans); color: var(--navy-deep);
   animation: ngSheetUp .3s cubic-bezier(.32,.72,.3,1);
   /* The one gutter every band answers to — the header's, the footer's and the body's cards alike. */
@@ -455,8 +458,30 @@
 
 /* ── header ─────────────────────────────────────────────────────────────────────────────────────
    The running total on the leading edge, the counterparty on the trailing one. */
-.ng-head { flex: 0 0 auto; padding: 14px var(--ng-gutter); background: var(--surface); border-bottom: 1px solid var(--border-hair); }
-.ng-head .ng-inner { display: flex; align-items: center; gap: 12px; }
+/* 🔴 **THE LIVE SHEET'S HEADER METRICS** (owner, 2026-09-23: *"use same ui as live one in the
+   beta the spacing - size etc same for footer and header"*). `.qp-head-r1`, which beta and main
+   still serve: `padding: 7px 18px 6px`, `gap: 14px`, a hairline under it. The vertical padding is
+   half what this sheet had - the live header is a BAND, not a section. */
+.ng-head { flex: 0 0 auto; padding: 7px var(--ng-gutter) 6px; background: var(--surface); border-bottom: 1px solid var(--border-hair); }
+.ng-head .ng-inner { display: flex; align-items: center; gap: 14px; }
+/* The title block: 14px/800 truncating, a 10.5px/600 line under it. The live sheet's own. */
+.ng-htitle { min-width: 0; flex: 1; }
+.ng-htitle .t { font-size: 14px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ng-htitle .s { margin-top: 2px; font-size: 10.5px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The status a settled room carries into the sheet, under the line it qualifies. */
+.ng-hnote { display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; padding: 3px 9px 3px 6px; border-radius: 999px; font-size: 10.5px; font-weight: 800; background: var(--warn-soft); color: var(--warn-deep); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
+.ng-hnote.danger { background: var(--danger-soft); color: var(--danger-deep); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+.ng-hnote .material-icons-outlined { font-size: 14px; }
+/* The total: a 9.5px caption over a 16px figure, pinned to the end. */
+.ng-htotal { flex: 0 0 auto; text-align: end; }
+.ng-htotal .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
+.ng-htotal .v { font-size: 16px; font-weight: 800; color: var(--navy); }
+.ng-htotal .v .cur { font-size: 10px; font-weight: 600; color: var(--muted); }
+.ng-htotal .v .per { font-size: 10px; font-weight: 700; color: var(--muted); }
+/* ⚠️ The ORIGINAL, struck, ahead of the figure that replaced it (note 8). */
+.ng-htotal .v .was { margin-inline-end: 6px; font-size: 12px; font-weight: 600; color: var(--muted); text-decoration: line-through; }
+/* The arithmetic behind the figure (owner, 2026-09-23: *"add details for the price as breakdonw"*). */
+.ng-htotal .bd { margin-top: 1px; font-size: 9.5px; font-weight: 600; color: var(--muted-light); }
 /* The figure sits at the trailing end, uncaptioned (app parity, 2026-09-17: "price on side and name
    on side, not price in center"). A caption named what the bar's only number obviously is. */
 .ng-head-l { flex: 0 0 auto; min-width: 0; margin-inline-start: auto; text-align: end; }
@@ -511,8 +536,9 @@
    three measured 940 including their padding: the body's cards stood 40px inside the header's own
    verticals, on the one sheet whose whole point is that the bands line up. Measured at 1920:
    1020 against 940 before, 940 across all four after. */
-/* White with the shell (item 2). The body used to be the desk the paper sat on. */
-.ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-inline: var(--ng-gutter); background: var(--surface); }
+/* The DESK the paper sits on (owner, 2026-09-23). The live sheet paints it `--border-mid`; this is
+   the house step nearest it, and the paper's own border is what draws the card's edge on top. */
+.ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-inline: var(--ng-gutter); background: var(--surface2); }
 .ng-body .ng-inner { padding: 14px 0 20px; }
 .ng-pad { padding: 0; }
 /* The white card is a CARD here, not the phone's full-bleed band: on a wide screen a band that
@@ -589,15 +615,27 @@
 /* ── a term, in its three states ─────────────────────────────────────────────────────────────────
    Settled (a quiet strip), active (the card with the two acts), and waiting (dashed, dimmed). One
    vocabulary for the payment term on the price sheet and every operating term on the terms sheet. */
-.ng-t { margin-bottom: 6px; border-radius: 8px; }
-.ng-t.done { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; background: var(--surface-alt); border: 1px solid var(--surface2); }
+/* Radius 12, the app's own on every card in this flow. */
+.ng-t { margin-bottom: 6px; border-radius: 12px; }
+/* 🔴 **A SETTLED ROW IS GREEN, and RED when the renter countered** (owner, 2026-09-23:
+   *"make the red or the gree on the panel iteslf like the app"*, and the app's own settled row:
+   `color: differs ? kNegRedBg : kNegGreenBg`, `border: differs ? kNegRedBorder : kNegGreenBorder`).
+   ~~One grey strip for both.~~ The tick and the pencil were the only thing separating «I took his
+   value» from «I refused it», at 11.5px, at the end of a grey line - so a page of answered terms
+   said nothing about which way any of them went.
+   ⚠️ **The FULL soft fill here, not the pale tint the live cards wear.** A settled row holds
+   no button, so nothing has to stay readable on top of it; the live card is paler precisely
+   because its «Choose another» does. Same reason the app keeps `kNegGreenBg` and `kNegGreenTint`
+   apart. */
+.ng-t.done { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 20%, transparent); }
+.ng-t.done.countered { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 26%, transparent); }
 .ng-t.done .k { font-size: 12px; font-weight: 600; color: var(--muted); }
 .ng-t.done .v { font-size: 11.5px; font-weight: 700; color: var(--ok); }
 .ng-t.done .v.changed { color: var(--danger); }
 /* 🔴 **THE GROUND CARRIES THE VERDICT**, so the state reads without a word (app parity): a conflict
    is red on sight, before anyone acts; a pending row is white; and a picker being open tints it the
    same red, because opening «Change» is choosing to disagree. */
-.ng-t.now { padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--border-hair); transition: background .15s ease, border-color .15s ease; }
+.ng-t.now { padding: 8px 10px; background: var(--surface); border: 1.5px solid var(--border-hair); transition: background .15s ease, border-color .15s ease; }
 /* 🔴 **A CONFLICT is red and a PENDING term is BLUE** (owner, 2026-09-22: *"follow the app
    ... in the ui of the terms panels and sectiosn even the colors"*; the app's own
    `negotiate_tones.dart`, 2026-09-17: *"conflict block in red, pending in light blue"*).
@@ -608,22 +646,42 @@
    the app's file says its greys are PRIVATE to that flow and must not be imported - so this is
    the nearest house token, which is the trade every ported prototype in this repo has made. It is
    a slate in the ink family rather than a true blue; the app is a shade cooler.
-   ⚠️ `.picking` follows whichever state the card is in rather than forcing red - opening the
-   options on a pending term does not make it a conflict. */
-.ng-t.now.clash { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 25%, transparent); }
-.ng-t.now.pending { background: color-mix(in srgb, var(--info) 8%, var(--surface)); border-color: color-mix(in srgb, var(--info) 28%, transparent); }
+   🔴 **THE PANEL ITSELF CARRIES THE COLOUR, and its two steps are NOT the same value**
+   (owner, 2026-09-23: *"make the red or the gree on the panel iteslf like the app"*).
+   ~~The clash card wore `--danger-soft` flat, the exact fill the «Choose another» button wears,
+   so the button disappeared into its own card and the state read as one red slab.~~ The app's
+   own note says why it keeps two: *"the ground is PALER than kNegRedBg on purpose - the
+   «تغيير» button IS #FDECEC, and a button the same colour as the card it sits on stops looking
+   like a button"*.
+   ⚠️ **The percentages are SAMPLED from the app's hexes, not chosen.** `kNegRedTint`
+   (#FEF8F7) is the danger token at ~4% over white and `kNegRedBorder` (#F6D2CE) at ~26%;
+   `kNegBlueBg` (#EAF2FB) is ~10% with `kNegBlueBorder` (#CFE1F5) at ~20%. A pending card is a
+   full BG where a conflict card is a TINT, which is the app's own asymmetry: pending holds no
+   open menu to stay readable over.
+   🔴 **A PENDING CARD TURNS RED WHILE ITS OPTIONS ARE OPEN**, which restores the app's rule
+   and ~~withdraws this file's own of 2026-09-22 (*"`.picking` follows whichever state the card is
+   in rather than forcing red"*)~~. Owner, 2026-09-23: *"check if we dont differ on anything in
+   behaviour from the app"*. The app's reasoning is that opening the menu IS choosing to
+   disagree, so the card joins the conflict family for as long as it is open. */
+.ng-t.now.clash, .ng-t.now.pending.picking { background: color-mix(in srgb, var(--danger) 4%, var(--surface)); border-color: color-mix(in srgb, var(--danger) 26%, transparent); }
+.ng-t.now.pending { background: color-mix(in srgb, var(--info) 10%, var(--surface)); border-color: color-mix(in srgb, var(--info) 20%, transparent); }
 .ng-t.done { cursor: pointer; }
 .ng-t .acts button:disabled { opacity: .45; cursor: default; }
-.ng-t.now .h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; max-width: 820px; margin-bottom: 8px; }
+/* The name has the row to itself now, so it WRAPS rather than squeezing the two values that
+   used to share it (see `.side` below). */
+.ng-t.now .h { max-width: 820px; margin-bottom: 4px; }
 .ng-t.now .h .k { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
-/* 🔴 **The VALUES are the row's subject, and they were the smallest thing on it** (owner,
-   2026-09-22: *"show the terms values clear and bigger"*). The side line ran at 11px with its two
-   answers bolded inside it, under a 12.5px label - so the term's NAME outweighed the two figures
-   being argued over. The line is 12px and its values 13px now, which puts them above the label.
-   ⚠️ `nowrap` + ellipsis stays: this row states two values and a longer pair must clip
-   rather than push the card's head onto a second line. */
-.ng-t.now .h .side { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ng-t.now .h .side b { font-size: 13px; color: var(--navy-deep); font-weight: 800; }
+/* 🔴 **THE TWO POSITIONS TAKE THEIR OWN CENTRED ROW** (owner, 2026-09-22: *"show the terms
+   values clear and bigger"*, then 2026-09-23 on «Your choice: not set · Supplier: 24 hours»:
+   *"even these make it middle and more visible"*).
+   ~~12px at the end of the name's row, `nowrap`, ellipsising before the name did.~~ Sharing a
+   row with the label meant the longer the term's NAME, the smaller its two answers - and the
+   answers are what is being decided. Full width under the name, 12.5px, values at 14px/800, and
+   it may wrap: there is no second column left to push onto a new line.
+   ⚠️ **Centred on his word**, where the app aligns it to the reading start. The two acts
+   below are centred too, so the card reads as one column rather than three alignments. */
+.ng-t.now .side { margin: 0 0 10px; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--muted-dark); }
+.ng-t.now .side b { font-size: 14px; font-weight: 800; color: var(--navy-deep); }
 /* ⚠️ The pair is CAPPED and sits at the reading end. In the prototype these are two `flex:1`
    buttons across a phone; with the sheet's cards running the screen they became two slabs, which
    reads as the card's main event rather than as the two answers to the line above them. */
@@ -633,9 +691,15 @@
    rather than at one edge of it. The 320px cap survives - stretched across the sheet they read as
    the card's main event rather than as the reply to the line above. */
 .ng-t .acts { display: flex; gap: 6px; max-width: 320px; margin-inline: auto; }
-.ng-t .acts button { flex: 1; border: 0; border-radius: 7px; padding: 7px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
-.ng-t .acts .change { background: var(--danger-soft); color: var(--danger); }
-.ng-t .acts .take { background: var(--ok-soft); color: var(--ok); }
+/* 🔴 **BORDERED, at the app's own metrics** (owner, 2026-09-23: *"add borders to the
+   buttons"*). The app's `_btn`: an explicit `BorderSide`, radius 10, 8px of vertical padding and
+   14px/700 centred, each `Expanded` so the pair splits the row.
+   ⚠️ **The border is what lets these sit on a TINTED card at all.** Two borderless fills on
+   a red ground read as one block - which is why the app pairs every fill with its own line, and
+   why the panel tint above had to be a step paler than these. */
+.ng-t .acts button { flex: 1; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; font-family: inherit; font-size: 14px; font-weight: 700; text-align: center; cursor: pointer; }
+.ng-t .acts .change { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 32%, transparent); color: var(--danger); }
+.ng-t .acts .take { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 34%, transparent); color: var(--ok); }
 /* 🔴 **HORIZONTAL, and always drawn** (owner, 2026-09-22: *"alwasy show other options if he
    chose 'choose another' to be shown horizantaly not vertically"*).
    ~~A hidden COLUMN, revealed by pressing «Choose another», capped at 320px.~~ Two faults in one
@@ -644,8 +708,11 @@
    of chips does not read as navigation the way a full-width stack of buttons did.
    ⚠️ `flex-wrap`, never a single line: a term with six options on a phone would otherwise
    overflow the card. */
-.ng-t .opts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--surface2); }
-.ng-t .opts button { border: 1px solid var(--border-hair); border-radius: 999px; padding: 6px 12px; background: var(--surface); font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted-dark); text-align: center; cursor: pointer; }
+/* ⚠️ No rule above them any more: the menu now REPLACES the two acts rather than standing
+   under them, so there is nothing to divide it from. Metrics are the app's `NegOptionPills`:
+   12/7 padding, a full round, 13px/700. */
+.ng-t .opts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.ng-t .opts button { border: 1px solid var(--border-hair); border-radius: 999px; padding: 7px 12px; background: var(--surface); font-family: inherit; font-size: 13px; font-weight: 700; color: var(--muted-dark); text-align: center; cursor: pointer; }
 .ng-t .opts button:hover { background: var(--surface2); }
 /* The chosen chip carries the same green the Accept button does - one colour for the position
    you hold, across the whole card. */
@@ -659,8 +726,11 @@
    way to learn whether it is his ask, the supplier's declaration or the platform's default. */
 .ng-t .why { display: block; margin-top: 2px; font-size: 10px; font-weight: 600; color: var(--muted-light); }
 .ng-t .why .material-icons-outlined { font-size: 11px; vertical-align: -1px; }
-/* Reopen a term the renter settled himself. */
-.ng-t .undo { margin-inline-start: 6px; border: 0; background: none; padding: 0; font-size: 12px; color: var(--muted-light); cursor: pointer; }
+/* 🔴 **THE PENCIL, at the app's own 13px** (owner, 2026-09-23: *"allow edit on the terms like
+   the app too"*). ~~A ↻ button drawn inside a row that is itself the button.~~ It inherits the
+   row's own ink, so a countered row's pencil is red and an agreed one's is green - the app's
+   `final pen = Icon(Icons.edit_outlined, size: 13, color: ink)`. */
+.ng-t .pen, .ng-grow .pen { margin-inline-start: 6px; font-size: 13px; vertical-align: -2px; color: inherit; opacity: .75; }
 
 /* ── the term SECTIONS (app parity, `_SectionHeader`) ───────────────────────────────────────────
    Each is a header BAND with its rows inside the same card — one border, one radius — so a section's
@@ -807,7 +877,16 @@
 
    The primary grows into whatever is left, so on a desktop width it is the widest thing on the bar
    and unmistakably the thing to press; Back and Accept size to their own words. */
-.ng-foot { flex: 0 0 auto; padding: 10px var(--ng-gutter); background: var(--surface); border-top: 1px solid var(--border-hair); }
+.ng-foot { flex: 0 0 auto; padding: 9px var(--ng-gutter); background: var(--surface); border-top: 1px solid var(--border-hair); }
+/* 🔴 **THE LIVE FOOTER**: `[log] [spacer] [the acts] [spacer]`, so the acts sit in the MIDDLE
+   and the references are pinned to the edge (owner, 2026-09-23). `.qp-foot`'s own metrics:
+   `padding: 9px 24px`, `gap: 10px`, a hairline over it.
+   ⚠️ The log is a LABELLED pill (`.qp-log`: bordered, 8px 12px, 12.5px/800), never a bare
+   glyph - it is the one control on the bar a reader would otherwise have to guess at. */
+.ng-foot-sp { flex: 1 1 auto; }
+.ng-foot-main { display: flex; align-items: center; gap: 10px; }
+.ng-log { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); padding: 8px 12px; font: inherit; font-size: 12.5px; font-weight: 800; color: var(--navy-mid); cursor: pointer; }
+.ng-log .material-icons-outlined { font-size: 16px; }
 .ng-foot .ng-inner { display: flex; align-items: center; gap: 8px; }
 .ng-log { flex: 0 0 auto; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface); color: var(--muted-dark); cursor: pointer; }
 .ng-back { flex: 0 0 auto; min-width: 110px; height: 44px; border: 1px solid var(--border-hair); border-radius: 12px; background: var(--surface); color: var(--navy); font-family: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
@@ -839,6 +918,9 @@
 /* The log's own card. ~~`.qp-sheet` was the wizard's shell and the log modal borrowed it.~~ The
    wizard is `.ng-shell` now, so the log carries the card it actually needs and nothing else. */
 .qp-sheet { display: flex; flex-direction: column; width: 100%; max-height: 90vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: var(--font-sans); color: var(--navy); animation: dpModal .22s ease; }
+/* The negotiation LOG's own size (owner, 2026-09-23). Wide enough for a round's rate, its two
+   legs and its total on one line, and tall enough that the tabs have a body under them. */
+.qp-sheet.ng-logm { max-width: 760px; height: min(78vh, 700px); }
 .qp-head-r1 { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
 .qp-log { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); padding: 8px 12px; font: inherit; font-size: 12.5px; font-weight: 800; color: var(--navy-mid); cursor: pointer; }
 /* activity log (📜 السجل) — real system_bot negotiation timeline */

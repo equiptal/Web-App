@@ -1157,6 +1157,7 @@ export function BidMapWorkspace({
                   scrollRef={bodyRef}
                   filtersOpen={filtersOpen}
                   onCloseFilters={closeFilters}
+                  itemImageUrl={itemImageUrl}
                 />
               )}
 
