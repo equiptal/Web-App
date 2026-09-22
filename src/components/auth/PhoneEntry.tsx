@@ -60,6 +60,9 @@ export function PhoneEntry({
 
   const isSaudi = dial === SAUDI_DIAL;
   const smsBlocked = PUBLIC_WEB_ENABLED && !isSaudi; // non-Saudi can't SMS → use Email tab
+  /* App parity: the mobile login enables Send at exactly 9 digits (`login_page.dart` `_canSubmit`).
+     Before this, any keystroke lit the button orange and the backend was left to refuse a short number. */
+  const phoneValid = digits.replace(/\D/g, "").length === 9;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -127,7 +130,7 @@ export function PhoneEntry({
 
       <button
         type="submit"
-        disabled={busy || !digits.trim() || smsBlocked}
+        disabled={busy || !phoneValid || smsBlocked}
         /* One call for both grounds: `authSubmit` returns the app's primary button either way, and
            only its disabled skin differs — see the note on it. */
         className={authSubmit(tone)}

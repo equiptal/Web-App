@@ -344,17 +344,33 @@
   line-height: 1;
   color: color-mix(in srgb, var(--navy-deep) 50%, transparent);
 }
+/* 🔴 **The drawing is inset to the circle's INSCRIBED SQUARE** (owner, 2026-09-22, on a marker
+   whose excavator ran past the rim: *"make sure the images fit the circule or the side rectangle"*).
+
+   `contain` fits a drawing to the BOX, and the box here is the circle's bounding square — so a wide
+   machine touched the left and right edges exactly where the curve cuts in, and the rim sliced its
+   tracks and its boom off. The largest square that fits inside a circle of diameter D has a side of
+   D/√2, which at 66px is 46.7: **9px in on every side**, and the whole machine then sits within the
+   curve whatever its aspect.
+
+   ⚠️ `center`, not `center bottom`. The bottom anchor belonged to the free-standing object
+   this used to be, which stood ON the availability disc; inside a circle it pushed the drawing onto
+   the rim it is being held off.
+
+   ⚠️ The PHOTO arm is untouched and must stay `inset: 0` with `cover`: a photograph has no
+   transparent ground, so filling the disc and cropping to it is what makes it read as a picture
+   rather than as a stamp floating in a ring. Same split the request rail's `fitOf` makes. */
 .bm-pin .bm-pin-img {
   position: absolute;
-  inset: 0;
+  inset: 9px;
   background-color: transparent;
-  background-position: center bottom;
+  background-position: center;
   background-repeat: no-repeat;
   /* `contain` for the taxonomy cut-out, which carries its own transparent ground. */
   background-size: contain;
 }
 /* The supplier's PHOTO fills the circle and is cropped to it, as the fleet card crops it. */
-.bm-pin .bm-pin-art.is-photo .bm-pin-img { background-size: cover; background-position: center; }
+.bm-pin .bm-pin-art.is-photo .bm-pin-img { inset: 0; background-size: cover; background-position: center; }
 /* Anchored to the STAGE, not to the object: the object carries a `filter`, which would make it the
    containing block and drag the tick around with the lift. */
 .bm-pin .bm-pin-tick {
@@ -1307,13 +1323,16 @@ main:has(.bidmap) > .page-back-bar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* ~~A 28px square holding the glyph.~~ A word button now (owner, 2026-09-22), same square corners
-     and same colours, sized to its label. */
+  /* ~~A 28px square holding the glyph.~~ A word button now (owner, 2026-09-22), sized to its label.
+     ~~`--radius-sm`, the square corner the glyph tile had.~~ **`--radius-lg`** (owner, same day): it
+     is `.bm-docsentry`'s radius, so the control that opens a MACHINE's papers and the one that opens
+     the FIRM's are one shape. They sit a band apart and do the same thing. */
   height: 26px;
+  gap: 5px;
   padding: 0 9px;
   background: var(--surface2);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-lg);
   color: var(--navy-mid);
   font-size: 10.5px;
   font-weight: 600;
@@ -1323,6 +1342,9 @@ main:has(.bidmap) > .page-back-bar {
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 .bidmap .bm-eq .bm-eq-open:hover { background: var(--surface); border-color: var(--border-strong); color: var(--navy); }
+/* The chevron points the way the reader travels. Dimmed against the label, as `.bm-docsentry-chev`
+   is: it is a direction, not a second word. */
+.bidmap .bm-eq .bm-eq-open-chev { font-size: 12px; line-height: 1; opacity: 0.7; }
 /* On a selected card the ground IS `var(--background)`, so the tint above would vanish into it — the control
    goes navy instead, which is the slate the accent bar already uses. */
 .bidmap .bm-eq.on .bm-eq-open { background: var(--navy); border-color: var(--navy); color: var(--surface); }

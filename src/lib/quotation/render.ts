@@ -54,6 +54,14 @@ export interface QuotationParty {
    * ⚠️ Absent, NOTHING is drawn: an empty tile reads as a mark that failed to load.
    */
   logoUrl?: string | null;
+  /**
+   * The app's two asks on the READER's own box (owner, 2026-09-23: *"in the app a quotation will ask
+   * a renter to add his logo in the empty logo slot or ask him to verify his company if not
+   * verified"*). `addLogo` fills the empty logo slot with a red «Add a logo»; `verify` sits where the
+   * tick would. Both are links and both are SCREEN ONLY (`@media print` drops them), as the app
+   * draws them on its preview and never in the PDF. Only ever set on the renter's own box.
+   */
+  asks?: { addLogo?: { href: string; label: string } | null; verify?: { href: string; label: string } | null };
   rows: QuotationPartyRow[];
 }
 
@@ -329,7 +337,12 @@ export const QUOTATION_STYLE = `${DS_ROOT_CSS}
   .q-freg{font-family:'Inter',system-ui,sans-serif;font-size:9.5px;color:var(--text-on-dark-dim);text-align:end;line-height:1.7;unicode-bidi:isolate;}
   /* 🔴 The owner prompt is SCREEN ONLY — it invites the reader to fix his own account, and a paper
      handed to a counterparty must not carry a note about the other side's profile. */
-  @media print{body{background:var(--surface);}.q-doc{margin:0;border-radius:0;max-width:none;}.q-prompt{display:none;}}
+  .q-addlogo{flex:0 0 auto;align-self:flex-start;display:inline-flex;align-items:center;padding:5px 8px;border:1px solid var(--danger);border-radius:7px;background:var(--danger-soft);color:var(--danger);font-size:10px;font-weight:800;text-decoration:none;white-space:nowrap;}
+  .q-verify{margin-inline-start:8px;display:inline-flex;align-items:center;padding:2px 8px;border:1px solid var(--danger);border-radius:20px;background:var(--danger-soft);color:var(--danger);font-size:10px;font-weight:800;text-decoration:none;white-space:nowrap;vertical-align:middle;}
+  .q-tools{position:sticky;top:0;z-index:5;display:flex;justify-content:flex-end;gap:8px;max-width:900px;margin:0 auto;padding:12px 16px;background:var(--background);}
+  .q-tools button{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--navy);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+  .q-tools button.pri{background:var(--brand);border-color:var(--brand);color:var(--surface);}
+  @media print{body{background:var(--surface);}.q-doc{margin:0;border-radius:0;max-width:none;}.q-prompt,.q-addlogo,.q-verify,.q-tools{display:none;}}
   @media (max-width:640px){.q-parties{grid-template-columns:minmax(0,1fr);}.q-head,.q-body,.q-foot{padding-inline:18px;}}`;
 
 const esc = (str: unknown) => String(str ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
@@ -394,8 +407,19 @@ export function numWordsAr(num: number): string {
 function partyHtml(p: QuotationParty): string {
   // Drawn whenever there IS one — the verification gate went on 2026-09-22; see
   // `QuotationParty.logoUrl`. The tick beside the name is what states the check.
-  const logo = p.logoUrl ? `<img class="q-plogo" src="${esc(p.logoUrl)}" alt="" />` : "";
-  const tick = p.verified ? `<span class="q-tick">✓</span>` : "";
+  // `onerror` removes a mark that fails to load (owner, 2026-09-23: a broken-image box in the supplier's
+  // slot). The app's `errorBuilder` does the same: a missing mark must read as no mark, never as a
+  // broken one.
+  const logo = p.logoUrl
+    ? `<img class="q-plogo" src="${esc(p.logoUrl)}" alt="" onerror="this.remove()" />`
+    : p.asks?.addLogo
+      ? `<a class="q-addlogo" href="${esc(p.asks.addLogo.href)}">+ ${esc(p.asks.addLogo.label)}</a>`
+      : "";
+  const tick = p.verified
+    ? `<span class="q-tick">✓</span>`
+    : p.asks?.verify
+      ? `<a class="q-verify" href="${esc(p.asks.verify.href)}">${esc(p.asks.verify.label)}</a>`
+      : "";
   const rows = p.rows
     .filter((r) => (r.value ?? "").toString().trim().length > 0)
     .map((r) => `<div class="q-prow"><b>${esc(r.label)}:</b> ${esc(r.value)}</div>`)
@@ -524,7 +548,7 @@ export function renderQuotationSection(doc: QuotationDoc): string {
   const contact = f ? [f.phone, f.email].filter(Boolean).join(" · ") : "";
   const footLines = [reg, contact].filter(Boolean).map((l) => esc(l)).join("<br />");
   const footer = f
-    ? `<div class="q-foot"><div class="q-foot-l">${f.logoUrl ? `<img class="q-flogo" src="${esc(f.logoUrl)}" alt="" />` : ""}<div><div class="q-fname">${esc(f.name)}</div>${
+    ? `<div class="q-foot"><div class="q-foot-l">${f.logoUrl ? `<img class="q-flogo" src="${esc(f.logoUrl)}" alt="" onerror="this.remove()" />` : ""}<div><div class="q-fname">${esc(f.name)}</div>${
         f.address ? `<div class="q-faddr">${esc(f.address)}</div>` : ""
       }</div></div>${footLines ? `<div class="q-freg">${footLines}</div>` : ""}</div>`
     : "";
@@ -585,12 +609,33 @@ export function quotationLegal(L: (en: string, ar: string) => string): string[] 
 }
 
 /** Wrap one or more rendered sections into a full, self-printing HTML page. */
-export function wrapQuotationPage(sectionsHtml: string, opts: { lang: QLang; title: string; autoPrint?: boolean }): string {
+export function wrapQuotationPage(
+  sectionsHtml: string,
+  opts: {
+    lang: QLang;
+    title: string;
+    autoPrint?: boolean;
+    /**
+     * «Download PDF» and «Share» above the paper (owner, 2026-09-23: *"it doesnt show option to
+     * download or share"*). Download is the browser's print-to-PDF, the same PDF the auto-print gave.
+     * Share hands the page itself to the system share sheet as a file, and is drawn only where the
+     * browser can share files (`navigator.canShare`). Screen only.
+     */
+    tools?: { download: string; share: string; fileName: string };
+  },
+): string {
   const isAr = opts.lang === "ar";
   const printScript = opts.autoPrint === false ? "" : `<script>window.onload=function(){setTimeout(function(){window.print();},350);}</script>`;
+  const tools = opts.tools
+    ? `<div class="q-tools"><button type="button" id="q-share" hidden>${esc(opts.tools.share)}</button><button type="button" class="pri" onclick="window.print()">${esc(opts.tools.download)}</button></div>` +
+      `<script>(function(){var b=document.getElementById("q-share");if(!b||!navigator.canShare)return;` +
+      `var mk=function(){var h="<!doctype html>"+document.documentElement.outerHTML;return new File([h],${JSON.stringify(opts.tools.fileName.replace(/[^\w.-]+/g, "_") + ".html")},{type:"text/html"});};` +
+      `try{if(!navigator.canShare({files:[mk()]}))return;}catch(e){return;}b.hidden=false;` +
+      `b.onclick=function(){navigator.share({files:[mk()],title:document.title}).catch(function(){});};})();</script>`
+    : "";
   return `<!doctype html><html lang="${isAr ? "ar" : "en"}" dir="${isAr ? "rtl" : "ltr"}"><head><meta charset="utf-8"><title>${esc(opts.title)}</title>` +
     `<meta name="viewport" content="width=device-width, initial-scale=1">` +
     `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>` +
     `<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">` +
-    `<style>${QUOTATION_STYLE}</style></head><body>${sectionsHtml}${printScript}</body></html>`;
+    `<style>${QUOTATION_STYLE}</style></head><body>${tools}${sectionsHtml}${printScript}</body></html>`;
 }

@@ -184,14 +184,30 @@
 .bm-rq-tile img { width: 100%; height: 100%; object-fit: cover; }
 .bm-rq-tile .material-icons-outlined { font-size: 22px; }
 .bm-rq-who { flex: 1; min-width: 0; display: block; }
+/* 🔴 **TWO LINES, not one cut mid-word** (owner, 2026-09-22, on a card reading
+   «Case PC · Crawler Exc…»: *"the card must be clean and organized"*).
+
+   The title is the MAKE and the MACHINE in one run — «Case PC · Crawler Excavator 20 ton» — inside a
+   240px column that also holds a 40px tile, a gap and a chevron. On one `nowrap` line that leaves
+   about 130px, so the machine was clipped to three letters and the card named a make with no
+   machine after it, which is the one thing this strip exists to say.
+
+   ⚠️ Clamped at TWO, never uncapped: the column sits beside the ask's own sentence and the
+   card's height is the taller of the two, so a third line would push a two-line ask into three for
+   the sake of a title nobody needs in full. The whole string stays on `title`.
+
+   ⚠️ `-webkit-line-clamp` needs all three of `display: -webkit-box`, `-webkit-box-orient` and
+   `overflow: hidden` — it is inert without any one of them, and inert here means an unclamped title
+   growing the card, which is worse than the clip it replaces. */
 .bm-rq-t {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   font-size: 11.5px;
   font-weight: 800;
+  line-height: 1.3;
   color: var(--navy-deep);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .bm-rq-serial, .bm-rq-ref {
   font-family: var(--font-mono-data);
@@ -208,7 +224,11 @@
    has to hunt for on the one occasion he needs it. Dropped from the notification
    body entirely, where there is no such occasion. */
 .bm-rq-ref { flex-shrink: 0; font-size: 8px; font-weight: 600; color: var(--muted-light); letter-spacing: 0.02em; }
-.bm-rq-go { flex-shrink: 0; font-size: 16px; color: var(--border-strong); }
+/* ⚠️ Pinned to the column's TRAILING EDGE, not left to sit wherever the title stops. It
+   chased the ellipsis, so it read as part of the truncated word rather than as the way into the
+   machine — and it is the same chevron `.bm-docsentry` puts at the end of its own row. `align-self`
+   keeps it on the first line of a title that now takes two. */
+.bm-rq-go { flex-shrink: 0; margin-inline-start: auto; align-self: flex-start; padding-top: 1px; font-size: 16px; color: var(--border-strong); }
 [dir="rtl"] .bm-rq-go { transform: scaleX(-1); }
 .bm-rq-body { flex: 1 1 200px; min-width: 0; padding: 10px 12px; }
 /* The ask's NAME, in the card's own colour and at the size the app sets (12/900).

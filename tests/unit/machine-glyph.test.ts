@@ -82,6 +82,12 @@ describe("the robot arm is off every no-artwork fallback", () => {
     "components/workspace/ItemTier.tsx",
     "components/create/MachineCard.tsx",
     "components/create/RequestsRail.tsx",
+    /* The bid map's ASK CARD (owner, 2026-09-22: *"the euqipment must show the image or the
+       fallback image used on the equipemtn card not this selly icon"*). It drew
+       `equipmentIcon(view.title)`, a per-family glyph whose answer for an unplaced machine is a
+       tractor or the factory arm — so the one surface that quotes a machine back to a supplier
+       named it with a mark from a different industry. */
+    "components/map/RequestCard.tsx",
   ];
 
   for (const f of FALLBACKS) {
@@ -104,5 +110,9 @@ describe("the robot arm is off every no-artwork fallback", () => {
      * per-family drawing set or a different glyph, and it is a decision about the map.
      */
     expect(read("components/requests/EquipImg.tsx")).toContain("precision_manufacturing");
+    /* ⚠️ Its remaining CALLERS are the map surface alone, which is what makes the split
+       defensible rather than merely unfinished: a `divIcon` is an HTML string. The ask card
+       left that list on 2026-09-22 — it is React and had no reason to be on it. */
+    expect(strip(read("components/map/RequestCard.tsx"))).not.toContain("equipmentIcon");
   });
 });

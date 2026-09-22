@@ -1,5 +1,6 @@
 "use client";
 
+import { uploadCompanyLogo } from "@/lib/company-logo";
 import { useState } from "react";
 import { useT, useLocale } from "@/lib/i18n";
 import { Dropdown } from "@/components/Dropdown";
@@ -76,63 +77,22 @@ export function CompanyIdentityModal({
   ];
 
   /**
-   * Downscale to 220px, re-encode as PNG, upload on pick, keep the KEY. Same size and format as the
-   * app (`downscaleCompanyLogo`) so one firm's logo looks identical wherever it is drawn: an unscaled
-   * photo would be embedded at full resolution in the quotation and the bid form, and PNG keeps
-   * transparency against those documents' light backgrounds.
-   *
-   * A logo is branding, never a blocker — a failure here notifies and leaves the pile sendable.
+   * Upload on pick, keep the KEY. The downscale and the upload are `uploadCompanyLogo`, shared with
+   * the quotation's logo dialog so the two cannot drift. A logo is branding, never a blocker: a
+   * failure here notifies and leaves the pile sendable.
    */
-  const onPickLogo = (file: File) => {
+  const onPickLogo = async (file: File) => {
     setLogoErr(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const max = 220;
-        let { width, height } = img;
-        if (width >= height && width > max) {
-          height = Math.round((height * max) / width);
-          width = max;
-        } else if (height > width && height > max) {
-          width = Math.round((width * max) / height);
-          height = max;
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(async (blob) => {
-          if (!blob) return;
-          setLogoBusy(true);
-          try {
-            const r = await fetch("/api/profile/doc-upload-url", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ filename: "company-logo.png", contentType: "image/png" }),
-            });
-            if (!r.ok) throw new Error("upload");
-            const { url, key } = (await r.json()) as { url: string; key: string };
-            const put = await fetch(url, {
-              method: "PUT",
-              body: blob,
-              headers: { "Content-Type": "image/png" },
-            });
-            if (!put.ok) throw new Error("upload");
-            setLogoKey(key);
-            setLogoPreview(canvas.toDataURL("image/png"));
-          } catch {
-            setLogoErr(t.verify.errors.submit);
-          } finally {
-            setLogoBusy(false);
-          }
-        }, "image/png");
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
+    setLogoBusy(true);
+    try {
+      const { key, preview } = await uploadCompanyLogo(file);
+      setLogoKey(key);
+      setLogoPreview(preview);
+    } catch {
+      setLogoErr(t.verify.errors.submit);
+    } finally {
+      setLogoBusy(false);
+    }
   };
 
   const submit = () => {
@@ -241,7 +201,7 @@ export function CompanyIdentityModal({
                   disabled={logoBusy}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) onPickLogo(f);
+                    if (f) void onPickLogo(f);
                     e.target.value = "";
                   }}
                 />

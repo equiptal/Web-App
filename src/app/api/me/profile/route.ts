@@ -29,6 +29,10 @@ export async function PUT(req: Request) {
       if (str(body.email)) payload.email = str(body.email);
       if (str(body.whatsapp)) payload.whatsapp = str(body.whatsapp);
       if (str(body.companyName)) payload.companyName = str(body.companyName);
+      // The company logo (2026-09-23, the quotation's «Add a logo»). The backend's
+      // `updateProfileSchema` takes `companyLogoKey` beside the four names it requires, and writes it
+      // to the profile and the company (`profile.service.ts`). Sent only when the caller sent one.
+      if (str(body.companyLogoKey)) payload.companyLogoKey = str(body.companyLogoKey);
 
       const result = await call<{ message?: string; messageAr?: string; tier?: string }>("/profile/me", {
         method: "PUT",

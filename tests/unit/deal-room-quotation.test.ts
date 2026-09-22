@@ -382,7 +382,10 @@ describe("the renter's own prompt", () => {
     /* ⚠️ A substring, not a `[^}]*` regex: the print block nests rules, so a negated-class match
        stops at the first inner `}` and fails on a stylesheet that is perfectly correct. */
     const print = QUOTATION_STYLE.slice(QUOTATION_STYLE.indexOf("@media print{"));
-    expect(print).toContain(".q-prompt{display:none;}");
+    // One grouped rule since 2026-09-23: the prompt, the renter's two asks and the Download/Share
+    // toolbar are all screen only.
+    const hidden = print.match(/([.\w,-]+)\{display:none;\}/)?.[1].split(",") ?? [];
+    for (const sel of [".q-prompt", ".q-addlogo", ".q-verify", ".q-tools"]) expect(hidden).toContain(sel);
   });
 
   /* ⚠️ Absent by default: every existing caller passes nothing, and a document that always carried a

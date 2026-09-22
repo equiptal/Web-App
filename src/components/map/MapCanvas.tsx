@@ -784,6 +784,79 @@ function machineIcon(
   });
 }
 
+/**
+ * **Google's map under the canvas, the map the app shows** (owner, 2026-09-23: *"check the map on the
+ * app what does it use and use it"*, then *"why we cant use this"*).
+ *
+ * ~~Google's Map Tiles API (`createSession` + `2dtiles`) as a Leaflet `TileLayer`.~~ Tried first and
+ * refused by Google for every key we hold: the web key and the app's three answer
+ * `API_KEY_SERVICE_BLOCKED`, the fourth `SERVICE_DISABLED`. Turning that service on is a Google Cloud
+ * change nobody here can make.
+ *
+ * So the canvas uses the service the web key IS allowed: the **Maps JavaScript API**, the same one
+ * that already draws the web's location picker. `leaflet.gridlayer.googlemutant` renders a real
+ * Google map inside a Leaflet grid layer, so every marker, route and chip on this canvas stays exactly
+ * as it is. It is Google's own JS map, not scraped tiles, which keeps it within Google's terms.
+ *
+ * Returns true once Google is drawing. Until then, with no key, or on `gm_authFailure` (Google's hook
+ * for a refused key), the caller keeps the keyless Esri layer, so the canvas is never blank.
+ */
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+let mapsJs: Promise<void> | null = null;
+function loadMapsJs(ar: boolean): Promise<void> {
+  const w = window as unknown as { google?: { maps?: unknown }; gm_authFailure?: () => void };
+  if (w.google?.maps) return Promise.resolve();
+  if (!mapsJs) {
+    mapsJs = new Promise<void>((resolve, reject) => {
+      // The location picker loads the same script; a tag already on the page is waited on, not doubled.
+      const existing = document.getElementById("gmaps-js") as HTMLScriptElement | null;
+      const s = existing ?? document.createElement("script");
+      s.addEventListener("load", () => resolve());
+      s.addEventListener("error", () => reject(new Error("maps-js")));
+      if (!existing) {
+        s.id = "gmaps-js";
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_KEY)}&language=${ar ? "ar" : "en"}`;
+        s.async = true;
+        document.head.appendChild(s);
+      }
+    });
+  }
+  return mapsJs;
+}
+
+function GoogleBase({ ar, onReady }: { ar: boolean; onReady: (ok: boolean) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!GOOGLE_KEY) return;
+    let live = true;
+    let layer: L.GridLayer | null = null;
+    const w = window as unknown as { gm_authFailure?: () => void };
+    const prev = w.gm_authFailure;
+    // Google calls this when it refuses the key. Drop our layer and hand the canvas back to Esri.
+    w.gm_authFailure = () => {
+      prev?.();
+      if (layer) map.removeLayer(layer);
+      if (live) onReady(false);
+    };
+    loadMapsJs(ar)
+      .then(() => import("leaflet.gridlayer.googlemutant"))
+      .then(() => {
+        if (!live) return;
+        const mk = (L.gridLayer as unknown as { googleMutant: (o: object) => L.GridLayer }).googleMutant;
+        layer = mk({ type: "roadmap", maxZoom: 19 }).addTo(map);
+        layer.bringToBack();
+        onReady(true);
+      })
+      .catch(() => live && onReady(false));
+    return () => {
+      live = false;
+      w.gm_authFailure = prev;
+      if (layer) map.removeLayer(layer);
+    };
+  }, [map, ar, onReady]);
+  return null;
+}
+
 export default function MapCanvas({
   site,
   addressLabel,
@@ -821,7 +894,9 @@ export default function MapCanvas({
   itemName?: string | null;
 }) {
   const t = useT();
-  const { dir } = useLocale();
+  const { dir, locale } = useLocale();
+  // Whether Google's map is drawing under the canvas; Esri stays until it is (see `GoogleBase`).
+  const [googleOn, setGoogleOn] = useState(false);
 
   /* The project pin — `siteIcon()`, decoded lines 262–265, value for value. `[40,52]` with the anchor
      at `[20,40]`, which is the teardrop's point rather than its centre: the pin marks the spot it
@@ -881,20 +956,28 @@ export default function MapCanvas({
         inertiaDeceleration={2800}
         style={{ height: "100%", width: "100%" }}
       >
-        {/* CARTO **voyager**, not OpenStreetMap standard (`baseUrl('voyager')`, decoded 3840). Not a
-            taste choice: every colour on this canvas was judged against voyager's pale ground — the
-            `var(--muted-dark)` route, the `var(--muted-light)` leader line, the white chips and the white pin tag. On OSM
-            standard's saturated green-and-buff they all lose contrast, and the route in particular
-            disappears into the road network it is drawn over.
-
-            The attribution carries BOTH credits because voyager's terms require both: the data is
-            OpenStreetMap's, the rendering is CARTO's. */}
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          subdomains="abcd"
-          maxZoom={19}
-        />
+        {/* 🔴 ~~CARTO **voyager** (`baseUrl('voyager')`, decoded 3840), chosen because every colour on
+            this canvas was judged against its pale ground.~~ CARTO began serving its keyless tiles with
+            an «API KEY REQUIRED» watermark (seen 2026-09-22 on staging and beta; the tile itself comes
+            back watermarked from `a.basemaps.cartocdn.com`, so no deploy of ours caused or can fix it).
+            ~~OpenStreetMap standard~~ was tried the same hour and refused: its servers answer a
+            non-browser fetch with an «Access blocked» tile and their policy is for light use.
+            **Esri World Street Map** now: keyless, labelled, no watermark, and a pale ground close to
+            voyager's, so the canvas colours judged against voyager still read.
+            ⚠️ Esri's terms expect an ArcGIS account for production use, and CARTO would take a key
+            too. A keyed provider (CARTO, Esri, or Google Maps as the app uses) is the durable fix and
+            needs an account decision.
+            **Google first (2026-09-23), Esri until it is ready or if Google refuses**: `GoogleBase`
+            above, which carries Google's own logo and attribution inside its layer. */}
+        <GoogleBase ar={locale === "ar"} onReady={setGoogleOn} />
+        {!googleOn && (
+          <TileLayer
+            key="esri"
+            attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, &copy; OpenStreetMap contributors'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
+          />
+        )}
         {/* Opposite the bid panel, which sits on the inline-START edge (owner, 2026-08-10) — so the
             buttons are top-right in English and top-left in Arabic. Being opposite is the rule, not the
             side: T41 M11's second clause is "never underneath the panel", and the panel is what moved.

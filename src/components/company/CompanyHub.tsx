@@ -53,6 +53,7 @@ export function CompanyHub({
   embedded = false,
   onCompany,
   onCreateCompany,
+  onViewDetails,
 }: {
   embedded?: boolean;
   /** Reports the firm (or its absence) to the page around it — the profile prints one name, not two. */
@@ -63,6 +64,19 @@ export function CompanyHub({
    * the question «do you have a company?» is actually asked.
    */
   onCreateCompany?: () => void;
+  /**
+   * Open the company's own particulars — legal name, authority role, national ID, city, the
+   * national address and the three papers. Owned by the page for the same reason as the form:
+   * it is a layer over it.
+   *
+   * 🔴 **The two are offered on DIFFERENT conditions, and that is the app's rule rather than a
+   * preference** (`company_profile_card._verificationSection`). Anything submitted can be read:
+   * pending, verified or refused. The FORM is offered only when there is nothing on file or it
+   * came back refused — *"a supplier under review can look at what they submitted but must not
+   * send it a second time; sending again is what stacks a duplicate for the reviewer"*. A refused
+   * submission gets both presses, as it does in the app.
+   */
+  onViewDetails?: () => void;
 } = {}) {
   const t = useT();
   const c = t.company;
@@ -202,6 +216,7 @@ export function CompanyHub({
           <NoCompanyCard
             busy={busy}
             onCreate={onCreateCompany}
+            onViewDetails={onViewDetails}
             onJoin={(code, name) => setConfirm(joinSpec(code, name))}
             onError={setError}
             onAttempt={() => setError(null)}
@@ -214,6 +229,7 @@ export function CompanyHub({
           company={company}
           embedded={embedded}
           busy={busy}
+          onViewDetails={onViewDetails}
           onApprove={(m) => void run(() => approveMember(m.userId))}
           onRemove={(m) => void run(() => removeMember(m.userId))}
           onPromote={(m) => setConfirm(promoteSpec(m))}
@@ -331,6 +347,7 @@ export function CompanyHub({
 export function NoCompanyCard({
   busy,
   onCreate,
+  onViewDetails,
   onJoin,
   onError,
   onAttempt,
@@ -338,6 +355,13 @@ export function NoCompanyCard({
   busy: boolean;
   /** Absent → the create route is not drawn, and the card is the join form it has always been. */
   onCreate?: () => void;
+  /**
+   * Read what was submitted. Drawn here as well as on an active firm, because the two do not
+   * arrive together: verification is what CREATES the company, so between sending the papers and
+   * a reviewer approving them this card is the one on screen and his own submission is the one
+   * thing he can still look at.
+   */
+  onViewDetails?: () => void;
   /** Called with the code AND the firm's name, once `validate-code` confirmed both. */
   onJoin: (code: string, companyName: string) => void;
   onError: (message: string) => void;
@@ -397,6 +421,19 @@ export function NoCompanyCard({
         >
           <Icon name="verified" size={16} />
           {c.createOwnCta}
+        </button>
+      )}
+
+      {/* Under review, or sent back: the papers are still his to read. See `CompanyHub`'s own note
+          on why this press and the one above answer to different conditions. */}
+      {onViewDetails && (
+        <button
+          type="button"
+          onClick={onViewDetails}
+          className={btn("secondary", "md", { full: true, className: "mt-3 flex items-center justify-center gap-1.5 transition" })}
+        >
+          <Icon name="description" size={16} />
+          {t.profile.companyDetails}
         </button>
       )}
 
@@ -489,6 +526,7 @@ function ActiveCompany({
   onDemote,
   onExit,
   onCopied,
+  onViewDetails,
 }: {
   company: MyCompany;
   /** Inside the profile: no masthead, and one column — the profile's own is already narrow. */
@@ -500,6 +538,8 @@ function ActiveCompany({
   onDemote: (m: CompanyMember) => void;
   onExit: () => void;
   onCopied: () => void;
+  /** Open the firm's particulars. Absent when nothing has been submitted — see `CompanyHub`. */
+  onViewDetails?: () => void;
 }) {
   const t = useT();
   const c = t.company;
@@ -645,6 +685,28 @@ function ActiveCompany({
             ) : undefined
           }
         />
+      )}
+
+      {/* 🔴 **The particulars have a door again** (owner, 2026-09-22: *"for company entity in the
+          app he can view its details and edit, use the same endpoints here"*).
+
+          ~~`CompanyDetails`, stacked open under this card.~~ Removed on 2026-09-07 because
+          stacked under his own details it made the profile a filing cabinet, and that is still
+          true; what was wrong is that it then had nowhere to be read at all. The app gives it a
+          SCREEN, reached from this row; here it is a layer, reached from this press.
+
+          ⚠️ A labelled BUTTON rather than the app's tappable row. On a phone a chevron on a row
+          is affordance enough; on a desktop card of plain facts nothing says the row is pressable,
+          and a row that silently is one is a control nobody finds. */}
+      {onViewDetails && (
+        <button
+          type="button"
+          onClick={onViewDetails}
+          className={btn("secondary", "md", { full: true, className: "mt-3 flex items-center justify-center gap-1.5 transition" })}
+        >
+          <Icon name="description" size={16} />
+          {t.profile.companyDetails}
+        </button>
       )}
 
       {/* ── Two columns, filling the page (owner, 2026-08-30) ───────────────────────────

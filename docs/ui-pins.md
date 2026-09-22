@@ -152,6 +152,14 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**53.1** | Documents tab — Download / Ask footer | `src/components/map/panel/EquipmentDocuments.tsx` |
 | &nbsp;&nbsp;**53.2** | Document row | `src/components/map/panel/DocRowList.tsx` |
 | **55** | Deal room | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.1** | Negotiation sheet (3 steps) | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.2** | Negotiation sheet \u2014 header: supplier, machine, running total | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.3** | Negotiation sheet \u2014 \u2460 the price table | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.4** | Negotiation sheet \u2014 \u2460 the summary block | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.5** | Negotiation sheet \u2014 \u2461 the terms step | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.6** | Negotiation sheet \u2014 the open term card | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.7** | Negotiation sheet \u2014 \u2462 review & send | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.8** | Negotiation sheet \u2014 footer: log, quotation, the acts | `src/components/deal-room/DealRoom.tsx` |
 | **56** | Chat card | `src/components/deal-room/ChatCard.tsx` |
 | **57** | Chat drawer (map) | `src/components/map/ChatDock.tsx` |
 | &nbsp;&nbsp;**57.1** | Chat drawer — identity + phase + kebab | `src/components/map/ChatDock.tsx` |
@@ -177,6 +185,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | **70** | Profile | `src/components/profile/ProfileView.tsx` |
 | **71** | Edit profile form | `src/components/profile/EditProfileForm.tsx` |
 | **72** | Company hub | `src/components/company/CompanyHub.tsx` |
+| **73** | Company logo dialog (from the quotation) | `src/components/company/CompanyLogoModal.tsx` |
 | **74** | My company card | `src/components/company/MyCompanyCard.tsx` |
 | **75** | Onboarding shell | `src/components/onboarding/OnboardingShell.tsx` |
 | **76** | Onboarding form | `src/components/onboarding/OnboardingForm.tsx` |

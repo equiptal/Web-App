@@ -419,7 +419,12 @@
    ⚠️ It slides UP rather than fading in, which is what a sheet does and what the wizard did. */
 .ng-shell {
   position: fixed; inset: 0; z-index: 61; display: flex; flex-direction: column;
-  background: var(--surface2); overflow: hidden;
+  /* 🔴 **ALL WHITE** (owner, 2026-09-22: *"show the sheet alll in white"*).
+     ~~`--surface2`, the grey desk the white paper was centred on.~~ That is the prototype's own
+     shape and it cost the sheet its calm: a grey band either side of the column, a white card in
+     the middle and a third tone inside the cards made three greys on a screen holding one
+     document. One surface now, and the RULES do the separating. */
+  background: var(--surface); overflow: hidden;
   font-family: var(--font-sans); color: var(--navy-deep);
   animation: ngSheetUp .3s cubic-bezier(.32,.72,.3,1);
   /* The one gutter every band answers to — the header's, the footer's and the body's cards alike. */
@@ -459,6 +464,9 @@
    that is always there names what the bar's only number obviously is. */
 .ng-new { display: flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; color: var(--warn-deep); }
 .ng-net { font-size: 19px; font-weight: 800; color: var(--navy); white-space: nowrap; }
+/* ⚠️ The ORIGINAL, struck, ahead of the figure that replaced it (item 8). Muted and a step
+   smaller, because it is the thing being moved away from rather than the number in play. */
+.ng-net .was { margin-inline-end: 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: line-through; }
 .ng-net .cur { font-size: 11px; font-weight: 600; color: var(--muted); }
 /* The billing period rides the figure, so the header states the SAME quantity the room's price bar
    and the bid card do: a rate, not a net-incl-VAT total. */
@@ -491,18 +499,11 @@
 
    ⚠️ It is `aria-hidden`: the footer's button already names the next step in words, and a rail
    that reads out «one, Price, two, Terms» before every screen is three labels for one fact. */
-.ng-steps { flex: 0 0 auto; padding: 10px var(--ng-gutter) 11px; background: color-mix(in srgb, var(--brand) 6%, var(--surface)); border-bottom: 1px solid var(--border-hair); }
-.ng-steps .ng-inner { display: flex; align-items: center; gap: 4px; }
-.ng-step { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.ng-step .badge { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--surface); border: 1.5px solid var(--border); color: var(--muted); font-size: 12.5px; font-weight: 800; }
-.ng-step .lbl { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
-.ng-step.on .badge { background: var(--brand); border-color: var(--brand); color: var(--brand-fg); }
-.ng-step.on .lbl { color: var(--brand-deep); font-weight: 800; }
-.ng-step.done .badge { background: var(--ok); border-color: var(--ok); color: var(--surface); }
-.ng-step.done .lbl { color: var(--ok); }
-/* The rule between two steps: it grows, so the rail spans the paper at any width. */
-.ng-steps .bar { flex: 1 1 auto; height: 2px; border-radius: 2px; background: var(--border); min-width: 18px; margin: 0 8px; }
-.ng-steps .bar.done { background: var(--ok); }
+/* 🔴 **`.ng-steps` and `.ng-step` are DELETED** (owner, 2026-09-22: *"remove the 3 steps
+   process bar"*). ~~The numbered rail under the header: a badge per step, the label beside it and
+   a growing rule between.~~ Deleted rather than left inert, which is this repo's rule for a
+   withdrawn motif - an unused block is one edit away from coming back by accident. The FOOTER's
+   named press carries the step now. */
 
 /* ── body ───────────────────────────────────────────────────────────────────────────────────── */
 /* ⚠️ **The gutter is on the BAND, not on the paper column** — as it is on the head, the rail and
@@ -510,7 +511,8 @@
    three measured 940 including their padding: the body's cards stood 40px inside the header's own
    verticals, on the one sheet whose whole point is that the bands line up. Measured at 1920:
    1020 against 940 before, 940 across all four after. */
-.ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-inline: var(--ng-gutter); background: var(--surface2); }
+/* White with the shell (item 2). The body used to be the desk the paper sat on. */
+.ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-inline: var(--ng-gutter); background: var(--surface); }
 .ng-body .ng-inner { padding: 14px 0 20px; }
 .ng-pad { padding: 0; }
 /* The white card is a CARD here, not the phone's full-bleed band: on a wide screen a band that
@@ -561,10 +563,17 @@
 .ng-sum { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; background: var(--surface2); }
 .ng-sum .item, .ng-sum .line { display: flex; justify-content: space-between; gap: 10px; }
 .ng-sum .item { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
-.ng-sum .item .lbl { display: flex; flex-direction: column; min-width: 0; }
+/* 🔴 **The factors sit BESIDE the name, not under it** (owner, 2026-09-22: *"for price put the
+   formula beside the title not below it"*). ~~`flex-direction: column`, so «2,000 × 32 × 1» was a
+   second line under «Crawler Excavator · 32 days».~~ Three rows each two lines tall made the
+   summary as tall as the table it summarises, and the formula is a GLOSS on the name rather than a
+   fact of its own.
+   ⚠️ `wrap`, so a long machine name and a three-factor formula drop rather than overflow the
+   row - which would push the figure at the far end off its own column. */
+.ng-sum .item .lbl { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
 /* The factors behind the figure, as the bid card prints them: «2,000 × 12». A row whose own numbers
    do not multiply is the one thing a customer checks. */
-.ng-sum .item .fx { margin-top: 2px; font-size: 10.5px; font-weight: 600; color: var(--muted-light); }
+.ng-sum .item .fx { font-size: 10.5px; font-weight: 600; color: var(--muted-light); }
 /* 🔴 THE COUNT, APPLIED ONCE, AT THE END. Everything above it describes one machine. */
 .ng-overall { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; }
 .ng-overall .k { font-size: 12.5px; font-weight: 800; color: var(--navy-deep); }
@@ -589,26 +598,58 @@
    is red on sight, before anyone acts; a pending row is white; and a picker being open tints it the
    same red, because opening «Change» is choosing to disagree. */
 .ng-t.now { padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--border-hair); transition: background .15s ease, border-color .15s ease; }
-.ng-t.now.clash, .ng-t.now.picking { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 25%, transparent); }
+/* 🔴 **A CONFLICT is red and a PENDING term is BLUE** (owner, 2026-09-22: *"follow the app
+   ... in the ui of the terms panels and sectiosn even the colors"*; the app's own
+   `negotiate_tones.dart`, 2026-09-17: *"conflict block in red, pending in light blue"*).
+   ~~Both wore `--danger-soft`, so the one state that still needs an answer looked like the one
+   that has gone wrong.~~ The app's reasoning is the point: grey read as chrome on a grey page, so
+   pending got a ground of its own.
+   ⚠️ **`--info`, not the app's `#2F6FB3`.** `palette-drift` forbids a raw hex in `src/`, and
+   the app's file says its greys are PRIVATE to that flow and must not be imported - so this is
+   the nearest house token, which is the trade every ported prototype in this repo has made. It is
+   a slate in the ink family rather than a true blue; the app is a shade cooler.
+   ⚠️ `.picking` follows whichever state the card is in rather than forcing red - opening the
+   options on a pending term does not make it a conflict. */
+.ng-t.now.clash { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 25%, transparent); }
+.ng-t.now.pending { background: color-mix(in srgb, var(--info) 8%, var(--surface)); border-color: color-mix(in srgb, var(--info) 28%, transparent); }
 .ng-t.done { cursor: pointer; }
 .ng-t .acts button:disabled { opacity: .45; cursor: default; }
 .ng-t.now .h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; max-width: 820px; margin-bottom: 8px; }
 .ng-t.now .h .k { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
-.ng-t.now .h .side { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ng-t.now .h .side b { color: var(--navy-deep); font-weight: 700; }
+/* 🔴 **The VALUES are the row's subject, and they were the smallest thing on it** (owner,
+   2026-09-22: *"show the terms values clear and bigger"*). The side line ran at 11px with its two
+   answers bolded inside it, under a 12.5px label - so the term's NAME outweighed the two figures
+   being argued over. The line is 12px and its values 13px now, which puts them above the label.
+   ⚠️ `nowrap` + ellipsis stays: this row states two values and a longer pair must clip
+   rather than push the card's head onto a second line. */
+.ng-t.now .h .side { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ng-t.now .h .side b { font-size: 13px; color: var(--navy-deep); font-weight: 800; }
 /* ⚠️ The pair is CAPPED and sits at the reading end. In the prototype these are two `flex:1`
    buttons across a phone; with the sheet's cards running the screen they became two slabs, which
    reads as the card's main event rather than as the two answers to the line above them. */
-.ng-t .acts { display: flex; gap: 6px; max-width: 320px; margin-inline-end: auto; }
+/* 🔴 **CENTRED** (owner, 2026-09-22: *"make the buttons of accept-choose another in the
+   center"*). ~~`margin-inline-end: auto`, which pinned the pair to the reading start.~~ They are
+   the card's two answers and neither is subordinate, so they sit under the middle of the question
+   rather than at one edge of it. The 320px cap survives - stretched across the sheet they read as
+   the card's main event rather than as the reply to the line above. */
+.ng-t .acts { display: flex; gap: 6px; max-width: 320px; margin-inline: auto; }
 .ng-t .acts button { flex: 1; border: 0; border-radius: 7px; padding: 7px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .ng-t .acts .change { background: var(--danger-soft); color: var(--danger); }
 .ng-t .acts .take { background: var(--ok-soft); color: var(--ok); }
-/* Capped like the two acts above them, and for the same reason: an option is an ANSWER to the line
-   it sits under, and a row of them running the whole screen reads as the card's own navigation. */
-.ng-t .opts { display: flex; flex-direction: column; gap: 4px; max-width: 320px; margin-top: 8px; margin-inline-end: auto; padding-top: 8px; border-top: 1px solid var(--surface2); }
-.ng-t .opts button { border: 0; border-radius: 7px; padding: 8px 10px; background: var(--surface-alt); font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted-dark); text-align: start; cursor: pointer; }
+/* 🔴 **HORIZONTAL, and always drawn** (owner, 2026-09-22: *"alwasy show other options if he
+   chose 'choose another' to be shown horizantaly not vertically"*).
+   ~~A hidden COLUMN, revealed by pressing «Choose another», capped at 320px.~~ Two faults in one
+   rule: a press that reveals three chips buys nothing, and a column made a two-option term as
+   tall as the card holding it. They wrap in a row now and the cap is gone with the column - a row
+   of chips does not read as navigation the way a full-width stack of buttons did.
+   ⚠️ `flex-wrap`, never a single line: a term with six options on a phone would otherwise
+   overflow the card. */
+.ng-t .opts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--surface2); }
+.ng-t .opts button { border: 1px solid var(--border-hair); border-radius: 999px; padding: 6px 12px; background: var(--surface); font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted-dark); text-align: center; cursor: pointer; }
 .ng-t .opts button:hover { background: var(--surface2); }
-.ng-t .opts button.on { color: var(--ok); }
+/* The chosen chip carries the same green the Accept button does - one colour for the position
+   you hold, across the whole card. */
+.ng-t .opts button.on { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 45%, transparent); color: var(--ok); font-weight: 700; }
 /* 🔴 ~~`.ng-t.later` — a dashed, dimmed «waiting for the one above» row for every term the walk had
    not reached.~~ **Deleted with the app's own** (owner: *"don't show any other term except the
    opened one"*). A placeholder is still a row to read past, and the section header's `(n/m)` count

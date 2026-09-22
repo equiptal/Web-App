@@ -13,9 +13,26 @@ import { readFileSync } from "node:fs";
 
 const SRC = readFileSync("src/components/deal-room/DealRoom.tsx", "utf8");
 const CSS = readFileSync("src/components/deal-room/deal-room-proto.css", "utf8");
+/** ⚠️ The stylesheet with its COMMENTS stripped, for every `not.toMatch`. This file explains
+ *  what it deleted and names the class while doing it, so a bare sweep fails on its own
+ *  explanation - the ninth time this repo has recorded that. */
+const CSS_CODE = CSS.replace(/\/\*[\s\S]*?\*\//g, "");
 
-/** The sheet's own slice of the component, so a rule is never matched against the room behind it. */
-const FLOW = SRC.slice(SRC.indexOf("function CounterFlow("));
+/**
+ * The sheet's own slice of the component, so a rule is never matched against the room behind it.
+ *
+ * 🔴 **It starts at `Qty`, not at `CounterFlow`.** `Qty` and `PriceCell` were hoisted OUT of
+ * the render body on 2026-09-22 to fix the price box losing focus after every character - a
+ * component declared in a render body is a new identity each render, so React remounted the input
+ * and the caret went with it. They are the sheet's own code and they sit above `CounterFlow` now.
+ *
+ * ⚠️ **The anchor asserts itself.** `indexOf` returning -1 would slice from the END of the
+ * file and every `toMatch` below would fail while every `not.toMatch` passed VACUOUSLY - the trap
+ * this repo has logged for `cancel-confirmation` and the intake's own class-string anchor.
+ */
+const FLOW_AT = SRC.indexOf("function Qty({");
+if (FLOW_AT < 0) throw new Error("negotiation-sheet: the sheet's slice anchor `function Qty({` is gone - re-point it");
+const FLOW = SRC.slice(FLOW_AT);
 
 describe("the header", () => {
   /* 🔴 **THE EYEBROW AND THE CAPTION ARE BOTH WITHDRAWN**, following the app's own removal of
@@ -47,8 +64,19 @@ describe("the header", () => {
   /* 🔴 **The request's short code is RESTORED, under the name.** The redesign dropped the block that
      carried it and left NO reference anywhere in the sheet, so a renter negotiating several deals
      with one firm had only the firm name to tell the sheets apart. */
-  it("carries the request's short code under the counterparty's name", () => {
-    expect(FLOW).toContain('<span className="ref">{room.shortCode}</span>');
+  /* 🔴 **The MACHINE under the firm, not the request's code** (owner, 2026-09-22: *"for the
+     header keep company name of supplier with equuoment name ans size dont mention request id"*).
+     ~~The short code, restored that same morning because the redesign had left no reference
+     anywhere in the sheet.~~ Inside a sheet opened FROM the request the code answers nothing, and
+     on a multi-item room it cannot even say which line is being negotiated. The machine can, and
+     the code is still on the log, the quotation and the room behind. */
+  it("names the machine and its size under the counterparty, and never the request's code", () => {
+    expect(FLOW).toContain('{machineLine && <span className="ref" title={machineLine}>{machineLine}</span>}');
+    expect(FLOW).toMatch(/const machineLine = \[/);
+    // The size rides the same run: a 20-ton and a 30-ton excavator are two negotiations.
+    expect(FLOW).toMatch(/equipmentSizeAr \|\| room\.details\.equipmentSize/);
+    const head = FLOW.slice(FLOW.indexOf('className="ng-head"'), FLOW.indexOf('className="ng-body"'));
+    expect(head).not.toContain("room.shortCode");
   });
 });
 
@@ -124,6 +152,16 @@ describe("the sheet itself", () => {
      ⚠️ **940, and the number is not a taste.** `.ng-cmp` was capped at 940 and `.ng-grow` at
      820 on 2026-09-22, so at this width nothing already capped changes size. beta's own 800 would
      have shrunk the compare card that was measured at 940. */
+  /* 🔴 **ONE WHITE SURFACE** (owner, 2026-09-22: *"show the sheet alll in white"*). ~~A white
+     paper centred on a grey desk, which is the prototype's own shape.~~ Three greys on a screen
+     holding one document; the RULES separate the bands now. The paper COLUMN survives - it is the
+     measurement, not the colour. */
+  it("paints the shell and the body white, with no desk behind the paper", () => {
+    expect(CSS).toMatch(/\.ng-shell \{[\s\S]*?background: var\(--surface\);/);
+    expect(CSS).toMatch(/\.ng-body \{[^}]*background: var\(--surface\); \}/);
+    expect(CSS_CODE).not.toMatch(/\.ng-body \{[^}]*background: var\(--surface2\)/);
+  });
+
   it("holds the cards to a paper column, centred on the desk", () => {
     expect(CSS).toMatch(/--ng-paper: 940px;/);
     expect(CSS).toMatch(/\.ng-inner \{ width: 100%; max-width: var\(--ng-paper\); margin-inline: auto; \}/);
@@ -137,8 +175,10 @@ describe("the sheet itself", () => {
        window: 1020 against 940 before, 940 across all four after. */
     expect(CSS).toMatch(/\.ng-body \{[^}]*padding-inline: var\(--ng-gutter\)/);
     expect(CSS).toMatch(/\.ng-body \.ng-inner \{ padding: 14px 0 20px; \}/);
-    // Head, steps, body and foot: FOUR bands on the one column, so nothing stands off the paper.
-    expect(FLOW.match(/className="ng-inner"/g)?.length).toBe(4);
+    /* Head, body and foot: THREE bands on the one column, so nothing stands off the paper.
+       ⚠️ It was FOUR until the step rail went (owner, 2026-09-22). The count is the point of
+       the case - a band added without its `.ng-inner` is one that ignores the paper. */
+    expect(FLOW.match(/className="ng-inner"/g)?.length).toBe(3);
   });
 
   /* 🔴 **THE STEP RAIL, restored from `beta`** (same note). It is the one device that makes
@@ -152,17 +192,17 @@ describe("the sheet itself", () => {
      ⚠️ `aria-hidden`, and NOT pressable: the footer already names the next step in words, and a
      rail that jumped a renter past an unanswered price would be a second route with none of `canNext`'s
      gates. */
-  it("names the three sheets with a step rail, which nothing can press", () => {
-    expect(CSS).toMatch(/\.ng-steps \{[^}]*var\(--ng-gutter\)/);
-    expect(CSS).toMatch(/\.ng-step\.on \.badge \{[^}]*background: var\(--brand\)/);
-    expect(CSS).toMatch(/\.ng-step\.done \.badge \{[^}]*background: var\(--ok\)/);
-    // The rule between two steps GROWS, so the rail spans the paper at any width.
-    expect(CSS).toMatch(/\.ng-steps \.bar \{[^}]*flex: 1 1 auto/);
-    expect(FLOW).toMatch(/<div className="ng-steps" aria-hidden="true">/);
-    expect(FLOW).toMatch(/i < page \? "✓" : i \+ 1/);
-    // It walks nothing: a rail with an onClick is the second route this comment refuses.
-    const rail = FLOW.slice(FLOW.indexOf('className="ng-steps"'), FLOW.indexOf('className="ng-body"'));
-    expect(rail).not.toMatch(/onClick/);
+  /* 🔴 **NO STEP RAIL** (owner, 2026-09-22: *"remove the 3 steps process bar"*). ~~① Price
+     —— ② Terms —— ③ Review, argued that same morning as «what makes three pages read as three
+     SHEETS».~~ It was `aria-hidden` and unpressable, so it spent a band of the sheet on decoration.
+     ⚠️ **The footer carries the step instead, and that was his pick** when the cost was put to
+     him: the button names where the press GOES, and nothing names where the reader IS. */
+  it("draws no step rail, in the markup or the stylesheet", () => {
+    expect(FLOW).not.toMatch(/className="ng-steps"/);
+    expect(CSS_CODE).not.toMatch(/^\.ng-steps/m);
+    expect(CSS_CODE).not.toMatch(/^\.ng-step[ .{]/m);
+    // The footer's named press is what replaced it, and it must still be there.
+    expect(FLOW).toContain('L("Send to the supplier", "إرسال إلى المورد")');
   });
 
   /* ⚠️ **The terms step is SIZED for a desktop** (owner, 2026-09-22: *"for terms use same
@@ -180,20 +220,67 @@ describe("the sheet itself", () => {
 
   /* At the phone's width the answer controls are full-bleed rows; across a wide screen they become
      slabs that read as the card's main event rather than as the answers to the line above them. */
-  it("keeps the answers to a reading column", () => {
+  /* 🔴 **The two acts are CENTRED and the options run ACROSS** (owner, 2026-09-22: *"make the
+     buttons of accept-choose another in the center"* and *"alwasy show other options ... to be
+     shown horizantaly not vertically"*).
+     ~~Both pinned to the reading start, the options a hidden COLUMN capped at 320px.~~ The acts
+     keep their cap - stretched across the sheet they read as the card's main event rather than as
+     the reply to the line above - but they sit under the middle of the question now. The options
+     lost the cap with the column: a row of chips does not read as navigation the way a full-width
+     stack of buttons did. */
+  it("centres the two acts and lays the options across", () => {
     expect(CSS).toMatch(/\.ng-t \.acts \{[^}]*max-width: 320px/);
-    expect(CSS).toMatch(/\.ng-t \.opts \{[^}]*max-width: 320px/);
+    expect(CSS).toMatch(/\.ng-t \.acts \{[^}]*margin-inline: auto/);
+    expect(CSS).toMatch(/\.ng-t \.opts \{[^}]*flex-wrap: wrap/);
+    expect(CSS_CODE).not.toMatch(/\.ng-t \.opts \{[^}]*flex-direction: column/);
     expect(CSS).toMatch(/\.ng-price input \{[^}]*max-width: 150px/);
+  });
+
+  /* 🔴 **The options are always drawn** (same note): a press that reveals three chips buys
+     nothing. Still withheld on «Keep my choice», which has no menu by construction - the only
+     alternative there is the value she already holds. */
+  it("shows the other options without a press, except where there is no menu", () => {
+    expect(FLOW).toMatch(/\{!keepMine && opts\.length > 0 && \(/);
+    expect(FLOW).not.toMatch(/\{open && !keepMine && \(/);
   });
 });
 
 describe("the price sheet", () => {
   /* 🔴 The input's own colours ARE the state: green while the figure still matches the supplier's,
      amber the moment it is edited. Losing either half leaves the renter unable to see what he moved. */
+  /**
+   * 🔴 **The price box must keep the caret** (owner, 2026-09-22: *"there is a bug that i cant
+   * write into price box it takes me out after each character"*).
+   *
+   * `PriceCell` and `Qty` were declared INSIDE `CounterFlow`'s render body. A component defined in
+   * a render body is a NEW function identity on every render, and React compares element types by
+   * identity - so each keystroke unmounted the subtree and mounted a fresh `<input>`, taking the
+   * focus with the old node. Nothing downstream can fix it: memoising the parent or the value does
+   * not make two function objects the same type.
+   *
+   * ⚠️ This asserts the POSITION, because that is the whole of the bug. jsdom would not catch
+   * it either - the remount is correct React behaviour, and only a caret notices.
+   */
+  it("declares the input's component at module scope, so typing cannot remount it", () => {
+    const body = SRC.indexOf("function CounterFlow(");
+    expect(body).toBeGreaterThan(-1);
+    for (const decl of ["function PriceCell(", "function Qty("]) {
+      const at = SRC.indexOf(decl);
+      expect(at, `${decl} is gone - it must stay a module-scope declaration`).toBeGreaterThan(-1);
+      expect(at, `${decl} moved back inside the render body: the price box loses focus per keystroke`).toBeLessThan(body);
+    }
+    // And the body must not re-declare one under any name that renders the money input.
+    expect(SRC.slice(body)).not.toMatch(/const \w+ = \([^)]*\) => \(?\s*<div className=\{?`?ng-price/);
+  });
+
   it("paints an edited price differently from one that still matches", () => {
     expect(CSS).toMatch(/\.ng-price input \{[^}]*border: 1\.5px solid var\(--ok\)/);
     expect(CSS).toMatch(/\.ng-price\.edited input \{[^}]*border-color: var\(--brand\)/);
-    expect(FLOW).toMatch(/const edited = refVal != null && changedFrom/);
+    /* ⚠️ The RULE is unchanged and the EXPRESSION moved: `changedFrom` carries the null test
+       itself now, so a leg the supplier never priced still reads as unedited. One comparator, at
+       module scope with the cell it serves. */
+    expect(FLOW).toMatch(/const edited = changedFrom\(numOf\(val\), refVal\)/);
+    expect(FLOW).toMatch(/function changedFrom[\s\S]*?ref != null && Math\.round\(cur\) !== Math\.round\(ref\)/);
   });
 
   /* Excluding a leg is confirmed first — it is reversible, and the app confirms it too. */

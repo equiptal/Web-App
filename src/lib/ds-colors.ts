@@ -72,6 +72,7 @@ export const COLORS = {
      note in `globals.css`; it is mirrored here only because this file must name every colour
      `:root` defines, and no standalone document has any use for it. */
   photoGround: "#e3ded7",
+  verified: "#2f9e5c",
   ok: "#1d9e55",
   okSoft: "#e2efe7",
   okDeep: "#1d7a45",
@@ -216,6 +217,7 @@ export const CSS_VAR_NAME: Record<keyof typeof COLORS, string> = {
   brandFg: "--brand-fg",
   gold: "--gold",
   photoGround: "--photo-ground",
+  verified: "--verified",
   ok: "--ok",
   okSoft: "--ok-soft",
   okDeep: "--ok-deep",

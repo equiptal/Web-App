@@ -518,3 +518,44 @@ describe("the whole machine is visible, and the zoom only eats the margin", () =
     expect(code.slice(pAt, pAt + 240)).not.toMatch(/h-full/);
   });
 });
+
+/**
+ * 🔴 **Nothing on this card may refuse to wrap at PHONE width** (owner, 2026-09-23, with a
+ * photograph of staging on his handset: the «In our catalogue» pill and the right borders of TYPE
+ * and SIZE cut off by the screen's edge).
+ *
+ * The equipment-name LABEL carried an unconditional `whitespace-nowrap`. Measured against the
+ * compiled stylesheet: it runs **328px** and cannot shrink, so with the pill beside it the card's
+ * min-content is **356px inside a 328px box** and the DOCUMENT overflows by 13px at a 360 viewport
+ * - which drags the header, the tabs and every panel sideways with it.
+ *
+ * ⚠️ **The one-line rule survives from `sm` up**, which is the 2026-09-14 ruling it came from
+ * (*"the pill dropping under the label put a third row into a block meant to read as a single
+ * field"*). That was right about the card he was looking at - a desktop one. Below `sm` the
+ * alternative is not a third row, it is the card leaving the screen.
+ *
+ * ⚠️ jsdom lays nothing out, so this reads the RULE rather than the width. The 13px is a
+ * measured fact recorded in the comment, not something a unit test can re-derive.
+ */
+describe("the card fits a phone", () => {
+  const SRC = readFileSync("src/components/create/MachineCard.tsx", "utf8");
+  /* Comments stripped: the note above the label NAMES the class it removed, so a bare sweep would
+     fail on its own explanation - the tenth time this repo has recorded that. */
+  const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+
+  it("lets the equipment-name label wrap below sm, and holds one line above it", () => {
+    expect(CODE).toContain('className="inline-flex items-center gap-2 align-middle sm:whitespace-nowrap"');
+    expect(CODE).not.toContain('className="inline-flex items-center gap-2 whitespace-nowrap align-middle"');
+  });
+
+  /* A nowrap run is only safe when it cannot outgrow its box: a short fixed string, or one with
+     `truncate` beside it so it clips instead of pushing. Every other one on this card is one of
+     those, and this case is what says so the next time one is added. */
+  it("leaves no unguarded nowrap on a run that can grow", () => {
+    for (const m of CODE.matchAll(/className=\{?["`][^"`]*whitespace-nowrap[^"`]*["`]/g)) {
+      const cls = m[0];
+      const guarded = cls.includes("sm:whitespace-nowrap") || cls.includes("truncate") || cls.includes("text-subhead");
+      expect(guarded, `unguarded nowrap: ${cls}`).toBe(true);
+    }
+  });
+});

@@ -249,6 +249,17 @@ export const PIN_REGISTRY = {
   "equipment-documents-foot": { n: "53.1", label: "Documents tab — Download / Ask footer", file: "src/components/map/panel/EquipmentDocuments.tsx" },
   "doc-row": { n: "53.2", label: "Document row", file: "src/components/map/panel/DocRowList.tsx" },
   "deal-room": { n: "55", label: "Deal room", file: "src/components/deal-room/DealRoom.tsx" },
+  /* 🔴 **The negotiation sheet's own parts.** It is the surface the owner sends the most notes
+     about - fifteen in one batch on 2026-09-22 - and until then the whole three-step sheet answered
+     to `55`, so every note had to be resolved by quoting its visible text. */
+  "ng-sheet": { n: "55.1", label: "Negotiation sheet (3 steps)", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-head": { n: "55.2", label: "Negotiation sheet \u2014 header: supplier, machine, running total", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-price": { n: "55.3", label: "Negotiation sheet \u2014 \u2460 the price table", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-sum": { n: "55.4", label: "Negotiation sheet \u2014 \u2460 the summary block", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-terms": { n: "55.5", label: "Negotiation sheet \u2014 \u2461 the terms step", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-term-card": { n: "55.6", label: "Negotiation sheet \u2014 the open term card", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-review": { n: "55.7", label: "Negotiation sheet \u2014 \u2462 review & send", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-foot": { n: "55.8", label: "Negotiation sheet \u2014 footer: log, quotation, the acts", file: "src/components/deal-room/DealRoom.tsx" },
   "chat-card": { n: "56", label: "Chat card", file: "src/components/deal-room/ChatCard.tsx" },
   /* `ChatDock`'s root is a fragment; the DRAWER is the surface, and its four parts are what a note
      about "the chat" almost always means. */
@@ -280,6 +291,7 @@ export const PIN_REGISTRY = {
   "profile-view": { n: "70", label: "Profile", file: "src/components/profile/ProfileView.tsx" },
   "edit-profile-form": { n: "71", label: "Edit profile form", file: "src/components/profile/EditProfileForm.tsx" },
   "company-hub": { n: "72", label: "Company hub", file: "src/components/company/CompanyHub.tsx" },
+  "company-logo-modal": { n: "73", label: "Company logo dialog (from the quotation)", file: "src/components/company/CompanyLogoModal.tsx" },
   "my-company-card": { n: "74", label: "My company card", file: "src/components/company/MyCompanyCard.tsx" },
   "onboarding-shell": { n: "75", label: "Onboarding shell", file: "src/components/onboarding/OnboardingShell.tsx" },
   "onboarding-form": { n: "76", label: "Onboarding form", file: "src/components/onboarding/OnboardingForm.tsx" },

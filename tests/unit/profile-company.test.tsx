@@ -16,7 +16,11 @@ import type { MyCompany } from "@/lib/contract/company";
  * profile, under the renter's details, and nothing on the page still points at the retired route.
  */
 
-const api = vi.hoisted(() => ({ company: null as MyCompany | null }));
+const api = vi.hoisted(() => ({
+  company: null as MyCompany | null,
+  /** What `/api/me` reports for the verification, so a case can pick the app's status. */
+  verification: "none" as string,
+}));
 vi.mock("@/lib/api/company-client", () => ({
   fetchMyCompany: () => Promise.resolve(api.company),
   validateInviteCode: () => Promise.resolve({ ok: false }),
@@ -55,12 +59,13 @@ const member = (over: Partial<MyCompany> = {}): MyCompany => ({
 
 beforeEach(() => {
   api.company = null;
+  api.verification = "none";
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       const body = url.includes("/api/me")
-        ? { user: { firstName: "Yara", lastName: "F", city: "Riyadh", jobTitle: "Procurement", email: "yara@moedatech.net", phone: "+966501112233", companyName: "Yesr Test", whatsapp: null }, verification: { status: "none" } }
+        ? { user: { firstName: "Yara", lastName: "F", city: "Riyadh", jobTitle: "Procurement", email: "yara@moedatech.net", phone: "+966501112233", companyName: "Yesr Test", whatsapp: null }, verification: { status: api.verification } }
         : {};
       return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
     }),
@@ -144,21 +149,29 @@ describe("the organization, on the profile", () => {
     expect(screen.getByText(en.company.dissolve)).toBeTruthy();
   });
 
-  it("prints ONE company name, and it is the firm's", async () => {
+  it("prints BOTH names, each once, and tells them apart by their labels", async () => {
     /**
-     * Owner, 2026-09-07: *"how yesr test and EQ Rental, 2 names? which one."*
+     * Owner, 2026-09-07: *"how yesr test and EQ Rental, 2 names? which one."* Then, 2026-09-22:
+     * *"first i must view all fields here, why the company name not shown"*.
      *
-     * Two different things were printed under one word: `profile.companyName` is free text typed at
-     * signup, and the block below states the COMPANY the account belongs to — the record that
-     * decides what he can see and what his bids are filed under. When both exist the firm wins.
+     * 🔴 **The first ruling hid the wrong half.** He was right that two names under one word is
+     * unreadable, and the answer taken then was to drop `profile.companyName` whenever a firm
+     * existed. But this grid is the read-back of the edit form beside it, and since 2026-09-21 that
+     * field is REQUIRED on the complete pass and is the fourth rung of the one naming rule — so a
+     * field the form demands and the grid refuses to show reads as a field that failed to save.
+     *
+     * They are two facts and they are labelled as two: the DISPLAY name he typed on his profile,
+     * and the firm's own row below. Same split the app keeps (`profile_form_page`: *"display/trade
+     * company name — saved to the profile, NOT to verification"*).
      */
     api.company = member({ name: "EQ Rental" });
     draw();
     await find("EQ Rental");
-    // Once, in the firm's own row — not again as a field of his personal details.
+    // The firm, once, in its own row — never repeated as a field of his personal details.
     expect(screen.getAllByText("EQ Rental")).toHaveLength(1);
-    // And the typed leftover is not printed beside it.
-    expect(screen.queryByText("Yesr Test")).toBeNull();
+    // And what he typed, once, under the Company label.
+    expect(screen.getAllByText("Yesr Test")).toHaveLength(1);
+    expect(screen.getByText(en.profile.companyName)).toBeTruthy();
   });
 
   it("falls back to what he typed when there is no firm", async () => {
@@ -192,5 +205,42 @@ describe("the organization, on the profile", () => {
     await find("Moedatech Contracting");
     const hrefs = [...document.querySelectorAll("a")].map((a) => a.getAttribute("href"));
     expect(hrefs).not.toContain("/company");
+  });
+});
+
+describe("the company's own particulars have a door", () => {
+  /**
+   * 🔴 **The app's split, on `supplierStatus`** (`company_profile_card._verificationSection`):
+   * 1 / 2 / 3 open the READ-ONLY details; the FORM is offered only on 0 and 3. A submission under
+   * review must not be sent a second time — *"sending again is what stacks a duplicate for the
+   * reviewer"*. The web reads the same two endpoints the app reads (`/api/verification` for the
+   * submission, `/api/verification/docs` for the presigned papers).
+   */
+  it("Given nothing submitted, Then there is nothing to read", async () => {
+    api.company = member();
+    draw();
+    await find(en.company.team);
+    expect(screen.queryByText(en.profile.companyDetails)).toBeNull();
+  });
+
+  for (const status of ["pending", "verified", "rejected"]) {
+    it(`Given a ${status} submission, Then the details can be opened`, async () => {
+      api.verification = status;
+      api.company = member();
+      draw();
+      expect(await find(en.profile.companyDetails)).toBeTruthy();
+    });
+  }
+
+  /**
+   * ⚠️ The press is drawn WITHOUT a company row too. Verification is what CREATES the firm, so
+   * between sending the papers and a reviewer approving them there is no company to hang it on —
+   * and his own submission is the one thing he can still look at.
+   */
+  it("Given a submission and no firm yet, Then it is still there", async () => {
+    api.verification = "pending";
+    api.company = null;
+    draw();
+    expect(await find(en.profile.companyDetails)).toBeTruthy();
   });
 });

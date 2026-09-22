@@ -23,6 +23,7 @@ Two things it does not hold, on purpose:
 | `src/components/common/GuestWall.tsx` | 9.5 Guest wall — blurred page + sign-in card (`guest-wall`) · 9.6 Guest wall — season chip (`guest-wall-season`) |
 | `src/components/common/SignInPrompt.tsx` | 79 Sign-in prompt (`sign-in-prompt`) |
 | `src/components/company/CompanyHub.tsx` | 72 Company hub (`company-hub`) |
+| `src/components/company/CompanyLogoModal.tsx` | 73 Company logo dialog (from the quotation) (`company-logo-modal`) |
 | `src/components/company/MyCompanyCard.tsx` | 74 My company card (`my-company-card`) |
 | `src/components/create/Canvas.tsx` | 16 Create canvas (3 columns) (`create-canvas`) · 16.2 Create — site + schedule locked strip (with «Change») (`locked-for-request`) |
 | `src/components/create/CreateBack.tsx` | 16.1 Create — «leave this request?» confirm (`create-leave-confirm`) |
@@ -34,7 +35,7 @@ Two things it does not hold, on purpose:
 | `src/components/create/WhenPanel.tsx` | 19 When panel (dates) (`when-panel`) · 19.1 When panel — head button (`when-panel-head`) · 19.2 When panel — open body (`when-panel-body`) |
 | `src/components/create/WherePanel.tsx` | 20 Where panel (site) (`where-panel`) · 20.1 Where panel — head button (`where-panel-head`) · 20.2 Where panel — open body (`where-panel-body`) |
 | `src/components/deal-room/ChatCard.tsx` | 56 Chat card (`chat-card`) |
-| `src/components/deal-room/DealRoom.tsx` | 55 Deal room (`deal-room`) |
+| `src/components/deal-room/DealRoom.tsx` | 55 Deal room (`deal-room`) · 55.1 Negotiation sheet (3 steps) (`ng-sheet`) · 55.2 Negotiation sheet \u2014 header: supplier, machine, running total (`ng-sheet-head`) · 55.3 Negotiation sheet \u2014 \u2460 the price table (`ng-sheet-price`) · 55.4 Negotiation sheet \u2014 \u2460 the summary block (`ng-sheet-sum`) · 55.5 Negotiation sheet \u2014 \u2461 the terms step (`ng-sheet-terms`) · 55.6 Negotiation sheet \u2014 the open term card (`ng-term-card`) · 55.7 Negotiation sheet \u2014 \u2462 review & send (`ng-sheet-review`) · 55.8 Negotiation sheet \u2014 footer: log, quotation, the acts (`ng-sheet-foot`) |
 | `src/components/Dialog.tsx` | 90 Dialog (`dialog`) · 90.1 Dialog — panel (`dialog-panel`) · 90.2 Dialog — header row (`dialog-header`) |
 | `src/components/Dropdown.tsx` | 92 Search select (`search-select`) |
 | `src/components/help/HelpManual.tsx` | 6.1 Help manual modal (`help-manual`) |

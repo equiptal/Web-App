@@ -1186,6 +1186,9 @@ export const en = {
       logoChange: "Change",
       logoUpload: "Upload",
       logoRemove: "Remove",
+      // The logo dialog the quotation's «Add a logo» opens (2026-09-23).
+      logoSave: "Save logo",
+      logoSaved: "Logo saved. Open the quotation again to see it on your side",
       continue: "Continue",
       confirmHeadline:
         "Not uploading the required company documents may lead to your registration being rejected",
@@ -1236,6 +1239,8 @@ export const en = {
     account: "Account",
     // Company / verification card
     companyVerifiedTitle: "Company verified",
+    /** The app's own label for both the press and the screen it opens (`companyDetails`). */
+    companyDetails: "Details",
     companyVerifiedBody: "Your company is verified. You have a trusted renter badge.",
     companyPendingTitle: "Verification in review",
     companyPendingBody: "Your company details are under review. We'll update your status here.",

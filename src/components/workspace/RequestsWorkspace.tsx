@@ -82,6 +82,8 @@ export function RequestsWorkspace() {
   // Unread chat per bid. `fetchDealRoomUnread` is one global total for the Inbox badge; the per-bid
   // number lives on received-bids, which reads it out of Stream's own per-channel counts.
   const [unreadByBid, setUnreadByBid] = useState<Record<string, number>>({});
+  /** Each bid's supplier mark as a SIGNED link, from the received-bids list (2026-09-23). */
+  const [logoByBid, setLogoByBid] = useState<Record<string, string | null>>({});
   const [wanted, setWanted] = useState<WorkspaceSelection>(EMPTY_SELECTION);
   const [tab, setTab] = useState<Tab>("cards");
   const [source, setSource] = useState<SourceFilter>("all");
@@ -233,7 +235,14 @@ export function RequestsWorkspace() {
     if (status !== "authed") return;
     let live = true;
     fetchReceivedBids()
-      .then((r) => live && setUnreadByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.unreadCount]))))
+      .then((r) => {
+        if (!live) return;
+        setUnreadByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.unreadCount])));
+        // The supplier's mark, SIGNED, for the quotation (owner, 2026-09-23). The bid projection
+        // only holds a bare key, which the private bucket refuses; this list is where the dashboard's
+        // working avatar comes from.
+        setLogoByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.supplierLogoUrl])));
+      })
       .catch(() => {});
     return () => {
       live = false;
@@ -575,6 +584,8 @@ export function RequestsWorkspace() {
         .catch(() => null),
     ]);
     const u = me?.user ?? {};
+    const renteeVerified = tier === "verified";
+    const profileHref = `${window.location.origin}/profile`;
     const reqItem = (rec as unknown as { equipmentItems?: { mobilizationByRentee?: boolean | null; demobilizationByRentee?: boolean | null }[] } | null)?.equipmentItems?.[0] ?? null;
     const code = item.code ?? fetchedCode ?? item.displayId;
     const reqCode = code.replace(/[^A-Za-z0-9-]/g, "");
@@ -602,6 +613,7 @@ export function RequestsWorkspace() {
             workSite: group?.locationLabel ?? null,
             // ABSOLUTE: the quotation opens in a blank window, where a relative path resolves to nothing.
             sealUrl: `${window.location.origin}/moedatech-logomark.svg`,
+            supplierLogoUrl: logoByBid[supBids[0].card.id] ?? null,
             entries: supBids.map((b) => ({
               bid: b.card,
               itemLabel: itemName,
@@ -621,7 +633,16 @@ export function RequestsWorkspace() {
               nationalAddress: u.nationalAddress ?? null,
               phone: u.phone ?? null,
               email: u.email ?? null,
-              verified: tier === "verified",
+              verified: renteeVerified,
+              logoUrl: u.companyLogoUrl ?? null,
+              // The app's two asks on his own box: verify first (no company, no mark to add), then
+              // the empty logo slot. Screen only; the PDF never carries them.
+              asks: {
+                verify: renteeVerified ? null : { href: `${profileHref}?verify=1`, label: ar ? "وثّق شركتك" : "Verify your company" },
+                // Opens the logo dialog on the profile (`CompanyLogoModal`), the web's in-place upload.
+                addLogo:
+                  renteeVerified && !u.companyLogoUrl ? { href: `${profileHref}?logo=1`, label: ar ? "أضف شعارًا" : "Add a logo" } : null,
+              },
             },
           }),
         ),
@@ -629,7 +650,14 @@ export function RequestsWorkspace() {
       .join("");
 
     const dlName = quotationDownloadName(code, [code]);
-    const html = wrapQuotationPage(sections, { lang: ar ? "ar" : "en", title: dlName });
+    // No auto-print any more: the page opens as the app's preview does, with «Download PDF» and
+    // «Share» above it (owner, 2026-09-23).
+    const html = wrapQuotationPage(sections, {
+      lang: ar ? "ar" : "en",
+      title: dlName,
+      autoPrint: false,
+      tools: { download: ar ? "تنزيل PDF" : "Download PDF", share: ar ? "مشاركة" : "Share", fileName: dlName },
+    });
     // A popup-blocked `window.open` returns null and used to fail silently — a dead click. Fall back
     // to downloading the self-printing file so the quotation is never a no-op.
     const w = window.open("", "_blank");
@@ -647,7 +675,7 @@ export function RequestsWorkspace() {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  }, [ar, item, shown, checkedBids, fetchedCode, tier, group?.locationLabel]);
+  }, [ar, item, shown, checkedBids, fetchedCode, tier, group?.locationLabel, logoByBid]);
 
   /**
    * ── The comparison, on paper (owner, 2026-09-09) ──────────────────────────────────────────────

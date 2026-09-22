@@ -611,7 +611,19 @@ export function MachineCard({
                     /* `inline-flex`, not `flex`: the star that `CanvasField` draws after this
                        label is its SIBLING, and a block-level label pushed it onto a line of its own.
                        Inline, the three flow together and wrap only if they genuinely cannot fit. */
-                    <span className="inline-flex items-center gap-2 whitespace-nowrap align-middle">
+                    /* 🔴 **`sm:` ON THE NOWRAP, because on a phone it took the CARD off the
+                       screen** (owner, 2026-09-23, with a photograph of staging on his handset: the
+                       pill and the right borders of TYPE and SIZE cut by the screen's edge).
+                       ~~`whitespace-nowrap`, unconditional.~~ Measured on the compiled stylesheet:
+                       the label runs **328px** and cannot shrink, so with the pill the card's
+                       min-content is **356px inside a 328px box** and the DOCUMENT overflows by
+                       13px at 360 - which moves the header, the tabs and every panel with it.
+                       ⚠️ **The one-line rule still holds where there is room.** It is the
+                       2026-09-14 ruling (*"the pill dropping under the label put a third row into a
+                       block meant to read as a single field"*) and it was right about the card he
+                       was looking at - a desktop one. Below `sm` the alternative is not a third row,
+                       it is the card leaving the screen. */
+                    <span className="inline-flex items-center gap-2 align-middle sm:whitespace-nowrap">
                       {t.create.machineCard.customEquipment}
                       {/* 🔴 The star is drawn HERE, not by `CanvasField` (`star={false}` below).
                           It renders the mark as the label's SIBLING, and once the label also carried

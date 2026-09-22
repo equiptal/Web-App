@@ -7,6 +7,252 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-23 - The profile shows every field the form collects, and the company's papers have a door again.**
+  Owner, with a screenshot: *"first i must view all fields here, why the company name not shown, also
+  for company entity in the app he can view its details and edit, use the same endpoints here"*.
+  🔴 **The read-only grid was hiding a field the form DEMANDS.** `{!firmName && ...}` dropped the
+  COMPANY row whenever a firm existed - the 2026-09-07 answer to *"yesr test and EQ Rental, 2 names?
+  which one"*. That reasoning expired on 2026-09-21, when `profile.companyName` became the fourth rung
+  of `counterpartyDisplayName` and the field became required on the complete pass. A field the form
+  makes mandatory and the grid refuses to print reads as a field that failed to save. Both names are
+  drawn now, each once, told apart by their labels: his display name under COMPANY, the firm in its own
+  row below. `firmName` and its orphaned comment are gone.
+  🔴 **The particulars are readable again, on the app's own condition.** `CompanyDetails` was
+  removed from the page on 2026-09-07 (*"even in the company details don't show it"*) and that ruling
+  stands - stacked under his own details it made the profile a filing cabinet. What was wrong is that
+  it then had nowhere to be read AT ALL. It is a `Dialog` now, opened by a Details press on the company
+  card. It self-fetches the two endpoints the app reads: `/api/verification` for the submission and
+  `/api/verification/docs` for the presigned papers.
+  ⚠️ **View and edit answer to DIFFERENT conditions, and that is the app's rule, not a taste**
+  (`company_profile_card._verificationSection`, on `supplierStatus` 0 none / 1 pending / 2 verified /
+  3 rejected). Anything submitted can be READ - 1, 2 and 3. The FORM is offered only on 0 and 3: a
+  submission under review must not be sent twice, because that stacks a duplicate for the reviewer. The
+  web already gated its form that way; only the read half was missing. A rejected submission gets both.
+  ⚠️ **The press is drawn on the no-company card too.** Verification is what CREATES the firm,
+  so between sending the papers and a reviewer approving them there is no company row to hang it on, and
+  his own submission is the one thing he can still look at.
+  Files: `src/components/profile/ProfileView.tsx`, `src/components/company/CompanyHub.tsx`,
+  `src/lib/i18n/en.ts`, `src/lib/i18n/ar.ts`, `tests/unit/profile-company.test.tsx`.
+  ⚠️ Still divergent, reported not fixed: the web cannot CLEAR a stored company name
+  (`updateProfileSchema` has no partial clear) while the app allows it.
+
+- **2026-09-23 - The negotiation sheet, fifteen notes: the price box keeps the caret, the step rail goes, the header names the MACHINE, and the terms are read off the app.**
+  Owner, a batch with two screenshots - the original Arabic sheet and the current English step ①.
+  🔴 **THE ONE THAT WAS A DEFECT, and its cause is worth the entry on its own** (*"there is a bug
+  that i cant write into price box it takes me out after each character"*). `PriceCell` and `Qty` were
+  declared INSIDE `CounterFlow`'s render body. A component defined in a render body is a NEW function
+  identity on every render, and React compares element types by IDENTITY - so every keystroke
+  unmounted the subtree and mounted a fresh `<input>`, taking the caret with the old node.
+  ⚠️ **Nothing downstream can fix it**: memoising the parent, the value or the handler does not
+  make two function objects the same type. Hoisting is the fix. `changedFrom` and `numOf` moved out
+  with them, so there is still ONE comparator deciding whether a figure has left the supplier's.
+  ⚠️ **A case pins the POSITION**, because that is the whole of the bug - and the first three test
+  edits did NOT pin it: renaming the hoisted component left them all green. Proved by doing it.
+  **The other fourteen, in his order:**
+  (1,2) **The sheet is ONE WHITE SURFACE.** ~~A white paper centred on a grey desk~~ - the prototype's
+  own shape, and three greys on a screen holding one document. The paper COLUMN survives at 940px: it
+  is the measurement, not the colour.
+  (5) **The factors sit BESIDE the name** (*"put the formula beside the title not below it"*).
+  `flex-direction: column` made every summary row two lines tall; the formula is a gloss on the name.
+  ⚠️ `flex-wrap`, so a long name plus a three-factor formula drops rather than pushing the figure
+  off its column.
+  (6) 🔴 **NO STEP RAIL.** ~~① Price —— ② Terms —— ③ Review, argued the previous morning as «what
+  makes three pages read as three SHEETS».~~ It was `aria-hidden` and unpressable - a band of the
+  sheet spent on decoration. Asked what would say which sheet he was on, he chose **the footer button
+  alone**: it names where the press GOES, and nothing names where he IS. His trade, taken explicitly.
+  🔴 **Its CSS went with it and an ORPHAN rule was left behind on the first cut** - `.ng-steps
+  .bar.done`, one line past the block I removed. That is the exact fault that broke the staging build
+  for a day on 2026-09-19. The suite caught it; `next build` would have been the only other thing that
+  could.
+  (7) **The header names the FIRM and the MACHINE** (*"dont mention request id"*). 🔴 This reverses
+  the previous morning's «the short code is restored under the name». Inside a sheet opened FROM the
+  request the code answers nothing, and on a multi-item room it cannot say which line is being
+  negotiated. The machine and its size can; the code is still on the log, the quotation and the room.
+  (8) **BEFORE → AFTER on the header's figure**, his pick of three placements. It starts as the
+  supplier's standing rate and stays that until the renter moves it; from then the original is struck
+  through beside his own. ⚠️ `counterRate` is null until `changedFrom` says something moved - the
+  same comparator the price cells paint with, so the bar and the cell cannot disagree.
+  (9) **«supplier's declaration» is gone from a pending card.** It repeated, in grey under the term's
+  name, the half of «Your choice: X · Supplier: Y» sitting one line below. ⚠️ The other two
+  survive and are NOT the same fact: «from your request» and «platform default» name a value with no
+  party behind it, which the side row cannot say.
+  (10,11) The values run 12/13px over the 12.5px label, so the figures being argued over outweigh the
+  term's name; the two acts are **centred** under the question rather than pinned to one edge.
+  (12) **Read off the APP, exactly** (his answer when asked how far to go). The green button is
+  `dealRoomAccept` = **«Accept» / «قبول»**, not «Take theirs» - and the Arabic here was ALREADY
+  «قبول», so the two locales had been naming one button differently. The three red labels already
+  matched. 🔴 **A CONFLICT is red and a PENDING term is BLUE**, which is the app's own 2026-09-17
+  ruling (*"grey read as chrome on a grey page"*): both wore `--danger-soft` here, so the state that
+  needs an answer looked like the one that has gone wrong.
+  ⚠️ **«Even the colors» could not be taken literally, and the APP says why.** Its
+  `negotiate_tones.dart` carries the prototype's own greys with a note that they are *"private to the
+  negotiate flow"* and *"nothing else in the app should import this file"*; `palette-drift` forbids a
+  raw hex in `src/` at all. So each is the nearest house token - `--info` for the pending blue, a
+  slate in the ink family where the app is a shade cooler. The same trade every ported prototype in
+  this repo has made since 2026-09-06, and it is recorded at the rule rather than left to be noticed.
+  (13) **The options are always drawn, and they run ACROSS.** ~~A hidden column, revealed by pressing
+  «Choose another».~~ A press that reveals three chips buys nothing, and a column made a two-option
+  term as tall as its own card. ⚠️ Still withheld on «Keep my choice», which has no menu by
+  construction: the only alternative there is the value she already holds.
+  (14) **The quotation sits beside the history, on EVERY step.** It was a link at the foot of step ③,
+  so a renter pricing step ① had to walk forward twice to read what he was changing. They are the
+  footer's REFERENCE pair - what has happened, and what it adds up to.
+  (15) **The review's terms open by default.** A summary that hides what it summarises asks for a
+  press to do the one thing the step exists for.
+  🔴 **PINS: the sheet had ONE (`55`) and no parts**, so all fifteen notes had to be resolved by
+  quoting visible text - which is the round trip pins exist to save, and this is the surface he sends
+  the most notes about. **55.1 … 55.8** now: the sheet, the header, the three steps, the summary, the
+  open term card and the footer.
+  Files: `src/components/deal-room/DealRoom.tsx`, `deal-room-proto.css`, `src/lib/uiPins.ts`,
+  `docs/ui-{pins,surface-map}.md` (regenerated), `tests/unit/negotiation-sheet.test.ts` (5 cases
+  re-pointed to the reversals, 3 new; 28 passing).
+  ⚠️ **Five cases pinned rulings this batch withdrew and NONE was weakened**: the short code, the
+  step rail, the answers column, the paper's grey desk and the band count (4 → 3, because a band went).
+  Each is rewritten to the new rule in his words.
+  🔴 **An assertion failed on its own explanation for the NINTH time**, twice here: the deletion
+  note names `.ng-steps` while saying it is gone. The suite reads a comment-stripped copy of the
+  stylesheet now (`CSS_CODE`), which is the fix the component suites already use.
+  🔴 **The `FLOW` slice had to move and now ASSERTS ITS OWN ANCHOR.** It sliced from
+  `function CounterFlow(`, and the hoisted components sit above that line; a bare `indexOf` returning
+  -1 would have sliced from the END of the file and left every `not.toMatch` passing vacuously - the
+  trap logged for `cancel-confirmation` and the intake's class-string anchor.
+  ⚠️ Verified: typecheck clean, lint 0 errors, **308 passing** across the seven sheet, pin,
+  term-state, chat, palette and token suites. The hoist break-checked by putting `PriceCell` back in
+  the render body - it went red alone.
+  🔴 **NOT SEEN RENDERED.** The sheet needs a signed-in renter with a live deal room and a
+  supplier's standing round. Per item, the one thing to look at: the price box taking a whole number
+  without losing focus; the header reading «Gulf Co · Crawler Excavator · 20 ton» with the struck
+  original beside the total once he edits; the terms page with a blue pending card and a red conflict
+  one; and the options wrapping rather than overflowing on a term with six.
+  🔴 **`deal-room-quotation` is RED and it is NOT this batch**: proved by stashing
+  `src/lib/quotation/` - another session's in-flight edits to `render.ts` and `bid-quotation.ts` - and
+  watching the suite go green at 26 passing. Reported, not touched.
+
+- **2026-09-23 - The bid map, five notes: the verified tick was BLACK, two images did not fit their frames, the two document controls were two shapes, and the ask card named a machine with a tractor.**
+  Owner, one batch of five screenshots: *"make it green"*, *"make sure the images fti the circule or
+  the side rectangle"*, *"make the equipment documents the same style as company documents (same
+  corner rounding- and with >)"*, and on the ask card *"it is trash and the euqipment must show the
+  image or the fallback image used on the equipemtn card not this selly icon and the card must be
+  clean and organized"*.
+  **Four of the five were DEFECTS with a traceable cause, not preferences**, which is the only
+  interesting thing about this batch.
+  (1) 🔴 **`--verified` was never DECLARED.** The theme block mirrored `--color-verified` and
+  `VerifiedMark` filled its rosette with `var(--verified)`, but no `:root` ever defined the token —
+  so the whole chain resolved to an invalid value, `fill` fell back to its initial **BLACK**, and the
+  badge rendered as a dark blob on every surface that draws it. `#2f9e5c`, the value `--shop-ok`
+  already carried under the comment *"the verified tick"*, so the storefront's tick and this one are
+  one green.
+  ⚠️ **NOT `--ok`.** That is the app's «this went well», and `VerifiedMark`'s own header says a badge
+  drifting with a status colour stops being a badge.
+  🔴 **A comment cost 46 colours.** `ds-colors.test.ts` reads `:root` by slicing to the FIRST
+  occurrence of the theme directive's name — and the note explaining the fix mentioned it, which
+  truncated the block and made every token after it read as undefined. 76 cases went red on prose.
+  The comment now says so where the next person will meet it.
+  (2) 🔴 **`contain` fits a drawing to the BOUNDING SQUARE, and the marker is a CIRCLE.** A wide
+  excavator therefore touched the left and right edges exactly where the curve cuts in, and the rim
+  sliced its tracks and its boom off. The largest square inside a circle of diameter D has a side of
+  D/√2, which at 66px is 46.7: the drawing is inset **9px a side** and now sits within the curve
+  whatever its aspect. `center` replaces `center bottom`, an anchor that belonged to the
+  free-standing object this used to be and which pushed the drawing onto the rim.
+  ⚠️ The PHOTO arm keeps `inset: 0` and `cover`: a photograph has no transparent ground, so filling
+  the disc is what makes it read as a picture rather than a stamp in a ring. Same split as `fitOf`.
+  (3) 🔴 **A SURFACE RULE beat a COMPONENT's own invariant, and this is the second time in one
+  batch.** `.mp-viewer img { object-fit: cover }` is specificity 0-1-1; `PhotoPlaceholder`'s
+  `object-contain` utility is 0-1-0 — so the panel cropped the platform's own «No Equipment Photo
+  Available» artwork and cut its words off, which is precisely the broken-photograph look that
+  component's comment exists to prevent. Its fit is INLINE now, asserted once where the artwork is
+  rather than in each frame that holds it.
+  (4) **«Equipment documents» takes `.bm-docsentry`'s shape**: `--radius-lg` in place of
+  `--radius-sm`, and a chevron. The header one band up opens the FIRM's papers and this opens the
+  MACHINE's; they were a rounded pill with a `›` and a square tile without one, a row apart, for one
+  act. ⚠️ The chevron flips with the LOCALE rather than by a transform, which would mirror its
+  weight with it.
+  ⚠️ **The element in the screenshot was the SELECTED state** (`.bm-eq.on .bm-eq-open`, navy on
+  navy), which is why it read as a dark rectangle and not as the grey tile the resting card draws.
+  Worth writing down: the first search for it went to `.mp-tab` and would have restyled the wrong
+  control.
+  (5) **The ask card draws `MachineGlyph`**, the drawn side-on excavator every other no-artwork
+  surface falls back to. ~~`equipmentIcon(view.title)`.~~ That map takes a machine FAMILY to a glyph
+  NAME, and for anything it cannot place the answer is a tractor or the factory arm this product
+  retired — so the one surface that quotes a machine back to a supplier named it with a mark from
+  another industry. It joins the glyph's call-site contract; a case pins that it left the name-based
+  map's callers.
+  ⚠️ **The MAP's markers still take that map and must**: a `divIcon` is an HTML string, where a
+  React component cannot go. The split is recorded in both places.
+  **And the card's layout**, which is the «clean and organized» half: the title is clamped to TWO
+  lines instead of cut mid-word — «Case PC · Crawler Exc…» named a make with no machine after it,
+  inside a 240px column that also holds a 40px tile and a chevron. ⚠️ Clamped at two and never
+  uncapped: the column sits beside the ask's own sentence and the card takes the taller of the two.
+  ⚠️ **`-webkit-line-clamp` is inert without all three of `display: -webkit-box`, `-webkit-box-orient`
+  and `overflow: hidden`** — and inert here means an unclamped title growing the card, which is
+  worse than the clip it replaces.
+  ⚠️ The chevron is pinned to the column's TRAILING EDGE. It chased the ellipsis, so it read as part
+  of the truncated word rather than as the way into the machine.
+  Files: `src/app/globals.css` (`--verified`), `src/lib/ds-colors.ts`,
+  `src/components/map/map-proto.css`, `src/components/map/request-card.css`,
+  `src/components/map/RequestCard.tsx`, `src/components/map/EquipmentList.tsx`,
+  `src/components/Photo.tsx`, `tests/unit/machine-glyph.test.ts` (the ask card added to the
+  contract, 1 new case; 13 passing).
+  ⚠️ Verified: typecheck clean OF THIS WORK, lint 0 errors, **317 passing across eight map, glyph,
+  card and palette suites**.
+  🔴 **NOT SEEN RENDERED, and it should have been.** A specimen carrying the real `map-proto.css`
+  and `request-card.css` was built and served for exactly this — the ask card, both document
+  controls in all three states, the marker with a drawing and with the glyph, and the tick — and the
+  browser extension DISCONNECTED before the first screenshot. It is at
+  `scratchpad/mapbits.html`. The four causes above are each proved by reading (a missing token, a
+  specificity pair, the inscribed-square arithmetic, a glyph map's own fallback); the two-line title
+  and the 9px inset are the two that most want a look.
+  🔴 **ANOTHER SESSION IS WRITING TO THIS TREE, still.** `DealRoom.tsx` changed at 23:56 and
+  `ProfileView.tsx` at 00:06, and `git log` moved to `08114c92` mid-batch. `npm run typecheck`
+  currently reports three `onViewDetails` errors across `ProfileView.tsx` and `CompanyHub.tsx` —
+  their half-landed change, reported and NOT touched.
+
+- **2026-09-22 - An OFF-PLATFORM bid carries no «Counter this price», because it never could.**
+  Owner, on a picture of one that did: *"how offline bids has counter this pruce, remove"*.
+  🔴 **It was not merely wrong to OFFER — the press could not work, and said nothing when it
+  failed.** `openCounter` calls `ensureDealRoom(card.id)`, and an off-platform card's id is
+  `link-<submissionId>`: a `LinkBidSubmission`, which is **not a `Bid` row**, so the call 404s and
+  that function's `catch` swallows it by design (*"a failure leaves the renter where he is rather
+  than dumping him in a room he did not ask for"*). The renter pressed a full-width orange bar and
+  nothing happened, with nothing on screen saying why.
+  ⚠️ **And the band had nothing to say on such an offer anyway.** Every state it carries — «new
+  message», «awaiting the supplier», «offer updated», the counter itself — is a fact about a DEAL
+  ROOM, and an off-platform supplier has no account, no Stream channel and no room.
+  ⚠️ **The whole BUTTON is withheld rather than drawn dead.** `bandDead` is the terminal state of a
+  LIVE negotiation («Deal closed»), so a grey bar saying that over an offer nobody ever negotiated
+  would be a claim about a conversation that never happened.
+  ⚠️ **What the card keeps is what is real for him**: «View quote», and «Invite to Moedatech» —
+  which is the route by which this supplier could one day be countered at all, so the removal must
+  not take the way ONTO the platform with it. A case pins that.
+  ⚠️ **TWO enforcement points, the argument `bid-equipment-access.ts` already makes for the same
+  shape**: the band is not drawn, and `openCounter` refuses an off-platform bid anyway. An entry
+  point is not a boundary — the terms modal reaches that function too, and a later caller would
+  otherwise inherit a call that 404s in silence.
+  Files: `src/components/workspace/BidCards.tsx`,
+  `tests/unit/offline-bid-no-counter.test.ts` (new, 6).
+  🔴 **A POSITIVE CONTROL caught a vacuous slice while the suite was being written**, which is the
+  whole argument for having one: `CARD.indexOf("ensureDealRoom")` matched the file's own IMPORT, so
+  the slice ran backwards and gave an empty string that every assertion under it passed against. It
+  searches from the function's own offset now.
+  🔴 **And the first break-check came back GREEN, which is how the case got stronger.**
+  `{!offline && (` appears TWICE in this file — a header chip takes the same condition — so a
+  `toContain` on the bare guard survived the band's guard being deleted. The case anchors on the
+  band's own button now, and the re-run went red with the guard removed and green with it back.
+  ⚠️ Verified: typecheck clean, lint 0 errors, **133 passing across seven bid-card, inbox and
+  season suites**.
+  🔴 **NOT seen rendered.** The card needs a signed-in renter holding an off-platform submission,
+  and the change is the removal of one element from a card that has shipped for weeks otherwise
+  unchanged — so what is pinned is which element exists, by the cases above.
+
+- **2026-09-22 - Send Code stays in its disabled skin until the phone number has exactly 9 digits.**
+  Owner, on the sign-in modal: *"make the button orange only when the number is allowed to send"*.
+  The gate was `!digits.trim()`, so one keystroke lit it orange and the backend refused the short
+  number afterwards. Rule copied from the mobile app (`login_page.dart` `_canSubmit`: length == 9),
+  counted on digits only so spaces typed in the field do not count.
+  Files: `src/components/auth/PhoneEntry.tsx`.
+  ⚠️ `0501234567` (10 digits, leading zero) is refused, as it is in the app. Reaches the auth modal
+  AND the legacy `/login` page, which share `PhoneEntry`.
+
 - **2026-09-22 - The season says NOTHING in words on the bar, and every one of its greens goes a step darker.**
   Owner, with a picture of the mark: *"remove this and can u make the all greens color of the national
   day theme more darker? a little bit"*.
@@ -168,6 +414,73 @@ reversal, or the reason an odd-looking line is load-bearing.
   shared link and have no Stream channel, so there is nothing to open beside the list. They live
   per-request, as the empty state says.
 
+- **2026-09-23 - The bid map draws GOOGLE's map through the Maps JavaScript API; the Map Tiles attempt is withdrawn.**
+  Owner: *"why we cant use this"*. 🔴 ~~Map Tiles API (`createSession` + `2dtiles`)~~, the entry below:
+  every Google key we hold refuses it (web key and two app keys `API_KEY_SERVICE_BLOCKED`, the fourth
+  `SERVICE_DISABLED`), and enabling it is a Google Cloud change nobody here can make. The app is not a
+  counter-example: it uses the Maps SDK for phones, a different service web pages cannot use.
+  Now `GoogleBase` loads the Maps JavaScript API with the web key (the service that already draws the
+  location picker, reusing its `gmaps-js` script tag) and `leaflet.gridlayer.googlemutant` (new
+  dependency, 0.16.0, Beerware licence) renders it under Leaflet, so markers, routes and chips are
+  unchanged. Esri stays until Google is ready, and comes back on `gm_authFailure` or a load error.
+  ⚠️ Not seen running: this machine has no key and the key is restricted to our domains, so the check
+  is on staging after deploy (Google map under the pins = working; Esri = refused).
+  Files: `src/components/map/MapCanvas.tsx`, `src/types/leaflet-googlemutant.d.ts` (new),
+  `package.json`, `package-lock.json`.
+- **2026-09-23 - A web logo uploader: the quotation's «Add a logo» opens it on the profile, and «Verify your company» opens verification.**
+  Owner: *"yes add"*. The app uploads from its quotation (`renter_record_cta.dart`); the web's quotation
+  is a separate tab, so its asks link to `/profile?logo=1` / `?verify=1` and `ProfileView` opens
+  `CompanyLogoModal` / `VerifyModal`, then drops the param so a reload does not reopen it. Unverified
+  renters asking for `?logo=1` get verification instead, the app's order. The deal room's prompt links
+  the same two places now.
+  ⚠️ **`PUT /profile/me` requires the four names** (`updateProfileSchema` extends `completeProfileSchema`),
+  so the dialog sends the renter's current values with the key; the web proxy passes `companyLogoKey`
+  only when sent. The downscale/upload moved into `src/lib/company-logo.ts` and `CompanyIdentityModal`
+  uses it too, so there is one copy. Pin 73.
+  Files: `src/lib/company-logo.ts` (new), `src/components/company/CompanyLogoModal.tsx` (new),
+  `src/components/profile/ProfileView.tsx`, `src/components/onboarding/CompanyIdentityModal.tsx`,
+  `src/app/api/me/profile/route.ts`, `src/components/workspace/RequestsWorkspace.tsx`,
+  `src/components/deal-room/DealRoom.tsx`, `src/lib/i18n/{en,ar}.ts`, `src/lib/uiPins.ts`.
+- **2026-09-23 - The workspace quotation: the supplier's logo loads, the renter is asked for his logo or his verification, and the page has Download PDF and Share.**
+  Owner: *"why logo not shown, also it doesnt show option to download or share + in the app a
+  quotation will ask a renter to add his logo in the empty logo slot or ask him to verify his company"*.
+  🔴 **The broken logo was an UNSIGNED link.** The bid projection carries the supplier's mark as a bare
+  storage key; `mediaUrl` joins it to the private bucket and S3 answers 403. The dashboard's avatar
+  loads because the received-bids list carries it SIGNED. The workspace now keeps those signed links
+  (`logoByBid`) and hands them in, and `bid-quotation.ts` lets the caller's link win over the bid's.
+  A mark that still fails is removed (`onerror`), never drawn broken. The stale "BidCard carries no
+  logo" note is corrected in place.
+  **The app's asks** (`renter_record_cta.dart`): unverified, a red «Verify your company» where the tick
+  goes; verified with no mark, a red «Add a logo» in the empty slot; the renter's own mark printed only
+  when verified. Screen only, dropped by `@media print`. ⚠️ Both link to `/profile`, as the deal room's
+  prompt does: the web has NO logo uploader for a verified renter (the app uploads in place, and
+  `PUT /profile/me` accepts `companyLogoKey`). That uploader is the follow-up.
+  **Download / Share**: `wrapQuotationPage({ tools })` draws both above the paper; Download is
+  print-to-PDF, Share passes the page as an .html file to the system share sheet and is shown only
+  where `navigator.canShare` accepts files. The workspace no longer auto-prints.
+  Files: `src/lib/quotation/{render,bid-quotation}.ts`, `src/components/workspace/RequestsWorkspace.tsx`,
+  `tests/unit/deal-room-quotation.test.ts`.
+- **2026-09-23 - The bid map's basemap is GOOGLE's roadmap, the app's map, with Esri as the fallback.**
+  Owner: *"check the map on the app what does it use and use it"*. The app uses `google_maps_flutter`.
+  The web keeps Leaflet and asks Google's Map Tiles API (`createSession`, then `2dtiles`) for the same
+  roadmap, in Arabic when the page is Arabic, with the key the web already ships
+  (`NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`, from `amplify.yml`). ⚠️ Scraped `mt*.google.com` tile URLs were
+  rejected: against Google's terms. ⚠️ **Needs the Map Tiles API enabled on that key** in Google Cloud;
+  until it is, or with no key (this machine has none, so it is UNTESTED against Google), `createSession`
+  fails and the map draws Esri, never blank. ⚠️ `main` "working" was the browser's cache: CARTO sends
+  tiles with a 180-day lifetime, and a fresh fetch with the production site as referer is watermarked too.
+  Files: `src/components/map/MapCanvas.tsx` (`useGoogleTiles`).
+- **2026-09-22 - The bid map's basemap is Esri World Street Map: CARTO's keyless tiles now carry an «API KEY REQUIRED» watermark.**
+  Owner, on staging and beta: *"critical issue that api key required"*. Not our deploy: a tile fetched
+  straight from `a.basemaps.cartocdn.com/rastertiles/voyager/...` comes back with the watermark in the
+  image, so every environment broke at once and no rollback would fix it.
+  🔴 ~~CARTO voyager~~. ⚠️ **OpenStreetMap standard was tried first and rejected**: its servers answered
+  the check with an «Access blocked» tile and their policy is for light use; the web's other two maps
+  (`MapLocationPicker`, `EquipmentLocationMap`) still load OSM and carry that risk. Esri is keyless,
+  labelled in Arabic and English over Riyadh, and pale enough for the canvas colours judged on voyager.
+  ⚠️ Esri's terms expect an ArcGIS account for production; the durable fix is a KEYED provider (CARTO,
+  Esri or Google Maps, which the app uses) and is an account decision. One `TileLayer` line to change.
+  Files: `src/components/map/MapCanvas.tsx`.
 - **2026-09-22 - The bid map page, one batch: photo fits the card, three weights, footer priced like the bid card, chat events as the app's grey pills, round photo markers, a white «Other bids» bar.**
   Owner, with three screenshots of `/bids/[id]/equipment`. What changed and the traps:
   🔴 **The footer mispriced the breakdown.** `BidMapWorkspace` never passed the request's START DATE to

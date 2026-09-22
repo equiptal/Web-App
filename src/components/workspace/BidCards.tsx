@@ -408,6 +408,11 @@ function BidCardTile({
    * `ensureDealRoom` throwing means no room, and no room means no sheet to open.
    */
   const openCounter = async () => {
+    /* ⚠️ **Two enforcement points that must agree**, the argument `bid-equipment-access.ts` makes
+       for the same shape: the band above is not drawn for an off-platform bid, and this refuses one
+       anyway. An entry point is not a boundary — the terms modal reaches this function too, and a
+       later caller would otherwise inherit a call that 404s in silence. */
+    if (offline) return;
     if (countering) return;
     setCountering(true);
     try {
@@ -803,6 +808,24 @@ function BidCardTile({
 
           ⚠️ Square corners: the CARD clips this to its own radius (`overflow-hidden` on the article).
           Rounding here too would put the corner in two places and they would drift. */}
+      {/* 🔴 **NO BAND ON AN OFF-PLATFORM BID** (owner, 2026-09-22, on a picture of one carrying
+          «Counter this price»: *"how offline bids has counter this pruce, remove"*).
+
+          It was not merely wrong to offer — it could not work. `openCounter` calls
+          `ensureDealRoom(card.id)`, and an off-platform card's id is `link-<submissionId>`: a
+          `LinkBidSubmission`, which is **not a `Bid` row**, so the call 404s and the catch swallows
+          it. The renter pressed a full-width orange bar and nothing happened, with no sign of why.
+
+          And there is nothing for the band to say on such an offer either. Every state it carries —
+          «new message», «awaiting the supplier», «offer updated», the counter itself — is a fact
+          about a DEAL ROOM, and an off-platform supplier has no account, no Stream channel and no
+          room. The card keeps the two acts that are real for him: «View quote» and «Invite to
+          Moedatech», which is the route by which he could one day be countered.
+
+          ⚠️ The whole BUTTON is withheld rather than drawn dead: `bandDead` is the terminal state
+          of a live negotiation («Deal closed»), and a grey bar saying that over an offer nobody ever
+          negotiated would be a claim about a conversation that never happened. */}
+      {!offline && (
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); if (!bandDead) void openCounter(); }}
@@ -831,6 +854,7 @@ function BidCardTile({
           </span>
         )}
       </button>
+      )}
 
       {termsOpen && (
         <BidTermsModal

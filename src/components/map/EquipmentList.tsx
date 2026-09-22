@@ -616,6 +616,14 @@ function EquipmentCard({
                   icon"*). The header one row up reads «Company documents»; this names the other
                   file, so the two controls say whose papers each one opens. */}
               {t.bidMap.eqDocuments}
+              {/* 🔴 **The same control, twice on one surface** (owner, 2026-09-22: *"make the
+                  equipment documents the same style as company documents (same corner rounding, and
+                  with >)"*). The header one band up opens the FIRM's papers and this opens the
+                  MACHINE's, and until now they were a rounded pill with a chevron and a square tile
+                  without one — two shapes for one act, a row apart.
+                  ⚠️ It flips with the LOCALE rather than being mirrored by a transform, which
+                  would mirror its weight with it. `.bm-docsentry-chev`'s own note says the same. */}
+              <span className="bm-eq-open-chev" aria-hidden="true">{ar ? "‹" : "›"}</span>
             </button>
           </div>
 

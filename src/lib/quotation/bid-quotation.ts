@@ -41,6 +41,7 @@ import {
   type QuotationDoc,
   type QuotationLineItem,
   type QuotationMoneyCell,
+  type QuotationParty,
   type QuotationPartyRow,
 } from "@/lib/quotation/render";
 
@@ -78,6 +79,12 @@ export interface QuotationRentee {
   email?: string | null;
   /** Party-verified — gates the green tick beside the party's NAME (app parity). */
   verified?: boolean;
+  /** The renter's own mark (`profile-status.companyLogoUrl`, presigned). Printed only beside a
+   *  VERIFIED renter, the app's rule (`renter_record_cta.dart`): a mark on file under an unverified
+   *  firm is not what the document shows, and the verify ask stands in its place. */
+  logoUrl?: string | null;
+  /** The screen-only asks on the renter's box — see `QuotationParty.asks`. */
+  asks?: QuotationParty["asks"];
 }
 
 export interface BuildBidQuotationInput {
@@ -99,9 +106,10 @@ export interface BuildBidQuotationInput {
    * The SUPPLIER's store mark, printed in its party box and in the navy footer (one logo, two slots,
    * exactly as the app does it).
    *
-   * 🔴 BACKEND, owed: `BidCard` carries no supplier logo. The received-bids projection has had
-   * `supplierLogoUrl` all along and the BID projection has not, so this arrives null today and both
-   * slots simply draw nothing — which is the app's own behaviour for a supplier with no mark.
+   * ~~🔴 BACKEND, owed: `BidCard` carries no supplier logo … so this arrives null today.~~ Corrected
+   * 2026-09-23: the bid projection DOES carry the mark, as a bare storage key, which becomes an
+   * unsigned 403 link (the broken box the owner saw). The received-bids list carries it SIGNED; pass
+   * that here and it wins over the bid's own.
    */
   supplierLogoUrl?: string | null;
   /** Issue date. Injectable so the document is deterministic under test. */
@@ -200,7 +208,13 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
   // ONE logo, TWO slots — the party box and the navy footer, exactly as the app draws it. The bid's
   // own store mark wins; the caller's override is the way a surface that already holds one (the
   // deal room, a store page) can hand it in without a second read.
-  const supLogo = sup.supplierLogoUrl ?? input.supplierLogoUrl ?? null;
+  //
+  // 🔴 The CALLER's mark wins now (owner, 2026-09-23: the supplier's slot drew a broken image). The
+  // bid projection carries a bare storage KEY, which `mediaUrl` turns into an UNSIGNED link to a
+  // private bucket (403); the received-bids list carries the same mark SIGNED, and a caller holding
+  // it hands it in here. The bid's own is the fallback, and a mark that still fails is removed by the
+  // renderer's `onerror` rather than drawn broken.
+  const supLogo = input.supplierLogoUrl ?? sup.supplierLogoUrl ?? null;
   const supplierRows = rows([
     [L("Address", "العنوان"), supAddress],
     [L("CR #", "س.ت"), supCr],
@@ -468,6 +482,8 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
       label: isAr ? "RENTER / المستأجر" : "RENTER",
       name: renteeName,
       verified: renteeVerified,
+      logoUrl: renteeVerified ? input.rentee.logoUrl ?? null : null,
+      asks: input.rentee.asks,
       rows: renteeRows,
     },
     lineItems,

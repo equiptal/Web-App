@@ -300,14 +300,14 @@ export function DealRoom({ id, onTitle, initialFlow }: {
               text: L("Your company is not verified yet, so this quotation carries your name without a mark.",
                       "لم يُوثّق ملف شركتك بعد، لذلك يحمل عرض السعر اسمك دون علامة."),
               actionLabel: L("Verify your company", "وثّق شركتك"),
-              href: `${window.location.origin}/profile`,
+              href: `${window.location.origin}/profile?verify=1`,
             };
           } else if (!u.companyLogoUrl) {
             ownerPrompt = {
               text: L("Your company has no logo on file, so this quotation shows your name alone.",
                       "لا يوجد شعار لشركتك، لذلك يظهر اسمك وحده على عرض السعر."),
               actionLabel: L("Add your logo", "أضف شعارك"),
-              href: `${window.location.origin}/profile`,
+              href: `${window.location.origin}/profile?logo=1`,
             };
           }
         }
@@ -1321,6 +1321,67 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
  * Accept is preceded by a binding-commitment warning. Nothing is submitted until the final CTA — the
  * parent's `submitCounter`/`doAccept` do the batched term + rate/accept-all call.
  */
+/* 🔴 **These two live at MODULE scope, and that is a BUG FIX rather than tidying**
+ * (owner, 2026-09-22: *"there is a bug that i cant write into price box it takes me out after each
+ * character"*).
+ *
+ * They were declared inside `CounterFlow`'s body. A component defined in a render body is a NEW
+ * function identity on every render, and React compares types by identity - so each keystroke
+ * unmounted the whole subtree and mounted a fresh one, destroying the `<input>` that held the
+ * caret. The renter typed one character and the focus was gone with the node.
+ *
+ * ⚠️ **It cannot be fixed by memoising the parent or the value.** The identity changes
+ * because the declaration is re-evaluated; nothing downstream can make React treat two different
+ * function objects as the same type. Hoisting is the fix, and everything the two closed over is a
+ * prop now.
+ *
+ * ⚠️ **Any component that renders an input must never be declared in a render body.** The
+ * rule is general - this file has three more inline components and they are safe only because
+ * nothing inside them holds focus.
+ */
+
+/** The count stepper, on the prototype's own 18px squares. */
+function Qty({ value, min, max, onChange, live }: { value: number; min: number; max: number; onChange: (v: number) => void; live: boolean }) {
+  return (
+    <span className="ng-qty">
+      <button type="button" disabled={!live || value <= min} onClick={() => onChange(Math.max(min, value - 1))}>−</button>
+      <b>{value}</b>
+      <button type="button" disabled={!live || value >= max} onClick={() => onChange(Math.min(max, value + 1))}>+</button>
+    </span>
+  );
+}
+
+/**
+ * One money cell. 🔴 Its COLOURS are the state: green while the figure still matches the
+ * supplier's standing offer, amber the moment it is edited, and the «Supplier: N» line under it
+ * turns with them. That is the whole of how the prototype says "you have moved this".
+ */
+function PriceCell({ val, onChange, refVal, live, supplierWord }: {
+  val: string; onChange: (s: string) => void; refVal: number | null; live: boolean; supplierWord: string;
+}) {
+  const edited = changedFrom(numOf(val), refVal);
+  if (!live) return <div className="ng-price"><b>{nf(numOf(val))}</b></div>;
+  return (
+    <div className={`ng-price${edited ? " edited" : ""}`}>
+      <input type="number" inputMode="numeric" min={0} value={val} placeholder="0" onChange={(e) => onChange(e.target.value)} />
+      {refVal != null && <div className="ref">{supplierWord}: {nf(refVal)}</div>}
+    </div>
+  );
+}
+
+/** ⚠️ ONE comparator for «has this moved off the supplier's figure», shared by the cell's own
+ *  skin and by anything else that asks. It rounds both ends: the input is a string and a trailing
+ *  `.0` is not a change anybody made. */
+function changedFrom(cur: number, ref: number | null): boolean {
+  return ref != null && Math.round(cur) !== Math.round(ref);
+}
+
+/** The body's own `num`, at module scope so {@link PriceCell} can read it. */
+function numOf(s: string): number {
+  const n = Number(s);
+  return s.trim() !== "" && !Number.isNaN(n) && n >= 0 ? n : 0;
+}
+
 function CounterFlow({
   mode, room, ar, L, busy, error,
   resolutions, onResolveLocal, onReopenLocal, unresolvedCount,
@@ -1436,7 +1497,12 @@ function CounterFlow({
   // Confirm before a leg (delivery/return) is excluded from the offer — reversible, but the app confirms.
   const [pendingEx, setPendingEx] = useState<null | { title: string; onYes: () => void }>(null);
   // Quotation-paper UI-only state (spec §6): collapsible دليل البنود categories + the السجل log modal.
-  const [guideOpen, setGuideOpen] = useState<Record<string, boolean>>({});
+  /* 🔴 **The review's term list starts OPEN** (owner, 2026-09-22: *"for the summary and review
+     also structure the terms cleanly and make them open at first not closed"*). ~~`{}`, so every
+     section read `?? false` and the reader met a closed accordion on the step whose whole job is
+     to let him check the position before he sends it.~~ A summary that hides what it summarises
+     asks for a press to do the one thing the step exists for. */
+  const [guideOpen, setGuideOpen] = useState<Record<string, boolean>>({ all: true });
   const [logOpen, setLogOpen] = useState(false);
   const [logTab, setLogTab] = useState<"all" | "price" | "terms">("all");
   /** The send's own refusal, said in place rather than as a toast: the press reached a button that
@@ -1445,6 +1511,16 @@ function CounterFlow({
 
   const num = (s: string) => { const n = Number(s); return s.trim() !== "" && !Number.isNaN(n) && n >= 0 ? n : 0; };
   const rate = editable ? num(rateStr) : (room.rate ?? 0);
+
+  /* ⚠️ **The machine, for the header** (item 7). Same pair the room's own top bar reads, and
+     the same fallbacks - a room whose taxonomy names never arrived still has a name to show. The
+     size rides the same run because a 20-ton and a 30-ton excavator are two different
+     negotiations. */
+  const machineLine = [
+    (ar ? room.details.equipmentLabelAr || room.details.equipmentLabel : room.details.equipmentLabel) || null,
+    (ar ? room.details.equipmentSizeAr || room.details.equipmentSize : room.details.equipmentSize) || null,
+  ].filter(Boolean).join(" · ") || null;
+
   const mob = editable ? num(mobStr) : (room.mobPrice ?? 0);
   const demob = editable ? num(demobStr) : (room.demobPrice ?? 0);
   const rateValid = rate > 0;
@@ -1656,10 +1732,19 @@ function CounterFlow({
   //
   // A FIXED term needs no such line: locked means the value came from the renter's own request and
   // was accepted by the act of bidding, which the lock already says.
+  /* 🔴 **«supplier's declaration» is GONE from a pending card** (owner, 2026-09-22: *"for terms
+     pending remove this supplier's declaration"*). ~~The three-way provenance line.~~ On a pending
+     row the card ALREADY names both sides one line below - «Your choice: X · Supplier: Y» - so the
+     note repeated the half the reader had just read, in smaller grey type, directly under the
+     term's own name. It was answering «whose value is this» on the one card that answers it twice
+     over.
+     ⚠️ The OTHER two survive, and they are not the same fact. «from your request» and
+     «platform default» name a value the side row does NOT carry: the side row states what each
+     party WANTS, and those two say where a value with no party behind it came from. */
   const srcNote = (t: DealTerm): string | null => {
     if (t.state === "fixed") return null;
+    if (t.source === "supplier_declared") return null;
     return t.source === "rentee_fixed" ? L("from your request", "من طلبك")
-      : t.source === "supplier_declared" ? L("supplier's declaration", "إقرار المورد")
       : L("platform default", "الافتراضي");
   };
 
@@ -1703,6 +1788,13 @@ function CounterFlow({
   // "Supplier: {price}" references — read the supplier's own round (app parity: otherSide.rate/mobPrice/
   // demobPrice), falling back to the room columns, exactly like the "Supplier: N units" refs beside them.
   const refRate = supRound?.rate ?? room.rate;
+
+  /* ⚠️ **`null` until the renter has actually moved the figure** (item 8). `rate` is the
+     supplier's standing rate while the box is untouched, so a before/after pair drawn from the
+     start would show one number struck through beside itself. `changedFrom` is the same rounding
+     comparator the price cells paint with, so the bar and the cell cannot disagree about whether
+     anything moved. */
+  const counterRate = editable && changedFrom(num(rateStr), refRate) ? num(rateStr) : null;
   const refMobPrice = supRound?.mobPrice ?? room.mobPrice;
   const refDemobPrice = supRound?.demobPrice ?? room.demobPrice;
   /**
@@ -1729,7 +1821,6 @@ function CounterFlow({
 
   /* 🔴 ~~`STEP_NAMES` — the caption inside the `‹ step ›` switcher.~~ Gone with the switcher: every
      footer control names its own destination now, so nothing has to name where you are. */
-  const changedFrom = (cur: number, ref: number | null) => ref != null && Math.round(cur) !== Math.round(ref);
 
   /* 🔴 ~~`theirsIsLatest` — «🔔 New offer from the supplier» over the header figure, and ONLY
      then.~~ **REMOVED 2026-09-22, following the app's own removal of 2026-09-19** on the owner's
@@ -1739,30 +1830,6 @@ function CounterFlow({
      on the app side too. The turn cue itself is not lost — the ROOM's price bar still draws
      «🔔 New reply» on `supplierCountered`, which is where a renter meets it before opening this. */
 
-  /** The count stepper, on the prototype's own 18px squares. */
-  const Qty = ({ value, min, max, onChange, live }: { value: number; min: number; max: number; onChange: (v: number) => void; live: boolean }) => (
-    <span className="ng-qty">
-      <button type="button" disabled={!live || value <= min} onClick={() => onChange(Math.max(min, value - 1))}>−</button>
-      <b>{value}</b>
-      <button type="button" disabled={!live || value >= max} onClick={() => onChange(Math.min(max, value + 1))}>+</button>
-    </span>
-  );
-
-  /**
-   * One money cell. 🔴 Its COLOURS are the state: green while the figure still matches the supplier's
-   * standing offer, amber the moment it is edited, and the «Supplier: N» line under it turns with
-   * them. That is the whole of how the prototype says "you have moved this".
-   */
-  const PriceCell = ({ val, onChange, ref: refVal, live }: { val: string; onChange: (s: string) => void; ref: number | null; live: boolean }) => {
-    const edited = refVal != null && changedFrom(num(val), refVal);
-    if (!live) return <div className="ng-price"><b>{nf(num(val))}</b></div>;
-    return (
-      <div className={`ng-price${edited ? " edited" : ""}`}>
-        <input type="number" inputMode="numeric" min={0} value={val} placeholder="0" onChange={(e) => onChange(e.target.value)} />
-        {refVal != null && <div className="ref">{L("Supplier", "المورد")}: {nf(refVal)}</div>}
-      </div>
-    );
-  };
 
   /** One line of the price table: the machine, then each transport leg. */
   const priceRow = (o: {
@@ -1781,7 +1848,7 @@ function CounterFlow({
       <span className="lbl" title={o.label}>{o.label}</span>
       <span className="dur">{o.duration}{o.durationSub ? <span className="sub">{o.durationSub}</span> : null}</span>
       {o.excluded ? <span className="out">{L("Excluded", "مستبعد")}</span> : <Qty value={o.qty} min={o.qtyMin} max={o.qtyMax} onChange={o.onQty} live={editable} />}
-      {o.excluded ? <span className="out">—</span> : <PriceCell val={o.val} onChange={o.onVal} ref={o.refVal} live={editable} />}
+      {o.excluded ? <span className="out">—</span> : <PriceCell val={o.val} onChange={o.onVal} refVal={o.refVal} live={editable} supplierWord={L("Supplier", "المورد")} />}
     </div>
   );
 
@@ -1928,8 +1995,12 @@ function CounterFlow({
     /** «Keep my choice» has no menu to open: it settles on the value already held. */
     const keepMine = conflict && opts.length <= 2;
     const myVal = d.chosen ?? t.renteePreference;
+    /* ⚠️ The card names its STATE, so the stylesheet can paint the two apart: red for a clash,
+       the app's blue for a term nobody has answered (owner, 2026-09-22, on the app's own
+       `negotiate_tones.dart`). `picking` no longer carries a colour of its own - opening the
+       options on a pending term does not make it a conflict, which is what the shared red said. */
     return (
-      <div key={t.key} className={`ng-t now${conflict ? " clash" : ""}${open ? " picking" : ""}`}>
+      <div key={t.key} {...pin("ng-term-card")} className={`ng-t now${conflict ? " clash" : " pending"}${open ? " picking" : ""}`}>
         <div className="h">
           <span className="k">{label}{notes && <span className="why">{notes}</span>}</span>
           <span className="side">{L("Your choice", "اختيارك")}: <b>{myVal != null && String(myVal) !== "" ? tval(t, myVal) : L("not set", "غير محدد")}</b> · {L("Supplier", "المورد")}: <b>{tval(t, t.supplierDeclared)}</b></span>
@@ -1939,9 +2010,20 @@ function CounterFlow({
             <div className="acts">
               <button type="button" className="change" disabled={keepMine && (myVal == null || String(myVal) === "")}
                 onClick={() => { if (keepMine) { onResolveLocal(t.key, "counter", myVal); setOpenTerm(null); setForcedTerm(null); } else setOpenTerm(open ? null : t.key); }}>{changeLabel}</button>
-              <button type="button" className="take" disabled={supStr(t) == null} onClick={() => { onResolveLocal(t.key, "accept"); setOpenTerm(null); setForcedTerm(null); }}>{L("Take theirs", "قبول")}</button>
+              {/* 🔴 **«Accept», the APP's own word** (owner, 2026-09-22: *"follow the app in the langiage
+                  of the buttons"*). ~~«Take theirs».~~ The app calls it `dealRoomAccept` - «Accept» /
+                  «قبول» - and the Arabic here was ALREADY «قبول», so the two locales were saying
+                  different things about one button. */}
+              <button type="button" className="take" disabled={supStr(t) == null} onClick={() => { onResolveLocal(t.key, "accept"); setOpenTerm(null); setForcedTerm(null); }}>{L("Accept", "قبول")}</button>
             </div>
-            {open && !keepMine && (
+            {/* 🔴 **The options stand OPEN, and they run ACROSS** (owner, 2026-09-22: *"alwasy
+                show other options if he chose 'choose another' to be shown horizantaly not
+                vertically"*). ~~Hidden until the button was pressed, then a column.~~ A press to
+                reveal a list of three chips is a press that buys nothing, and a column of them
+                made a two-option term as tall as the card it sits in. `.opts` wraps in a row now.
+                ⚠️ Still withheld on «Keep my choice», which has no menu by construction:
+                the only alternative there is the value she already holds. */}
+            {!keepMine && opts.length > 0 && (
               <div className="opts">
                 {opts.map((o) => (
                   <button key={o.value} type="button" className={o.value === (myVal != null ? String(myVal) : supStr(t)) ? "on" : undefined}
@@ -2053,11 +2135,10 @@ function CounterFlow({
     return termCard(t, answered ? "done" : "now");
   };
 
-  const quotationHref = `/deal-room/${room.id}`;
 
   return (
     <div className="qp-scrim" dir={ar ? "rtl" : "ltr"} onClick={() => !busy && onClose()}>
-      <div className="ng-shell" onClick={(e) => e.stopPropagation()}>
+      <div {...pin("ng-sheet")} className="ng-shell" onClick={(e) => e.stopPropagation()}>
         {/* ── header: who is on the other side, and the RATE ──────────────────────────────────
             🔴 **THE RATE, exactly as the bid card and the room's price bar print it** — no VAT, no
             duration, no unit count (app parity, 2026-09-20: *"show the price at top header without
@@ -2074,18 +2155,39 @@ function CounterFlow({
             page carried it and the redesign dropped the block whole, leaving NO reference anywhere
             in the sheet — a renter negotiating several deals with one firm had only the firm's name
             to tell the sheets apart. Under the name, not beside it: the name is looked for first. */}
-        <div className="ng-head">
+        <div {...pin("ng-sheet-head")} className="ng-head">
           <div className="ng-inner">
+          {/* 🔴 **The firm, then the MACHINE** (owner, 2026-09-22: *"for the header keep company
+              name of supplier with equuoment name ans size dont mention request id"*).
+              ~~The supplier's name over the request's short code.~~ That code answers a question
+              nobody asks inside a sheet they opened FROM the request: he is negotiating one
+              machine with one firm, and on a multi-item room the code cannot even say which line
+              he is on. The machine and its size can.
+              ⚠️ **This reverses the same morning's «the short code is restored under the
+              name»**, which put it back because the redesign had left no reference anywhere in the
+              sheet. It is still reachable - the log, the quotation and the room behind all carry
+              it - and his instruction is explicit. */}
           <div className="ng-party">
             <span className="ng-ava">{room.supplier.name.charAt(0).toUpperCase()}</span>
             <span className="ng-who">
               <b title={room.supplier.name}>{room.supplier.name}</b>
-              {room.shortCode && <span className="ref">{room.shortCode}</span>}
+              {machineLine && <span className="ref" title={machineLine}>{machineLine}</span>}
             </span>
           </div>
           <div className="ng-head-l">
             {/* Money reads left-to-right in both locales. */}
-            <div className="ng-net" dir="ltr">{nf(rate)} <span className="cur">{sar}</span><span className="per">/{periodLabel}</span></div>
+            {/* 🔴 **BEFORE → AFTER, the way the app's chat counter card reads it** (owner,
+                2026-09-22: *"the price here will take the original bid then if new offer sent will
+                show before and after like the price -counter in the app chat"*).
+                The figure starts as the SUPPLIER's standing rate and stays that until the renter
+                moves it; from then on both are on the bar, his own leading, with the original
+                struck through beside it. One place, always in view while he edits - which is why
+                it is here rather than on each row, where the green/amber «Supplier: N» line
+                already says the same thing per leg. */}
+            <div className="ng-net" dir="ltr">
+              {counterRate != null && <span className="was">{nf(rate)}</span>}
+              {nf(counterRate ?? rate)} <span className="cur">{sar}</span><span className="per">/{periodLabel}</span>
+            </div>
             {settledNote && (
               <div className={`ng-note${room.status === "ABANDONED" ? " danger" : ""}`}>
                 <span className="material-icons-outlined">{room.status === "ABANDONED" ? "cancel" : room.status === "CLOSED" ? "verified" : "schedule"}</span>
@@ -2097,33 +2199,21 @@ function CounterFlow({
           </div>
         </div>
 
-        {/* ① Price —— ② Terms —— ③ Review (owner, 2026-09-22: *"i want the previosu 3 sheets style
-            layout ... for the frame and general layout"*, pointing at `main` / `beta`).
-
-            🔴 **It is what makes three pages read as three SHEETS.** Without it the only thing naming
-            the step was the footer's own button, and that says where you are GOING, never where you
-            are — so a renter on the terms page had nothing telling him a review still followed.
-            ⚠️ Not pressable. The footer walks the steps and refuses on a gap (`canNext`); a rail that
-            jumped a renter past an unanswered price would be a second route with none of the gates. */}
-        <div className="ng-steps" aria-hidden="true">
-          <div className="ng-inner">
-            {[L("Price", "السعر"), L("Terms", "الشروط"), L("Review", "المراجعة")].map((label, i) => (
-              <Fragment key={label}>
-                {i > 0 && <span className={`bar${i <= page ? " done" : ""}`} />}
-                <span className={`ng-step${i === page ? " on" : i < page ? " done" : ""}`}>
-                  <span className="badge">{i < page ? "✓" : i + 1}</span>
-                  <span className="lbl">{label}</span>
-                </span>
-              </Fragment>
-            ))}
-          </div>
-        </div>
+        {/* 🔴 **NO STEP RAIL** (owner, 2026-09-22: *"remove the 3 steps process bar"*).
+            ~~① Price —— ② Terms —— ③ Review, a band under the header, argued that morning as
+            «what makes three pages read as three SHEETS».~~ It cost a whole band of a sheet whose
+            body is the thing worth reading, and it was `aria-hidden` and unpressable - so it was
+            decoration that took height from the content.
+            ⚠️ **The FOOTER carries the step now, and that was his pick** when the cost was put
+            to him: «Next: Terms» / «Review & send» / «Send to the supplier». It names where the
+            press GOES rather than where the reader is, which is the half the rail used to add;
+            he took that trade explicitly rather than a heading standing in for it. */}
 
         <div className="ng-body">
           <div className="ng-inner">
           {/* ── ① the price ─────────────────────────────────────────────────────────────────── */}
           {page === 0 && (
-            <>
+            <div {...pin("ng-sheet-price")}>
               {showCompare && (
                 <div className="ng-pad">{compareCard()}</div>
               )}
@@ -2186,7 +2276,7 @@ function CounterFlow({
                     legal position — and a single multiplier at the end cannot describe that. When
                     they diverge the block keeps its per-leg totals, which are the only honest shape
                     for it. The bid card never faces this: a bid carries one count. */}
-                <div className="ng-sum">
+                <div {...pin("ng-sheet-sum")} className="ng-sum">
                   <div className="item">
                     <span className="lbl">{room.details.equipmentLabel ?? L("Base rental", "الإيجار الأساسي")}{hasDuration ? ` · ${rentalDays} ${L("days", "يوم")}` : ""}
                       {factorLine("rental") && <span className="fx">{factorLine("rental")}</span>}
@@ -2225,12 +2315,12 @@ function CounterFlow({
                 {payTerms.length > 0 && <div style={{ padding: "0 16px 14px" }}>{payTerms.map(payCard)}</div>}
                 {editable && !rateValid && <p className="ng-err" style={{ padding: "0 16px 14px" }}>{L("Enter a rate to continue", "أدخل سعرًا للمتابعة")}</p>}
               </div>
-            </>
+            </div>
           )}
 
           {/* ── ② the terms ─────────────────────────────────────────────────────────────────── */}
           {page === 1 && (
-            <div className="ng-card pad">
+            <div {...pin("ng-sheet-terms")} className="ng-card pad">
               {operatingTerms.length === 0 ? (
                 <p style={{ padding: "20px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>{L("No operating terms.", "لا توجد شروط تشغيل.")}</p>
               ) : (
@@ -2288,7 +2378,7 @@ function CounterFlow({
 
           {/* ── ③ the review ────────────────────────────────────────────────────────────────── */}
           {page === 2 && (
-            <div className="ng-pad" style={{ paddingBottom: 14 }}>
+            <div {...pin("ng-sheet-review")} className="ng-pad" style={{ paddingBottom: 14 }}>
               <div className="ng-rcard">
                 <div className="ng-rcard-h"><span className="material-icons-outlined">receipt_long</span>{L("The price you are sending", "السعر الذي سترسله")}</div>
                 <div className="ng-rbody">
@@ -2341,11 +2431,11 @@ function CounterFlow({
                         <div className="df" style={{ width: pct(diff) }} />
                         <div className="pd" style={{ width: pct(pend) }} />
                       </div>
-                      <button type="button" className="ng-guide-h" onClick={() => setGuideOpen((g) => ({ ...g, all: !(g.all ?? false) }))} aria-expanded={guideOpen.all ?? false}>
+                      <button type="button" className="ng-guide-h" onClick={() => setGuideOpen((g) => ({ ...g, all: !(g.all ?? true) }))} aria-expanded={guideOpen.all ?? true}>
                         <span>{L("Matched", "متوافقة")}</span>
                         <span className={`material-icons-outlined chev${guideOpen.all ? " open" : ""}`}>expand_more</span>
                       </button>
-                      {(guideOpen.all ?? false) && operatingTerms.map((t) => { const s = status(t); return (
+                      {(guideOpen.all ?? true) && operatingTerms.map((t) => { const s = status(t); return (
                         <div key={t.key} className="ng-gnrow"><span className="k">{ar ? t.labelAr : t.label}</span><span className={`ng-gst ${s}`}>{word(s)}</span></div>
                       ); })}
                     </div>
@@ -2353,13 +2443,6 @@ function CounterFlow({
                 );
               })()}
 
-              {/* The quotation, from step ③ — the renter reads the position back before he sends it
-                  (app parity: `_QuotationLink`). It opens the room's own document, which is the same
-                  paper the room's CTA opens; nothing is generated twice. */}
-              <a className="ng-quote" href={quotationHref} onClick={(e) => { e.preventDefault(); onOpenQuotation?.(); }}>
-                <span>{L("Read the quotation", "عرض السعر")}</span>
-                <span className="material-icons-outlined">chevron_left</span>
-              </a>
 
               {mode === "accept" && (
                 <div style={{ marginTop: 12 }}>
@@ -2403,11 +2486,23 @@ function CounterFlow({
             go; step ③ says who it goes to, because that is the fact a reader is about to act on.
             ⚠️ Navy, never the accept button's green: green on this sheet means «I take your
             position», and sending a reply is the opposite of that. */}
-        <div className="ng-foot">
+        <div {...pin("ng-sheet-foot")} className="ng-foot">
           <div className="ng-inner">
           <button type="button" className="ng-log" onClick={() => setLogOpen(true)} aria-label={L("Log", "السجل")} title={L("Log", "السجل")}>
             <span className="material-icons-outlined">history</span>
           </button>
+          {/* 🔴 **The quotation sits beside the history, on EVERY step** (owner, 2026-09-22:
+              *"always show the qoutation on the footer of this negotioation beside the history"*).
+              ~~A link at the foot of step ③ only.~~ The paper states the position he is building,
+              so a renter pricing step ① had to walk forward twice to read what he was changing.
+              ⚠️ Both are the footer's REFERENCE pair - what has happened, and what it adds up
+              to - and they sit at the leading edge, away from the acts at the trailing one. */}
+          {onOpenQuotation && (
+            <button type="button" className="ng-log ng-quote-btn" onClick={() => onOpenQuotation()}
+              aria-label={L("Read the quotation", "عرض السعر")} title={L("Read the quotation", "عرض السعر")}>
+              <span className="material-icons-outlined">description</span>
+            </button>
+          )}
           {page > 0 && (
             <button type="button" className="ng-back" disabled={busy} onClick={() => setPage((p) => (p - 1) as 0 | 1 | 2)}>{L("Back", "رجوع")}</button>
           )}

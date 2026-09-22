@@ -111,6 +111,24 @@
   /* ── Status ──────────────────────────────────────────────────────────────────────────────────
      Three tiers each, and the same fill/text split the brand has: `--warn` fills at 2.97:1 and
      `--warn-deep` is the amber that may carry text. */
+  /* 🔴 **THE VERIFIED BADGE'S GREEN, and it was never DECLARED** (owner, 2026-09-22, on a
+     picture of a BLACK tick beside a company name: *"make it green"*).
+     The theme block below mirrored `--color-verified` and `VerifiedMark` filled its rosette
+     with `var(--verified)`, but no `:root` ever defined it — so the whole chain resolved to an
+     invalid value, `fill` fell back to its initial BLACK, and the badge rendered as a dark blob
+     on every surface that draws it.
+     ⚠️ **It is NOT `--ok`.** That is the app's «this went well» and a badge that drifted with a
+     status colour would stop being a badge — `VerifiedMark`'s own header says so. This is the
+     value `--shop-ok` already carried under the comment *"the verified tick"*, so the storefront's
+     tick and this one are one green rather than two.
+     🔴 **The comment above may not contain the theme directive's own name**, for the reason this
+     one found the hard way: `ds-colors.test.ts` reads `:root` by slicing to the FIRST occurrence of
+     it, so a mention inside a comment truncates the block and every token after it reads as
+     undefined. 46 colours went missing over one word in prose.
+     ⚠️ `ds-colors.test.ts` walks every colour `:root` defines and requires `ds-colors.ts` to
+     name it, which is why that mirror moved in the same edit — and why a token declared in
+     neither slipped through unnoticed for as long as it did. */
+  --verified: #2f9e5c;
   --ok: #1d9e55;             /* OS `success` */
   --ok-soft: #e2efe7;        /* OS `success-bg` */
   --ok-deep: #1d7a45;        /* OS `success-ink` */

@@ -23,13 +23,13 @@
  * file holds no copy and no derivation.
  */
 
-import { equipmentIcon } from "@/components/requests/EquipImg";
 import { companyInitials } from "@/components/map/panel/machine-panel-model";
 import type { RequestCardView } from "@/lib/contract/request-card";
 /* The card's own chrome travels WITH it. These rules were `.bidmap`-scoped in `map-proto.css` until
    the owner put the same card in `/deal-room/[id]` (2026-08-11) — a surface that is not `.bidmap`,
    where the shared markup therefore painted as unstyled text. See `request-card.css`. */
 import "@/components/map/request-card.css";
+import { MachineGlyph } from "@/components/MachineGlyph";
 import { pin } from "@/lib/uiPins";
 
 export interface RequestCardProps {
@@ -87,7 +87,8 @@ export function RequestCard({
      The card showed the same gold `precision_manufacturing` tile on every machine — a robot arm on an
      excavator — because the fallback named one glyph for the whole taxonomy. It now walks the same
      chain the rest of the feature walks (`EquipImg`, and `MapCanvas` for the pins): the unit's own
-     photo when its file has one, else the icon `equipmentIcon` derives from what the machine IS.
+     photo when its file has one, else `MachineGlyph` — the drawn excavator every other
+ *     no-artwork surface falls back to.
 
      The name it derives from is the card's own title — `model · spec`, whose spec half is the
      subcategory the fleet row carries — so the icon is keyed to the same words the reader sees. The
@@ -115,7 +116,19 @@ export function RequestCard({
              the same title the strip prints, which since 2026-09-08 is the firm's real name. */
           <span className="bm-rq-initials">{companyInitials(view.title)}</span>
         ) : (
-          <span className="material-icons-outlined">{equipmentIcon(view.title)}</span>
+          /* 🔴 **The equipment card's own fallback, never a Material glyph** (owner, 2026-09-22:
+             *"the euqipment must show the image or the fallback image used on the equipemtn card
+             not this selly icon"*). That map takes a machine FAMILY to a glyph NAME, and for
+             anything it cannot place the answer is a tractor or the factory arm this product
+             retired on 2026-09-22 — a mark from a different industry standing in for an
+             excavator.
+             ⚠️ `MachineGlyph` is the drawn side-on excavator every other no-artwork surface
+             falls back to (the rail's disc, the details modal, the item tier, the machine card),
+             so a machine with no picture looks the same here as it does there. It paints with
+             `currentColor`, which is what lets the tile keep its own ink.
+             ⚠️ The MAP's markers still take the name-based map, and must: a `divIcon` is an
+             HTML string, where a React component cannot go. That split is recorded there. */
+          <MachineGlyph size={20} />
         )}
       </span>
       <span className="bm-rq-who">
