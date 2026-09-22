@@ -630,28 +630,9 @@ export function ProjectPills() {
                   }
                 />
                 )}
-                {shown(terms.operator?.nationality) && (
-                <PillSelect<string>
-                  label={t.projects.pills.nationality}
-                  value={terms.operator?.nationality ?? null}
-                  options={["any", "restricted"]}
-                  optionLabel={(v) =>
-                    v === "any" ? t.create.operatorCard.nationalityAny : t.create.operatorCard.nationalityRestricted
-                  }
-                  changed={dirty("preferences.operator_nationality")}
-                  onRemove={() =>
-                    actions.patchTerms({ operator: { ...terms.operator, nationality: null } }, ["preferences.operator_nationality"])
-                  }
-                  onChange={(v) =>
-                    actions.patchTerms(
-                      /* Leaving «restricted» drops the list with it: a stale set of nationalities on a
-                         request that now accepts any would ride to the supplier unseen. */
-                      { operator: { ...terms.operator, nationality: v, ...(v === "any" ? { nationalityCustom: null } : {}) } },
-                      ["preferences.operator_nationality"],
-                    )
-                  }
-                />
-                )}
+                {/* 🔴 ~~The nationality pill.~~ Hidden on every surface (2026-09-22) — see
+                    `term-visibility.ts`. It was drawn only once answered, so on a NEW request it is
+                    simply never reached; on an OLD one the value survives and is no longer shown. */}
                 {shown(terms.operator?.certificate?.[0]) && (
                 <PillSelect<string>
                   label={t.projects.pills.opCerts}

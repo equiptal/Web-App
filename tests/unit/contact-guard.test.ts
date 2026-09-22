@@ -114,9 +114,26 @@ describe("where the guard runs", () => {
      loudest control on a privacy warning was the one that ignores it. */
   it("paints the warning red with the quiet way out", () => {
     const modal = DOCK.slice(DOCK.indexOf("{contactAsk && ("));
-    expect(modal).toContain("dl-modal-ic danger");
-    expect(modal).toContain('color: "var(--danger)"');
+    expect(modal).toContain('className="text-danger"'); // the mark beside the title
+    expect(modal).toContain("text-body font-semibold text-danger"); // and the sentence itself
     // The way OUT sits first, the dismissal last and filled.
     expect(modal.indexOf("Share anyway")).toBeLessThan(modal.indexOf('L("Got it"'));
+  });
+
+  /**
+   * 🔴 **The escape hatch is the QUIET red, never `tone="danger"`.** That tone is a solid red fill,
+   * which would once again make the loudest control on a privacy warning the one that ignores it —
+   * the fault the app corrected on 2026-09-20. It is a ghost button wearing the soft red, and the
+   * dismissal is the one that reads as primary.
+   */
+  it("uses the design system's dialog, and keeps the safe action primary", () => {
+    /* ⚠️ COMMENTS STRIPPED. The component's own note names `tone="danger"` while saying it must not
+       be used, so a bare `not.toContain` fails on its own explanation — the eighth time this repo
+       has met that. */
+    const modal = DOCK.slice(DOCK.indexOf("{contactAsk && (")).replace(/\{?\/\*[\s\S]*?\*\/\}?/g, "");
+    expect(modal).toContain("<Dialog");
+    expect(modal).not.toContain('tone="danger"');
+    expect(modal).toContain('tone="ghost"');
+    expect(modal).toContain('tone="primary"');
   });
 });

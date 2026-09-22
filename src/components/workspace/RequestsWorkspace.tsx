@@ -9,8 +9,16 @@ import { PAGE_MAX, PAGE_X } from "@/components/AppShell";
 import { Skeleton } from "@/components/Skeleton";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { GuestRequestsPreview, GuestWall } from "@/components/common/GuestWall";
-import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
-import { groupRequests, requestCodeOf, type RequestGroup } from "@/lib/contract/requests";
+import { cancelRequest, fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
+import {
+  cancelBlockedReason,
+  cancellableItems,
+  groupBiddingClosed,
+  groupRequests,
+  isBiddingClosed,
+  requestCodeOf,
+  type RequestGroup,
+} from "@/lib/contract/requests";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import {
   EMPTY_SELECTION,
@@ -35,6 +43,7 @@ import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import { AiRankPanel } from "@/components/workspace/AiRankPanel";
 import { BidSizeFilter } from "@/components/workspace/BidSizeFilter";
 import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
+import { ConfirmCancelModal } from "@/components/requests/RequestEditModals";
 import { computeCycleTotals } from "@/lib/contract/cycle-totals";
 import { buildCompareSheet, type SheetMoneyCol } from "@/lib/export/compare-sheet";
 import { formatSar } from "@/lib/pricing/rental";
@@ -392,6 +401,82 @@ export function RequestsWorkspace() {
   const [hidden, setHidden] = useState<string[]>([]);
   useEffect(() => setHidden(hiddenRequests()), []);
   const hide = useCallback((key: string) => setHidden(hideRequest(key)), []);
+
+  /* 🔴 **The × on a circle: cancel a LIVE request, hide a CLOSED one** (owner, 2026-09-22:
+     *"clicking it for active will cancel it with confirm popup same used when i cancel from the
+     request details and if it is closed then will remove it from the fleet only"*).
+
+     ⚠️ **The DECISION is here, not in the rail**, and it reads the tile's own `closed` - the
+     same `groupBiddingClosed` that drew the greyscale and the caption. The rail could not make it:
+     the confirmation has to NAME the request and cancel its items, and only this component holds
+     the group.
+
+     🔴 **A LIVE group with nothing cancellable SAYS WHY, and is never hidden.** `isCancellable`
+     is `OPEN || ACTIVE` while `groupBiddingClosed` also admits `PARTIALLY_ACCEPTED` - so a group
+     whose live items are all partially accepted reads LIVE and has no item the backend would take
+     (`REQUEST_CANCEL_NOT_ALLOWED`). Both other answers are wrong:
+       · ~~hide it~~ breaks `hidden-requests`'s own standing rule - *"only a closed group can be
+         hidden … a live request that vanished from the rail would be a request the renter cannot
+         get back to, and this store has no undo"*. It is still taking bids on its siblings.
+       · ~~draw no ×~~ leaves one circle in a row of them with no control and no reason.
+     So it takes the product's OWN answer, which already existed for this exact case:
+     `cancelBlockedReason`, written to be *"shown inline when the renter taps its disabled ×, so a
+     greyed-out control always explains itself (a tooltip wouldn't, on touch)"*.
+
+     ⚠️ **The reason is read off a LIVE item, never off the group.** The group has no status of
+     its own, and the terminal siblings are not what is blocking the cancellation - a group holding
+     one EXPIRED item and one PARTIALLY_ACCEPTED one would otherwise report the expiry, which the
+     renter can do nothing about and which is not why the × refused. */
+  const [cancelling, setCancelling] = useState<RequestGroup | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelled, setCancelled] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const dismissTile = useCallback(
+    (key: string) => {
+      const g = (groups ?? []).find((x) => x.id === key);
+      if (!g) return;
+      // Shut: the circle comes off THIS device's rail and nothing is told to the backend.
+      if (groupBiddingClosed(g.items)) {
+        hide(key);
+        return;
+      }
+      // Live, but the backend would refuse every item: say why, and leave the circle where it is.
+      if (!cancellableItems(g.items).length) {
+        const blocking = g.items.find((i) => !isBiddingClosed(i.status)) ?? g.items[0];
+        if (blocking) setToast(cancelBlockedReason(blocking.status, ar));
+        return;
+      }
+      setCancelError(null);
+      setCancelled(false);
+      setCancelling(g);
+    },
+    [ar, groups, hide],
+  );
+
+  /* ⚠️ **Every cancellable item, one DELETE each** - the dashboard's own `doCancel`, because a
+     circle stands for the whole request and a fanned-out RFQ is several requests behind it. The
+     backend refuses anything that is not OPEN or ACTIVE, which is what `cancellableItems` filters.
+
+     ⚠️ `Promise.all`, so one refusal reports a failure for the batch rather than a partial
+     success nothing states. The reload after Done is what tells the renter which items really went.
+
+     ⚠️ `busy` is NOT lowered on success (`RequestEditModals`'s own rule): the act is over, and
+     a confirm button coming back to life under a tick invites a second cancellation. */
+  const doCancel = useCallback(async () => {
+    const g = cancelling;
+    if (!g || cancelBusy) return;
+    setCancelBusy(true);
+    setCancelError(null);
+    try {
+      await Promise.all(cancellableItems(g.items).map((i) => cancelRequest(i.id)));
+      setCancelled(true);
+    } catch {
+      setCancelError(ar ? "لم يتمّ الإجراء. حاول مجددًا." : "That didn’t go through. Try again.");
+    } finally {
+      setCancelBusy(false);
+    }
+  }, [ar, cancelBusy, cancelling]);
 
   const tiles = useMemo(() => {
     const all = railTiles(groups ?? [], ar);
@@ -764,8 +849,7 @@ export function RequestsWorkspace() {
         tiles={tiles}
         activeKey={resolved.groupId}
         onPick={pickGroup}
-        onShare={() => drawer.open("share")}
-        onHide={hide}
+        onDismiss={dismissTile}
       />
 
 
@@ -1030,6 +1114,38 @@ export function RequestsWorkspace() {
             setGroups(null);
             setReloads((n) => n + 1);
           }}
+        />
+      )}
+
+      {/* The × on a LIVE circle. Same component, same scope and same wording as the dashboard's
+          row action, so one act does not read as two - and `done` is what turns it into the tick
+          rather than dismissing in silence (2026-09-17).
+
+          ⚠️ **Done carries the reload**, never the success itself: the rail has to re-read to
+          grey the circle and put «Closed» under it, and until he has read the tick there is nothing
+          to reload FOR. The circle then stays on the rail, greyed, and a second × hides it. */}
+      {cancelling && (
+        <ConfirmCancelModal
+          ar={ar}
+          L={(en, arr) => (ar ? arr : en)}
+          busy={cancelBusy}
+          error={cancelError}
+          done={cancelled}
+          scope={{
+            kind: "all",
+            idLabel: cancelling.groupRef ?? cancelling.items[0]?.displayId ?? cancelling.id,
+            total: cancellableItems(cancelling.items).length,
+          }}
+          onClose={() => {
+            if (cancelled) {
+              setGroups(null);
+              setReloads((n) => n + 1);
+            }
+            setCancelling(null);
+            setCancelled(false);
+            setCancelError(null);
+          }}
+          onConfirm={() => void doCancel()}
         />
       )}
     </div>

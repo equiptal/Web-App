@@ -12,6 +12,7 @@ import { projectTitle } from "@/lib/contract/project";
 import type { ProjectSummary } from "@/lib/contract/project";
 import type { TemplateOption } from "@/lib/contract/project-apply";
 import { pin } from "@/lib/uiPins";
+import { MachineGlyph } from "@/components/MachineGlyph";
 
 /**
  * The renter's past requests, in a rail beside the intake (owner, 2026-09-16, handing over
@@ -658,7 +659,7 @@ export function ProjectFloorChips({ rail }: { rail: RequestRail }) {
 function MachineArt({ url }: { url: string | null }) {
   const [failed, setFailed] = useState(false);
   if (!url || failed) {
-    return <Icon name="precision_manufacturing" size={14} className="flex-none text-muted-light" />;
+    return <MachineGlyph size={14} className="flex-none text-muted-light" />;
   }
   return (
     <span className="grid h-[18px] w-[18px] flex-none place-items-center overflow-hidden rounded-sm">

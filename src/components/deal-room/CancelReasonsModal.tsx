@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import { Dialog } from "@/components/Dialog";
+import { Dialog, DialogButton } from "@/components/Dialog";
 
 const CANCEL_REASONS: ReadonlyArray<{ en: string; ar: string }> = [
   { en: "Found a better offer", ar: "وجدت عرضاً أفضل" },
@@ -45,7 +45,21 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
   const canSubmit = !busy && reason.length > 0;
 
   return (
-    <Dialog open onClose={busy ? () => {} : onClose} size="sm" padded={false}>
+    <Dialog
+      open
+      onClose={onClose}
+      size="sm"
+      padded={false}
+      dismissible={!busy}
+      footer={
+        <>
+          <DialogButton tone="ghost" full disabled={busy} onClick={onClose}>{L("Back", "رجوع")}</DialogButton>
+          <DialogButton tone="danger" full disabled={!canSubmit} onClick={() => onSubmit(reason)}>
+            {busy ? L("Cancelling…", "جارٍ الإلغاء…") : L("Confirm Cancellation", "تأكيد الإلغاء")}
+          </DialogButton>
+        </>
+      }
+    >
       <div dir={ar ? "rtl" : "ltr"} style={{ padding: "26px 22px 22px", textAlign: "center" }}>
         <span style={{ display: "inline-flex", width: 44, height: 44, borderRadius: "50%", background: "var(--danger-bg, var(--danger-soft))", color: "var(--danger, var(--danger))", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
           <span className="material-icons-outlined" style={{ fontSize: 22 }}>cancel</span>
@@ -88,14 +102,7 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
           />
         )}
 
-        {error && <p className="dl-err" style={{ marginTop: 12 }}>{error}</p>}
-
-        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button type="button" className="dl-mbtn" style={{ flex: 1 }} disabled={busy} onClick={onClose}>{L("Back", "رجوع")}</button>
-          <button type="button" className="dl-mbtn danger" style={{ flex: 1 }} disabled={!canSubmit} onClick={() => onSubmit(reason)}>
-            {busy ? L("Cancelling…", "جارٍ الإلغاء…") : L("Confirm Cancellation", "تأكيد الإلغاء")}
-          </button>
-        </div>
+        {error && <p className="mt-3 text-meta font-semibold text-danger">{error}</p>}
       </div>
     </Dialog>
   );

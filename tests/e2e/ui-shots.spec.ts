@@ -46,6 +46,8 @@ const SPECIMENS = [
   "yard-explain",
   "request-card-company",
   "request-card-document",
+  "fleet-list",
+  "other-bids",
   "price-footer",
   "browse-directory",
   "national-day",

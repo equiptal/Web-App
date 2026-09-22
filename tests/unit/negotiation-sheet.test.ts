@@ -112,19 +112,70 @@ describe("the sheet itself", () => {
     expect(CSS).not.toMatch(/\.ng-shell \{[^}]*max-width: \d/);
   });
 
-  /* NO column cap (owner, 2026-09-19: *"centralize the parent cards across the screen so it has equal
-     margin on right and on left"*). One gutter, declared once on the shell and answered by the header,
-     the footer and the body's cards alike, so the margin is identical on both sides at any width, and
-     this sheet follows the same morning's product-wide "every page is fluid" ruling rather than
-     keeping a private cap of its own. */
-  it("runs the cards the width with one gutter either side", () => {
-    expect(CSS).toMatch(/\.ng-inner \{ width: 100%; \}/);
-    expect(CSS).not.toMatch(/\.ng-inner \{[^}]*max-width/);
+  /* 🔴 **A PAPER COLUMN, centred on the desk** (owner, 2026-09-22, pointing at `main` / `beta`:
+     *"i want the previosu 3 sheets style layout ... for the frame and general layout"*).
+
+     🔴 **This REVERSES 2026-09-19**, which was itself a withdrawal: ~~*"centralize the parent
+     cards across the screen so it has equal margin on right and on left"*, one gutter and no cap.~~
+     That ruling is not wrong about margins and still holds — the gutter is one number and the two
+     edges are equal. What it cannot give is the thing asked for now: a SHEET reads as a sheet only
+     when it has an edge, and content running a 1900px monitor has none.
+
+     ⚠️ **940, and the number is not a taste.** `.ng-cmp` was capped at 940 and `.ng-grow` at
+     820 on 2026-09-22, so at this width nothing already capped changes size. beta's own 800 would
+     have shrunk the compare card that was measured at 940. */
+  it("holds the cards to a paper column, centred on the desk", () => {
+    expect(CSS).toMatch(/--ng-paper: 940px;/);
+    expect(CSS).toMatch(/\.ng-inner \{ width: 100%; max-width: var\(--ng-paper\); margin-inline: auto; \}/);
+    // The gutter SURVIVES the cap: it is what keeps the paper off the window's edge below 940.
     expect(CSS).toMatch(/--ng-gutter: clamp\(/);
     expect(CSS).toMatch(/\.ng-head \{[^}]*padding: 14px var\(--ng-gutter\)/);
     expect(CSS).toMatch(/\.ng-foot \{[^}]*padding: 10px var\(--ng-gutter\)/);
-    expect(CSS).toMatch(/\.ng-body \.ng-inner \{[^}]*padding: 14px var\(--ng-gutter\)/);
-    expect(FLOW.match(/className="ng-inner"/g)?.length).toBe(3);
+    /* ⚠️ The body's gutter is on the BAND, as it is on the other three — it sat on `.ng-inner`
+       here, so that one column measured 940 of CONTENT while the rest measured 940 including their
+       padding, and the cards stood 40px inside the header's own verticals. Measured at a 1920
+       window: 1020 against 940 before, 940 across all four after. */
+    expect(CSS).toMatch(/\.ng-body \{[^}]*padding-inline: var\(--ng-gutter\)/);
+    expect(CSS).toMatch(/\.ng-body \.ng-inner \{ padding: 14px 0 20px; \}/);
+    // Head, steps, body and foot: FOUR bands on the one column, so nothing stands off the paper.
+    expect(FLOW.match(/className="ng-inner"/g)?.length).toBe(4);
+  });
+
+  /* 🔴 **THE STEP RAIL, restored from `beta`** (same note). It is the one device that makes
+     three pages read as THREE SHEETS rather than as a page replacing itself: the footer's button
+     says where you are GOING, never where you are.
+
+     ⚠️ **Tokens direct — `--brand` for the open step, `--ok` for a finished one.** beta reached
+     the same two colours by remapping `--action` and `--rentee` locally inside the sheet, and a local
+     remap of `--action` is the drift RM3-AC-33 and `palette-drift` exist to stop.
+
+     ⚠️ `aria-hidden`, and NOT pressable: the footer already names the next step in words, and a
+     rail that jumped a renter past an unanswered price would be a second route with none of `canNext`'s
+     gates. */
+  it("names the three sheets with a step rail, which nothing can press", () => {
+    expect(CSS).toMatch(/\.ng-steps \{[^}]*var\(--ng-gutter\)/);
+    expect(CSS).toMatch(/\.ng-step\.on \.badge \{[^}]*background: var\(--brand\)/);
+    expect(CSS).toMatch(/\.ng-step\.done \.badge \{[^}]*background: var\(--ok\)/);
+    // The rule between two steps GROWS, so the rail spans the paper at any width.
+    expect(CSS).toMatch(/\.ng-steps \.bar \{[^}]*flex: 1 1 auto/);
+    expect(FLOW).toMatch(/<div className="ng-steps" aria-hidden="true">/);
+    expect(FLOW).toMatch(/i < page \? "✓" : i \+ 1/);
+    // It walks nothing: a rail with an onClick is the second route this comment refuses.
+    const rail = FLOW.slice(FLOW.indexOf('className="ng-steps"'), FLOW.indexOf('className="ng-body"'));
+    expect(rail).not.toMatch(/onClick/);
+  });
+
+  /* ⚠️ **The terms step is SIZED for a desktop** (owner, 2026-09-22: *"for terms use same
+     structure and same languag eand same behaviour but on sizes suitable foe web"*). Structure,
+     wording and behaviour are untouched — he named the sizes and nothing else. */
+  it("reads the terms at a monitor's distance, not a phone's", () => {
+    expect(CSS).toMatch(/\.ng-sect-h \{[^}]*padding: 13px 16px;[^}]*font-size: 13\.5px/);
+    expect(CSS).toMatch(/\.ng-sect-b \{ padding: 10px 14px 13px;/);
+    expect(CSS).toMatch(/\.ng-grow \.k \{ font-size: 13px;/);
+    expect(CSS).toMatch(/\.ng-grow \.v \{ font-size: 13px;/);
+    // ⚠️ The row's OWN 820px cap is gone: the paper already caps it, and two caps on one row is
+    // how a row ends up narrower than its card for a reason nobody can find.
+    expect(CSS).not.toMatch(/\.ng-grow \{[^}]*max-width/);
   });
 
   /* At the phone's width the answer controls are full-bleed rows; across a wide screen they become

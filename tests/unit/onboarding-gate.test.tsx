@@ -108,3 +108,36 @@ describe("the routing that was already right is left alone", () => {
     expect(MODAL).toMatch(/if \(alreadyComplete\) onCreated\(\)/);
   });
 });
+
+describe("the company name is asked for, and required", () => {
+  /**
+   * 🔴 **Restored and REQUIRED** (app parity, `profile_form_page._companyNameIsValid`, and the
+   * owner: *"company is required in the profile form ... they are in app so align"*).
+   *
+   * ~~Removed on 2026-09-07 (*"remove it from the form UI now"*), because the FIRM a renter later
+   * verifies carries its own name and the typed one had no reader left.~~ That reasoning stopped
+   * being true on 2026-09-21: `counterpartyDisplayName` made `profile.companyName` the fourth rung
+   * of the one naming rule, so it IS what every surface shows a renter by when no verified firm
+   * stands behind him. Blank, he is listed among firms under his personal name.
+   */
+  it("Given the complete form, Then the field is there and starred", () => {
+    expect(FORM).toContain("const [companyName, setCompanyName] = useState");
+    expect(FORM).toContain("{o.companyName}");
+    expect(FORM).toContain("placeholder={o.companyNamePlaceholder}");
+  });
+
+  it("Given a blank company, Then the form refuses at two characters", () => {
+    // The app's own floor, not a rounder number: `_companyNameCtrl.text.trim().length >= 2`.
+    expect(FORM).toContain("if (companyName.trim().length < 2) next_fe.companyName = o.errors.companyName;");
+  });
+
+  /**
+   * ⚠️ **BOTH submit paths carry it.** This form posts to `/api/auth/complete-signup` on the
+   * email-first route and `/api/profile/complete` otherwise; a field added to one of them is a field
+   * half the accounts never send. Both routes already forwarded `companyName` while the UI was gone,
+   * so nothing on the wire changed.
+   */
+  it("Given either submit path, Then the company goes with it", () => {
+    expect(FORM.match(/companyName: companyName\.trim\(\),/g)).toHaveLength(2);
+  });
+});

@@ -314,6 +314,8 @@ export function normalizedBidToBidCard(
     matchCount: 0,
     conflictCount: 0,
     dealRoomId: null,
+    // An agent-built card describes a bid nobody has opened a room on.
+    dealRoomStatus: null,
     expired: false,
     // Fold the free-text notes + any non-canonical extra_terms (agent-extracted clauses that don't map
     // to a table field) into one note, so the comparison's "Notes" row surfaces everything the quote had.

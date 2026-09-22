@@ -131,7 +131,12 @@ export function StoreCard({ store }: { store: StoreCardData }) {
     >
       {/* The tile is the mark. White, because a logo is drawn for paper and most of these carry their
           own white; contained and generously sized, because a wordmark needs width to be read. */}
-      <div className="relative flex aspect-[16/11] w-full items-center justify-center border-b border-shop-line bg-white p-5">
+      {/* 🔴 **The padding is halved on a phone, because it was eating the mark.** Measured: a
+          card is 156px at a 360px viewport, so `p-5` left the wordmark 116x67 to be read in - and a
+          wordmark needs WIDTH, which is this tile's whole argument. `p-3` gives it 132x83, half as
+          much again. From `sm` up the card is wide enough that the generous inset is what makes the
+          logo read as a mark rather than as a picture, so nothing above the phone changes. */}
+      <div className="relative flex aspect-[16/11] w-full items-center justify-center border-b border-shop-line bg-white p-3 sm:p-5">
         <ShopLogo src={store.logoUrl} name={store.name} className="h-full w-full" />
         {store.isVerified && (
           <span className="absolute end-2 top-2">

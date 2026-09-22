@@ -233,6 +233,7 @@ export const goldenBid = (p: Partial<BidCard> = {}): BidCard => ({
   matchCount: 0,
   conflictCount: 0,
   dealRoomId: null,
+  dealRoomStatus: null,
   expired: false,
   note: null,
   requiredCerts: [],

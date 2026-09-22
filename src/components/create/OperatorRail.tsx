@@ -93,7 +93,11 @@ export function OperatorRail({ item, shaking = false, onOpenState }: OperatorRai
   useEffect(() => {
     if (shaking) setExpanded(true);
   }, [shaking]);
-  const complete = !on || [op.fatFood, op.fatAccommodationTransport, op.nationality].every(Boolean);
+  /* 🔴 **`op.nationality` is OUT of this test, and that is not tidying** (2026-09-22). With
+     the control hidden the field can never be answered on a new request, so leaving it here would
+     have made the rail read INCOMPLETE for ever — a permanent amber dot on a panel with nothing
+     left to fill. Exactly the silent dead state a display-only change is supposed not to create. */
+  const complete = !on || [op.fatFood, op.fatAccommodationTransport].every(Boolean);
 
   const setOp = (field: string, patch: Parameters<typeof actions.patchItemOperator>[1]) => {
     prov.touch(`operator.${field}`);
@@ -265,16 +269,16 @@ export function OperatorRail({ item, shaking = false, onOpenState }: OperatorRai
         </button>
         {moreOpen && (
           <div className="grid gap-3.5 px-3.5 pb-3.5 sm:grid-cols-2">
-            <CanvasField label={t.create.operatorCard.nationality} source={prov.itemSource("operator.nationality", op.nationality)}>
-              <ChoiceRow<string>
-                value={op.nationality}
-                onChange={(v) => setOp("nationality", { nationality: v, ...(v === "any" ? { nationalityCustom: null } : {}) })}
-                options={[
-                  { value: "any", label: t.create.operatorCard.nationalityAny },
-                  { value: "restricted", label: t.create.operatorCard.nationalityRestricted },
-                ]}
-              />
-            </CanvasField>
+            {/* 🔴 ~~Operator nationality.~~ Hidden on every surface (owner, 2026-09-22, on
+                the app: *"operator nationality is removed in the app, check it there and align
+                web to it"*). See `term-visibility.ts`; the app hides its own in
+                `equipment_step.dart` for the same reason.
+                ⚠️ **The STATE is deliberately KEPT** — `nationality` / `nationalityCustom` are still
+                parsed onto the item, still patched by everything else and still SENT, exactly as the app
+                keeps `_operatorNationality` loaded and written back. A request created before the term was
+                hidden therefore preserves what it holds instead of being silently cleared by an edit; a NEW
+                request leaves it null, because nothing draws the control that used to set it.
+            */}
             <CanvasField
               label={t.create.operatorCard.nightShift}
               source={prov.itemSource("operator.night_shift", op.nightShift, undefined, true)}
@@ -286,18 +290,8 @@ export function OperatorRail({ item, shaking = false, onOpenState }: OperatorRai
                 </span>
               </span>
             </CanvasField>
-            {/* Only meaningful under "Restricted" — and cleared when leaving it, so a stale list can't
-                ride along invisibly on a request that now accepts any nationality. */}
-            {op.nationality === "restricted" && (
-              <div className="sm:col-span-2">
-                <TextInput
-                  value={op.nationalityCustom ?? ""}
-                  maxLength={100}
-                  placeholder={t.create.operatorCard.nationalityCustom}
-                  onChange={(e) => actions.patchItemOperator(item.id, { nationalityCustom: e.target.value })}
-                />
-              </div>
-            )}
+            {/* ~~The restricted-nationality list.~~ It went with the control above: a box that
+                appears only under an answer nobody can give is a box nobody can reach. */}
           </div>
         )}
       </div>

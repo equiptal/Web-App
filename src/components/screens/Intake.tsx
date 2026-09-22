@@ -296,6 +296,9 @@ export function Intake() {
         ? false
         : getComputedStyle(box).direction === "rtl";
 
+    /* Half his width plus a letter of air. It keeps him off the character he follows AND off the
+       native caret, which is drawn at exactly this point (owner, 2026-09-22: *"i want it both the
+       agent icon and the cursor beside each other"*) - one number, because they stand in one place. */
     const gap = MANSOUR_CARET / 2 + 3;
     // The edge he hangs off: the character's trailing side when he follows it, its leading side when
     // he is standing in the space before it. In an RTL run both are mirrored.
@@ -506,12 +509,16 @@ export function Intake() {
                The placeholder stays visible — it is the element's own, not text, so transparency does
                not reach it.
 
-               🔴 `caret-transparent`, and MANSOUR is the caret (owner, 2026-09-22, choosing it over
-               keeping the bar beside him). The cost, stated: the blink is gone, so nothing but the
-               focus ring says the box is focused, and an empty box shows no insertion point at all.
-               He is drawn on every caret move, including one made with the arrow keys, so the
-               POSITION the bar used to report is not lost - only its blink. */
-            className={`${FIELD_TEXT} relative w-full flex-1 resize-none border-0 bg-transparent text-transparent caret-transparent outline-none placeholder:text-muted/70 focus-visible:outline-none`}
+               🔴 **THE BAR IS BACK, AND MANSOUR STANDS BESIDE IT** (owner, 2026-09-22, later the
+               same day: *"i want it both the agent icon and the cursor beside each other"*).
+               ~~`caret-transparent`, chosen that morning over keeping the bar.~~ Hiding it made him
+               the ONLY insertion point, and a 22px mark cannot stand in a 4px word gap - so
+               mid-sentence he covered the letter beside him and nothing said exactly where the next
+               character would land. With the bar drawn the two split the job: the bar is the precise
+               point, he is the agent standing at it, and the gap that already kept him off the
+               letter is what keeps him off the bar. The blink comes back with it, which is also the
+               only thing that said the box was focused. */
+            className={`${FIELD_TEXT} relative w-full flex-1 resize-none border-0 bg-transparent text-transparent caret-navy outline-none placeholder:text-muted/70 focus-visible:outline-none`}
           />
 
           {/* ── Mansour, ON THE CARET (owner, 2026-09-22) ──────────────────────────────

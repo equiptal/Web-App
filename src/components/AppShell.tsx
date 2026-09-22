@@ -22,7 +22,6 @@ import { NotificationsBell } from "@/components/NotificationsBell";
 import { AppNav, AppNavMobile, type NavItem } from "@/components/AppNav";
 import { ArrowBackIcon, MailIcon, CountBadge } from "@/components/HeaderIcons";
 import { pin } from "@/lib/uiPins";
-import { seasonOrdinal } from "@/lib/season";
 
 /**
  * App shell for the renter web app (web-app/004, AC-01/02/03/09/25). One bar across the top holding
@@ -412,46 +411,26 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
             {t.shell.beta}
           </span>
 
-          {/* ── The season MARK (owner, 2026-09-16; re-cut 2026-09-17) ───────────────────────────
-              🔴 ~~The kit's chip: a gold outlined PILL saying «96 National Day».~~ It is the kit's
-              ordinal MARK now — the outlined figure, the gold hairline, the small caption — laid out
-              as a row for a 52px bar (owner: *"remove the 96 from the cta and just make this style
-              instead of the 96 pill on header"*). The mark was on the dashboard band; there is one
-              of it, and it is here.
+          {/* 🔴 ~~The season MARK — the outlined ordinal, a gold hairline and «National Day»,
+              beside the wordmark.~~ REMOVED (owner, 2026-09-22, with a picture of it: *"remove
+              this"*). It had already replaced the kit's gold PILL on 2026-09-17, which had itself
+              replaced the mark on the dashboard band — three placements in six days for one note,
+              and this is the fourth answer: the bar carries none.
 
-              Why it reads better as well as being the instruction: «Beta» beside it is an outlined
-              pill, so a second outlined pill a hand's width away read as a pair of controls. The
-              mark has no border and no ground, so it cannot.
+              ⚠️ What the season still wears on this bar is everything that is not WORDS: the
+              three-stop gradient, the dot lattice, the palm grove and the gold Najdi seam along the
+              bottom edge. That was always the better division — the bar is the product's own
+              chrome, and a caption on it is the one seasonal piece that has to be read rather than
+              merely seen.
 
-              It sits with the wordmark because that is what it is a note ON — the product, wearing
-              a season.
+              ⚠️ `.nd-mark*` went with it, rules and all, rather than being left inert: an
+              unused seasonal block is one edit away from coming back by accident, which is exactly
+              what this log recorded when the dune sweep was deleted on 2026-09-17. Pin 2.5 is
+              RETIRED, never renumbered — a number that has been quoted must not come back meaning
+              something else.
 
-              ⚠️ **`aria-hidden`, which the pill was NOT.** That is a behaviour change and it is
-              deliberate: the pill made a screen reader say «96 National Day» in the first breath of
-              every page in the product, for a fortnight, about something nobody can act on. The
-              band's mark was already hidden for the same reason and this is now consistent with it.
-
-              ⚠️ **Latin digits, in both locales.** The Flutter kit draws «٩٦»; this app has said
-              «the numbers should be in eng even in arabic» since 2026-09-04 and applies
-              `latinDigits()` to rows that arrive Arabic-indic from the database. One seasonal pill
-              is not the place to reverse a product-wide rule.
-
-              ⚠️ **Hidden below `sm`, and the rule for that is in `globals.css`, not here.** A phone
-              bar already carries the mark, «Beta», the tabs sheet and three 34px controls, and a
-              fourth pill on that row is what pushes the whole document wider than the screen — the
-              fault audited out of three surfaces on 2026-09-08.
-              🔴 `max-sm:hidden` was on this element and CANNOT WORK: Tailwind emits its utilities
-              inside `@layer utilities` and the seasonal block is unlayered, so the season's own
-              `display` wins at every width and the chip rides the phone bar all fortnight. Read off
-              the compiled sheet, not guessed. The season decides its own display, in one place.
-
-              Rendered all year and drawn by CSS only, so the server and the client agree on the
-              markup and nothing flickers. */}
-          <span {...pin("header-season-mark")} className="nd-mark" aria-hidden="true">
-            <span className="nd-mark-fig">{seasonOrdinal()}</span>
-            <span className="nd-mark-rule" />
-            <span className="nd-mark-sub">{t.season.nationalDay}</span>
-          </span>
+              ⚠️ `seasonOrdinal` survives and is still read by the guest wall's head strip;
+              the import here went with the markup. */}
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────
               Absolutely placed, so it is centred on the HEADER rather than on whatever space the
@@ -757,7 +736,9 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
           {back && (
             // `flex` across the full width rather than `inline-flex`: the bar carries a trailing slot
             // now, and the control itself stays exactly where it was, first on the line.
-            <div {...pin("page-back")} className={cx(PAGE_BACK, fullBleed && `${PAGE_X} pt-2`)}>
+            // `page-back-bar` carries no style of its own: it is the hook a surface uses to restyle its
+            // own bar (the bid map's white strip, `map-proto.css`, 2026-09-22) without a prop here.
+            <div {...pin("page-back")} className={cx("page-back-bar", PAGE_BACK, fullBleed && `${PAGE_X} pt-2`)}>
               {(() => {
                 /* ── ONE control, one word, one place (owner, 2026-09-03) ───────────────────────
                    *"There are many variations of the back button on screens, and some have two. I

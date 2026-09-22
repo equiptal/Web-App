@@ -35,7 +35,6 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**2.2** | Header — centred nav slot | `src/components/AppShell.tsx` |
 | &nbsp;&nbsp;**2.3** | Header — beta mark | `src/components/AppShell.tsx` |
 | &nbsp;&nbsp;**2.4** | Header — season backdrop (palms, dots, seam) | `src/components/AppShell.tsx` |
-| &nbsp;&nbsp;**2.5** | Header — season mark | `src/components/AppShell.tsx` |
 | **3** | Nav tabs — desktop | `src/components/AppNav.tsx` |
 | &nbsp;&nbsp;**3.1** | Nav tab — one link | `src/components/AppNav.tsx` |
 | **4** | Nav tabs — mobile | `src/components/AppNav.tsx` |
@@ -98,7 +97,10 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**26.1** | Rail — create tile | `src/components/workspace/RequestRail.tsx` |
 | &nbsp;&nbsp;**26.2** | Rail — request tiles | `src/components/workspace/RequestRail.tsx` |
 | &nbsp;&nbsp;**26.3** | Item tier — one chip per machine | `src/components/workspace/ItemTier.tsx` |
-| **27** | Request context bar (location + item) | `src/components/workspace/RequestContextBar.tsx` |
+| &nbsp;&nbsp;**26.4** | Circle — the request's machines on one ground | `src/components/workspace/CircleArt.tsx` |
+| &nbsp;&nbsp;**26.5** | Circle — the zoomed view behind a double press | `src/components/workspace/RequestRail.tsx` |
+| **27** | Request context bar (location + machines) | `src/components/workspace/RequestContextBar.tsx` |
+| &nbsp;&nbsp;**27.1** | Context bar — the machines the request asked for | `src/components/workspace/RequestContextBar.tsx` |
 | **28** | Request details modal | `src/components/workspace/RequestDetailsModal.tsx` |
 | &nbsp;&nbsp;**28.5** | Bid size filter — include larger equipment | `src/components/workspace/BidSizeFilter.tsx` |
 | **29** | Bid cards | `src/components/workspace/BidCards.tsx` |
@@ -115,13 +117,14 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | **45** | Bid map workspace | `src/components/map/BidMapWorkspace.tsx` |
 | &nbsp;&nbsp;**45.1** | Bid map — canvas side | `src/components/map/BidMapWorkspace.tsx` |
 | &nbsp;&nbsp;**45.2** | Bid map — side panel | `src/components/map/BidMapWorkspace.tsx` |
+| &nbsp;&nbsp;**45.3** | Bid map — «Other bids» strip in the back bar | `src/components/map/OtherOffers.tsx` |
 | **46** | Map canvas | `src/components/map/MapCanvas.tsx` |
 | &nbsp;&nbsp;**46.1** | Map — one machine's marker | `src/components/map/MapCanvas.tsx` |
 | **47** | Fleet card (equipment list) | `src/components/map/EquipmentList.tsx` |
 | &nbsp;&nbsp;**47.1** | Fleet card — photo cell | `src/components/map/EquipmentList.tsx` |
-| &nbsp;&nbsp;**47.2** | Fleet card — readiness + file icon | `src/components/map/EquipmentList.tsx` |
+| &nbsp;&nbsp;**47.2** | Fleet card — readiness + «Equipment documents» | `src/components/map/EquipmentList.tsx` |
 | &nbsp;&nbsp;**47.3** | Fleet card — yard card (distance + availability) | `src/components/map/EquipmentList.tsx` |
-| &nbsp;&nbsp;**47.5** | Fleet list — filter bar | `src/components/map/EquipmentList.tsx` |
+| &nbsp;&nbsp;**47.5** | Fleet list — filter control (end of the count pills row) | `src/components/map/EquipmentList.tsx` |
 | &nbsp;&nbsp;**47.6** | Fleet list — filter panel | `src/components/map/EquipmentList.tsx` |
 | **48** | Price footer | `src/components/map/PriceFooter.tsx` |
 | &nbsp;&nbsp;**48.1** | Price footer — the rate | `src/components/map/PriceFooter.tsx` |
@@ -156,7 +159,12 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**57.3** | Chat drawer — the thread | `src/components/map/ChatDock.tsx` |
 | &nbsp;&nbsp;**57.4** | Chat drawer — composer | `src/components/map/ChatDock.tsx` |
 | &nbsp;&nbsp;**57.5** | Chat drawer — staged request card | `src/components/map/ChatDock.tsx` |
+| &nbsp;&nbsp;**57.6** | Chat drawer — negotiation event (grey pill) | `src/components/map/ChatDock.tsx` |
 | **60** | Inbox | `src/components/inbox/InboxView.tsx` |
+| &nbsp;&nbsp;**60.1** | Inbox — the chats column | `src/components/inbox/InboxView.tsx` |
+| &nbsp;&nbsp;**60.2** | Inbox — one chat row | `src/components/inbox/InboxView.tsx` |
+| &nbsp;&nbsp;**60.3** | Inbox — the conversation beside the list | `src/components/inbox/InboxView.tsx` |
+| &nbsp;&nbsp;**60.4** | Inbox — nothing picked yet | `src/components/inbox/InboxView.tsx` |
 | **61** | Browse stores | `src/components/stores/BrowseSurface.tsx` |
 | &nbsp;&nbsp;**61.1** | Browse — heading + search + city, one row | `src/components/stores/BrowseSurface.tsx` |
 | &nbsp;&nbsp;**61.2** | Browse — category rail | `src/components/stores/BrowseSurface.tsx` |

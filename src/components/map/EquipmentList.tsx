@@ -71,7 +71,7 @@
  * a surface, not a decision.
  */
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
 // Two numeral formatters, and the split is deliberate: `arabicIndicDigits` truncates, which is what a
 // COUNT wants, and `distanceDigits` keeps one decimal, which is what a measured distance wants.
 import { arabicIndicDigits, distanceDigits } from "@/lib/contract/bid-map";
@@ -144,6 +144,61 @@ export interface EquipmentListProps {
    *  container's `scrollTop` rather than `scrollIntoView`, which scrolls every ancestor and moves the
    *  whole page. */
   scrollRef?: RefObject<HTMLElement | null>;
+  /** Whether the filter panel is open. The WORKSPACE owns it (owner, 2026-09-22), because the button
+   *  that opens it sits in the count pills' row, which the workspace draws. */
+  filtersOpen: boolean;
+  onCloseFilters: () => void;
+}
+
+/**
+ * The filter's one control, drawn by the workspace at the END of the count pills' row (owner,
+ * 2026-09-22: *"put the filter on the same row as units pills"*). Absent when the model offers no
+ * group, as before. The clear link rides beside it while a chip is on, so a narrowed list still has
+ * its way out without opening the panel.
+ */
+export function EquipmentFilterButton({
+  view,
+  open,
+  onToggle,
+  onClear,
+}: {
+  view: EquipmentListView;
+  open: boolean;
+  onToggle: () => void;
+  onClear: () => void;
+}) {
+  const t = useT();
+  const { locale } = useLocale();
+  const num = (n: number) => (locale === "ar" ? arabicIndicDigits(n) : String(n));
+  if (view.groups.length === 0 && view.active.length === 0) return null;
+  return (
+    <div {...pin("equipment-filter")} className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel}>
+      {view.active.length > 0 && (
+        <button type="button" className="bm-eqf-clear" onClick={onClear}>
+          {t.bidMap.eqFilterClear}
+        </button>
+      )}
+      {/* The groups live BEHIND this control (owner, 2026-08-11). One icon states that filtering
+          exists and how much of it is on; the panel states the rest, when asked. */}
+      {view.groups.length > 0 && (
+        <button
+          type="button"
+          className={`bm-eqf-btn${open ? " on" : ""}`}
+          /* `aria-haspopup`, not `aria-expanded`: this opens a panel over the column, not a region
+             below itself. */
+          aria-haspopup="dialog"
+          aria-label={t.bidMap.eqFilterLabel}
+          title={t.bidMap.eqFilterLabel}
+          onClick={onToggle}
+        >
+          <span className="material-icons-outlined">tune</span>
+          {/* The count of ACTIVE filters, not of groups — the number that tells the renter the list
+              in front of them is not the whole offer. */}
+          {view.active.length > 0 && <span className="bm-eqf-btn-n" dir="ltr">{num(view.active.length)}</span>}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function EquipmentList({
@@ -160,6 +215,8 @@ export function EquipmentList({
   askPending,
   onToggleShowAll,
   scrollRef,
+  filtersOpen,
+  onCloseFilters,
 }: EquipmentListProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -168,17 +225,14 @@ export function EquipmentList({
   const machines = view.machines;
   const num = (n: number) => (ar ? arabicIndicDigits(n) : String(n));
 
-  /** The filter groups are behind a control now, so the bar is one line until asked. Escape closes
-   *  it — a panel that only its own button can dismiss is a panel the renter has to aim at twice.
-   *  (The `filterRef` that used to sit here was written and never read: a ref nothing measures is a
-   *  handle for a behaviour that does not exist.) */
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  /** Escape closes the filter panel — a panel that only its own button can dismiss is a panel the
+   *  renter has to aim at twice. The open flag itself is the workspace's (2026-09-22). */
   useEffect(() => {
     if (!filtersOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFiltersOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCloseFilters(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [filtersOpen]);
+  }, [filtersOpen, onCloseFilters]);
 
   // Bring the selected card into view when it is off-screen — which is the case when the selection was
   // made on the MAP (AC-15). Already-visible cards are left exactly where they are: scrolling a card
@@ -233,45 +287,12 @@ export function EquipmentList({
   return (
     <>
       {/* ── V17 · the filter bar ─────────────────────────────────────────────────────────────────
-          Absent entirely when the model offers no group — an empty control row is worse than none.
-          The count renders whether or not anything is filtered, because «٨ من ٨» is the sentence that
-          makes «٣ من ٨» readable later. */}
-      {(view.groups.length > 0 || view.active.length > 0) && (
-        <div {...pin("equipment-filter")} className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel}>
-          <div className="bm-eqf-top">
-            <span className="bm-eqf-count">{countLine()}</span>
-            {view.active.length > 0 && (
-              <button type="button" className="bm-eqf-clear" onClick={onClearFilters}>
-                {t.bidMap.eqFilterClear}
-              </button>
-            )}
-            {/* The groups live BEHIND this control (owner, 2026-08-11). Laid out flat, they were two
-                labelled rows of chips above every list — furniture the renter reads past on the way
-                to the machines, on a panel whose whole width is 392px. One icon states that filtering
-                exists and how much of it is on; the panel states the rest, when asked. */}
-            {view.groups.length > 0 && (
-              <button
-                type="button"
-                className={`bm-eqf-btn${filtersOpen ? " on" : ""}`}
-                /* `aria-haspopup`, not `aria-expanded`: this no longer grows a region below itself,
-                   it opens a panel over the column. A reader told the control is "expanded" would go
-                   looking underneath it for content that is somewhere else entirely. */
-                aria-haspopup="dialog"
-                aria-label={t.bidMap.eqFilterLabel}
-                title={t.bidMap.eqFilterLabel}
-                onClick={() => setFiltersOpen((v) => !v)}
-              >
-                <span className="material-icons-outlined">tune</span>
-                {/* The count of ACTIVE filters, not of groups — the number that tells the renter the
-                    list in front of them is not the whole offer. */}
-                {view.active.length > 0 && (
-                  <span className="bm-eqf-btn-n" dir="ltr">{num(view.active.length)}</span>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+          ~~A row of its own above the list: «1 of 2», the clear link and the tune button.~~ Moved
+          (owner, 2026-09-22: *"remove this 1 of 2 and put the filter on the same row as units
+          pills"*). The button is `EquipmentFilterButton` below, drawn by the workspace in the count
+          pills' row; the panel it opens is still this file's. The count is still stated where it
+          earns its place: in the panel's foot, while chips are being pressed, and in the filtered
+          empty state. */}
 
       {/* ── The filter's OWN panel, over the existing one (owner, 2026-08-11) ─────────────────────
           `.mp-over`'s idiom, and deliberately so: the company documents already open this way, and a
@@ -299,7 +320,7 @@ export function EquipmentList({
               className="bm-eqfp-x"
               aria-label={t.common.close}
               title={t.common.close}
-              onClick={() => setFiltersOpen(false)}
+              onClick={onCloseFilters}
             >
               <span className="material-icons-outlined">close</span>
             </button>
@@ -587,26 +608,14 @@ function EquipmentCard({
             <button
               type="button"
               className="bm-eq-open"
-              aria-label={`${t.bidMap.eqOpenFile} — ${title}`}
-              title={t.bidMap.eqOpenFile}
+              aria-label={`${t.bidMap.eqDocuments} — ${title}`}
               onClick={() => onOpenDetail(machine.equipmentId)}
             >
-              {/* The owner's own glyph (2026-08-31) — a document with its lines, read under a
-                  magnifier, the document's edge broken where the lens crosses it. Drawn rather than
-                  fetched: the material set's `find_in_page` puts the lens INSIDE the page, which
-                  reads as a search box on a form; this reads as reviewing the papers. */}
-              <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" focusable="false">
-                <path
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M17.8 11.1V1.2H1.3v21.7h16.5v-3M4.7 5.2h9.3M4.7 9.6h6.2M4.7 14h3.7M4.7 18.4h3.7"
-                />
-                <circle cx="15.2" cy="15.2" r="4" fill="none" stroke="currentColor" strokeWidth="1.7" />
-                <path fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" d="m18.2 18.2 3.5 3.5" />
-              </svg>
+              {/* ~~The owner's own glyph (2026-08-31), a document under a magnifier.~~ WORDS now
+                  (owner, 2026-09-22: *"the icon of the equipment card to be equipment documents not
+                  icon"*). The header one row up reads «Company documents»; this names the other
+                  file, so the two controls say whose papers each one opens. */}
+              {t.bidMap.eqDocuments}
             </button>
           </div>
 

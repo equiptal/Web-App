@@ -19,6 +19,10 @@ const bid = (over: Partial<PriceFooterBid> = {}): PriceFooterBid => ({
   priceUnit: "PER_DAY",
   unitsOffered: 3,
   agreedUnits: null,
+  currentRentalUnits: null,
+  // The request's own count, which `liveRentalUnits` caps at. Above every count below, so no case
+  // here is decided by the cap unless it says so.
+  numberOfUnits: 9,
   mobPrice: 500,
   demobPrice: 400,
   mobUnits: null,
@@ -127,12 +131,15 @@ describe("counts vs agreed — two numbers, both correct (004a §4a.4)", () => {
     expect(priceFooterModel(bid({ agreedUnits: 3 }), 10).unitsDiffer).toBe(false);
   });
 
-  it("NEVER follows an unapproved counter (RM3-AC-67)", () => {
-    // `currentRentalUnits` is the backend's `lastProposedRentalUnits`. It is not in `PriceFooterBid`
-    // at all, so the module cannot read it — this asserts the property rather than the discipline.
-    const withCounter = { ...bid({ agreedUnits: null }), currentRentalUnits: 1 } as PriceFooterBid;
-    expect(priceFooterModel(withCounter, 10).pricedUnits).toBe(3);
-    expect("currentRentalUnits" in ({} as PriceFooterBid)).toBe(false);
+  // 🔴 ~~"NEVER follows an unapproved counter (RM3-AC-67)"~~. Withdrawn (owner, 2026-09-22: the
+  // footer prices like the BID CARD, and on the rule itself *"check the app"*). The app dropped
+  // RM3-AC-67 on 2026-08-14 (APP-RDR-25) for exactly this reason: every other pricing surface reads
+  // the live count, so the footer was the one screen quoting a different total for the same bid.
+  it("follows the live count the bid card prices on: agreed, then the latest proposed, then offered", () => {
+    expect(priceFooterModel(bid({ agreedUnits: null, currentRentalUnits: 1 }), 10).pricedUnits).toBe(1);
+    expect(priceFooterModel(bid({ agreedUnits: 2, currentRentalUnits: 1 }), 10).pricedUnits).toBe(2);
+    // Capped at what the request asked for, as `liveRentalUnits` caps the card.
+    expect(priceFooterModel(bid({ unitsOffered: 5, numberOfUnits: 4 }), 10).pricedUnits).toBe(4);
   });
 });
 
@@ -153,7 +160,9 @@ describe("the no-room case — the common one", () => {
   });
 
   it("never prices on zero units, however the bid was projected", () => {
-    expect(priceFooterModel(bid({ unitsOffered: 0 }), 10).pricedUnits).toBe(1);
+    // The request's own count stands in for a zero offer, as it does on the bid card; with neither,
+    // one unit.
+    expect(priceFooterModel(bid({ unitsOffered: 0, numberOfUnits: 0 }), 10).pricedUnits).toBe(1);
   });
 });
 
@@ -218,6 +227,8 @@ describe("the footer reads the same inputs as `mapDealRoom`, not merely the same
     priceUnit: RAW.bid.priceUnit,
     unitsOffered: RAW.bid.unitsOffered.length,
     agreedUnits: RAW.agreedUnits,
+    currentRentalUnits: null,
+    numberOfUnits: RAW.request.equipmentItems[0].numberOfUnits,
     mobPrice: RAW.bid.mobPrice,
     demobPrice: RAW.bid.demobPrice,
     mobUnits: RAW.mobUnits,

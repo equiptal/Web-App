@@ -136,7 +136,10 @@ describe("a row reads: the count, the picture, then the machine", () => {
     // `<img>` absorbs that as «no artwork», drawing the browser's broken-image mark.
     expect(rail).toContain("onError={() => setFailed(true)}");
     expect(rail).toContain('if (!url || failed)');
-    expect(rail).toContain('name="precision_manufacturing"');
+    /* 🔴 The glyph is a DRAWN component now, not a name from the icon font (owner,
+       2026-09-22: *"use nice icons not this"*). The RULE is unchanged - a machine with no
+       picture still draws a stand-in rather than a broken image - and only its address moved. */
+    expect(rail).toContain("<MachineGlyph");
   });
 });
 

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { groupBiddingClosed, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
+import { railMachines } from "@/lib/contract/workspace";
+import { CircleArt, MAX_IN_CIRCLE } from "@/components/workspace/CircleArt";
 import { cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
@@ -47,20 +49,37 @@ export function RequestContextBar({
   const label = itemLabel(item, ar);
   const qty = item?.item?.qty ?? 1;
 
-  /**
-   * The machine's own picture, as the rail draws it (owner, 2026-09-15).
-   *
-   * `RequestListItem.item` already carries it — `imageUrl` resolved through `publicTaxonomyUrl` and
-   * `imageIsPhoto` saying WHICH of the taxonomy's two kinds of picture it is — so this costs no
-   * request and no new field. Nothing is invented where the catalogue holds nothing: the glyph.
-   */
-  const art = item?.item?.imageUrl ?? null;
+  /* 🔴 **The bar stands for the REQUEST, not for the machine on screen** (owner, 2026-09-22:
+     *"mak it also show the items name in the navy card"*, answering where the rail's montage should
+     reach). ~~The active item's one picture, and its name alone.~~ A multi-item request drew one of
+     its machines here while the rail circle above it drew three, so the same request had two
+     portraits a row apart - and which line is being READ is the ITEMS strip's own job, which marks
+     it with `aria-current`.
+
+     ⚠️ `railMachines` is the RAIL's derivation, shared rather than repeated. Two answers to
+     «which machines does this request hold» is how the bar and the tile above it come to name
+     different machines, and nothing would fail when they did. */
+  const machines = railMachines(group, ar);
   /* An `<img>` absorbs a 403 as «no artwork», and the taxonomy's objects are not public-read on
-     staging — so a perfectly well-formed URL answers 403 and the circle would draw a broken-image
+     staging, so a perfectly well-formed URL answers 403 and the circle would draw a broken-image
      glyph, which is strictly worse than the icon. Keyed by URL rather than a bare boolean: the bar
-     re-renders for a different machine and a flag would carry the last one's failure onto it. */
+     re-renders for a different request and a flag would carry the last one's failure onto it. */
   const [brokenArt, setBrokenArt] = useState<string[]>([]);
-  const showArt = art && !brokenArt.includes(art) ? art : null;
+  const live = machines.map((m) => (m.url && brokenArt.includes(m.url) ? { ...m, url: null } : m));
+  /* The FIRST machine that has a picture, which is exactly what `railTiles` puts on the tile - so a
+     request whose montage cannot be drawn (fewer than two pictures) falls back to the same single
+     image in both places. */
+  const lead = live.find((m) => m.url) ?? null;
+
+  /* The machines NAMED, up to the same three the circle draws, each with its own count. Past three
+     a bare «+N» rather than a sentence: the row is one line inside a 44px control and the drawer
+     one press away lists every line in full. */
+  const multi = machines.length > 1;
+  const shownNames = live.slice(0, MAX_IN_CIRCLE);
+  const restCount = live.length - shownNames.length;
+  const namesLine = shownNames
+    .map((m) => (m.qty > 1 ? `${m.qty} × ${m.name}` : m.name))
+    .join(ar ? "\u060c " : ", ");
 
   return (
     <div {...pin("request-context")} className="relative flex flex-none items-stretch">
@@ -95,49 +114,43 @@ export function RequestContextBar({
           onOpenRequest ? "hover:bg-navy-mid" : "cursor-default",
         )}
       >
-        {/* ── The machine, on the leading edge (owner, 2026-09-15) ───────────────────────────────
+        {/* ── The machines, on the leading edge (owner, 2026-09-15, then 2026-09-22) ───────────────────────────────
             *"can u have the equipment image as circle on the left of this card"* — «left» being the
             LEADING edge, so it mirrors with the reading direction like everything else on this row;
             it is first in the flex row and needs no rule of its own to land there.
+
+            ~~«The MACHINE's own picture», read straight off the active `RequestListItem.item`.~~
+            It is the whole REQUEST's now; see the note beside `machines` above. It still costs no
+            request and no new field - the pictures were already on every item of the group.
 
             32px inside a 44px control leaves 6px clear a side, which is the same air the two lines
             beside it already sit in. The ground is `surface3`, the rail's own: a picture with a
             transparent margin needs something behind it, and on navy that has to be the light tone
             or the margin swallows the machine. */}
         <span className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full border border-white/15 bg-surface3">
-          {showArt ? (
-            /* ── Which fit, decided by which PICTURE it is ───────────────────────────────────────
-               The rail's ruling, verbatim, because it is the same asset in the same shape of hole:
-               a PHOTOGRAPH reaches its own edges and takes `cover`; a DRAWING carries its own
-               transparent margin, so cropping one enlarges the margin rather than the machine and it
-               takes `contain` scaled up to the circle's diameter instead.
+          {/* 🔴 **The RAIL's montage, at 32px** - the same component, so the two discs cannot drift
+              apart in fit, in spread or in how many machines they admit. Every ruling behind it
+              lives in `CircleArt`: the photograph takes the crop and the drawing the scale, each
+              cell is masked so the pictures lose their own rectangular edges, and the row is capped
+              at three.
 
-               ⚠️ 1.34 is not a taste: `contain` draws the catalogue's 1.34:1 artwork at
-               32 × 23.9 in this box, and 32 ÷ 23.9 = 1.34. It survives a change of box size and it
-               would NOT survive a re-cut of the assets to a different aspect — at a square source it
-               is 1. Safe only because the parent is `overflow-hidden rounded-full`.
-               (The rail carries the same number and the measurement behind it.) */
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={showArt}
-              alt=""
-              draggable={false}
-              onError={() => setBrokenArt((b) => (b.includes(showArt) ? b : [...b, showArt]))}
-              className={
-                item?.item?.imageIsPhoto
-                  ? "h-8 w-8 rounded-full object-cover"
-                  : "h-8 w-8 scale-[1.34] object-contain"
-              }
-            />
-          ) : (
-            <Icon name="precision_manufacturing" size={15} className="text-muted" />
-          )}
+              ⚠️ **A 32px disc holding three machines gives each ~12px**, which reads as a montage
+              rather than as three machines. That is the cost of putting the request here rather
+              than one of its lines, and the lever is this number - never a second cap inside
+              `CircleArt`, which the rail reads too. */}
+          <CircleArt
+            machines={live}
+            fallback={lead?.url ?? null}
+            fallbackIsPhoto={lead?.isPhoto ?? false}
+            onBroken={(url) => setBrokenArt((b) => (b.includes(url) ? b : [...b, url]))}
+            size={32}
+          />
         </span>
         <span className="flex min-w-0 flex-1 flex-col justify-center gap-1">
         {/* ── The site leads, the machine follows (owner, 2026-08-27) ────────────────────────────
-            The site is the 12.5px white and the machine the 11px grey under it. The item filter one
-            row down names the machine in full and says which is being read, so the bar does not have
-            to carry it loudly as well. Where the work is has no such second home.
+            The site is the 12.5px white and the machines the 11px grey under them. The ITEMS strip
+            one row down says WHICH of them is being read, so the bar does not have to carry that as
+            well - it names what the request asked for. Where the work is has no such second home.
 
             Both lines size to their content up to 30rem — they were capped at 170px each, which cut
             «Impact Hammer (Diesel/Hydraulic)» in half and a Riyadh address before its district.
@@ -156,9 +169,15 @@ export function RequestContextBar({
               {group.locationLabel}
             </span>
           </span>
-          <span className="flex min-w-0 items-center gap-1.5 text-label font-semibold leading-[13px] text-white/60">
-            <span className="truncate">{label}</span>
-            {qty > 1 && (
+          <span {...pin("context-machines")} className="flex min-w-0 items-center gap-1.5 text-label font-semibold leading-[13px] text-white/60">
+            <span className="truncate">{multi ? namesLine : label}</span>
+            {multi && restCount > 0 && (
+              /* Latin digits in both locales, product-wide since 2026-09-04. */
+              <span className="tabular flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold text-white/70">
+                +{restCount}
+              </span>
+            )}
+            {!multi && qty > 1 && (
               <span className="flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold text-white/70">
                 ×{qty}
               </span>

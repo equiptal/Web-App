@@ -190,11 +190,20 @@ describe("where he is used", () => {
     expect(INTAKE.slice(at, at + 400)).toMatch(/translate\(-50%, -50%\)/);
   });
 
-  /* 🔴 The bar is GONE - he is the only insertion point now, which is the owner's own pick over
-     keeping both. A `caret-navy` here would put two carets in one box. */
-  it("leaves no native caret beside him", () => {
-    expect(INTAKE).toMatch(/caret-transparent/);
-    expect(INTAKE).not.toMatch(/caret-navy/);
+  /* 🔴 **The bar STANDS BESIDE him** (owner, 2026-09-22, reversing his own pick of that morning:
+     *"i want it both the agent icon and the cursor beside each other"*). ~~`caret-transparent`, with
+     him as the only insertion point.~~ A 22px mark cannot stand in a 4px word gap, so mid-sentence he
+     covered the letter beside him and nothing said where the next character would land. The bar is
+     the precise point, he is the agent standing at it, and `gap` is what holds them apart. */
+  it("keeps the native caret, with him beside it", () => {
+    /* ⚠️ The CLASS ATTRIBUTE, not the file: the strike-through above names the withdrawn class
+       while saying it must not be there, and a bare `not.toMatch` fails on its own explanation.
+       Sixth time in this repo. */
+    const cls = INTAKE.slice(INTAKE.indexOf("${FIELD_TEXT} relative w-full"));
+    expect(cls.slice(0, cls.indexOf("`}"))).toMatch(/caret-navy/);
+    expect(cls.slice(0, cls.indexOf("`}"))).not.toMatch(/caret-transparent/);
+    // The one number that keeps him off both the letter and the bar.
+    expect(placeBody()).toMatch(/const gap = MANSOUR_CARET \/ 2 \+ 3;/);
   });
 
   /* ⚠️ Measured with a `Range` over the MIRROR, never with a span injected into it: the mirror wraps

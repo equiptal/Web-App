@@ -8,181 +8,9 @@ import { PAGE_X } from "@/components/AppShell";
 import { publicTaxonomyUrl } from "@/lib/contract/requests";
 import { Dialog } from "@/components/Dialog";
 import type { RailMachine, RailTile } from "@/lib/contract/workspace";
+import { CircleArt } from "@/components/workspace/CircleArt";
 import { pin } from "@/lib/uiPins";
-
-/**
- * The rail at the top of the workspace — one circle per request, newest first, and a `New` tile that
- * starts another. Picking a circle is how the whole page changes subject.
- *
- * A closed request keeps its place in the rail rather than dropping out of it: its bids are still
- * worth reading, and a rail that silently loses rows teaches the renter not to trust it.
- *
- * **The ring says one thing: whether the request is shut** (owner, 2026-08-27). Grey for closed and
- * dimmed with it; nothing at all otherwise. ~~Brand for the request being read, green for one with
- * bids waiting.~~ Three colours on a row of circles, and two of them competed — an active request
- * with bids waiting could not show both, so the orange won and the green news was lost on the one
- * tile the renter was looking at. Which tile is being read is carried by its full opacity and its
- * navy caption, which is what carried it alongside the ring anyway.
- *
- * A closed request keeps its place until the renter takes it off himself — the × on its circle hides
- * it on this device and touches nothing else.
- */
-/**
- * How many machines a 52px circle may show (owner, 2026-09-21: *"show 3 items at most"*).
- *
- * ⚠️ A fourth is 13px wide, which is a mark rather than a machine - and the count badge already
- * states how many lines the request really holds, so nothing is hidden by stopping here.
- */
-const MAX_IN_CIRCLE = 3;
-
-/**
- * **How much bigger than its share each machine is drawn, and how far the next one is pulled back
- * over it** (owner, 2026-09-22: *"u can make them a little bigger and closer"*).
- *
- * At an even share the machines were small and stood apart, because each asset is shot with its own
- * margin either side - so half a circle of picture is rather less than half a circle of machine.
- * Drawing each at 132/n of the width and pulling the next back closes that gap from both ends.
- *
- * ⚠️ The two numbers are ONE decision: `SPREAD - OVERLAP` is the row's total width, 116%, at any
- * count - the boost is `SPREAD / n` and the pull-back `OVERLAP / (n - 1)`, so two machines at 66%
- * overlap by 16 and three at 44% by 8. The row therefore always oversails the disc by the same 8%
- * a side, which the round clip takes and the mask has already faded.
- *
- * ⚠️ Chosen at the real 52px, magnified 6x, against an even share and against 72/22: the wider
- * pair pushes the outer machines into the rim and the deeper overlap eats the excavator's bucket.
- */
-const SPREAD = 132;
-const OVERLAP = 16;
-
-/**
- * How a machine's picture fills its hole - the rail's own ruling, in one place now that three
- * surfaces in this file draw one.
- *
- * ⚠️ A PHOTOGRAPH reaches its own edges and takes the crop; a taxonomy DRAWING carries its own
- * transparent margin, so cropping it enlarges the margin rather than the machine. 1.34 is
- * arithmetic, not taste: `contain` draws the catalogue's 1.34:1 artwork at 1/1.34 of the box's
- * height, and this puts it back. At a SQUARE source it becomes 1 - see the long note below.
- */
-const fitOf = (isPhoto: boolean) => (isPhoto ? "object-cover" : "scale-[1.34] object-contain");
-
-/**
- * **What dissolves one picture's edge into the next** (owner, 2026-09-22, twice: *"cant we merge
- * them in one background? not shown as 2 seperate imeages"*, and then *"still in the images the
- * same"* against the first attempt).
- *
- * 🔴 Matching the disc to the assets' ground was not enough, and the reason took two goes to
- * find. Every render shares one beige sweep - `--photo-ground` is its measured value - but the
- * sweep is not FLAT: it is dark at the very edge and lighter through the middle. Measured on
- * `taxonomy-icons/spider-lift`: corners #d8d4cd, mid-edge #e6e1da, centre #ddd9d2, against a disc
- * of #e3ded7. `object-contain` draws the whole file, so each machine arrived inside a rectangle
- * whose middle is paler than the disc around it - and two of those read as two pasted pictures.
- *
- * 🔴 **The first mask did nothing to the top and bottom, and that is the trap worth naming.** A
- * CSS mask is sized to the ELEMENT BOX, not to the picture inside it. With `height: 100%` the box
- * was 26x52 while `contain` drew the picture 26x19.4, so the mask's solid core spanned +/-17.9px
- * vertically and the picture only +/-9.7px: every pixel of it sat inside the solid part and its
- * horizontal edges were never touched. Measured in a browser, which is the only way to see it -
- * the source reads as though it is fading something.
- *
- * So the element must BE the picture: `height: auto` makes the box 26x19.4, and `closest-side`
- * then puts the gradient's end exactly on the picture's own edges whatever its aspect. Solid to
- * 68%, gone at the edge.
- *
- * ⚠️ **68 was chosen against 40 and 55 at the real size, magnified 9x.** All three remove the
- * rectangle; the lower two also fade the machine's extremities - the crawler's counterweight, the
- * spider lift's outriggers - for nothing.
- *
- * ⚠️ **Compared against the two alternatives at 14x** before taking the mask at all.
- * `object-cover` fills each half and so has no rectangle, at the cost of a 2.7x crop that leaves a
- * fragment of each machine and a hard vertical seam where the two meet. A top-and-bottom fade
- * closes the horizontal edges and leaves the vertical ones standing.
- *
- * ⚠️ `black` rather than a hex: a mask reads ALPHA and never hue, so the colour is arbitrary -
- * and a hex here would be a paint value to `palette-drift` that paints nothing.
- */
-const CELL_MASK = "radial-gradient(closest-side, black 68%, transparent 100%)";
-
-/**
- * **The circle draws the request's machines on ONE ground** (owner, 2026-09-21: *"cant u merge
- * their backgorudn like they sit on one background and zoom them out? show 3 items at most in the
- * circule"*).
- *
- * 🔴 ~~A grid of cells with a hairline between them and each on its own grey tile.~~ That was
- * the first cut, hours earlier, and he is right about it: four framed thumbnails in a 52px circle
- * read as four broken pictures rather than as one request holding four machines. The machines now
- * stand side by side on a single continuous ground, each whole and each at its own aspect - which
- * is what «zoom them out» asks for. How WIDE each is drawn is {@link SPREAD}'s decision.
- *
- * 🔴 **The ground is `--photo-ground`, and that is what makes the merge SEAMLESS rather than
- * merely tidy.** These renders are all shot on one beige studio sweep - measured earlier today
- * across two assets, twelve samples, all within 4/255 of #e3ded7 - so images laid edge to edge on
- * a disc painted that colour have no boundary at all. Painted `surface3` instead, the pictures'
- * own beige draws a visible rectangular band across a grey circle, which is the state this
- * replaces. Seen at 9x before choosing.
- *
- * **THREE at most** (his number). A fourth machine at 13px is not a machine, and how many lines the
- * request really holds is the count badge's job, on every tile whatever this shows.
- *
- * ⚠️ It still draws only what it CAN draw: with fewer than two pictures the circle is the single
- * image it always was, because one picture beside a grey glyph is worse than the picture alone.
- */
-function CircleArt({
-  machines,
-  fallback,
-  fallbackIsPhoto,
-  onBroken,
-}: {
-  machines: RailMachine[];
-  fallback: string | null;
-  fallbackIsPhoto: boolean;
-  onBroken: (url: string) => void;
-}) {
-  const art = machines.filter((m) => m.url);
-  if (art.length < 2) {
-    if (!fallback) return <Icon name="precision_manufacturing" size={20} className="text-muted" />;
-    return (
-      /* eslint-disable-next-line @next/next/no-img-element */
-      <img
-        src={fallback}
-        alt=""
-        draggable={false}
-        onError={(e) => { e.currentTarget.style.display = "none"; onBroken(fallback); }}
-        className={`h-[52px] w-[52px] ${fitOf(fallbackIsPhoto)} ${fallbackIsPhoto ? "rounded-full" : ""}`}
-      />
-    );
-  }
-  const shown = art.slice(0, MAX_IN_CIRCLE);
-  return (
-    /* ⚠️ `flex-none` on each picture below: the row is deliberately WIDER than the disc
-       (see {@link SPREAD}), and without it flexbox would shrink every machine back to fit. */
-    <span className="flex h-[52px] w-[52px] items-center justify-center overflow-hidden rounded-full">
-      {shown.map((m, i) => (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          key={`${m.id}-${i}`}
-          src={publicTaxonomyUrl(m.url) ?? ""}
-          alt=""
-          draggable={false}
-          onError={(e) => { e.currentTarget.style.display = "none"; onBroken(m.url as string); }}
-          /* ⚠️ **`h-auto`, so the ELEMENT IS THE PICTURE** - which is what makes the mask work at
-             all (see {@link CELL_MASK}) and is why there is no `object-fit` here: at its own aspect
-             there is nothing to fit. NO scale either, unlike the single picture: the 1.34 exists to
-             hide one drawing's letterbox band against the round edge, and here the neighbours are
-             the rest of the band.
-             ⚠️ The mask is per CELL and never on the disc: the disc's own edge is the circle,
-             which is already a clean shape, and fading that would grey the rim. */
-          className="h-auto flex-none"
-          style={{
-            width: `${SPREAD / shown.length}%`,
-            ...(i > 0 ? { marginInlineStart: `-${OVERLAP / (shown.length - 1)}%` } : null),
-            maskImage: CELL_MASK,
-            WebkitMaskImage: CELL_MASK,
-          }}
-        />
-      ))}
-    </span>
-  );
-}
+import { MachineGlyph } from "@/components/MachineGlyph";
 
 /**
  * **The circle, big** (owner, 2026-09-21: *"clicking double on the circule open the circule image
@@ -205,7 +33,7 @@ function CircleZoom({ machines, onClose }: { machines: RailMachine[]; onClose: (
   const title = machines.map((m) => m.name).join(locale === "ar" ? "، " : ", ");
   return (
     <Dialog open onClose={onClose} size={machines.length > 1 ? "lg" : "md"} title={title}>
-      <div className={`grid gap-4 ${machines.length > 1 ? "sm:grid-cols-2" : ""}`}>
+      <div {...pin("circle-zoom")} className={`grid gap-4 ${machines.length > 1 ? "sm:grid-cols-2" : ""}`}>
         {machines.map((m, i) => (
           <figure key={`${m.id}-${i}`} className="m-0">
             {/* ⚠️ **The same ground as the circle** (owner, same note: *"the images must show like
@@ -219,7 +47,7 @@ function CircleZoom({ machines, onClose }: { machines: RailMachine[]; onClose: (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={publicTaxonomyUrl(m.url) ?? ""} alt="" className="h-auto w-full" />
               ) : (
-                <Icon name="precision_manufacturing" size={64} className="text-muted" />
+                <MachineGlyph size={64} className="text-muted" />
               )}
             </span>
             <figcaption className="mt-2 text-body font-semibold text-navy">
@@ -233,20 +61,53 @@ function CircleZoom({ machines, onClose }: { machines: RailMachine[]; onClose: (
   );
 }
 
+/**
+ * The rail at the top of the workspace — one circle per request, newest first, and a `New` tile that
+ * starts another. Picking a circle is how the whole page changes subject.
+ *
+ * A closed request keeps its place in the rail rather than dropping out of it: its bids are still
+ * worth reading, and a rail that silently loses rows teaches the renter not to trust it.
+ *
+ * **The ring says one thing: whether the request is shut** (owner, 2026-08-27). Grey for closed and
+ * dimmed with it; nothing at all otherwise. ~~Brand for the request being read, green for one with
+ * bids waiting.~~ Three colours on a row of circles, and two of them competed — an active request
+ * with bids waiting could not show both, so the orange won and the green news was lost on the one
+ * tile the renter was looking at. Which tile is being read is carried by its full opacity and its
+ * navy caption, which is what carried it alongside the ring anyway.
+ *
+ * **EVERY circle carries a ×, and what it does depends on the request** (owner, 2026-09-22:
+ * *"i want it to be on all circules instead of the share even if active"*).
+ *
+ * 🔴 ~~The badge slot held SHARE on the active tile and the × on a closed one, and the two could
+ * never both apply "because sharing invites bids, which a shut request cannot take".~~ The share
+ * badge is gone from the rail entirely - it is in the request's own drawer, which is where the
+ * expiry, the logo and the recipients live too, so a 20px circle was the poorest of the doors onto
+ * it. One slot, one control, and the state decides only what pressing it MEANS:
+ *
+ *   LIVE   → cancel the request, behind the confirmation the dashboard and the drawer already use.
+ *   CLOSED → take the circle off this device's rail. Nothing is told to the backend.
+ *
+ * ⚠️ **The rail does neither itself.** It reports the press and the workspace decides, because
+ * only the workspace holds the group the confirmation has to name and the items it has to cancel.
+ * A rail that knew how to cancel would be a second answer to «which items does this act reach».
+ */
 export function RequestRail({
   tiles,
   activeKey,
   onPick,
-  onShare,
-  onHide,
+  onDismiss,
 }: {
   tiles: RailTile[];
   activeKey: string | null;
   onPick: (key: string) => void;
-  /** Share the request the rail is showing — the badge on its own tile (owner's reference). */
-  onShare?: (() => void) | null;
-  /** Take a CLOSED request's circle off this device's rail. Absent → no × is drawn. */
-  onHide?: ((key: string) => void) | null;
+  /**
+   * The × on a circle was pressed. Absent → no × is drawn at all.
+   *
+   * ⚠️ It is ONE callback for both meanings. Two - `onCancel` and `onHide` - would put the
+   * live/closed test in two places, and the day they disagreed the rail would offer to cancel a
+   * request the caption under it calls closed.
+   */
+  onDismiss?: ((key: string) => void) | null;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -477,56 +338,35 @@ export function RequestRail({
                       means bids are waiting. Printing the number as well spent the tile's one badge
                       slot on something said twice, and it hid the count of machines — which the
                       ring cannot say and nothing else on the rail does. */}
-                  {/* ── Share, on the tile the page is showing (owner's reference, 2026-08-25) ──
-                      One request is being read at a time, and the link that invites bids onto it is
-                      about THAT request — so it rides its own circle rather than waiting inside the
-                      drawer. It appears on the active tile only, for the same reason. */}
-                  {/* ── Taking a finished request off the rail (owner, 2026-08-27) ──────────────
-                      A closed or expired request has nothing left to do but take up a circle. The ×
-                      hides it on this device — the request is untouched, nothing is told to the
-                      backend, and another member of the firm still sees it.
+                  {/* ── The ×, on every circle (owner, 2026-09-22) ─────────────────────────
+                      ~~Share on the active tile, × on a closed one, and a stated rule that the two
+                      could never both apply.~~ They collided anyway - both sat at `-end-1 -top-1`,
+                      so a tile that was active AND closed drew share over the ×, which is the
+                      screenshot of 2026-08-31. One slot ends that for good.
 
-                      **Only on a closed tile.** A live request that could be dismissed would be a
-                      request the renter cannot get back to, and there is no undo in the rail.
+                      ⚠️ The LABEL is the whole of what the state changes here. A live circle
+                      says «Cancel this request» and a closed one «Hide this request», and the press
+                      itself is the same: the workspace reads the same `closed` this tile drew
+                      itself with, so the label and the act cannot describe different things.
 
-                      It takes the place the share badge holds on the active tile, and the two can
-                      never both apply: sharing invites bids, which a shut request cannot take.
-
-                      ~~That last sentence was a claim, not a rule.~~ Both badges sat at the same
-                      `-end-1 -top-1`, so on a tile that was BOTH active and closed they stacked and
-                      share painted over the ✕ — the owner's screenshot, 2026-08-31: a request reading
-                      «Closed» offering to be shared for bids it can no longer receive. The share badge
-                      now carries `!tile.closed` so the rule is enforced where it is stated. */}
-                  {tile.closed && onHide && (
+                      ⚠️ `tabIndex={-1}` and a `role`, not a `<button>`: the tile IS a button and
+                      a button inside a button is invalid markup no two browsers agree on. The tile's
+                      own press is what a keyboard reaches; this is a pointer affordance. */}
+                  {onDismiss && (
                     <span
                       role="button"
                       tabIndex={-1}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onHide(tile.key);
+                        onDismiss(tile.key);
                       }}
-                      aria-label={t.workspace.hideRequest}
-                      title={t.workspace.hideRequest}
+                      aria-label={tile.closed ? t.workspace.hideRequest : t.workspace.cancelRequest}
+                      title={tile.closed ? t.workspace.hideRequest : t.workspace.cancelRequest}
+                      /* A hairline collar, like the circle's own edge - `border-2` put a 2px white
+                         ring on a 20px badge, which is a tenth of it. */
                       className="absolute -end-1 -top-1 grid h-5 w-5 cursor-pointer place-items-center rounded-full border border-surface bg-muted text-white transition hover:bg-navy"
                     >
                       <Icon name="close" size={11} />
-                    </span>
-                  )}
-                  {active && !tile.closed && onShare && (
-                    <span
-                      role="button"
-                      tabIndex={-1}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onShare();
-                      }}
-                      aria-label={t.workspace.shareRequest}
-                      title={t.workspace.shareRequest}
-                      /* A hairline collar, like the circle's own edge — `border-2` put a 2px white
-                         ring on a 20px badge, which is a tenth of it. */
-                      className="absolute -end-1 -top-1 grid h-5 w-5 place-items-center rounded-full border border-surface bg-navy text-white transition hover:bg-navy-mid"
-                    >
-                      <Icon name="ios_share" size={12} className="font-normal" />
                     </span>
                   )}
                   {/* ── Several MACHINES, or several of ONE (owner, 2026-08-26) ──────────────────

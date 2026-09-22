@@ -116,8 +116,14 @@ export interface ShareRequestPanelProps {
    * request does not carry its supplier's name on any projection yet - see `directTarget`'s note.
    */
   direct?: { supplierName: string | null; storeId: string | null } | null;
-  /** `post` mode: posts and returns the new request's uuid. Null means the post failed. */
-  onPost?: () => Promise<string | null>;
+  /**
+   * `post` mode: posts and returns the new request's uuid. Null means the post failed.
+   *
+   * `asBroadcast` is the confirmation's «Broadcast instead» on a DIRECT request: post it to the
+   * whole market instead of to the firm it was started from. The caller owns that switch, because
+   * the recipient lives on the draft and this panel never touches it.
+   */
+  onPost?: (asBroadcast?: boolean) => Promise<string | null>;
   /** Fired once a share has gone out, with how many suppliers it reached. */
   /**
    * Fired once a share has gone out. `channel` is `"none"` when the request went to Moedatech alone
@@ -324,6 +330,18 @@ export function ShareRequestPanel({
    */
   /** The last step, and the only one with a way out. */
   const [confirming, setConfirming] = useState(false);
+  /**
+   * Who this DIRECT request is about to reach, as answered on the confirmation (app parity).
+   *
+   * The app asks it in a sheet of its own on Submit - «Send to {store}» or «Broadcast instead» -
+   * with the store PRE-PICKED, dismissal posting nothing, and the broadcast switch one-way. The web
+   * asks the same question inside the confirmation it already draws (owner, 2026-09-22), so one
+   * press raises one dialog: who receives it, and through which channels, in one reading.
+   *
+   * ⚠️ Reset to «direct» on every open, so a choice cannot ride from a press he cancelled into the
+   * next one - the same rule `skipEmail` follows one line below.
+   */
+  const [recipient, setRecipient] = useState<"direct" | "broadcast">("direct");
   /**
    * Whether THIS press is the one that minted the request.
    *
@@ -704,9 +722,30 @@ export function ShareRequestPanel({
   const emailWillGo =
     channel === "email" && (provider === "gmail" || (!!connect?.connected && !skipEmail));
 
-  const confirmTitle = uuid ? c.confirmSendTitle : emailWillGo ? c.confirmBothTitle : c.confirmPostTitle;
-  const confirmSub = emailWillGo || uuid ? c.confirmSubBoth : c.confirmSubPost;
-  const confirmAction = uuid ? c.confirmDoSend : emailWillGo ? c.confirmDoBoth : c.confirmDoPost;
+  /**
+   * Is the confirmation carrying the WHO question as well as the where?
+   *
+   * A DIRECT request that has not been posted yet, in the flow that posts it. A live request is past
+   * answering: its type is on the row, and `share` mode is a second share of something already
+   * addressed.
+   */
+  const askRecipient = !!direct && mode === "post" && !uuid;
+
+  /* ⚠️ ~~`c.confirmPostTitle` on the last arm.~~ It reads «Post this request and e-mail it?», and
+     that arm is the one case where NO mail leaves - Moedatech alone, or an Outlook that is not
+     connected - so the title promised the very thing the block under it was explaining would not
+     happen. */
+  const confirmTitle = uuid ? c.confirmSendTitle : emailWillGo ? c.confirmBothTitle : c.confirmPostAloneTitle;
+  /* ⚠️ While the WHO is still open, «it reaches one place» would be a statement about an answer he
+     has not given - and false the moment he picks the market. The app's own subtitle asks instead. */
+  const confirmSub = askRecipient ? c.confirmSubPick : emailWillGo || uuid ? c.confirmSubBoth : c.confirmSubPost;
+  const confirmAction = uuid
+    ? c.confirmDoSend
+    : emailWillGo
+      ? c.confirmDoBoth
+      : askRecipient
+        ? c.confirmDoPostRequest
+        : c.confirmDoPost;
 
   /**
    * 🔴 **No guess when we do not know which mailbox sends** (owner, 2026-09-07: *"if gmail or still
@@ -964,10 +1003,22 @@ export function ShareRequestPanel({
      * ⚠️ It returns without opening a pop-up. The Confirm press is its own gesture, so the blank
      * consent window can be opened there — which is the only moment a browser allows it.
      */
-    if (ch === "email" && !confirmed) {
+    /**
+     * 🔴 **A DIRECT request is asked WHO it goes to, on every channel** (app parity: the app raises
+     * its own sheet on Submit whenever `state.isDirect`, and skips it entirely for a broadcast).
+     *
+     * The e-mail confirmation has stood here since 2026-09-07; this adds the one case it never
+     * covered, which is the ordinary one for a request started from a store - Moedatech alone, no
+     * mail, so the press posted to one firm with nothing asked and nothing to cancel.
+     *
+     * ⚠️ `post` mode and an unposted request only: a live request's type cannot be changed, and
+     * `share` mode is a second share of something already addressed.
+     */
+    if (!confirmed && (ch === "email" || askRecipient)) {
       /* ⚠️ Cleared on every open, so «don't send by Outlook» can never carry into a request he
          did not press it on. */
       setSkipEmail(false);
+      setRecipient("direct");
       setConfirming(true);
       return;
     }
@@ -1002,7 +1053,9 @@ export function ShareRequestPanel({
     // a failed mail window would throw away the thing that succeeded.
     let id = uuid;
     if (!id && mode === "post" && onPost) {
-      id = await onPost();
+      /* His answer to «who receives it» rides into the post, which is the only place it can be read:
+         the recipient is on the DRAFT, and the switch has to be made before the request exists. */
+      id = await onPost(recipient === "broadcast");
       if (id) postedHere.current = true;
     }
     if (!id) {
@@ -2701,6 +2754,32 @@ export function ShareRequestPanel({
               title={c.destNoMarket}
               detail={c.offCatalogueLine}
             />
+          ) : askRecipient && direct ? (
+            /* ── WHO receives it, and he may still say «everybody» (app parity, 2026-09-22) ──────
+                The app asks this in a sheet of its own on Submit: two cards, the store pre-picked,
+                «Broadcast instead» beside it. Folded into this dialog at the owner's word, so one
+                press raises one layer - the destinations it already lists are the SAME reading.
+                ⚠️ A CHOICE, drawn as one: two options, one of them selected, and the button below
+                says what happens. It is not two statements the renter has to tell apart by colour. */
+            <div className="grid gap-2">
+              <span className="text-label font-extrabold uppercase tracking-[0.05em] text-muted-dark">{c.whoReceives}</span>
+              <RecipientOption
+                on={recipient === "direct"}
+                onPick={() => setRecipient("direct")}
+                icon="storefront"
+                logo={storeLogo ? { src: storeLogo, alt: "" } : undefined}
+                title={direct.supplierName ?? c.destDirectFallback}
+                detail={c.destDirectLine}
+              />
+              <RecipientOption
+                on={recipient === "broadcast"}
+                onPick={() => setRecipient("broadcast")}
+                icon="public"
+                logo={{ src: "/moedatech-logo.svg", alt: "Moedatech" }}
+                title={c.destBroadcastInstead}
+                detail={c.destBroadcastLine}
+              />
+            </div>
           ) : direct ? (
             /* ── A DIRECT request reaches ONE firm, and the block says whose (owner, 2026-09-13) ──
                 ~~The Moedatech block, promising «every supplier there can bid on it».~~ On a direct
@@ -2846,6 +2925,72 @@ export function ShareRequestPanel({
         }}
       />
     </div>
+  );
+}
+
+/**
+ * One of the two answers to «who receives this request», drawn as the block it sits beside.
+ *
+ * 🔴 **It is a CHOICE and it has to look like one.** `Destination` states a fact - this place will
+ * receive it - and the confirmation lists one or two of them. These two are alternatives, exactly one
+ * of which is true after the press, so they carry a radio and the selected one is ringed. Two
+ * `Destination`s side by side would have said both were happening.
+ *
+ * ⚠️ **NAVY for the pick, never green and never orange.** This file's own three tones are load-
+ * bearing (2026-09-13): green means «it happened» and is earned only by the tick, orange means «pay
+ * attention, this will not work the way you expect». A chosen recipient is neither - it is the
+ * ordinary answer to the question above it - so the selection is the ink colour and nothing more.
+ *
+ * ⚠️ Exported for `dev/preview` (`recipient-choice`): the dialog needs a draft, a store and a
+ * session, so the pair could not be looked at while it was being built.
+ */
+export function RecipientOption({
+  on,
+  onPick,
+  icon,
+  logo,
+  title,
+  detail,
+}: {
+  on: boolean;
+  onPick: () => void;
+  icon: string;
+  logo?: { src: string; alt: string };
+  title: string;
+  detail: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      aria-pressed={on}
+      className={cx(
+        "flex w-full items-start gap-3 rounded-md border p-3.5 text-start transition",
+        on ? "border-navy bg-surface" : "border-border bg-surface2 hover:border-border-strong",
+      )}
+    >
+      {/* The radio, first in the row: a renter scanning two blocks reads WHICH before he reads what. */}
+      <span
+        className={cx(
+          "mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full border-2",
+          on ? "border-navy" : "border-border-strong",
+        )}
+      >
+        {on && <span className="h-2 w-2 rounded-full bg-navy" />}
+      </span>
+      {logo ? (
+        /* ⚠️ The store's own mark where there is one, the same as the block this replaces: at this
+           moment the renter is checking WHICH firm, and a house glyph cannot tell him. */
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logo.src} alt={logo.alt} className="mt-px h-5 w-5 flex-none rounded-full object-contain" />
+      ) : (
+        <Icon name={icon} size={20} className="mt-px flex-none text-muted-dark" />
+      )}
+      <span className="min-w-0 flex-1">
+        <b className="block text-body font-extrabold text-navy">{title}</b>
+        <span className="mt-0.5 block text-meta leading-relaxed text-muted-dark">{detail}</span>
+      </span>
+    </button>
   );
 }
 

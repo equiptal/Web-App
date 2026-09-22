@@ -132,14 +132,20 @@ describe("one counterparty, one name", () => {
     expect(name).toBe("Al-Faisal Contracting Est.");
   });
 
-  it("falls back to a verified firm's brand, then to the person", () => {
+  it("falls back to the firm's brand, verified or not, then to the person", () => {
     expect(
       readSupplierDisplayName({ supplier: { company: { name: "Zahid Tractor", isVerified: true } } }),
     ).toBe("Zahid Tractor");
-    // An unverified company row is an ops draft, not an identity: the person's name is truer.
+    /* 🔴 ~~"An unverified company row is an ops draft, not an identity: the person's name is
+       truer."~~ WITHDRAWN with the verification gate (product decision, 2026-09-21): a firm nobody
+       had approved yet was read by its owner's PERSONAL name on every surface, with the name he had
+       typed stored and never shown. The tick is what says anyone checked, and it is computed
+       separately — see `counterparty-name.ts`. */
     expect(
-      readSupplierDisplayName({ supplier: { firstName: "Murad", lastName: "A", company: { name: "Placeholder" } } }),
-    ).toBe("Murad A");
+      readSupplierDisplayName({ supplier: { firstName: "Murad", lastName: "A", company: { name: "Unchecked Co" } } }),
+    ).toBe("Unchecked Co");
+    // The person is still the answer when no column names a firm at all.
+    expect(readSupplierDisplayName({ supplier: { firstName: "Murad", lastName: "A" } })).toBe("Murad A");
   });
 
   it("carries into the received-bids rows the strip and the rail are built from", () => {

@@ -43,11 +43,15 @@ export interface QuotationParty {
   /**
    * The party's own mark, drawn at the box's TRAILING edge beside the text column.
    *
-   * 🔴 **A MARK ONLY EXISTS BEHIND A VERIFIED PARTY**, which is the app's own gate
-   * (`_PartyBox`: `verified && logo != null`). A profile can carry a logo while its firm is
-   * unverified — one set before a rejection, or inherited — and printing it puts a company's brand on
-   * a document beside a party nobody has checked. Absent, NOTHING is drawn: an empty tile reads as a
-   * mark that failed to load.
+   * 🔴 ~~**A MARK ONLY EXISTS BEHIND A VERIFIED PARTY** — a profile can carry a logo while its firm
+   * is unverified, and printing it puts a company's brand on a document beside a party nobody has
+   * checked.~~ **WITHDRAWN 2026-09-22 on the owner's word** (*"the supplier logo must appear at top
+   * and at footer beside his name"*), and it now matches the ruling the NAMES took the same day: a
+   * mark, like a company name, is the firm's own CLAIM, and the thing that says whether anyone
+   * checked it is the verified tick drawn beside it. One gate for both, or a document names a firm it
+   * refuses to show the mark of.
+   *
+   * ⚠️ Absent, NOTHING is drawn: an empty tile reads as a mark that failed to load.
    */
   logoUrl?: string | null;
   rows: QuotationPartyRow[];
@@ -158,6 +162,21 @@ export interface QuotationDoc {
    *  without one — and at the strip's end rather than beside the tick, where it read as a second
    *  bullet in the sentence instead of as the seal on a signature. */
   sealUrl?: string | null;
+  /**
+   * **The renter's own gap, named on his own document** (owner, 2026-09-22).
+   *
+   * Drawn when the RENTER viewing this paper has no verified company, or has one with no mark: his
+   * side of the header prints as a bare name beside a supplier carrying a logo and a tick, and
+   * nothing anywhere told him why or what to do about it.
+   *
+   * 🔴 **His OWN gap only, never the supplier's.** A strip naming a missing supplier mark would
+   * tell the renter to fix something only the supplier can, on a document the supplier wrote.
+   *
+   * 🔴 **SCREEN ONLY.** `@media print` drops it, and no caller passes it into a PDF, a share or an
+   * e-mail: it is an invitation to the one person reading it in the app, and on a paper handed to a
+   * counterparty it would be a note about the reader's own account printed on someone else's copy.
+   */
+  ownerPrompt?: { text: string; actionLabel?: string | null; href?: string | null } | null;
   footer?: QuotationFooter | null;
   /** Appended after the amount-in-words (app parity: "Estimate for one day · Final amount as operated"). */
   amountWordsSuffix?: string;
@@ -285,6 +304,16 @@ export const QUOTATION_STYLE = `${DS_ROOT_CSS}
   .q-tc li.rule{padding-top:10px;border-top:1px solid var(--border-hair);}
   .q-tc b{color:var(--navy-deep);font-weight:800;}
 
+  /* The renter's own gap, on his own document (owner, 2026-09-22). Orange — «pay attention», not
+     «something is wrong with this offer», which is what a red strip on a supplier's quotation would
+     say. 🔴 SCREEN ONLY: the print media query below drops it, because it is an invitation to the
+     reader and not part of the paper anyone is handed.
+     ⚠️ NO BACKTICKS in this block: it lives inside a template literal, and one ends the string —
+     the same trap this file hit on 2026-09-18. */
+  .q-prompt{margin-top:16px;display:flex;align-items:center;gap:10px;background:var(--brand-soft);border:1px solid var(--brand-light);border-radius:10px;padding:10px 14px;font-size:12px;font-weight:600;color:var(--brand-deep);}
+  .q-prompt .material{flex:0 0 auto;font-size:14px;}
+  .q-prompt .txt{flex:1 1 auto;min-width:0;}
+  .q-prompt .act{flex:0 0 auto;font-weight:800;color:var(--brand-deep);text-decoration:underline;}
   .q-signed{margin-top:16px;display:flex;align-items:center;gap:10px;background:var(--ok-soft);border:1px solid color-mix(in srgb, var(--ok) 35%, transparent);border-radius:10px;padding:10px 14px;}
   .q-signed .tick{flex:0 0 auto;color:var(--ok);font-size:14px;font-weight:900;}
   .q-signed .txt{flex:1;font-size:10.5px;color:var(--navy);line-height:1.5;}
@@ -298,7 +327,9 @@ export const QUOTATION_STYLE = `${DS_ROOT_CSS}
   .q-fname{font-weight:800;font-size:13px;color:var(--surface);line-height:1.35;}
   .q-faddr{font-size:9.5px;font-weight:500;color:var(--text-on-dark-dim);margin-top:2px;line-height:1.6;}
   .q-freg{font-family:'Inter',system-ui,sans-serif;font-size:9.5px;color:var(--text-on-dark-dim);text-align:end;line-height:1.7;unicode-bidi:isolate;}
-  @media print{body{background:var(--surface);}.q-doc{margin:0;border-radius:0;max-width:none;}}
+  /* 🔴 The owner prompt is SCREEN ONLY — it invites the reader to fix his own account, and a paper
+     handed to a counterparty must not carry a note about the other side's profile. */
+  @media print{body{background:var(--surface);}.q-doc{margin:0;border-radius:0;max-width:none;}.q-prompt{display:none;}}
   @media (max-width:640px){.q-parties{grid-template-columns:minmax(0,1fr);}.q-head,.q-body,.q-foot{padding-inline:18px;}}`;
 
 const esc = (str: unknown) => String(str ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
@@ -361,9 +392,9 @@ export function numWordsAr(num: number): string {
 }
 
 function partyHtml(p: QuotationParty): string {
-  // A mark only exists behind a VERIFIED party, and it is drawn at the box's trailing edge — see
-  // `QuotationParty.logoUrl` for why both halves of that are deliberate.
-  const logo = p.verified && p.logoUrl ? `<img class="q-plogo" src="${esc(p.logoUrl)}" alt="" />` : "";
+  // Drawn whenever there IS one — the verification gate went on 2026-09-22; see
+  // `QuotationParty.logoUrl`. The tick beside the name is what states the check.
+  const logo = p.logoUrl ? `<img class="q-plogo" src="${esc(p.logoUrl)}" alt="" />` : "";
   const tick = p.verified ? `<span class="q-tick">✓</span>` : "";
   const rows = p.rows
     .filter((r) => (r.value ?? "").toString().trim().length > 0)
@@ -478,6 +509,16 @@ export function renderQuotationSection(doc: QuotationDoc): string {
           .filter(Boolean)
           .join(" · ")}</div>${doc.sealUrl ? `<img class="q-seal" src="${esc(doc.sealUrl)}" alt="" />` : ""}</div>`;
 
+  /* Above the signature strip, which is where the document stops being the offer and starts being
+     the platform speaking. A prompt among the TERMS would read as one. */
+  const prompt = doc.ownerPrompt
+    ? `<div class="q-prompt"><span class="material">⚠</span><span class="txt">${esc(doc.ownerPrompt.text)}</span>${
+        doc.ownerPrompt.href && doc.ownerPrompt.actionLabel
+          ? `<a class="act" href="${esc(doc.ownerPrompt.href)}">${esc(doc.ownerPrompt.actionLabel)}</a>`
+          : ""
+      }</div>`
+    : "";
+
   const f = doc.footer;
   const reg = f ? [f.crNumber ? `C.R. ${f.crNumber}` : "", f.vatNumber ? `VAT ${f.vatNumber}` : ""].filter(Boolean).join(" · ") : "";
   const contact = f ? [f.phone, f.email].filter(Boolean).join(" · ") : "";
@@ -519,6 +560,7 @@ export function renderQuotationSection(doc: QuotationDoc): string {
       </div>
       <div class="q-words">${esc(L("Amount in words", "المبلغ كتابةً"))}: <b>${esc(words)}</b></div>
       ${termsHtml}
+      ${prompt}
       ${signed}
     </div>
     ${footer}

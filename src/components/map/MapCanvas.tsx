@@ -633,6 +633,17 @@ function hoverBoxHtml(card: EquipmentCardModel, ar: boolean, scale: number, t: R
  * always in the DOM and the image is painted OVER it as a background, so a URL that 404s simply never
  * paints and the icon shows through. The icon is muted slate rather than the availability colour,
  * because a fallback is not a statement about availability; `map-proto.css` records the one residual.
+ *
+ * ── 🔴 The SUPPLIER'S OWN PHOTO, in a CIRCLE (owner, 2026-09-22) ──────────────────────────────────
+ * *"can we show the real equipment image of the supplier not this and show it as circle not squares
+ * like this"*. This reverses two rulings above for a machine that HAS a photo: the free-standing
+ * 94 × 74 object (2026-08-08) and AC-80's taxonomy image as the first choice. Every machine of one
+ * request drew the same stock render, so the map could not tell two of them apart, while the card
+ * beside it showed the real one.
+ *
+ * The photo is `pin.card.photo`, the SAME `heroPhotoUrl` the fleet card shows, so a marker and its
+ * card can never show two pictures of one machine. The chain is now photo → taxonomy image → icon,
+ * all three inside the circle; the background-over-icon trick still covers a URL that fails.
  */
 function machineIcon(
   pin: MachinePin,
@@ -697,6 +708,9 @@ function machineIcon(
   const art = selected
     ? "animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards"
     : "transform:translateY(-4px)";
+  // The machine's own photo first (owner, 2026-09-22), the request's taxonomy image after it.
+  const photo = safeImageUrl(pin.card?.photo ?? null);
+  const artSrc = photo ?? src;
 
   return L.divIcon({
     className: "", // no Leaflet default box — the marker is entirely our own markup
@@ -735,9 +749,9 @@ function machineIcon(
       // half of a shadow this app no longer has.
       `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";outline:4px solid color-mix(in srgb, var(--info) 60%, transparent)" : ""}"></span>` +
       `<span class="bm-pin-shadow"></span>` +
-      `<span class="bm-pin-art" style="${art}">` +
+      `<span class="bm-pin-art${photo ? " is-photo" : ""}" style="${art}">` +
       `<span class="bm-pin-glyph material-icons-outlined">${esc(iconName)}</span>` +
-      (src ? `<span class="bm-pin-img" style="background-image:url('${src}')"></span>` : "") +
+      (artSrc ? `<span class="bm-pin-img" style="background-image:url('${artSrc}')"></span>` : "") +
       `</span>` +
       // A sibling of the object, not a child: the object carries a `filter`, which would make it the
       // containing block and drag the tick along with the lift.

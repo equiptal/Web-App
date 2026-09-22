@@ -228,18 +228,30 @@ export function CtaBanner() {
       />
       <span aria-hidden="true" className="absolute inset-0 -z-10 bg-navy opacity-[0.35] mix-blend-multiply" />
 
-      {/* ── The season's own layer, and it is LAST here on purpose ───────────────────────
-          The kit's eight-palm TREE LINE plus the dot lattice. The kit says which piece belongs
-          where: eight palms "need room to work — it is for a splash or a role gate, not a 66 dp
-          bar", and this band is 160px and full-window. The header keeps the four cut-off trees.
+      {/* 🔴 **THE SEASON IS OFF THIS BAND** (owner, 2026-09-22, on a screenshot of it carrying
+          palms and a dot field: *"can u remove the palms and theme here on the cta keep it as its
+          original"*).
 
-          🔴 **It must come after the photograph, the two gradients and the multiply**, because all
-          four are at exactly `-z-10` and among equals the last one wins. Declared above them it is
-          perfectly present in the DOM and invisible on screen — which is the halo bug this same
-          file shipped with on 2026-09-16, in the same depth, for the same reason.
+          ~~`nd-band`: the kit's eight-palm TREE LINE plus the dot lattice, on the reasoning that
+          eight palms "need room to work — it is for a splash or a role gate, not a 66 dp bar" and
+          this band is 160px and full-window.~~ That was the best surface in the app FOR the motif
+          and it is still the wrong place for it: this band exists to say ONE sentence, and a grove
+          drawn across the photograph competes with the sentence rather than framing it.
 
-          Inert out of season: `.nd-band` matches no rule until the attribute is written. */}
-      <span aria-hidden="true" className="nd-band absolute inset-0 -z-10" />
+          ⚠️ **This is the FOURTH treatment withdrawn from this one element**, after the gold
+          seam and the dune sweep (both 2026-09-17) and the ordinal mark. The band's own navy, its
+          photograph, its one orange word and its orange button have never changed throughout. The
+          lesson is worth keeping rather than re-learning: **the dashboard band takes no seasonal
+          decoration at all** - not on its edges, not across its face.
+
+          ⚠️ **Deleted rather than left inert**, which is the dune's own precedent: the class
+          off the element, the `.nd-band` rule out of `globals.css`, and `nd96-treeline.svg` with
+          it. An unused seasonal rule is one edit away from coming back by accident.
+
+          ⚠️ **The header is untouched and still wears the season** - its green gradient, its
+          grove and the gold Najdi seam along its bottom edge, which is the zigzag directly above
+          this band in his screenshot. He named the CTA; the bar was his own choice of home for the
+          season on 2026-09-17 and is not this change's to take. */}
 
       <div className={cx("relative mx-auto flex w-full items-center gap-6", PAGE_MAX, PAGE_X)}>
         <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-5">

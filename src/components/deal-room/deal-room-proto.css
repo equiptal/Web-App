@@ -170,7 +170,8 @@
    Centered like `.sysev` (they are narration, not a party bubble) but a card, since they carry values. */
 /* The tone stripe is on the inline-START edge so it mirrors correctly under `dir=rtl`. */
 /* Centred, because the negotiation vocabulary is an EVENT in the room rather than either party's
-   remark — the dock reaches the same answer through `.bm-chat-event`. The dock's ceiling and no
+   remark. (The map's dock draws these as the app's grey pill since 2026-09-22, `.bm-chat-pill`; this
+   room keeps the card, because its rate card carries Accept and Counter.) The dock's ceiling and no
    margin, for the reason `.dl-rq-card` above carries. */
 .dlproto .chatcard { align-self: center; width: 86%; max-width: min(86%, 376px); margin: 0; padding: 11px 13px; background: var(--surface1); border: 1px solid var(--border); border-inline-start: 3px solid var(--border); border-radius: var(--radius-lg); }
 .dlproto .cc-head { display: flex; align-items: center; gap: 7px; }
@@ -423,15 +424,29 @@
   animation: ngSheetUp .3s cubic-bezier(.32,.72,.3,1);
   /* The one gutter every band answers to — the header's, the footer's and the body's cards alike. */
   --ng-gutter: clamp(16px, 3vw, 40px);
+  /* 🔴 **THE PAPER.** Owner, 2026-09-22: *"i want the previosu 3 sheets style layout ... i
+     mean for the frame and general layout"*, pointing at `main` / `beta`, where the sheet is a
+     white PAPER centred on a grey desk under a numbered step rail.
+     ⚠️ **940, not beta's 800**, and the number is not a taste: `.ng-cmp` is already capped at
+     940 and `.ng-grow` at 820, so at this width nothing that is ALREADY capped changes size and
+     everything uncapped comes in to meet them. Importing beta's 800 would have shrunk the
+     compare card that was measured at 940 on 2026-09-22. */
+  --ng-paper: 940px;
 }
 @keyframes ngSheetUp { from { transform: translateY(100%); } to { transform: none; } }
-/* 🔴 NO COLUMN CAP. ~~The content was capped at 760px and centred, on the argument that the design
-   is drawn to a phone's width.~~ Owner: *"centralize the parent cards across the screen so it has
-   equal margin on right and on left"*, which is also this product's own standing ruling of the same
-   morning — every page is FLUID, the 1440 cap is gone, and a sheet keeping a private one of its own
-   would be the one surface that did not follow it. The cards take the width and each one sits in the
-   SAME gutter, so the margin is equal on both sides at any screen size. */
-.ng-inner { width: 100%; }
+/* 🔴 **A PAPER COLUMN, centred on the desk** (owner, 2026-09-22, pointing at `main` / `beta`:
+   *"i want the previosu 3 sheets style layout ... for the frame and general layout"*).
+
+   🔴 **This REVERSES 2026-09-19's no-cap ruling**, which was itself a withdrawal of a 760px cap:
+   ~~*"centralize the parent cards across the screen so it has equal margin on right and on left"*~~.
+   That ruling is not wrong about margins and it never was — the gutter is still one number and the
+   margin is still equal on both edges. What it could not give is the thing he is asking for now: a
+   SHEET reads as a sheet only when it has an edge, and content running a 1900px monitor has none.
+   The desk (`.ng-body`'s grey) is what the margin becomes.
+
+   ⚠️ The HEAD and the FOOT take the same column, so the party, the rate and the footer's buttons
+   stand on the paper's own verticals rather than at the window's edges with the sheet in between. */
+.ng-inner { width: 100%; max-width: var(--ng-paper); margin-inline: auto; }
 
 /* ── header ─────────────────────────────────────────────────────────────────────────────────────
    The running total on the leading edge, the counterparty on the trailing one. */
@@ -462,11 +477,41 @@
 .ng-note.danger { color: var(--danger); }
 .ng-note .material-icons-outlined { font-size: 13px; }
 
+/* ── the step rail ─────────────────────────────────────────────────────────
+   🔴 **RESTORED from `beta` (owner, 2026-09-22).** It is the one device that makes three pages
+   read as THREE SHEETS rather than as a page that keeps replacing itself: ① Price —— ② Terms ——
+   ③ Review, each badge filling as it is passed, the bar between them turning green behind it.
+   Without it the only thing naming the step was the footer's own button, which says where you are
+   GOING and never where you are.
+
+   ⚠️ **Tokens direct — `--brand` for the step you are on, `--ok` for one you have finished.** beta
+   remapped `--action` and `--rentee` locally inside the sheet to reach the same two colours, and a
+   local remap of `--action` is exactly the drift `palette-drift` and RM3-AC-33 exist to stop: that
+   token is the bid map's ask and means one thing in this product.
+
+   ⚠️ It is `aria-hidden`: the footer's button already names the next step in words, and a rail
+   that reads out «one, Price, two, Terms» before every screen is three labels for one fact. */
+.ng-steps { flex: 0 0 auto; padding: 10px var(--ng-gutter) 11px; background: color-mix(in srgb, var(--brand) 6%, var(--surface)); border-bottom: 1px solid var(--border-hair); }
+.ng-steps .ng-inner { display: flex; align-items: center; gap: 4px; }
+.ng-step { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.ng-step .badge { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--surface); border: 1.5px solid var(--border); color: var(--muted); font-size: 12.5px; font-weight: 800; }
+.ng-step .lbl { font-size: 13px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.ng-step.on .badge { background: var(--brand); border-color: var(--brand); color: var(--brand-fg); }
+.ng-step.on .lbl { color: var(--brand-deep); font-weight: 800; }
+.ng-step.done .badge { background: var(--ok); border-color: var(--ok); color: var(--surface); }
+.ng-step.done .lbl { color: var(--ok); }
+/* The rule between two steps: it grows, so the rail spans the paper at any width. */
+.ng-steps .bar { flex: 1 1 auto; height: 2px; border-radius: 2px; background: var(--border); min-width: 18px; margin: 0 8px; }
+.ng-steps .bar.done { background: var(--ok); }
+
 /* ── body ───────────────────────────────────────────────────────────────────────────────────── */
-.ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; background: var(--surface2); }
-/* ONE gutter, on the body's own column, so every card below inherits the same margin rather than
-   each block carrying its own and drifting apart. */
-.ng-body .ng-inner { padding: 14px var(--ng-gutter) 20px; }
+/* ⚠️ **The gutter is on the BAND, not on the paper column** — as it is on the head, the rail and
+   the foot. It sat on `.ng-inner` here, so this one column measured 940 of CONTENT while the other
+   three measured 940 including their padding: the body's cards stood 40px inside the header's own
+   verticals, on the one sheet whose whole point is that the bands line up. Measured at 1920:
+   1020 against 940 before, 940 across all four after. */
+.ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-inline: var(--ng-gutter); background: var(--surface2); }
+.ng-body .ng-inner { padding: 14px 0 20px; }
 .ng-pad { padding: 0; }
 /* The white card is a CARD here, not the phone's full-bleed band: on a wide screen a band that
    reaches both edges stops reading as one object among others. */
@@ -585,23 +630,34 @@
    ⚠️ **Two strip treatments only**: «Agreed terms ✓» is the green one, everything else the grey.
    The rest of this page is a row, so the remaining kinds take grey rather than inventing a third and
    fourth colour. */
-.ng-sect-title { margin: 2px 0 6px; font-size: 12.5px; font-weight: 800; color: var(--navy); }
-.ng-sect { margin-top: 10px; border: 1px solid var(--border-hair); border-radius: 10px; overflow: hidden; }
-.ng-sect-h { display: flex; align-items: center; gap: 8px; width: 100%; padding: 11px 12px; border: 0; background: var(--surface2); font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted); text-align: start; cursor: pointer; }
+/* 🔴 **THE TERMS STEP IS SIZED FOR A DESKTOP** (owner, 2026-09-22: *"for terms use same structure
+   and same languag eand same behaviour but on sizes suitable foe web"*).
+
+   ⚠️ **Structure, wording and behaviour are UNTOUCHED** — the app's six sections in the app's
+   order, its three Change labels, its open/collapse rule and its queue. He named the sizes and
+   nothing else, and the six sections were read off `counter_offer_terms_page.dart` on 2026-09-22.
+
+   ⚠️ **The row's own 820px cap is GONE**, because the paper is 940 and already caps it: two caps
+   on one row is how a row ends up narrower than the card holding it for a reason nobody can find.
+   Every figure below went up about one step — 11px→13.5 on the band, 12→13 in a row — which is the
+   difference between a phone's reading distance and a monitor's. */
+.ng-sect-title { margin: 4px 0 8px; font-size: 13.5px; font-weight: 800; color: var(--navy); }
+.ng-sect { margin-top: 12px; border: 1px solid var(--border-hair); border-radius: 10px; overflow: hidden; }
+.ng-sect-h { display: flex; align-items: center; gap: 8px; width: 100%; padding: 13px 16px; border: 0; background: var(--surface2); font-family: inherit; font-size: 13.5px; font-weight: 700; color: var(--muted); text-align: start; cursor: pointer; }
 .ng-sect-h .t { flex: 1 1 auto; min-width: 0; }
-.ng-sect-h .chev { flex: 0 0 auto; font-size: 13px; transition: transform .2s ease; }
+.ng-sect-h .chev { flex: 0 0 auto; font-size: 15px; transition: transform .2s ease; }
 .ng-sect-h .chev.open { transform: rotate(-90deg); }
 .ng-sect.agreed .ng-sect-h { background: var(--ok-soft); color: var(--ok); }
 /* Breathing room INSIDE the card: without the top gap the first row's border touches the header's
    hairline and the two read as one smudged edge. */
-.ng-sect-b { padding: 8px 10px 10px; background: var(--surface); }
+.ng-sect-b { padding: 10px 14px 13px; background: var(--surface); }
 .ng-sect-b:empty { display: none; }
-.ng-grow { display: flex; align-items: center; justify-content: space-between; gap: 10px; max-width: 820px; margin-top: 4px; padding: 8px 12px; border-radius: 8px; background: var(--surface-alt); }
+.ng-grow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 5px; padding: 10px 14px; border-radius: 8px; background: var(--surface-alt); }
 .ng-grow:first-child { margin-top: 0; }
 .ng-grow.live { cursor: pointer; }
 .ng-grow.live:hover { background: var(--surface2); }
-.ng-grow .k { font-size: 12px; font-weight: 600; color: var(--muted); }
-.ng-grow .v { font-size: 12px; font-weight: 700; color: var(--muted-dark); }
+.ng-grow .k { font-size: 13px; font-weight: 600; color: var(--muted); }
+.ng-grow .v { font-size: 13px; font-weight: 700; color: var(--muted-dark); }
 .ng-grow.agreed { background: color-mix(in srgb, var(--ok-soft) 45%, var(--surface)); }
 .ng-grow.agreed .k { color: var(--muted-dark); }
 .ng-grow.agreed .v { color: var(--ok); }
@@ -804,7 +860,9 @@
 .dlproto .dr-menu button.danger:hover { background: var(--danger-bg); }
 
 /* Destructive confirm button, alongside `.warn` and `.green`. */
-.dlproto .dl-mbtn.danger { background: var(--danger); border-color: var(--danger); color: var(--surface); }
+/* ~~`.dl-mbtn.danger`.~~ Swept with its last caller (2026-09-22). Every dialog in this file's
+   surfaces is the app's own `Dialog` now, and its acts are `DialogButton`s, so a button skin
+   here would be a second answer to a question the design system already answers. */
 
 /* ── term provenance + last-move hint ───────────────────────────────────────────────────────────
    Two sub-label lines under a term's name: WHERE its value came from, and the last move made on it.

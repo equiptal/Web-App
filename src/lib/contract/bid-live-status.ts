@@ -25,7 +25,18 @@ export type BidLiveStatusKind =
    * always lived gets read as a status label and skipped. The kind stays distinct so the CTA can
    * still name the answer, which is where a sentence fits.
    */
-  | "ask-answered";
+  | "ask-answered"
+  /**
+   * 🔴 **The supplier revised his offer** — a new price, new units, new terms. Distinct from
+   * `ask-answered` because it is not something he SAID, it is the offer itself moving under the
+   * renter. The backend has emitted it all along (`bid-live-status.ts:89-90`, from
+   * `bid.price_changed` / `bid.updated`); this parser did not name it, so every one was DROPPED by
+   * the unrecognised-kind rule below and the card said nothing.
+   */
+  | "bid-changed"
+  /** 🔴 **The supplier pulled the offer.** Same story: `bid.withdrawn` reaches us and was discarded.
+   *  The end of the bid, reported in the same slot as everything else so there is one place to look. */
+  | "bid-withdrawn";
 
 export interface BidLiveStatus {
   kind: BidLiveStatusKind;
@@ -41,6 +52,8 @@ const KIND_FROM_WIRE: Record<string, BidLiveStatusKind> = {
   quotationDownloaded: "quotation-downloaded",
   renteeMessage: "rentee-message",
   askAnswered: "ask-answered",
+  bidChanged: "bid-changed",
+  bidWithdrawn: "bid-withdrawn",
 };
 
 /**

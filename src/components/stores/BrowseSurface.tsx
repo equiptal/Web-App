@@ -263,7 +263,11 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
             tokens, `py-2` — so it stood 8px shorter than the input beside it and in a different grey.
             `triggerClass` is a per-call override and reaches no other dropdown in the product.
             The wrapper carries the width because `Dropdown`'s root takes no `className`. */}
-        <div className="w-[190px] flex-none">
+        {/* ⚠️ **Full width once the row has wrapped** (phone). Measured at 360 and 392: the
+            search takes the whole row, so the city dropped to a line of its own and sat 190px wide
+            in a 360px row - a ragged half-empty band under a full-width field. It keeps its 190px
+            from `sm` up, which is where the two share a line and the pair reads as one control. */}
+        <div className="w-full flex-none sm:w-[190px]">
           <Dropdown
             label={t.browse.anyCity}
             placeholder={t.browse.anyCity}

@@ -3,9 +3,7 @@ import {
   EMPTY_SELECTION,
   documentsTargetUnit,
   filterBySource,
-  isClosedGroup,
   isNewEntryRequest,
-  isClosedRequest,
   railTiles,
   requestActions,
   resolveSelection,
@@ -15,7 +13,7 @@ import {
   termsDial,
   type WorkspaceBid,
 } from "@/lib/contract/workspace";
-import type { RequestGroup, RequestListItem, RequestStatus } from "@/lib/contract/requests";
+import { groupBiddingClosed, type RequestGroup, type RequestListItem, type RequestStatus } from "@/lib/contract/requests";
 import type { BidCard, TermRow, TermState } from "@/lib/contract/bids";
 
 function item(id: string, status: RequestStatus = "OPEN", qty = 1, imageUrl: string | null = null): RequestListItem {
@@ -67,31 +65,58 @@ function bid(id: string, source: "app" | "offline"): WorkspaceBid {
   return { card: { id } as BidCard, source };
 }
 
-describe("isClosedRequest", () => {
-  it("treats every end-of-life status as closed, whatever its case", () => {
-    for (const s of ["CLOSED", "HUB_CLOSED", "EXPIRED", "FORCE_EXPIRED", "closed"]) {
-      expect(isClosedRequest(s)).toBe(true);
+/**
+ * 🔴 **A circle is shut exactly when the navy bar under it says so** (owner, 2026-09-22, on a
+ * tile drawing full colour and a share badge beneath a bar reading CLOSED).
+ *
+ * ~~`isClosedRequest` / `isClosedGroup`, a DENYLIST of {CLOSED, HUB_CLOSED, EXPIRED,
+ * FORCE_EXPIRED}.~~ The context bar reads `groupBiddingClosed`, an ALLOWLIST of the LIVE statuses,
+ * so a CANCELLED request was shut to the bar and live to the rail. The two agreed on the four the
+ * denylist named, which is why it stood: only a cancellation parts them.
+ *
+ * ⚠️ These cases assert the ALIGNMENT rather than a list of statuses. A list would have to be
+ * edited in step with `isBiddingClosed` by hand, which is the drift this replaces; comparing the
+ * two answers cannot go stale.
+ */
+describe("the rail circle and the context bar agree on «closed»", () => {
+  const STATUSES: RequestStatus[] = [
+    "OPEN",
+    "ACTIVE",
+    "PARTIALLY_ACCEPTED",
+    "ACCEPTED",
+    "CANCELLED",
+    "ABANDONED",
+    "CLOSED",
+    "HUB_CLOSED",
+    "EXPIRED",
+    "FORCE_EXPIRED",
+  ];
+
+  it("reads every status the same way the bar does", () => {
+    for (const st of STATUSES) {
+      const items = [item("a", st)];
+      expect(railTiles([group("g", items)])[0].closed).toBe(groupBiddingClosed(items));
     }
   });
 
-  it("leaves live requests open", () => {
-    for (const s of ["OPEN", "ACTIVE", "PARTIALLY_ACCEPTED", "ACCEPTED"]) {
-      expect(isClosedRequest(s)).toBe(false);
-    }
+  it("calls a CANCELLED request closed — the case the two predicates used to disagree on", () => {
+    expect(railTiles([group("g", [item("a", "CANCELLED")])])[0].closed).toBe(true);
   });
-});
 
-describe("isClosedGroup", () => {
   it("stays open while one item is live", () => {
-    expect(isClosedGroup(group("g", [item("a", "CLOSED"), item("b", "OPEN")]))).toBe(false);
+    const items = [item("a", "CLOSED"), item("b", "OPEN")];
+    expect(railTiles([group("g", items)])[0].closed).toBe(false);
   });
 
   it("closes only when every item has", () => {
-    expect(isClosedGroup(group("g", [item("a", "CLOSED"), item("b", "EXPIRED")]))).toBe(true);
+    const items = [item("a", "CANCELLED"), item("b", "EXPIRED")];
+    expect(railTiles([group("g", items)])[0].closed).toBe(true);
   });
 
+  /* An empty group is not a shut request: it is a group we know nothing about, and greying it
+     would state a fact about a request whose items have not loaded. */
   it("does not call an empty group closed", () => {
-    expect(isClosedGroup(group("g", []))).toBe(false);
+    expect(railTiles([group("g", [])])[0].closed).toBe(false);
   });
 });
 

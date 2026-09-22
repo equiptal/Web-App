@@ -146,13 +146,13 @@ export const COLORS = {
      surfaces (the OG image, the clipboard card, the printed quotation) wears the season today: a
      quotation is a contract document and a pasted card lands in somebody else's inbox, and neither
      is a place to celebrate. They are here to be reachable, and to be checked. */
-  ndGround: "#00542a",
-  ndDeep: "#05351f",
-  ndMid: "#0a7a3e",
-  ndGreen: "#006c35",
+  ndGround: "#004724",
+  ndDeep: "#042d1a",
+  ndMid: "#096835",
+  ndGreen: "#005c2d",
   ndAccent: "#d7c48a",
   ndMint: "#e8f2ea",
-  ndInk: "#0d5c3e",
+  ndInk: "#0b4e35",
 } as const;
 
 /**

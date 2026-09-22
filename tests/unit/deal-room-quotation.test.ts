@@ -4,7 +4,7 @@ import {
   mapDealRoom, mapQuotation, quotationLinkKind, buildDealRoomQuotationDoc, isHiddenDealRoomTermKey,
   type DealRoomView, type QuotationView,
 } from "@/lib/contract/deal-room";
-import { renderQuotationSection } from "@/lib/quotation/render";
+import { renderQuotationSection, QUOTATION_STYLE } from "@/lib/quotation/render";
 
 /**
  * The deal-room quotation, aligned to the APP (owner's ruling: the app's behaviour is correct).
@@ -326,5 +326,68 @@ describe("a deal that has a stored PDF still renders live", () => {
     const src = readFileSync("src/components/deal-room/DealRoom.tsx", "utf8");
     expect(src).not.toMatch(/if\s*\(\s*q\.pdfUrl\s*\)/);
     expect(src).not.toMatch(/window\.open\(\s*q\.pdfUrl/);
+  });
+});
+
+// ── 8 · The supplier's mark, and the renter's own gap ────────────────────────────────────────────────
+
+describe("the supplier's mark reaches BOTH documents", () => {
+  /* 🔴 `storeLogoKey` has been on the deal-room payload since the room shipped
+     (`deal-room.service.ts:1601`) and the web read it NOWHERE — so the deal room's quotation printed
+     no supplier logo at the top or in its footer while the BID quotation printed both. One contract,
+     two documents, which is the split the app forbids. */
+  it("draws the supplier's store mark at the party box and in the navy footer", () => {
+    const r = mapDealRoom({ ...rawRoom(), supplier: { id: 2, companyName: "Acme Cranes", isVerified: true, storeLogoKey: "stores/acme/logo.png" } });
+    expect(r.supplier.logoUrl).toContain("stores/acme/logo.png");
+    const doc = buildDealRoomQuotationDoc(r, null, RENTEE, false, L);
+    expect(doc.supplier.logoUrl).toBe(r.supplier.logoUrl);
+    expect(doc.footer?.logoUrl).toBe(r.supplier.logoUrl);
+  });
+
+  /* 🔴 **The verification gate is WITHDRAWN** (owner, 2026-09-22: *"the supplier logo must appear at
+     top and at footer beside his name"*), matching the ruling the NAMES took the same day: a mark is
+     the firm's own claim and the tick beside it is what says anyone checked. */
+  it("draws the mark for an UNVERIFIED firm too, and still says it is unverified", () => {
+    const r = mapDealRoom({ ...rawRoom(), supplier: { id: 2, companyName: "Acme Cranes", isVerified: false, storeLogoKey: "k.png" } });
+    const html = renderQuotationSection(buildDealRoomQuotationDoc(r, null, RENTEE, false, L));
+    expect(html).toContain("q-plogo");
+    expect(buildDealRoomQuotationDoc(r, null, RENTEE, false, L).supplier.verified).toBe(false);
+  });
+
+  /* ⚠️ Absent, NOTHING is drawn: an empty tile reads as a mark that failed to load. */
+  it("draws no tile at all when the firm has no mark", () => {
+    const r = mapDealRoom(rawRoom());
+    expect(r.supplier.logoUrl).toBeNull();
+    expect(renderQuotationSection(buildDealRoomQuotationDoc(r, null, RENTEE, false, L))).not.toContain("q-plogo");
+  });
+});
+
+describe("the renter's own prompt", () => {
+  const withPrompt = () => {
+    const doc = buildDealRoomQuotationDoc(room(), null, RENTEE, false, L);
+    doc.ownerPrompt = { text: "Your company is not verified yet", actionLabel: "Verify your company", href: "/profile" };
+    return renderQuotationSection(doc);
+  };
+
+  it("names the gap and the way to fix it", () => {
+    const out = withPrompt();
+    expect(out).toContain("q-prompt");
+    expect(out).toContain("Your company is not verified yet");
+    expect(out).toContain("Verify your company");
+  });
+
+  /* 🔴 **SCREEN ONLY.** It invites the reader to fix his OWN account, and a paper handed to a
+     counterparty must not carry a note about the other side's profile. */
+  it("is dropped by the print stylesheet", () => {
+    /* ⚠️ A substring, not a `[^}]*` regex: the print block nests rules, so a negated-class match
+       stops at the first inner `}` and fails on a stylesheet that is perfectly correct. */
+    const print = QUOTATION_STYLE.slice(QUOTATION_STYLE.indexOf("@media print{"));
+    expect(print).toContain(".q-prompt{display:none;}");
+  });
+
+  /* ⚠️ Absent by default: every existing caller passes nothing, and a document that always carried a
+     prompt would nag a renter whose account is complete. */
+  it("draws nothing when there is no gap", () => {
+    expect(renderQuotationSection(buildDealRoomQuotationDoc(room(), null, RENTEE, false, L))).not.toContain("q-prompt");
   });
 });

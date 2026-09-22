@@ -227,7 +227,14 @@ export function ShareOnPost({
    */
   const offCatalogue = !!draftForm?.items.length && draftForm.items.every((i) => i.isUndefined === true);
 
-  const post = async (): Promise<string | null> => {
+  /**
+   * `asBroadcast` is the confirmation's «Broadcast instead» on a DIRECT request (app parity).
+   *
+   * ⚠️ It is handed to `submit`, never dispatched here and read back: `submit` reads the store
+   * through a ref written during RENDER, so a `goBroadcast()` on the line above would not be visible
+   * to the call on the line below and the request would go to the firm he had just declined.
+   */
+  const post = async (asBroadcast?: boolean): Promise<string | null> => {
     /**
      * The account gate lives here now, because this is the button that posts.
      *
@@ -239,7 +246,7 @@ export function ShareOnPost({
       setShowAccount(true);
       return null;
     }
-    const result = await actions.submit();
+    const result = await actions.submit({ asBroadcast });
     const uuid = result?.requestUuids?.[0] ?? null;
     // `submit` has already put the failure on the store; the review above says what went wrong.
     if (!uuid) return null;

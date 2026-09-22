@@ -6,12 +6,15 @@
 import { computeRentalTotal, divisorNote, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
 import { cityLabel, urgencyLabel, rentalTypeLabel, fulfillmentLabel, latinDigits, termValueLabel } from "@/lib/contract/labels";
 import { partyToken } from "./labels";
+import { companyNamePartsOf, counterpartyDisplayName } from "./counterparty-name";
+import { mediaUrl } from "./stores";
 // Type-only — the deal-room quotation BUILDER lives here (pure, testable in the node suite); the
 // rendering itself stays in the shared template module.
 import type { QuotationDoc, QuotationLineItem, QuotationMoneyCell, QuotationPartyRow } from "@/lib/quotation/render";
 import { CLAUSE, ClauseList, extraTermClauses, resolveTerm, type TermSource as ClauseTermSource } from "@/lib/quotation/clauses";
 import { quotationLegal } from "@/lib/quotation/render";
 import { SUPPORT_EMAIL } from "@/lib/quotation/bid-quotation";
+import { HIDDEN_TERM_KEYS } from "@/lib/contract/term-visibility";
 
 export type DealRoomStatus = "OPEN" | "NEGOTIATING" | "AWAITING_SUPPLIER_CONFIRMATION" | "CLOSED" | "ABANDONED" | string;
 
@@ -21,6 +24,19 @@ export interface DealParty {
   isVerified: boolean;
   /** Contact number. Server-gated: supplier.phone is always present; rentee.phone only once CLOSED. */
   phone: string | null;
+  /**
+   * The firm's mark, from the supplier's STORE (`storeLogoKey`).
+   *
+   * 🔴 **On the wire since the room shipped (`deal-room.service.ts:1601`) and read by NOTHING here
+   * until now**, which is why the deal room's quotation printed no supplier logo at the top OR in its
+   * footer while the BID quotation printed both — one contract, two documents, and the app forbids
+   * exactly that.
+   *
+   * ⚠️ The STORE's logo, not a company one: a supplier has no separate company mark by design (the
+   * same split `companyLogoKindFor` makes on the profile), so reading a company field here would
+   * render an empty tile for a firm with a perfectly good mark on file.
+   */
+  logoUrl: string | null;
 }
 
 export type TermState = "fixed" | "soft_accepted" | "disputed" | "pending" | "agreed" | string;
@@ -312,9 +328,14 @@ function mapDoc(raw: Record<string, unknown>): DealRoomDocument {
  *  the web printing those two on the quotation while the app printed neither — one contract, two
  *  documents. */
 export const HIDDEN_DEAL_ROOM_TERM_KEYS = new Set<string>([
+  /* 🔴 The PRODUCT-WIDE set is spread in rather than restated (2026-09-22). This list
+     held `operator_nationality` of its own, and the day that term left every OTHER surface
+     too there were two places saying so - which is how one of them comes to be edited alone.
+     The keys below it are the deal room's own, hidden here and nowhere else. */
+  ...HIDDEN_TERM_KEYS,
   "PRICE", "mobilization_pricing", "demobilization_pricing",
   "fulfillment_type", "required_attachments", "mobilization_lead_time",
-  "operator_nationality", "operator_certification", "safety_certifications",
+  "operator_certification", "safety_certifications",
   "fat", "payment_method", "offer_duration",
   /* 🔴 `overtime_rate` joined the list on 2026-09-18, matching `kHiddenDealRoomTermKeys`. The rentee is
      no longer asked for an overtime rate (2026-08-30), so there is nothing to negotiate — the room was
@@ -644,9 +665,16 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     supplierId: n(d.supplierId),
     supplier: {
       id: n(sup.id),
-      name: s(sup.companyName) ?? s(sup.storeName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
+      // ⚠️ The four name columns first (`counterpartyDisplayName` — the backend's own order, and the
+      // one rule every surface reads). `getDealRoom` already folds its resolved brand into
+      // `companyName`, which is one of those four, so a payload that carries only that still lands on
+      // the same answer. The STORE name sits below them and above the person.
+      name: counterpartyDisplayName(companyNamePartsOf(sup))
+        || s(sup.storeName)
+        || ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
       isVerified: sup.isVerified === true,
       phone: s(sup.phone),
+      logoUrl: mediaUrl(sup.storeLogoKey ?? sup.store_logo_key ?? sup.storeLogoUrl),
     },
     rate: n(d.lastProposedRate) ?? n(bid.priceAmount),
     mobPrice: n(d.lastProposedMobPrice) ?? n(bid.mobPrice),
@@ -920,6 +948,7 @@ export function buildDealRoomQuotationDoc(
       label: ar ? "SUPPLIER / المورد" : "SUPPLIER",
       name: room.supplier.name,
       verified: room.supplier.isVerified === true,
+      logoUrl: room.supplier.logoUrl,
       rows: partyRows([
         // Live — the deal-room payload always carries the supplier's phone; the snapshot only backstops.
         [L("Phone", "الهاتف"), room.supplier.phone ?? q?.supplierPhone ?? null],
@@ -948,6 +977,9 @@ export function buildDealRoomQuotationDoc(
       name: room.supplier.name,
       phone: room.supplier.phone ?? q?.supplierPhone ?? null,
       email: q?.supplierEmail ?? null,
+      // The SUPPLIER's mark, beside his name in the navy band — q3's own footer, and what the bid
+      // quotation has drawn all along.
+      logoUrl: room.supplier.logoUrl,
     },
     /**
      * 🔴 THE SAME FIVE CLAUSES the bid quotation prints. ~~A two-sentence disclaimer, on the

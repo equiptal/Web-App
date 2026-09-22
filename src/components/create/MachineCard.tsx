@@ -44,6 +44,7 @@ import {
   type Party,
   type RequiredGap,
 } from "@/lib/contract";
+import { MachineGlyph } from "@/components/MachineGlyph";
 
 /**
  * The title of an overlay control, carrying its star and, once it has refused, the word.
@@ -268,7 +269,13 @@ export function MachineCard({
 
             ⚠️ **CONTENT, still the real fix and still owed**: masters cut 4:5 for this box, or shot
             on transparency. Either retires both this token and the `scale-[1.2]` below. */}
-        <div {...pin("machine-card-image")} className={`relative min-h-[450px] max-h-[640px] w-full min-w-0 overflow-hidden rounded-md ${photo && !photoBroken ? "bg-photo-ground" : "bg-surface2"}`}>
+        {/* 🔴 **The 450px floor is a DESKTOP floor** (owner, 2026-09-14: *"same height as its
+            neighbour card"*), and the neighbour is only beside it from `lg` up - below that the grid
+            is one column and the photograph sits ON TOP of every field it was meant to stand level
+            with. At 450px it took more than half an 844px phone screen before the renter reached the
+            first answer. 260px on a phone; the floor and the ceiling both return at `sm`, where the
+            2026-09-14 and 2026-09-15 measurements (the 1.2 scale, the 366x450 box) still hold. */}
+        <div {...pin("machine-card-image")} className={`relative min-h-[260px] w-full min-w-0 overflow-hidden rounded-md sm:min-h-[450px] sm:max-h-[640px] ${photo && !photoBroken ? "bg-photo-ground" : "bg-surface2"}`}>
           {/* ── The subtype's own photograph, where the admin panel has one (owner, 2026-08-31) ──
               The panel drew a Material Symbol chosen by matching the subtype's NAME against a list of
               words — «excavator» → the agriculture glyph — which is a reasonable guess and never the
@@ -1136,7 +1143,7 @@ function EquipmentChooser({
                               onError={() => setBrokenArt((b) => (b.includes(r.id) ? b : [...b, r.id]))}
                             />
                           ) : (
-                            <Icon name="precision_manufacturing" size={16} className="text-muted" />
+                            <MachineGlyph size={16} className="text-muted" />
                           )}
                         </span>
                         <span className="min-w-0 truncate">

@@ -431,8 +431,18 @@ export const en = {
          «Every supplier there can bid on it» is the broadcast promise and it is false here. The
          title is the STORE's own name; these are the fallback and the two sentences. */
       destDirectFallback: "This supplier",
-      destDirectLine: "Your request goes to this supplier only, and nobody else sees it",
+      destDirectLine: "They will be the only supplier who can bid",
       destDirectPosted: "It is already sent to this supplier",
+      /* ── The renter may still send it to the whole market instead (app parity, 2026-09-22) ────
+         The app's `submitConfirmSheet*` strings, word for word, because this is the same question
+         asked at the same moment and the two products must not phrase it differently. */
+      whoReceives: "Who receives it",
+      confirmSubPick: "Pick one option to confirm",
+      /* The act, while WHO it reaches is the question above the button. «Post to Moedatech» over a
+         card reading «nobody else sees it» is the dialog arguing with itself. */
+      confirmDoPostRequest: "Post the request",
+      destBroadcastInstead: "Broadcast instead",
+      destBroadcastLine: "Reach all matching suppliers in your area and compare bids",
       destMoedatech: "Moedatech",
       destShared: "Shared",
       destOutlook: "Outlook",
@@ -448,6 +458,9 @@ export const en = {
       destOutlookOff: "Outlook is not connected",
       destOutlookOffBody: "Nothing is e-mailed. Connect Outlook and your requests go out from your own address, with your suppliers in blind copy",
       confirmPostTitle: "Post this request and e-mail it?",
+      /* Nothing is e-mailed on this press: Moedatech is the only channel, or Outlook is not
+         connected. The title used to promise a mail that was never going to leave. */
+      confirmPostAloneTitle: "Post this request?",
       confirmSendTitle: "E-mail this request?",
       confirmPostLine: "Your request goes live on Moedatech, where every supplier there can bid on it",
       /* ~~«…, each in blind copy».~~ Dropped from the confirmation (owner, 2026-09-08). It is true and
@@ -1090,6 +1103,7 @@ export const en = {
       lastName: "Last name must be 2–50 characters.", // AC-02/03
       city: "Select your city.", // AC-02
       jobTitle: "Select your job title.", // AC-02
+      companyName: "Enter your company name.", // app parity: required on the complete pass
       email: "Enter a valid email address.",
       emailRequired: "A valid email address is required.",
       whatsapp: "Enter a valid Saudi mobile number.", // AC-04
@@ -1329,10 +1343,15 @@ export const en = {
     // papers live behind «Details ›» on each card and are never reached from here. The full phrases
     // survive where there is room for them: the company panel's own heading still reads «Company
     // documents», and the chip carries «Verified company on the platform» on its title.
+    //
+    // 🔴 Reversed for the documents entry (owner, 2026-09-22: *"i want the company document to be
+    // clearly company documents"*). The width it needed came back the same day: the verified chip on
+    // the map header is the tick alone now, its word on the tick's name and title, so «Company
+    // documents» fits beside the name without squeezing it.
     verifiedCompany: "Verified",
     /** The chip's full sentence, on its `title` — the prototype puts it there too. */
     verifiedCompanyWhy: "Verified company on the platform",
-    companyDocuments: "Documents",
+    companyDocuments: "Company documents",
     // V3 — the count pills. `type` is the REQUEST's own equipment type, and it agrees with the count.
     // "With the supplier" means machines that FIT this request, never his whole yard.
     // «registered», not the prototype's «لدى المورد» / "with the supplier" (owner, 2026-08-10). The
@@ -1481,7 +1500,9 @@ export const en = {
      *  this offer), and what his answer does to the colour above. */
     eqYardLine1: "The supplier has not set the yard this equipment would move from for your offer, so it might not be available. Ask him to confirm it is available for your offer",
     eqYardLine2: "When he confirms availability by setting its yard, this turns green as confirmed",
-    otherBids: "Other offers",
+    // «Other bids», sentence case (owner, 2026-09-22: *"call it other bids and dont capitalize it
+    // all"*). The strip's CSS used to uppercase it; that rule is gone too.
+    otherBids: "Other bids",
     eqYardExplainCta: "Ask the supplier",
     eqYardExplainLater: "Not now",
     // The same surface, in the state where the question is already out. It shows what was asked and
@@ -1495,6 +1516,10 @@ export const en = {
     // The dots beside the file icon: the machine's papers, scored the way the app scores them.
     eqReadinessOnFile: "{done} of {total} documents on file",
     eqOpenFile: "Open this machine's file",
+    // The card's corner control, as WORDS (owner, 2026-09-22: *"the icon of the equipment card to be
+    // equipment documents not icon"*). It sits one row under «Company documents», so the two name
+    // whose papers each one opens.
+    eqDocuments: "Equipment documents",
     eqNoPhoto: "No photo",
     eqSelect: "Show this equipment on the map",
     // RM3-AC-26 — a price and a count were given, and nothing else. No empty card furniture.
@@ -1718,6 +1743,29 @@ export const en = {
     },
   },
   workspace: {
+    /* ── the bid card's BAND (app parity, `RenteeBandState`) ───────────────────────────────
+       One caption per card, and the card's only news channel. ⚠️ `band.counterPrice` deliberately
+       repeats `priceFooter.counterPrice`: the band and the map's own footer are two surfaces saying
+       one act, and the app keeps the same word on both. */
+    band: {
+      counterPrice: "Counter this price",
+      /* A room exists and nobody has priced yet. The owner asked for the second wording explicitly:
+         there is an OFFER on the table to answer, not just a price to undercut. */
+      counterOffer: "Counter this offer",
+      awaitingSupplier: "Awaiting supplier response",
+      newCounterOffer: "New counter offer",
+      newMessage: "New message from supplier",
+      /* ⚠️ ONE caption for every ask and every resolution (app parity): the renter does not remember
+         which question he asked, and the room shows him when he opens it. It is also what makes a
+         PARTIAL answer safe to report, since the wording claims nothing about what is on file. */
+      supplierAnswered: "Supplier answered your request",
+      offerUpdated: "Supplier updated the offer",
+      awaitingConfirmation: "Awaiting supplier confirmation",
+      dealClosed: "Deal closed",
+      accepted: "Accepted",
+      withdrawn: "Withdrawn",
+      expired: "Expired",
+    },
     title: "My Requests",
     // The rail's first tile. It is an action, not a request, so it says what it makes.
     newRequest: "New",

@@ -22,6 +22,9 @@
  * `docs/ui-change-playbooks.md` names the specimen beside each surface.
  */
 
+import { useState } from "react";
+import { en } from "@/lib/i18n/en";
+import { RecipientOption } from "@/components/share/ShareRequestPanel";
 import { NoCompanyCard } from "@/components/company/CompanyHub";
 import { BrowseSurface } from "@/components/stores/BrowseSurface";
 import { GuestWall, GuestDashboardPreview, GuestRequestsPreview } from "@/components/common/GuestWall";
@@ -33,6 +36,9 @@ import { RequestCard } from "@/components/map/RequestCard";
 import { PriceFooter } from "@/components/map/PriceFooter";
 import { EquipmentDetail } from "@/components/map/panel/EquipmentDetail";
 import { YardExplainDialog } from "@/components/map/YardExplainDialog";
+import { EquipmentFilterButton, EquipmentList } from "@/components/map/EquipmentList";
+import { OtherOffers } from "@/components/map/OtherOffers";
+import { equipmentListView, listedMachines } from "@/lib/contract/equipment-list";
 import { mapFleet, type FleetMachine } from "@/lib/contract/fleet";
 import { draftSubject, requestCardView, type RequestCardCtx } from "@/lib/contract/request-card";
 import { composeDocumentRequest, composeShortfallRequest, type RenteeRequestDraft } from "@/lib/contract/rentee-request";
@@ -60,6 +66,29 @@ const machine = (locationSource: string): FleetMachine =>
       inBid: true,
     },
   ])[0];
+
+/** A PORTRAIT photo, three times taller than wide: the shape that used to stretch its fleet card
+ *  (owner, 2026-09-22). An inline SVG so the specimen needs no asset and no network. */
+const TALL_PHOTO =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="900"><rect width="300" height="900" fill="black"/><rect y="330" width="300" height="240" fill="slategray"/></svg>');
+
+/** Two offered machines, the first with the portrait photo, read against a request that asks for a
+ *  certificate so the filter control has a group to offer. */
+const fleetSpecimen = () => {
+  const fleet = mapFleet([
+    {
+      equipmentId: "eq-1", manufacturer: "BOMAG", modelName: "pc", year: 2020, locationSource: "listing_yard",
+      distanceKm: 15.5, photoKeys: [{ slot: "front", key: "p1", url: TALL_PHOTO }], documentKeys: [], inBid: true,
+    },
+    {
+      equipmentId: "eq-2", manufacturer: "Caterpillar", modelName: "320D2 GC", year: 2022, locationSource: "unit_yard",
+      distanceKm: 8.2, photoKeys: [], documentKeys: [{ type: "tuv_cert", key: "d0", url: "", verifyStatus: null, expiryDate: null }], inBid: true,
+    },
+  ]);
+  const request = { reqEquipmentCerts: ["tuv"] };
+  return { view: equipmentListView(listedMachines(fleet), request, []), request };
+};
 
 const cardCtx = (over: Partial<RequestCardCtx> = {}): RequestCardCtx => ({
   L,
@@ -208,7 +237,46 @@ const cmRows: WorkspaceBid[] = [
   cmBid("b6", "Al Jazira Equipment Rental", 33500),
 ];
 
+/**
+ * The confirmation's «who receives it» pair, with its own selection so both states can be seen.
+ *
+ * The dialog it lives in needs a draft, a store and a signed-in renter, so this is the only way to
+ * look at the two options while they are being changed.
+ */
+function RecipientChoiceSpecimen() {
+  const [on, setOn] = useState<"direct" | "broadcast">("direct");
+  const c = en.intake.postShare;
+  return (
+    <div className="grid gap-2" style={{ width: 520 }}>
+      <span className="text-label font-extrabold uppercase tracking-[0.05em] text-muted-dark">{c.whoReceives}</span>
+      <RecipientOption
+        on={on === "direct"}
+        onPick={() => setOn("direct")}
+        icon="storefront"
+        title="Zahid Tractor"
+        detail={c.destDirectLine}
+      />
+      <RecipientOption
+        on={on === "broadcast"}
+        onPick={() => setOn("broadcast")}
+        icon="public"
+        logo={{ src: "/moedatech-logo.svg", alt: "Moedatech" }}
+        title={c.destBroadcastInstead}
+        detail={c.destBroadcastLine}
+      />
+    </div>
+  );
+}
+
 export const SPECIMENS: Specimen[] = [
+  {
+    id: "recipient-choice",
+    /* The review screen's own share card is what raises this dialog; the panel carries no pin of
+       its own, so the picture is filed under the screen the press is made on. */
+    pin: "21",
+    label: "Send confirmation — direct or broadcast",
+    render: () => <RecipientChoiceSpecimen />,
+  },
   {
     id: "compare-matrix",
     pin: "24",
@@ -436,6 +504,51 @@ export const SPECIMENS: Specimen[] = [
     render: () => <ProcessingView imageUrl={null} title={L("Reading your request", "نقرأ طلبك")} caption={null} />,
   },
   {
+    /* 47 — the photo cropped to the card's own height, «Equipment documents» as words, and the
+       filter at the end of the count pills' row with no «1 of 2» above the list (owner, 2026-09-22).
+       The pills are the workspace's markup, drawn here with its own class names around the real
+       filter control. */
+    id: "fleet-list",
+    pin: "47",
+    label: "Fleet list — portrait photo, documents control, filter in the pills row",
+    render: () => {
+      const { view, request } = fleetSpecimen();
+      return (
+        <div className="bidmap" style={{ width: 400, height: 560 }}>
+          <aside className="bm-panel" style={{ position: "relative" }}>
+            <div className="bm-counts">
+              <span className="bm-pill"><span className="bm-pill-n">2</span><span className="bm-pill-l">Spider Lifts 58 m registered</span></span>
+              <span className="bm-pill"><span className="bm-pill-n">2</span><span className="bm-pill-l">in this offer</span></span>
+              <EquipmentFilterButton view={view} open={false} onToggle={() => {}} onClear={() => {}} />
+            </div>
+            <div className="bm-body">
+              <EquipmentList
+                view={view} request={request} filterIds={[]} onToggleFilter={() => {}} onClearFilters={() => {}}
+                selectedId={null} cueId={null} onOpenDetail={() => {}} onFocusMachine={() => {}} onYardPress={() => {}}
+                filtersOpen={false} onCloseFilters={() => {}}
+              />
+            </div>
+          </aside>
+        </div>
+      );
+    },
+  },
+  {
+    /* 45.3 — «Other bids», sentence case, the firms as boxes (owner, 2026-09-22). */
+    id: "other-bids",
+    pin: "45.3",
+    label: "Other bids strip",
+    render: () => (
+      <OtherOffers
+        currentBidId="b2"
+        offers={[
+          { bidId: "b1", supplierName: "Gulf Co", supplierLogoUrl: null, currentPrice: 9000, priceUnit: "PER_MONTH" },
+          { bidId: "b2", supplierName: "Q", supplierLogoUrl: null, currentPrice: 10000, priceUnit: "PER_MONTH" },
+        ]}
+      />
+    ),
+  },
+  {
     id: "price-footer",
     pin: "48",
     label: "Price footer",
@@ -512,11 +625,9 @@ export const SPECIMENS: Specimen[] = [
           <span className="flex-none rounded-full border border-white/25 px-1.5 py-px text-label font-extrabold uppercase tracking-wide text-white/70">
             Beta
           </span>
-          <span className="nd-mark" aria-hidden>
-            <span className="nd-mark-fig">96</span>
-            <span className="nd-mark-rule" />
-            <span className="nd-mark-sub">{L("National Day", "اليوم الوطني")}</span>
-          </span>
+          {/* 🔴 ~~The season mark, beside «Beta».~~ Removed from the bar (owner, 2026-09-22),
+              so the specimen draws what ships: the gradient, the dots, the grove and the gold seam,
+              and no words. */}
           <span className="ms-auto flex-none text-body font-extrabold">{L("Dashboard", "الرئيسية")}</span>
         </>
       );

@@ -42,7 +42,8 @@ import { ChatDock } from "@/components/map/ChatDock";
 import type { MachinePin } from "@/components/map/MapCanvas";
 import { PriceFooter } from "@/components/map/PriceFooter";
 import { useRenteeRequestSender } from "@/components/map/useRenteeRequestSender";
-import { EquipmentList } from "@/components/map/EquipmentList";
+import { EquipmentFilterButton, EquipmentList } from "@/components/map/EquipmentList";
+import { durationDaysBetween } from "@/lib/pricing/rental";
 // The list's own card model, built here ONCE and handed to both readers — the cards in the column and
 // the hover box on each marker. Two calls would be two answers waiting to differ (RM3-AC-19).
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
@@ -392,8 +393,15 @@ export function BidMapWorkspace({
   /** The price basis' duration — `estimatedDurationDays`, which is EXACTLY the field `mapDealRoom`
    *  reads into `periods`. Reading a different one would make the footer's figures disagree with the
    *  deal room's for the same room (RM3-AC-24). */
+  //
+  // ⚠️ And the bid card's fallback (owner, 2026-09-22: *"use same price as in bid card"*): with no
+  // stored duration, the days between the request's dates, exactly as `mapRequestListItem` derives
+  // the `durationDays` the card prices on.
+  const requestStartDate = typeof request?.startDate === "string" ? request.startDate : null;
   const requestDurationDays =
-    typeof request?.estimatedDurationDays === "number" ? request.estimatedDurationDays : null;
+    typeof request?.estimatedDurationDays === "number"
+      ? request.estimatedDurationDays
+      : durationDaysBetween(requestStartDate, typeof request?.endDate === "string" ? request.endDate : null);
 
   /** The RFQ group, resolved the way `inboxGroupKey` resolves it: the fan-out group when the request
    *  has one, else the request itself — which simply means "this bid has no siblings". Read through
@@ -431,6 +439,10 @@ export function BidMapWorkspace({
      and pressing a chip is not a retraction of it. `equipmentListView` collapses on its own when the
      expansion stops meaning anything (nothing outside the offer survives the chips). */
   const [showAllEquipment, setShowAllEquipment] = useState(false);
+  /** The filter panel. Here, not in the list, because its button sits in the count pills' row
+   *  (owner, 2026-09-22). */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const closeFilters = useCallback(() => setFiltersOpen(false), []);
   const view = useMemo(
     () => equipmentListView(listed, bid, filterIds, { showAll: showAllEquipment }),
     [listed, bid, filterIds, showAllEquipment],
@@ -991,15 +1003,23 @@ export function BidMapWorkspace({
                     {/* The chip's label is short so the supplier's NAME survives the 392px row
                         (`en.ts`, owner 2026-08-19); the full sentence rides on `title`, where the
                         width costs nothing. The prototype's chip carries the same phrase there. */}
+                    {/* ~~The word «Verified» beside the tick.~~ The tick ALONE (owner, 2026-09-22: *"only
+                        show the verified icon not whole word but clicking on supplier will show it
+                        verified fine in the details"*). The company panel still says it in words;
+                        here the word rides on the tick's accessible name and its title. */}
                     {bid.verified && (
-                      <span className="bm-verified" title={t.bidMap.verifiedCompanyWhy}>
+                      <span
+                        className="bm-verified"
+                        title={t.bidMap.verifiedCompanyWhy}
+                        role="img"
+                        aria-label={t.bidMap.verifiedCompany}
+                      >
                         {/* ~~A bare stroked check at 11px, in the chip's own ink (`rVerifiedChip`,
                             prototype 4056).~~ The house mark (owner, 2026-09-02): one badge wherever
                             something is vetted, so the chip here and the chip on a supplier's profile
                             are the same claim in the same shape. It brings its own green rather than
                             taking the chip's, which is what makes it recognisable on any ground. */}
-                        <VerifiedMark size={12} />
-                        {t.bidMap.verifiedCompany}
+                        <VerifiedMark size={16} />
                       </span>
                     )}
                   </span>
@@ -1041,6 +1061,16 @@ export function BidMapWorkspace({
                     of a matched pair makes it the answer and the other the footnote, which is the
                     opposite of what a comparison is for — `map-proto.css` carries the full note. */}
                 {kase !== "single" && countPill(t.bidMap.countInOffer, counts.offered)}
+                {/* The filter, at the END of the pills' row (owner, 2026-09-22). Only once the fleet
+                    has answered, since the chips are built from it. */}
+                {fleet && (
+                  <EquipmentFilterButton
+                    view={view}
+                    open={filtersOpen}
+                    onToggle={() => setFiltersOpen((v) => !v)}
+                    onClear={() => setFilterIds([])}
+                  />
+                )}
               </div>
             )}
 
@@ -1125,6 +1155,8 @@ export function BidMapWorkspace({
                   askPending={(m) => askPending(composeMachineRequest("availability", m.equipmentId))}
                   onToggleShowAll={() => setShowAllEquipment((v) => !v)}
                   scrollRef={bodyRef}
+                  filtersOpen={filtersOpen}
+                  onCloseFilters={closeFilters}
                 />
               )}
 
@@ -1158,7 +1190,16 @@ export function BidMapWorkspace({
                 wizard bound to `DealRoom.tsx`'s local state (004a §4a.1). التفاصيل expands this in
                 place, taking vertical space from the list above rather than overlaying it — the
                 panel is a fixed-width column, so there is nowhere to overlay to. */}
-            <PriceFooter bid={bid} durationDays={requestDurationDays} />
+            {/* The START DATE too (owner, 2026-09-22). Without it the shared rental maths cannot count
+                Fridays and returns the bare rate, so the breakdown's rental, VAT and totals were not
+                the bid card's for the same bid. */}
+            <PriceFooter
+              bid={bid}
+              durationDays={requestDurationDays}
+              startDate={requestStartDate}
+              mobByRentee={item?.mobilizationByRentee ?? null}
+              demobByRentee={item?.demobilizationByRentee ?? null}
+            />
           </>
         ) : (
           // No bid resolved yet. The route renders its own not-found/loading states, so this is only

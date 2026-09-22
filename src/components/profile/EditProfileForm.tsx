@@ -121,6 +121,11 @@ export function EditProfileForm({
     if (lastName.trim().length < 2 || lastName.trim().length > 50) next_fe.lastName = t.onboarding.errors.lastName;
     if (!city.trim()) next_fe.city = t.onboarding.errors.city;
     if (!jobTitle.trim()) next_fe.jobTitle = t.onboarding.errors.jobTitle;
+    /* 🔴 **Required on a FIRST save, optional on an edit** — the app's own split
+       (`profile_form_page._companyNameIsValid`: `!_isComplete || length >= 2`). A renter who came
+       here to change his phone must not be blocked by a field that was optional the day he signed
+       up; a renter completing his profile is being named by it on every surface. */
+    if (isFirstSave && companyName.trim().length < 2) next_fe.companyName = t.onboarding.errors.companyName;
     if (email.trim() && !EMAIL_RE.test(email.trim())) next_fe.email = t.onboarding.errors.email;
     if (whatsapp.trim() && !WA_RE.test(whatsapp.replace(/\s/g, ""))) next_fe.whatsapp = t.onboarding.errors.whatsapp;
     // Optionals can be ADDED here but not removed: updateProfileSchema has no partial-clear, so the BFF
@@ -236,7 +241,8 @@ export function EditProfileForm({
 
       <div>
         <label className={labelCls}>
-          {p.companyName} {optionalTag(profile.companyName)}
+          {p.companyName}{" "}
+          {isFirstSave ? <span className="text-danger">*</span> : optionalTag(profile.companyName)}
         </label>
         <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={p.companyNamePlaceholder} />
         {companyNote && <p className="mt-1 text-meta text-danger">{companyNote}</p>}

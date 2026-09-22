@@ -22,6 +22,9 @@ export interface RenterProfile {
   lastName: string | null;
   /** Company name on the renter's profile (display name; verification holds the legal name). */
   companyName: string | null;
+  /** The firm's own mark, when one is on file. Null is "none uploaded", which is what the
+   *  quotation's renter prompt invites him to fix. */
+  companyLogoUrl?: string | null;
   city: string | null;
   jobTitle: string | null;
   email: string | null;

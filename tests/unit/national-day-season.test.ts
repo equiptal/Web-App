@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -199,10 +199,20 @@ describe("the header wears it without branching on the date", () => {
     expect(shell).not.toContain("seasonAt");
   });
 
-  it("carries all three hosts on the bar", () => {
+  it("carries the bar and its decoration, and says NOTHING in words", () => {
     expect(shell).toContain('className="nd-bar sticky top-0');
     expect(shell).toContain('className="nd-decor"');
-    expect(shell).toMatch(/className="nd-mark"/);
+    /**
+     * 🔴 ~~`.nd-mark` — the outlined ordinal, a gold hairline and «National Day».~~ REMOVED
+     * (owner, 2026-09-22, on a picture of it: *"remove this"*). It had replaced the kit's gold PILL
+     * on 2026-09-17, which had itself replaced the mark on the dashboard band: three placements in
+     * six days for one caption, and this is the fourth answer.
+     *
+     * What survives is the division that was always the better one: the bar wears everything that
+     * is not WORDS — the gradient, the dot lattice, the palm grove and the gold Najdi seam — and a
+     * caption is the one seasonal piece that has to be read rather than merely seen.
+     */
+    expect(shell).not.toMatch(/className="nd-mark"/);
   });
 
   /**
@@ -230,14 +240,62 @@ describe("the header wears it without branching on the date", () => {
    * putting a utility back on the element and quietly undoing it. It survived the pill becoming a
    * mark because the trap belongs to the BLOCK, not to whatever is standing in it.
    */
-  it("leaves the phone rule to the stylesheet, where it can win", () => {
-    expect(shell).not.toMatch(/nd-mark[^"]*(max-sm:|hidden|sm:inline-flex)/);
-    expect(read("src/app/globals.css")).toContain("@media (width >= 40rem) {");
+  it("leaves any width rule to the STYLESHEET, where it can win", () => {
+    /**
+     * 🔴 The trap OUTLIVES the element it was found on, which is why this case does.
+     * `max-sm:hidden` was once on the mark and could never have worked: Tailwind emits its utilities
+     * inside `@layer utilities`, the seasonal block is unlayered, and unlayered CSS beats layered
+     * CSS outright whatever the specificity — so the season's own `display` won at every width and
+     * the mark would have ridden the phone bar all fortnight. Read off the compiled sheet, not
+     * reasoned about.
+     *
+     * ⚠️ With the mark gone the bar has nothing left to hide below `sm`, so what is asserted is
+     * the RULE rather than a selector: no seasonal host on this bar may carry a Tailwind width
+     * utility, because the next one added would lose in exactly the same way.
+     */
+    expect(shell).not.toMatch(/nd-(bar|decor|mark|chip)[^"]*(max-sm:|sm:inline-flex)/);
   });
 
-  it("writes the ordinal in Latin digits, as this app does everywhere", () => {
-    expect(shell).toContain("{seasonOrdinal()}");
-    expect(shell).not.toMatch(/[٠-٩]/);
+  it("writes the ordinal in Latin digits, wherever it is still drawn", () => {
+    /**
+     * ⚠️ The bar no longer draws it at all — `seasonOrdinal` left `AppShell` with the mark — so
+     * the rule is pinned where the figure survives: the guest wall's head strip. The Flutter kit
+     * draws «٩٦»; this app has said *"the numbers should be in eng even in arabic"* since
+     * 2026-09-04, and one seasonal figure is not the place to reverse a product-wide rule.
+     */
+    expect(shell).not.toContain("seasonOrdinal");
+    const wall = read("src/components/common/GuestWall.tsx");
+    expect(wall).toContain("{seasonOrdinal()}");
+    expect(wall).not.toMatch(/[٠-٩]/);
+  });
+
+  /**
+   * 🔴 **EVERY National Day green went a step darker** (owner, 2026-09-22: *"can u make the
+   * all greens color of the national day theme more darker? a little bit"*). Each channel at 85% of
+   * the kit's own value, so the HUE is untouched and only the depth moves.
+   *
+   * ⚠️ Every one of them is a GROUND under white text, so this is strictly safer: the bar's
+   * contrast goes UP, never down. `--nd-mint` is deliberately NOT moved — it is the pale chip's
+   * ground on a LIGHT surface, near-white by design, and darkening it would turn the one quiet
+   * weight in the kit into a second solid chip.
+   */
+  it("keeps the season's greens dark, and the mint pale", () => {
+    const css = read("src/app/globals.css");
+    for (const [token, value] of [
+      ["--nd-ground", "#004724"],
+      ["--nd-deep", "#042d1a"],
+      ["--nd-mid", "#096835"],
+      ["--nd-green", "#005c2d"],
+      ["--nd-ink", "#0b4e35"],
+    ]) {
+      expect(css).toContain(`${token}: ${value};`);
+    }
+    expect(css).toContain("--nd-mint: #e8f2ea;");
+    // `ds-colors.ts` mirrors every colour `:root` defines, and its own suite requires the two to
+    // agree — so a darkening applied to one and not the other fails there rather than on screen.
+    const ds = read("src/lib/ds-colors.ts");
+    expect(ds).toContain('ndGround: "#004724"');
+    expect(ds).toContain('ndInk: "#0b4e35"');
   });
 });
 
@@ -271,25 +329,27 @@ describe("the kit's motifs land on the surfaces the kit names", () => {
   const wall = read("src/components/common/GuestWall.tsx");
   const intake = read("src/components/screens/Intake.tsx");
 
-  it("gives the 160px band the eight-palm TREE LINE and the 52px bar the four-palm grove", () => {
-    expect(css).toContain('url("/nd96-treeline.svg")');
+  /* 🔴 **The TREE LINE is withdrawn** (owner, 2026-09-22: *"remove the palms and theme here
+     on the cta keep it as its original"*). ~~The 160px band took the eight-palm line because the
+     kit says eight palms "need room to work".~~ It had the room and it was still wrong: the band
+     says ONE sentence and a grove across the photograph competes with it. The bar keeps its
+     four-palm grove, which is the owner's own choice of home for the season. */
+  it("gives the 52px bar the four-palm grove, and the band nothing", () => {
     expect(css).toContain('url("/nd96-palms.svg")');
-    // Each file is named exactly once, so the two cannot quietly swap surfaces.
-    expect(css.match(/nd96-treeline\.svg/g)).toHaveLength(1);
+    // Named exactly once: the grove may not quietly spread to a second surface.
     expect(css.match(/nd96-palms\.svg/g)).toHaveLength(1);
+    // The artwork went with the rule, so neither can come back by half.
+    expect(css).not.toContain("nd96-treeline");
+    expect(existsSync(resolve(process.cwd(), "public/nd96-treeline.svg"))).toBe(false);
   });
 
-  /**
-   * 🔴 The band's seasonal layer must come AFTER the photograph, the two gradients and the
-   * multiply. All four sit at exactly `-z-10`, and among equals the last one painted wins - so
-   * declared above them the tree line is perfectly present in the DOM and invisible on screen.
-   * That is the halo bug this same file shipped with on 2026-09-16, at the same depth.
-   */
-  it("draws the band's season layer after every other -z-10 layer", () => {
-    const multiply = cta.indexOf("mix-blend-multiply");
-    const band = cta.indexOf('className="nd-band');
-    expect(multiply).toBeGreaterThan(-1);
-    expect(band).toBeGreaterThan(multiply);
+  /* 🔴 **The band carries NO seasonal layer at all**, which retires the paint-order case that
+     stood here. ~~It pinned that `.nd-band` was declared after the photograph, the two gradients
+     and the multiply, because all four sit at `-z-10` and among equals the last one painted
+     wins.~~ That rule was real and is now unreachable; what replaces it is the stronger one. */
+  it("puts no seasonal layer on the band, in the markup or the stylesheet", () => {
+    expect(cta).not.toMatch(/className="[^"]*nd-band/);
+    expect(css).not.toContain(".nd-band");
   });
 
   /**
@@ -314,11 +374,15 @@ describe("the kit's motifs land on the surfaces the kit names", () => {
    * bar. The band exists to say ONE sentence, and a second piece of copy at the far end of it was
    * competing with that sentence for the same 160px.
    */
-  it("leaves the band with no mark and no words of its own", () => {
+  /* **FOUR treatments have now been withdrawn from this one element**: the gold seam and the dune
+     sweep from its bottom edge (2026-09-17), the ordinal mark, and now the tree line and dot field
+     from its face. The rule is worth stating once rather than re-learning: the dashboard band takes
+     NO seasonal decoration, on its edges or across it. Its navy, its photograph, its one orange
+     word and its orange button are what it has always been. */
+  it("leaves the band with no mark, no words and no decoration of its own", () => {
     expect(cta).not.toMatch(/nd-mark/);
     expect(cta).not.toMatch(/seasonOrdinal/);
-    // What it keeps: the two pieces that sit INSIDE it and say nothing.
-    expect(cta).toContain('className="nd-band');
+    expect(cta).not.toMatch(/className="[^"]*nd-(band|seam|dune)/);
   });
 
   it("gives the role gate the INTERLOCKING band and the pale chip", () => {

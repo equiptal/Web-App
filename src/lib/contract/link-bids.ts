@@ -535,6 +535,8 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     matchCount: 0,
     conflictCount: 0,
     dealRoomId: null,
+    // An off-platform submission has no deal room at all, so no status either.
+    dealRoomStatus: null,
     expired: false,
     note: sub.notes ?? null,
     requiredCerts: reqEqCertCodes,
@@ -561,7 +563,10 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
       ].filter(Boolean) as TermRow[],
       contract: [
         c.operator != null && termRow("operator_included", "Operator", "المشغّل", c.operator, rt.operator),
-        c.nationality != null && termRow("nationality", "Operator nationality", "جنسية المشغّل", c.nationality, rt.nationality),
+        /* 🔴 ~~The nationality row.~~ hidden on every surface (see `term-visibility.ts`). Dropped at the PARSE,
+           as the app drops its own deviations, so no reader downstream has to remember. The
+           confirmation is still carried on `LinkBidConfirmations` — an older submission that
+           answered it keeps its answer, which is simply no longer drawn. */
         c.fatFood != null && termRow("fat_food", "Food (F.A.T)", "الطعام", c.fatFood, rt.fatFood),
         c.fatTransport != null && termRow("fat_transport", "Accommodation & transport", "السكن والمواصلات", c.fatTransport, rt.fatTransport),
         c.fuel != null && termRow("fuel_responsibility", "Fuel responsibility", "مسؤولية الوقود", c.fuel, rt.fuel),

@@ -385,9 +385,14 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     // *"While the conversation is open it IS the affordance — a button under it would be a second
     // one."* The prototype returns null; ours must not render the FAB under its own drawer, where it
     // would be a second control claiming to toggle one state.
-    expect(dockSrc).toMatch(/\{!open && \(\s*<button type="button" className="bm-dock"/);
-    // …and the drawer's ✕ is then the only way back, so it must still exist.
-    expect(dockSrc).toContain('className="bm-chat-x" onClick={() => setOpen(false)}');
+    // ⚠️ `!embedded` joined the condition on 2026-09-22: the inbox stands this component IN a
+    // column, where a floating control over the conversation is the same second affordance this
+    // rule forbids. The rule is unchanged; it now has two reasons.
+    expect(dockSrc).toMatch(/\{!open && !embedded && \(\s*<button type="button" className="bm-dock"/);
+    // …and the drawer's ✕ is then the only way back, so it must still exist. Floating, it closes
+    // the drawer; embedded, the PAGE says what closing means — `setOpen(false)` would leave an empty
+    // column with no control anywhere to fill it again.
+    expect(dockSrc).toContain("onClick={() => (embedded ? onClose?.() : setOpen(false))}");
   });
 
   it("docks the conversation beside the panel rather than floating it (`rDrawer`, prototype 1573–1580)", () => {
@@ -423,9 +428,13 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
   it("moves the conversation with ONE control, and that control moves nothing else", () => {
     // A view preference: it may not touch the selection, the map, the active tab or the channel.
     expect(dockSrc).toContain('onClick={() => setPlace((p) => (p === "fill" ? "mirror" : "fill"))}');
-    const place = dockSrc.slice(
-      dockSrc.indexOf('className="bm-chat-place"'),
-      dockSrc.indexOf('className="bm-chat-x"'),
+    /* 🔴 COMMENTS STRIPPED FIRST, for the eighth time in this repo: the note beside the ✕
+       explains that `setOpen(false)` is the wrong close for an embedded dock, so the sweep below
+       failed on its own explanation rather than on any code. */
+    const noComments = dockSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+    const place = noComments.slice(
+      noComments.indexOf('className="bm-chat-place"'),
+      noComments.indexOf('className="bm-chat-x"'),
     );
     expect(place.length).toBeGreaterThan(120); // positive control on the slice
     for (const forbidden of ["setActiveBidId", "setOpen", "refresh(", "ensureDealRoom", "onOpenMachine"]) {

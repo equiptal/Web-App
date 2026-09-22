@@ -219,13 +219,21 @@
      borrowing the success colour would give one colour two meanings on the same screen.
 
      The values are the Flutter kit's own, so the two products celebrate in the same green. */
-  --nd-ground: #00542a;      /* the bar's ground — the kit's `nd-ground` */
-  --nd-deep: #05351f;        /* the gradient's dark corner */
-  --nd-mid: #0a7a3e;         /* the gradient's light corner */
-  --nd-green: #006c35;       /* the flag's green: a solid chip, the corner ribbon */
+  /* 🔴 **A STEP DARKER, all of them** (owner, 2026-09-22: *"can u make the all greens color
+     of the national day theme more darker? a little bit"*). Each channel at 85% of the kit's own
+     value, so the HUE is untouched and only the depth moves — the flag's green read bright against
+     this product's navy chrome, which is the one thing the season must not fight.
+     ⚠️ Every one of them is a GROUND under white text, so darker is strictly safer: the bar's
+     contrast goes up, never down. `--nd-mint` is deliberately NOT moved — it is the pale chip's
+     ground on a LIGHT surface, near-white by design, and darkening it would make the one quiet
+     weight in the kit read as a second solid chip. */
+  --nd-ground: #004724;      /* the bar's ground — the kit's `nd-ground`, darkened */
+  --nd-deep: #042d1a;        /* the gradient's dark corner */
+  --nd-mid: #096835;         /* the gradient's light corner */
+  --nd-green: #005c2d;       /* the flag's green: a solid chip, the corner ribbon */
   --nd-accent: #d7c48a;      /* pale gold — the Najdi seam, the chip's figure, the hairline */
   --nd-mint: #e8f2ea;        /* the pale chip's ground, for a LIGHT surface */
-  --nd-ink: #0d5c3e;         /* the pale chip's ink, AA on `--nd-mint` */
+  --nd-ink: #0b4e35;         /* the pale chip's ink, AA on `--nd-mint` — darker only helps it */
 
   /* ── Disabled ────────────────────────────────────────────────────────────────────────────────
      A state with its own colours rather than a faded copy of another one. `opacity: .5` over an
@@ -987,83 +995,30 @@ body {
    gradients and the multiply are all at exactly that depth, so a decoration declared before them
    paints underneath and is invisible. That is the CTA halo's fault of 2026-09-16, and the reason
    this span sits last among the band's `-z-10` children rather than first. */
-[data-season="nd"] .nd-band {
-  background-image:
-    url("/nd96-treeline.svg"),
-    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1px, transparent 1.6px);
-  background-repeat: no-repeat, repeat;
-  background-position: center bottom, 0 0;
-  background-size: cover, 22px 22px;
-}
+/* 🔴 **`.nd-band` is DELETED** (owner, 2026-09-22: *"remove the palms and theme here on the
+   cta keep it as its original"*). ~~The eight-palm tree line and the dot lattice, across the
+   dashboard band.~~ Fourth treatment withdrawn from that element, after the gold seam, the dune
+   sweep and the ordinal mark: **the band takes no seasonal decoration at all**, on its edges or
+   across its face. `public/nd96-treeline.svg` went with the rule - an unused seasonal rule is one
+   edit away from returning by accident, and its own artwork is what makes that cheap. */
 
-/* ── The ordinal mark, ON THE BAR ─────────────────────────────────────────────────────────────────
-   96 OUTLINED rather than filled, beside a pale gold hairline, with the season's name after it. The
-   kit's reasoning, kept: "outlined because solid white makes it a heading — it is a mark".
+/* 🔴 ~~The season MARK on the bar — `.nd-mark`, `.nd-mark-fig`, `.nd-mark-rule`,
+   `.nd-mark-sub`: the outlined ordinal, a 1x14 gold hairline and a small caption, laid out as a row
+   for a 52px bar.~~ REMOVED (owner, 2026-09-22: *"remove this"*, on a picture of it).
 
-   🔴 **It moved here from the dashboard band, and it REPLACES the pill that used to sit beside the
-   wordmark** (owner, 2026-09-17: *"remove the 96 from the cta and just make this style instead of
-   the 96 pill on header"*). One mark, in one place. The band keeps its tree line, its dot field and
-   its dune sweep and says nothing in words — which is the better division anyway: the band is the
-   product's own headline and a second piece of copy over it was competing with the one sentence
-   that screen exists to say.
+   Deleted rather than left inert, the same ruling the dune sweep took below on 2026-09-17: an
+   unused seasonal rule is one edit away from coming back by accident, and the strike-through
+   carries the reasoning without carrying the code.
 
-   ⚠️ **It is the same VOCABULARY, laid out for a 52px bar rather than a 160px band** — the outlined
-   figure, the gold hairline and the small caption. The stack itself could not come: the band drew
-   the figure at 58px, which does not fit in a bar that is 52px tall including its own padding. So
-   the column becomes a row and the rule turns on its side. Everything that made it a mark rather
-   than a heading survives; only the axis changed.
+   ⚠️ Two things worth keeping out of it, because both were learned the hard way:
+     · the width rule belonged HERE and never as a `max-sm:hidden` on the element — Tailwind emits
+       its utilities inside `@layer utilities` and this block is unlayered, so the season's own
+       `display` wins at every width. That trap outlives this mark and applies to the next one.
+     · `-webkit-text-stroke` is the only way to outline text, so an outlined figure always needs a
+       filled fallback under an `@supports`, never a guessed value.
 
-   ⚠️ **No pill, no border, no ground.** That is the point of the swap: «Beta» beside it is an
-   outlined pill, and two pills a hand's width apart read as a pair of controls. A mark is not a
-   control and now does not look like one.
-
-   ⚠️ Withheld below `sm`, and the rule is HERE rather than a `max-sm:hidden` on the element — the
-   seasonal block is unlayered and beats any utility at every width. Same trap, same answer as the
-   pill it replaces. */
-.nd-mark { display: none; }
-@media (width >= 40rem) {
-  [data-season="nd"] .nd-mark {
-    display: inline-flex;
-    align-items: center;
-    gap: 7px;
-    flex: none;
-    user-select: none;
-  }
-}
-[data-season="nd"] .nd-mark-fig {
-  font-size: 19px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.34);
-}
-/* `-webkit-text-stroke` is the only way to outline text and it is unprefixed nowhere, so the
-   filled-at-34% rule above is the fallback a browser without it keeps rather than a value this
-   block would otherwise have to guess at. Same shape as the kit's own `@supports`.
-   ⚠️ 1.2px, not the band's 2px: a stroke is an absolute width, so the weight that read as an
-   outline on a 58px figure reads as a solid slab on a 19px one. */
-@supports (-webkit-text-stroke: 1px #fff) {
-  [data-season="nd"] .nd-mark-fig {
-    color: transparent;
-    -webkit-text-stroke: 1.2px rgba(255, 255, 255, 0.82);
-  }
-}
-/* The hairline turns on its side with the layout: 92x1 under a column becomes 1x14 between two
-   things in a row. It is the piece that keeps the gold on the bar now that the pill's border has
-   gone, so it is not decoration that can be dropped. */
-[data-season="nd"] .nd-mark-rule {
-  width: 1px;
-  height: 14px;
-  background: var(--nd-accent);
-  opacity: 0.75;
-}
-[data-season="nd"] .nd-mark-sub {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.72);
-  white-space: nowrap;
-}
+   The bar still wears the season in everything that is not words: the gradient, the dot lattice,
+   the palm grove and the gold Najdi seam. */
 
 /* 🔴 ~~The dune sweep — a shallow curved cut, in the page's own colour, along the dashboard band's
    bottom edge.~~ WITHDRAWN (owner, 2026-09-17: *"make the cta of ai straight line as it was"*), and

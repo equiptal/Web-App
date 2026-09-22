@@ -19,6 +19,7 @@ import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestEditModals";
 import { ACTIONS, btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { MachineGlyph } from "@/components/MachineGlyph";
 
 /** What the share sheet needs about this request's public bid link. */
 export interface ShareLinkMeta {
@@ -423,10 +424,30 @@ export function RequestDetailsModal({
                     <div className="flex items-center gap-3 px-3 py-2.5">
                       <span className="grid h-11 w-14 flex-none place-items-center overflow-hidden rounded-sm bg-surface3">
                         {img ? (
+                          /* 🔴 **Which fit, decided by which PICTURE it is** (owner, 2026-09-22, sweeping
+                             the montage across every multi-item surface). ~~`object-cover` for
+                             both.~~ A taxonomy DRAWING carries its own transparent margin, so
+                             cropping one to a 56x44 box enlarges the margin and cuts the machine -
+                             which on a multi-item request it did once per row. A PHOTOGRAPH reaches
+                             its own edges and takes the crop. The rail's ruling of 2026-09-12 and
+                             2026-09-14, three surfaces along.
+
+                             ⚠️ **No scale here, unlike the rail's circle.** The 1.34 exists to fill a
+                             ROUND hole whose curve would otherwise show a drawing's letterbox edge;
+                             this box is a rectangle of very nearly the artwork's own 1.34:1, so
+                             `contain` already fills it and a scale would only crop again. */
                           /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={img} alt="" className="h-full w-full object-cover" />
+                          <img
+                            src={img}
+                            alt=""
+                            className={
+                              it.item?.imageIsPhoto
+                                ? "h-full w-full object-cover"
+                                : "h-full w-full object-contain"
+                            }
+                          />
                         ) : (
-                          <Icon name="precision_manufacturing" size={20} className="text-muted" />
+                          <MachineGlyph size={20} className="text-muted" />
                         )}
                       </span>
                       <div className="min-w-0 flex-1">

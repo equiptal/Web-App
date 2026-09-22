@@ -19,7 +19,7 @@ Two things it does not hold, on purpose:
 | File | Pins |
 | --- | --- |
 | `src/components/AppNav.tsx` | 3 Nav tabs — desktop (`app-nav`) · 3.1 Nav tab — one link (`nav-tab`) · 4 Nav tabs — mobile (`app-nav-mobile`) |
-| `src/components/AppShell.tsx` | 1 App frame (`app-shell`) · 2 Header bar (navy) (`app-header`) · 2.1 Header — logo (`header-logo`) · 2.2 Header — centred nav slot (`header-nav-slot`) · 2.3 Header — beta mark (`header-beta`) · 2.4 Header — season backdrop (palms, dots, seam) (`header-season-decor`) · 2.5 Header — season mark (`header-season-mark`) · 5 Account menu + locale toggle (`header-account`) · 5.1 Header — EN/AR toggle (`header-locale`) · 5.2 Header — inbox + bell pair (`header-icons`) · 5.3 Header — avatar (`header-avatar`) · 7 Page body (gutters live here) (`page-main`) · 8 Back arrow (`page-back`) |
+| `src/components/AppShell.tsx` | 1 App frame (`app-shell`) · 2 Header bar (navy) (`app-header`) · 2.1 Header — logo (`header-logo`) · 2.2 Header — centred nav slot (`header-nav-slot`) · 2.3 Header — beta mark (`header-beta`) · 2.4 Header — season backdrop (palms, dots, seam) (`header-season-decor`) · 5 Account menu + locale toggle (`header-account`) · 5.1 Header — EN/AR toggle (`header-locale`) · 5.2 Header — inbox + bell pair (`header-icons`) · 5.3 Header — avatar (`header-avatar`) · 7 Page body (gutters live here) (`page-main`) · 8 Back arrow (`page-back`) |
 | `src/components/common/GuestWall.tsx` | 9.5 Guest wall — blurred page + sign-in card (`guest-wall`) · 9.6 Guest wall — season chip (`guest-wall-season`) |
 | `src/components/common/SignInPrompt.tsx` | 79 Sign-in prompt (`sign-in-prompt`) |
 | `src/components/company/CompanyHub.tsx` | 72 Company hub (`company-hub`) |
@@ -43,11 +43,12 @@ Two things it does not hold, on purpose:
 | `src/components/home/HomeNotificationBubble.tsx` | 10.7 Home — notification bubble (`home-bubble`) |
 | `src/components/home/HomeRequests.tsx` | 10.4 Home — requests + bids rail (`home-requests`) |
 | `src/components/home/StartYourRequestModal.tsx` | 11 Start-your-request modal (`start-request-modal`) |
-| `src/components/inbox/InboxView.tsx` | 60 Inbox (`inbox-view`) |
+| `src/components/inbox/InboxView.tsx` | 60 Inbox (`inbox-view`) · 60.1 Inbox — the chats column (`inbox-list`) · 60.2 Inbox — one chat row (`inbox-row`) · 60.3 Inbox — the conversation beside the list (`inbox-pane`) · 60.4 Inbox — nothing picked yet (`inbox-pane-empty`) |
 | `src/components/map/BidMapWorkspace.tsx` | 45 Bid map workspace (`bid-map-workspace`) · 45.1 Bid map — canvas side (`bidmap-canvas`) · 45.2 Bid map — side panel (`bidmap-panel`) |
-| `src/components/map/ChatDock.tsx` | 57 Chat drawer (map) (`chat-dock`) · 57.1 Chat drawer — identity + phase + kebab (`chat-dock-head`) · 57.2 Chat drawer — supplier tabs (`chat-dock-tabs`) · 57.3 Chat drawer — the thread (`chat-dock-thread`) · 57.4 Chat drawer — composer (`chat-dock-composer`) · 57.5 Chat drawer — staged request card (`chat-dock-draft`) |
-| `src/components/map/EquipmentList.tsx` | 47 Fleet card (equipment list) (`equipment-card`) · 47.1 Fleet card — photo cell (`equipment-card-photo`) · 47.2 Fleet card — readiness + file icon (`equipment-card-head`) · 47.3 Fleet card — yard card (distance + availability) (`equipment-card-yard`) · 47.5 Fleet list — filter bar (`equipment-filter`) · 47.6 Fleet list — filter panel (`equipment-filter-panel`) |
+| `src/components/map/ChatDock.tsx` | 57 Chat drawer (map) (`chat-dock`) · 57.1 Chat drawer — identity + phase + kebab (`chat-dock-head`) · 57.2 Chat drawer — supplier tabs (`chat-dock-tabs`) · 57.3 Chat drawer — the thread (`chat-dock-thread`) · 57.4 Chat drawer — composer (`chat-dock-composer`) · 57.5 Chat drawer — staged request card (`chat-dock-draft`) · 57.6 Chat drawer — negotiation event (grey pill) (`chat-dock-event`) |
+| `src/components/map/EquipmentList.tsx` | 47 Fleet card (equipment list) (`equipment-card`) · 47.1 Fleet card — photo cell (`equipment-card-photo`) · 47.2 Fleet card — readiness + «Equipment documents» (`equipment-card-head`) · 47.3 Fleet card — yard card (distance + availability) (`equipment-card-yard`) · 47.5 Fleet list — filter control (end of the count pills row) (`equipment-filter`) · 47.6 Fleet list — filter panel (`equipment-filter-panel`) |
 | `src/components/map/MapCanvas.tsx` | 46 Map canvas (`map-canvas`) · 46.1 Map — one machine's marker (`map-pin`) |
+| `src/components/map/OtherOffers.tsx` | 45.3 Bid map — «Other bids» strip in the back bar (`other-bids`) |
 | `src/components/map/panel/CompanyPanel.tsx` | 51 Supplier panel (`company-panel`) |
 | `src/components/map/panel/DocRowList.tsx` | 53.2 Document row (`doc-row`) |
 | `src/components/map/panel/EquipmentDetail.tsx` | 52 Equipment detail panel (`equipment-detail`) · 52.1 Equipment detail — the viewer (photo / paper) (`equipment-detail-viewer`) · 52.2 Equipment detail — tab strip (`equipment-detail-tabs`) · 52.3 Equipment detail — yard card (`equipment-detail-yard`) · 52.4 Equipment detail — match grid (`equipment-detail-grid`) |
@@ -78,10 +79,11 @@ Two things it does not hold, on purpose:
 | `src/components/workspace/AiRankPanel.tsx` | 30.9 Compare — the assistant under the table (`ai-rank-panel`) |
 | `src/components/workspace/BidCards.tsx` | 29 Bid cards (`workspace-bid-cards`) · 29.1 Bid card — one tile (`bid-card`) · 29.2 Bid card — header (`bid-card-header`) · 29.3 Bid card — bottom row (`bid-card-footer`) |
 | `src/components/workspace/BidSizeFilter.tsx` | 28.5 Bid size filter — include larger equipment (`bid-size-filter`) |
+| `src/components/workspace/CircleArt.tsx` | 26.4 Circle — the request's machines on one ground (`circle-art`) |
 | `src/components/workspace/CompareMatrix.tsx` | 30 Compare matrix (`compare-matrix`) · 30.1 Matrix — horizontal scroller (`matrix-scroller`) · 30.2 Matrix — supplier column (`matrix-supplier-col`) |
 | `src/components/workspace/ItemTier.tsx` | 26.3 Item tier — one chip per machine (`item-tier`) |
-| `src/components/workspace/RequestContextBar.tsx` | 27 Request context bar (location + item) (`request-context`) |
+| `src/components/workspace/RequestContextBar.tsx` | 27 Request context bar (location + machines) (`request-context`) · 27.1 Context bar — the machines the request asked for (`context-machines`) |
 | `src/components/workspace/RequestDetailsModal.tsx` | 28 Request details modal (`request-details`) |
-| `src/components/workspace/RequestRail.tsx` | 26 Requests rail (full-bleed band) (`request-rail`) · 26.1 Rail — create tile (`rail-create-tile`) · 26.2 Rail — request tiles (`rail-tiles`) |
+| `src/components/workspace/RequestRail.tsx` | 26 Requests rail (full-bleed band) (`request-rail`) · 26.1 Rail — create tile (`rail-create-tile`) · 26.2 Rail — request tiles (`rail-tiles`) · 26.5 Circle — the zoomed view behind a double press (`circle-zoom`) |
 | `src/components/workspace/RequestsWorkspace.tsx` | 25 Requests workspace (`requests-workspace`) |
 <!-- pins:end -->

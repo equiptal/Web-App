@@ -630,8 +630,13 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
       </div>
 
       {/* The table and the rail are ONE row: the bids are what these requests came back with, and a
-          rail underneath would have read as a second, unrelated list. */}
-      <div className="grid items-stretch gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+          rail underneath would have read as a second, unrelated list.
+
+          Level only while BOTH are collapsed (owner, 2026-09-22: *"why showing more on one panel
+          expand the other panel beside it"*). `items-stretch` is what keeps the five-and-five pair
+          level at rest; with one side expanded it also stretched the other to the taller one's
+          height, a tall empty card. Expanded, each card keeps its own height. */}
+      <div className={cx("grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]", allRequests || allBids ? "items-start" : "items-stretch")}>
         <div className={cx(CARD, "flex min-w-0 flex-col overflow-hidden")}>
           <div className="flex-1 overflow-x-auto">
             <table className="w-full border-collapse">

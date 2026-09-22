@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState, Fragment } from "react";
 import { Dropdown } from "@/components/Dropdown";
+import { Dialog, DialogButton } from "@/components/Dialog";
+import { Icon } from "@/components/Icon";
 import { useRouter } from "next/navigation";
 import { type Channel } from "stream-chat";
 import { useLocale } from "@/lib/i18n";
 import { STREAM_API_KEY, leaseStream } from "@/lib/chat/stream-connection";
 import { usePageBack } from "@/components/AppShell";
 import { fetchBids, fetchRequestDetail, fetchRequestGroup, fetchDealRoom, fetchStreamToken, fetchQuotation, proposeRate, acceptDeal, batchUpdateTerms, releaseDeal, withdrawAcceptance, closeDealRoom, ApiError } from "@/lib/api/client";
+import { counterpartyDisplayName } from "@/lib/contract/counterparty-name";
 import { computeDealTotals, buildDealRoomQuotationDoc, quotationLinkKind, lastTermMove, isConflictingTerm, isSettledByValues, type DealRoomView, type DealTerm, type QuotationView } from "@/lib/contract/deal-room";
 import { reconstructRounds, collapseRounds, latestRoundBy, withOpeningRound, liveRound, roundOverride, type DealRound } from "@/lib/contract/deal-rounds";
 import { valText, type ResolutionsMap } from "@/components/deal-room/DealRoomTerms";
@@ -76,11 +79,14 @@ function buildQuotationHtml(
   L: LFn,
   /** The room’s live position, so the paper and the price bar cannot print two different deals. */
   live?: DealRound | null,
+  /** The RENTER's own gap — screen only, dropped by the print stylesheet. */
+  ownerPrompt?: { text: string; actionLabel?: string | null; href?: string | null } | null,
 ): string {
   const kind = quotationLinkKind(room.status) ?? "preview";
   const doc = buildDealRoomQuotationDoc(room, q, rentee, ar, L, {
     logoUrl: typeof window !== "undefined" ? `${window.location.origin}/moedatech-logomark.svg` : undefined,
   }, live ? roundOverride(room, live) : null);
+  if (ownerPrompt) doc.ownerPrompt = ownerPrompt;
   return wrapQuotationPage(renderQuotationSection(doc), {
     lang: doc.lang,
     title: kind === "final" ? L("Final quotation", "عرض السعر النهائي") : L("Preview quotation", "معاينة عرض السعر"),
@@ -260,18 +266,50 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       const q = await fetchQuotation(id).catch(() => null);
       // The buyer block, live from the signed-in rentee (the app fills it from the profile the same way).
       let rentee: { name: string; phone?: string | null; email?: string | null } = { name: "" };
+      /* 🔴 **The renter's OWN gap, named on his own document** (owner, 2026-09-22). His side of the
+         header prints as a bare name beside a supplier carrying a logo and a tick, and nothing told
+         him why or what to do. His gap only — a strip naming a missing SUPPLIER mark would tell him
+         to fix something only the supplier can, on a document the supplier wrote. */
+      let ownerPrompt: { text: string; actionLabel?: string | null; href?: string | null } | null = null;
       try {
         const meRes = await fetch("/api/me", { cache: "no-store" });
         if (meRes.ok) {
           const d = (await meRes.json()) as {
-            user?: { firstName?: string | null; lastName?: string | null; companyName?: string | null; phone?: string | null; email?: string | null };
+            user?: {
+              firstName?: string | null; lastName?: string | null; companyName?: string | null;
+              companyLegalName?: string | null; companyLogoUrl?: string | null;
+              tier?: string | null; phone?: string | null; email?: string | null;
+            };
           };
           const u = d.user ?? {};
           rentee = {
-            name: (u.companyName?.trim() || [u.firstName, u.lastName].filter(Boolean).join(" ")) ?? "",
+            // ⚠️ The shared naming rule, not a hand-rolled `companyName || person`: one counterparty
+            // must not read one way here and another on the card beside it.
+            name: counterpartyDisplayName({
+              companyLegalName: u.companyLegalName,
+              profileCompanyName: u.companyName,
+              personName: [u.firstName, u.lastName].filter(Boolean).join(" "),
+            }),
             phone: u.phone ?? null,
             email: u.email ?? null,
           };
+          // Unverified outranks "no mark": there is no point asking for a logo from an account that
+          // has not established a company to put one on.
+          if (u.tier !== "verified") {
+            ownerPrompt = {
+              text: L("Your company is not verified yet, so this quotation carries your name without a mark.",
+                      "لم يُوثّق ملف شركتك بعد، لذلك يحمل عرض السعر اسمك دون علامة."),
+              actionLabel: L("Verify your company", "وثّق شركتك"),
+              href: `${window.location.origin}/profile`,
+            };
+          } else if (!u.companyLogoUrl) {
+            ownerPrompt = {
+              text: L("Your company has no logo on file, so this quotation shows your name alone.",
+                      "لا يوجد شعار لشركتك، لذلك يظهر اسمك وحده على عرض السعر."),
+              actionLabel: L("Add your logo", "أضف شعارك"),
+              href: `${window.location.origin}/profile`,
+            };
+          }
         }
       } catch {
         /* the buyer block is best-effort */
@@ -283,7 +321,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       }
       // The SAME live position the price bar prices on — a paper that re-derived from the room’s
       // columns would print the last agreement under a heading the renter just read a counter on.
-      w.document.write(buildQuotationHtml(room, q, rentee, ar, L, liveRoundOf(room, messages)));
+      w.document.write(buildQuotationHtml(room, q, rentee, ar, L, liveRoundOf(room, messages), ownerPrompt));
       w.document.close();
     } catch (e) {
       setQuoteErr(errMsg(e, L("Couldn’t load the quotation.", "تعذّر تحميل عرض السعر.")));
@@ -1093,25 +1131,29 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       )}
 
       {releaseOpen && (
-        <div className="dl-modal" dir={ar ? "rtl" : "ltr"} onClick={() => !releasing && setReleaseOpen(false)}>
-          <div className="dl-modal-card" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
-            <div className="dl-modal-head">
-              <span className="dl-modal-ic warn"><span className="material-icons-outlined">lock_open</span></span>
-              <div className="dl-modal-tt"><div className="dl-modal-title">{L("Reopen this deal?", "إعادة فتح هذه الصفقة؟")}</div></div>
-              <button className="dl-modal-x" disabled={releasing} onClick={() => setReleaseOpen(false)} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
-            </div>
-            <div className="dl-modal-body">
-              <p className="dl-modal-msg">
-                {L("This reopens negotiation with the supplier. The accepted deal returns to negotiating and the terms/price can change again. A new quotation is issued once you re-confirm.", "يعيد هذا فتح التفاوض مع المؤجّر: تعود الصفقة المقبولة إلى التفاوض ويمكن تغيير الشروط والسعر. يصدر عرض سعر جديد بعد إعادة التأكيد.")}
-              </p>
-              {releaseErr && <p className="dl-err">{releaseErr}</p>}
-            </div>
-            <div className="dl-modal-foot">
-              <button className="dl-mbtn" disabled={releasing} onClick={() => setReleaseOpen(false)}>{L("Cancel", "إلغاء")}</button>
-              <button className="dl-mbtn warn" disabled={releasing} onClick={() => void doRelease()}>{releasing ? L("Reopening…", "جارٍ إعادة الفتح…") : L("Reopen", "إعادة الفتح")}</button>
-            </div>
-          </div>
-        </div>
+        <Dialog
+          open
+          onClose={() => setReleaseOpen(false)}
+          size="sm"
+          // ⚠️ `dismissible` goes off while the call is in flight: the scrim and Escape were already
+          // guarded by `!releasing`, and the corner close by `disabled`. One flag now says it once.
+          dismissible={!releasing}
+          icon={<Icon name="lock_open" size={20} className="text-warn-deep" />}
+          title={L("Reopen this deal?", "إعادة فتح هذه الصفقة؟")}
+          footer={
+            <>
+              <DialogButton tone="ghost" disabled={releasing} onClick={() => setReleaseOpen(false)}>{L("Cancel", "إلغاء")}</DialogButton>
+              <DialogButton tone="primary" disabled={releasing} onClick={() => void doRelease()}>
+                {releasing ? L("Reopening…", "جارٍ إعادة الفتح…") : L("Reopen", "إعادة الفتح")}
+              </DialogButton>
+            </>
+          }
+        >
+          <p className="text-body text-navy-mid">
+            {L("This reopens negotiation with the supplier. The accepted deal returns to negotiating and the terms/price can change again. A new quotation is issued once you re-confirm.", "يعيد هذا فتح التفاوض مع المؤجّر: تعود الصفقة المقبولة إلى التفاوض ويمكن تغيير الشروط والسعر. يصدر عرض سعر جديد بعد إعادة التأكيد.")}
+          </p>
+          {releaseErr && <p className="mt-2 text-meta font-semibold text-danger">{releaseErr}</p>}
+        </Dialog>
       )}
 
       
@@ -1168,7 +1210,9 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
         [L("Name", "الاسم"), [ar ? d.equipmentLabelAr ?? d.equipmentLabel : d.equipmentLabel, ar ? d.equipmentSizeAr ?? d.equipmentSize : d.equipmentSize].filter(Boolean).join(" · ") || null],
         [L("Units", "عدد الوحدات"), room.requestedUnits > 0 ? String(room.requestedUnits) : null],
         [L("Operator", "المشغّل"), yn(d.operatorIncluded, ["Included", "مشمول"], ["Not included", "غير مشمول"])],
-        [L("Operator nationality", "جنسية المشغّل"), d.operatorNationality],
+        /* 🔴 ~~Operator nationality.~~ hidden on every surface (see `term-visibility.ts`). The room's TERM table
+           has dropped it at the parse since 2026-09-18; this details card read the request
+           directly and therefore kept printing it. */
         [L("Operators", "عدد المشغّلين"), d.numberOfOperators ? String(d.numberOfOperators) : null],
       ],
     },
@@ -1492,28 +1536,31 @@ function CounterFlow({
   // Binding-commitment warning before the accept flow.
   if (!bindingOk) {
     return (
-      <div className="dl-modal" dir={ar ? "rtl" : "ltr"} onClick={onClose}>
-        <div className="dl-modal-card" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
-          <div className="dl-modal-head">
-            <span className="dl-modal-ic danger"><span className="material-icons-outlined">gavel</span></span>
-            <div className="dl-modal-tt"><div className="dl-modal-title">{L("This is a binding commitment", "هذا التزام مُلزِم")}</div></div>
-            <button className="dl-modal-x" onClick={onClose} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
-          </div>
-          <div className="dl-modal-body center">
-            <p className="dl-modal-msg">
-              {L("Accepting confirms the agreed rate and terms with the supplier for final confirmation. Please review the terms and price before you continue.", "القبول يؤكّد السعر والشروط المتفق عليها مع المؤجّر للتأكيد النهائي. يُرجى مراجعة الشروط والسعر قبل المتابعة.")}
-            </p>
-            <label className="dl-modal-ack">
-              <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
-              {L("I understand this is binding", "أفهم أن هذا مُلزِم")}
-            </label>
-          </div>
-          <div className="dl-modal-foot">
-            <button className="dl-mbtn" onClick={onClose}>{L("Cancel", "إلغاء")}</button>
-            <button className="dl-mbtn green" disabled={!ack} onClick={() => { setAck(false); setBindingOk(true); }}>{L("Continue", "متابعة")}</button>
-          </div>
-        </div>
-      </div>
+      <Dialog
+        open
+        onClose={onClose}
+        size="sm"
+        icon={<Icon name="gavel" size={20} className="text-danger" />}
+        title={L("This is a binding commitment", "هذا التزام مُلزِم")}
+        footer={
+          <>
+            <DialogButton tone="ghost" onClick={onClose}>{L("Cancel", "إلغاء")}</DialogButton>
+            <DialogButton tone="primary" disabled={!ack} onClick={() => { setAck(false); setBindingOk(true); }}>
+              {L("Continue", "متابعة")}
+            </DialogButton>
+          </>
+        }
+      >
+        <p className="text-body text-navy-mid">
+          {L("Accepting confirms the agreed rate and terms with the supplier for final confirmation. Please review the terms and price before you continue.", "القبول يؤكّد السعر والشروط المتفق عليها مع المؤجّر للتأكيد النهائي. يُرجى مراجعة الشروط والسعر قبل المتابعة.")}
+        </p>
+        {/* The acknowledgement is what unlocks «Continue» — it is the whole point of this layer, so
+            it sits in the body rather than as a line of small print under it. */}
+        <label className="mt-3 flex cursor-pointer items-center gap-2.5 rounded-sm border border-border bg-surface2 px-3 py-2.5 text-body font-semibold text-navy">
+          <input type="checkbox" className="h-4 w-4 flex-none accent-brand" checked={ack} onChange={(e) => setAck(e.target.checked)} />
+          {L("I understand this is binding", "أفهم أن هذا مُلزِم")}
+        </label>
+      </Dialog>
     );
   }
 
@@ -2047,6 +2094,28 @@ function CounterFlow({
             )}
           </div>
           <button type="button" className="ng-x" onClick={() => !busy && onClose()} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
+          </div>
+        </div>
+
+        {/* ① Price —— ② Terms —— ③ Review (owner, 2026-09-22: *"i want the previosu 3 sheets style
+            layout ... for the frame and general layout"*, pointing at `main` / `beta`).
+
+            🔴 **It is what makes three pages read as three SHEETS.** Without it the only thing naming
+            the step was the footer's own button, and that says where you are GOING, never where you
+            are — so a renter on the terms page had nothing telling him a review still followed.
+            ⚠️ Not pressable. The footer walks the steps and refuses on a gap (`canNext`); a rail that
+            jumped a renter past an unanswered price would be a second route with none of the gates. */}
+        <div className="ng-steps" aria-hidden="true">
+          <div className="ng-inner">
+            {[L("Price", "السعر"), L("Terms", "الشروط"), L("Review", "المراجعة")].map((label, i) => (
+              <Fragment key={label}>
+                {i > 0 && <span className={`bar${i <= page ? " done" : ""}`} />}
+                <span className={`ng-step${i === page ? " on" : i < page ? " done" : ""}`}>
+                  <span className="badge">{i < page ? "✓" : i + 1}</span>
+                  <span className="lbl">{label}</span>
+                </span>
+              </Fragment>
+            ))}
           </div>
         </div>
 

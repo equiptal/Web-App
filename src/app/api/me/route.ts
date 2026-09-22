@@ -59,6 +59,8 @@ interface BackendStatus {
   companyName?: string | null;
   /** The registered entity name. The app carries it; nothing on the web reads it yet. */
   companyLegalName?: string | null;
+  /** The firm's own mark, presigned by `profile-status`. Drives the quotation's renter prompt. */
+  companyLogoUrl?: string | null;
   crNumber?: string | null;
   vatNumber?: string | null;
   nationalAddress?: string | null;
@@ -87,6 +89,9 @@ export async function GET(req: Request) {
         lastName: me.lastName ?? null,
         // Profile-status first, because that is the payload the app builds a renter's identity from.
         companyName: status.companyName ?? me.companyName ?? me.supplierProfile?.companyName ?? null,
+        // The renter's OWN mark, so his quotation can tell him when his side of the header has none.
+        // `profile-status` presigns it (`profile.service.ts:357`); the web has never read it.
+        companyLogoUrl: status.companyLogoUrl ?? null,
         city: me.city ?? null,
         jobTitle: me.jobTitle ?? null,
         email: me.email ?? null,

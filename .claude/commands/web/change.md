@@ -1,5 +1,5 @@
 ---
-description: Apply a BATCH of UI/behaviour notes (screenshots + free text) to the renter web app — read them back as a numbered worklist, ask only the questions that change the work, edit, prove it with pictures, then report per item.
+description: Apply a BATCH of UI/behaviour notes (screenshots + free text) to the renter web app — read them back as a numbered worklist, ask only the questions that change the work, edit, run the fast gate, then report per item.
 ---
 
 # /web:change — a batch of notes, applied
@@ -63,12 +63,6 @@ Under the block, three short lines and nothing more:
   anything else» (nothing adjacent gets flagged).
 - **Never needed:** the file, the CSS class, the component, how to do it, or which test breaks.
 - **The environment matters**, because twice a reported regression was a stale deploy.
-
-### 3. Say whether the flow can be photographed
-
-One sentence: does that flow have a specimen in `src/app/dev/preview/specimens.tsx`? If not, offer
-the two ways out — he starts `npm run dev:preview -- --port 3100` and the real screens get checked,
-or the report names which items went unverified.
 
 He is free to ignore the shape and write prose; the flow below reads either. The template saves the
 round trip, it is not a form.
@@ -152,35 +146,29 @@ So, in the same batch:
 A component whose root is a fragment cannot carry the attribute — pin a real child (that is what
 `47` and `57` are), and a Leaflet `divIcon` writes `data-pin` by hand from the registry.
 
-## Step 6 — Prove it: the gate, then the pictures
+## Step 6 — The gate, and nothing slower
+
+Owner, 2026-09-22: *"remove this steps that take too much time"*. Speed is part of the job here.
 
 ```bash
-npm run typecheck && npm run lint && npm test
-npm run ui:shots            # PNGs into .artifacts/ui/ — read them, then attach them to the report
+npm run typecheck && npm run lint
+npx vitest run <the suites for the files you touched>
 ```
 
-`npm run ui:shots` drives `/dev/preview`, which renders each surface on invented data with no
-session (`src/app/dev/preview/specimens.tsx`). **A surface you changed that has no specimen gets
-one in this batch** — that is the only way the next change to it can be seen.
-
-Then LOOK at the PNGs (Read them). What they catch and nothing else does: a row that wraps, a badge
-that overflows, an Arabic mirror that breaks, a dark slab that lost its contrast. Say in the report
-what the pictures showed, not that you ran the command.
-
-Two things the pictures cannot prove: real content fitting real data, and anything behind auth. If
-the owner is at the keyboard, ask him to run `! npm run dev` and sign in, then check the real screen
-in Chrome. If he is not, say plainly which items are layout-verified and which are unverified.
-
-`npm run build` last, and only if a route, a config or a dependency changed — it is slow on this
-machine and a CSS-only batch does not need it.
+- **No screenshots, no specimens, no builds, no throwaway pages, no dev server.** `ui:shots`,
+  `/dev/preview` specimens and `next build` are out of this command. The owner looks at the real
+  screen himself; the report names, per item, the one thing to look at.
+- **No subagents.** Read, search and edit in the main session.
+- **Targeted tests only**: the suites that read the files you changed (grep `tests/unit` for the file
+  or selector). The full `npm test` runs only when a shared helper or a global token moved.
+- A failing test that reads files this batch did not touch is reported as pre-existing, not chased.
 
 ## Step 7 — Report, per item, and write the change log
 
 Report as a table mirroring Step 1: `#`, what changed, files, verdict (`done` / `skipped — his
-word` / `blocked — why`), and one line of evidence (the test that pins it, the picture that shows
-it). Then:
+word` / `blocked — why`), and one line of evidence (the test that pins it, or what to look at on screen). Then:
 
-- The `CLAUDE.md` **Change log** entry — newest first, in the house format, with his quotes, the
+- The `docs/CHANGELOG.md` entry — newest first, in the house format, with his quotes, the
   traps (`⚠️`) and anything reversed (`🔴`). One entry for the batch, not one per item.
 - **Backend work as its own line**, if the batch touched something the web cannot fix alone.
 - **Never commit.** Leave it in the working tree and say what is ready.
@@ -190,7 +178,7 @@ it). Then:
 1. **A dropped item.** Eight notes in, seven out. Step 1's count and Step 7's table are the guard.
 2. **"Which element?"** A round trip that costs a day. Pins are the answer, and Step 5 keeps them
    worth quoting.
-3. **"Not verified visually."** Step 6's pictures.
+3. **A slow batch.** The owner waits on every minute. Step 6 is the whole of the checking.
 4. **A test that pinned the old decision, left failing or quietly weakened.** Never weaken one:
    update it to the new ruling, in the owner's words, and say so in the report.
 5. **A silent widening.** A shared component or a global token touched without saying whom else it

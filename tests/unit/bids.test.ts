@@ -36,23 +36,65 @@ describe("mapBidList — supplierId", () => {
 });
 
 describe("mapBidList — supplierName precedence", () => {
-  it("shows the supplier's profile company name over the verification-queue company row", () => {
+  /* 🔴 **THE REGISTERED NAME WINS, and this case used to pin the opposite.** ~~"shows the supplier's
+     profile company name over the verification-queue company row" — on the reasoning that
+     `company.name` is an ops-typed row and the two drift.~~ The drift is real and the conclusion was
+     wrong: the answer is the name on the REGISTRATION, which is `legalName`, and which neither side
+     of that old rule ever read. The order is the backend's own (`identity-select.ts`) and the app's
+     (`counterparty_name.dart`): company.legalName → profile.companyLegalName → company.name →
+     profile.companyName → the person. */
+  it("reads the four name columns in the registration's order", () => {
     const out = mapBidList({
       activeBids: [{
         id: "b1",
-        supplierDisplayName: "Ops Typo Co", // backend resolves company.name first — we don't
+        supplierDisplayName: "Resolved By Server",
         supplier: {
           id: 7, firstName: "Yara", lastName: "Test", supplierStatus: 2,
-          supplierProfile: { companyName: "Al Ghadeer Est." },
-          company: { name: "Ops Typo Co", isVerified: true },
+          supplierProfile: { companyName: "Basic Profile Co", companyLegalName: "Profile Legal Co" },
+          company: { name: "Trade Name Co", legalName: "Al Ghadeer Heavy Equipment Est.", isVerified: true },
         },
       }],
     });
-    expect(out[0].supplierName).toBe("Al Ghadeer Est.");
-    expect(out[0].verified).toBe(true); // name source doesn't touch the verified signal
+    expect(out[0].supplierName).toBe("Al Ghadeer Heavy Equipment Est.");
+    expect(out[0].verified).toBe(true); // the name source does not touch the verified signal
   });
 
-  it("falls back to the verified firm's brand, then the person's name", () => {
+  it("falls through the four columns as each one empties", () => {
+    const at = (company: Record<string, unknown>, supplierProfile: Record<string, unknown>) =>
+      mapBidList({ activeBids: [{ id: "b1", supplier: { id: 7, firstName: "Yara", lastName: "Test", company, supplierProfile } }] })[0].supplierName;
+    expect(at({ legalName: "Legal", name: "Trade" }, { companyLegalName: "PLegal", companyName: "PName" })).toBe("Legal");
+    expect(at({ name: "Trade" }, { companyLegalName: "PLegal", companyName: "PName" })).toBe("PLegal");
+    expect(at({ name: "Trade" }, { companyName: "PName" })).toBe("Trade");
+    expect(at({}, { companyName: "PName" })).toBe("PName");
+    expect(at({}, {})).toBe("Yara Test");
+  });
+
+  /* 🔴 **NO VERIFICATION GATE** (product decision, 2026-09-21). The web gated a firm's name on
+     `isVerified`, so a company name typed on a basic profile was stored and never shown and that
+     supplier read by their PERSONAL name on every surface until ops approved them. The tick is what
+     says anyone checked, and it is computed separately. */
+  it("names an UNVERIFIED firm, and still says it is unverified", () => {
+    const out = mapBidList({
+      activeBids: [{
+        id: "b1",
+        supplier: { id: 7, firstName: "Yara", lastName: "Test", company: { name: "Unchecked Co", isVerified: false } },
+      }],
+    });
+    expect(out[0].supplierName).toBe("Unchecked Co");
+    expect(out[0].verified).toBe(false);
+  });
+
+  /* ⚠️ Several projections FLATTEN the profile onto the supplier, with no nested object at all.
+     Reading only the nested shapes renamed every one of those to «Supplier». */
+  it("reads a company name flattened straight onto the supplier", () => {
+    const out = mapBidList({ activeBids: [{ id: "b1", supplier: { id: 42, companyName: "Al Rajhi" } }] });
+    expect(out[0].supplierName).toBe("Al Rajhi");
+  });
+
+  /* ⚠️ Renamed with the rule: the firm's brand no longer depends on the tick, so «the VERIFIED
+     firm's brand» stated a premise that had stopped being true. `isVerified` is left on the fixture
+     because it must make no difference, which the case above proves from the other side. */
+  it("falls back to the firm's trade name, then the person's name", () => {
     const brand = mapBidList({ activeBids: [{ id: "b1", supplier: { id: 7, firstName: "Yara", lastName: "Test", company: { name: "Gulf Co", isVerified: true } } }] });
     expect(brand[0].supplierName).toBe("Gulf Co");
     const person = mapBidList({ activeBids: [{ id: "b1", supplier: { id: 7, firstName: "Yara", lastName: "Test" } }] });
@@ -91,7 +133,7 @@ describe("bidSuppliers", () => {
   const bc = (p: Partial<BidCard>): BidCard => ({
     id: "b", status: "PENDING", supplierId: null, supplierCompanyId: null, supplierName: "S", supplierLogoUrl: null, verified: false, rating: null,
     distanceKm: null, submittedAt: null, validUntil: null, price: null, mobPrice: null, demobPrice: null,
-    priceUnit: null, duration: null, numberOfUnits: 1, unitsOffered: 1, openingPrice: null, lastCounterBy: null, requestChangedAt: null, liveStatus: null, reqMinYear: null, equipment: null, eqVerified: false,
+    priceUnit: null, duration: null, numberOfUnits: 1, unitsOffered: 1, openingPrice: null, lastCounterBy: null, dealRoomStatus: null, requestChangedAt: null, liveStatus: null, reqMinYear: null, equipment: null, eqVerified: false,
     compliance: { entityType: "individual", activityLicense: false, taxNumber: false, nationalAddress: false, safety: false, saso: false, localContent: false },
     matchCount: 0, conflictCount: 0, dealRoomId: null, expired: false,
     note: null, requiredCerts: [], heldCertCodes: [], ownershipDocs: [], mobLeadTime: null, demobLeadTime: null,
@@ -375,5 +417,106 @@ describe("mapBidList — a declared term carries what the supplier chose", () =>
   it("leaves the STATE alone — a declaration is still pending until the deal room locks it", () => {
     const b = withDecl({ payment_terms: "net_60" });
     expect(row(b, "payment_terms")?.state).toBe("grey");
+  });
+});
+
+describe("mapBidList — the price the card SHOWS", () => {
+  /* 🔴 **THE SUPPLIER'S OWN LATEST, then acceptance, then his opening bid** (app parity,
+     `BidModel.displayPrice`). Owner + PM, on the app, 2026-09-19: *"a quotation is an offer from
+     seller to buyer … whatever supplier's latest offer is shows regardless of acceptance"*.
+
+     ~~`currentPrice ?? negRate ?? priceAmount` — the live room rate, whoever moved it.~~ So the
+     RENTER'S OWN COUNTER rewrote the price on his own bid card: he asked 16,800 against an offer of
+     18,400 and the card then read 16,800, as though the supplier had agreed to it. */
+  const bid = (over: Record<string, unknown>) =>
+    mapBidList({ activeBids: [{ id: "b1", priceAmount: 18400, supplier: { id: 7, companyName: "S" }, ...over }] })[0];
+
+  it("ignores the renter's counter and keeps the supplier's opening figure", () => {
+    // The room's live rate is the renter's ask; the supplier has proposed nothing of his own.
+    expect(bid({ currentPrice: 16800, lastCounterBy: "rentee" }).price).toBe(18400);
+  });
+
+  it("moves the moment the SUPPLIER proposes, accepted or not", () => {
+    expect(bid({ currentPrice: 16800, lastCounterBy: "rentee", supplierLatest: { rate: 17900, at: "2026-09-20T10:00:00Z" } }).price).toBe(17900);
+  });
+
+  /* ⚠️ The `accepted` arm is UNDER it and is NOT dead: a room created before the history carried its
+     proposal snapshot has no `supplierLatest`, and there acceptance is the only thing that makes the
+     room's figures safe to print. */
+  it("takes the negotiated figure once the bid is ACCEPTED, with no supplierLatest on the row", () => {
+    expect(bid({ status: "ACCEPTED", currentPrice: 16800 }).price).toBe(16800);
+    // …and still prefers the supplier's own latest when the row does carry one.
+    expect(bid({ status: "ACCEPTED", currentPrice: 16800, supplierLatest: { rate: 17900, at: "x" } }).price).toBe(17900);
+  });
+
+  it("applies the same rule to both transport legs", () => {
+    const b = bid({ mobPrice: 1200, demobPrice: 900, currentPrice: 16800, lastCounterBy: "rentee",
+      supplierLatest: { rate: 17900, mobPrice: 1400, at: "x" } });
+    expect(b.mobPrice).toBe(1400);
+    // The supplier named no demob in his proposal, so his opening figure stands rather than the room's.
+    expect(b.demobPrice).toBe(900);
+  });
+
+  /* ⚠️ An EMPTY `supplierLatest` is not an offer. Treating the object's presence as the test would
+     blank every figure on a row the backend sent as `{}`. */
+  it("falls through an empty supplierLatest rather than blanking the price", () => {
+    expect(bid({ supplierLatest: {}, currentPrice: 16800, lastCounterBy: "rentee" }).price).toBe(18400);
+  });
+
+  /* The OPENING price is kept whole beside it, which is what `bidCounterDelta` strikes through. */
+  it("keeps the opening figure intact for the delta", () => {
+    expect(bid({ currentPrice: 16800, supplierLatest: { rate: 17900, at: "x" } }).openingPrice).toBe(18400);
+  });
+});
+
+describe("mapBidList — whose counter stands on a term", () => {
+  /* 🔴 **HIS counters, never hers** (app parity: `buildBidTermsArgs` filters `c.side == 'supplier'`
+     and says why). `counters` carries the latest counter on a term WHICHEVER side wrote it, and the
+     overlay writes it into `value` — the column every reader treats as the SUPPLIER's offer. So a
+     renter who countered read his own proposal back as the supplier's, and it equals his own ask by
+     construction, so the row went GREEN as though the supplier had agreed to something unseen. */
+  const row = (over: Record<string, unknown>) =>
+    mapBidList({
+      activeBids: [{
+        id: "b1",
+        request: { paymentTerms: "net_30", equipmentItems: [{}] },
+        ...over,
+      }],
+    })[0].negotiableTerms?.find((r) => r.key === "payment_terms");
+
+  it("ignores a counter the RENTER wrote", () => {
+    const r = row({ counters: [{ termKey: "payment_terms", newValue: "net_30", side: "rentee", occurredAt: "2026-09-12T09:00:00Z" }] });
+    // Neither his value nor a green state: the supplier has still said nothing.
+    expect(r?.value ?? null).not.toBe("net_30");
+    expect(r?.state).not.toBe("matched");
+    expect(r?.counterSide ?? null).toBeNull();
+  });
+
+  it("takes the SUPPLIER's counter, and says who moved it and when", () => {
+    const r = row({ counters: [{ termKey: "payment_terms", newValue: "net_90", side: "supplier", occurredAt: "2026-09-12T09:00:00Z" }] });
+    expect(r?.value).toBe("net_90");
+    expect(r?.state).toBe("conflict"); // his value differs from the ask
+    expect(r?.counterSide).toBe("supplier");
+    expect(r?.updatedAt).toBe("2026-09-12T09:00:00Z");
+  });
+
+  /* ⚠️ **A counter with NO side is kept.** An older payload does not carry the field, and reading
+     its silence as the renter's would retire the whole overlay on every bid predating it. */
+  it("keeps a counter that names no side", () => {
+    const r = row({ counters: [{ termKey: "payment_terms", newValue: "net_90" }] });
+    expect(r?.value).toBe("net_90");
+  });
+
+  it("stamps an AGREED term with the lock's own time, and no counter side", () => {
+    const r = row({ lockedTerms: [{ termKey: "payment_terms", lockedValue: "net_60", lockedAt: "2026-09-13T08:00:00Z" }] });
+    expect(r?.state).toBe("agreed");
+    expect(r?.updatedAt).toBe("2026-09-13T08:00:00Z");
+    expect(r?.counterSide ?? null).toBeNull();
+  });
+
+  it("leaves a term the room never touched with no provenance at all", () => {
+    const r = row({});
+    expect(r?.counterSide ?? null).toBeNull();
+    expect(r?.updatedAt ?? null).toBeNull();
   });
 });

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { OtherOffer } from "@/lib/contract/other-offers";
 import { useT } from "@/lib/i18n";
+import { pin } from "@/lib/uiPins";
 // The strip's own rules moved out of `.bidmap` with it: it no longer renders inside that surface.
 import "./map-proto.css";
 
@@ -42,7 +43,7 @@ export function OtherOffers({ offers, currentBidId }: { offers: OtherOffer[]; cu
   if (offers.length < 2) return null;
 
   return (
-    <div className="bm-sibs" role="tablist" aria-label={t.bidMap.otherBids}>
+    <div {...pin("other-bids")} className="bm-sibs" role="tablist" aria-label={t.bidMap.otherBids}>
       <span className="bm-sibs-l">{t.bidMap.otherBids}</span>
       <div className="bm-sibs-row">
         {offers.map((o) => {

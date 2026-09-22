@@ -56,7 +56,12 @@ Once you learn a URL, edit this file so the next run does not ask again.
 
 On **prod** you may only read. No creating a request, no submitting a bid, no sending a quotation, no cancelling a deal room, no uploading a document, no editing a profile. Any case marked `mutating` in the registry is reported `SKIPPED (prod, mutating)`, not silently dropped. If the user asks for a mutating case on prod anyway, say plainly that it writes real data to a live tenant and get an explicit go-ahead first.
 
-On **local**, start the server yourself if it is not up: `npm run dev`, wait for the port, and stop it when done.
+On **local**, start the server yourself if it is not up and never ask the owner to do it:
+`NODE_OPTIONS= npx next dev` (the `npm run dev` script is broken here — it passes
+`--no-experimental-webstorage`, which the local Node refuses), wait for the port, stop it when done.
+⚠️ **The first compile can outlast any timeout on this machine** (OneDrive path). If it does,
+do NOT hand it back — fall back to the build-plus-compiled-stylesheet method or report the layer as
+not run.
 
 ## Step 1 — Resolve authentication
 

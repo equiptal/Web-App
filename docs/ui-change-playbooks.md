@@ -117,16 +117,11 @@ it sits in.
 ## The gate, every time
 
 ```bash
-npm run typecheck && npm run lint && npm test
-npm run ui:pins      # regenerate the two pin tables if the registry moved
-npm run ui:shots     # PNGs into .artifacts/ui/ — then READ them
+npm run typecheck && npm run lint
+npx vitest run <suites for the touched files>   # full npm test only when shared code moved
+npm run ui:pins      # only if the pin registry moved
 ```
 
-`npm run build` only when a route, a config or a dependency changed.
-
-## Specimens (the pictures)
-
-`src/app/dev/preview/specimens.tsx` — one entry per surface, real component, invented data, no
-session. Add one for any surface a batch changes that has none; the id is what `?s=` takes and what
-`tests/e2e/ui-shots.spec.ts` walks. The page renders only on localhost and staging (the pin
-overlay's own host allowlist).
+~~`npm run ui:shots`, specimens and `npm run build`.~~ Dropped from the batch flow (owner,
+2026-09-22: *"remove this steps that take too much time"*). The specimens page still exists for
+anyone who wants it; it is no longer a step.

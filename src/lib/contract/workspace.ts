@@ -10,7 +10,7 @@
  */
 
 import { bucketBidTerms, type BidCard, type TermRow } from "./bids";
-import type { RequestGroup, RequestListItem } from "./requests";
+import { groupBiddingClosed, type RequestGroup, type RequestListItem } from "./requests";
 
 /** Where a bid came from. The filter above the tabs switches between these. */
 export type BidSource = "app" | "offline";
@@ -96,18 +96,46 @@ export interface WorkspaceSelection {
 export const EMPTY_SELECTION: WorkspaceSelection = { groupId: null, itemId: null, bidId: null };
 
 /**
- * A request whose bidding is over. `EXPIRED` and `FORCE_EXPIRED` are included deliberately: to the
- * renter reading the rail they are the same fact — nothing more will arrive here.
+ * **A rail circle is shut exactly when the navy context bar says so** (owner, 2026-09-22, on a
+ * tile drawing full colour and a share badge under a bar reading CLOSED).
+ *
+ * 🔴 ~~`CLOSED_STATUSES` = {CLOSED, HUB_CLOSED, EXPIRED, FORCE_EXPIRED}, plus `isClosedRequest`
+ * and `isClosedGroup` over it.~~ That was a DENYLIST, and `groupBiddingClosed` - which the bar, the
+ * dashboard's «Closes» column and every cancel affordance already read - is an ALLOWLIST of the
+ * LIVE statuses ({OPEN, ACTIVE, PARTIALLY_ACCEPTED}). So `CANCELLED`, `ABANDONED` and `ACCEPTED`
+ * were shut to the bar and live to the circle above it: full colour, no «Closed» caption, and a
+ * share badge inviting bids the request can no longer take.
+ *
+ * ⚠️ **The two agree on the four the denylist named**, which is why this stood for a month: a
+ * request that EXPIRES reads the same either way, and it is a CANCELLATION that parts them.
+ *
+ * ⚠️ The 2026-08-31 ruling «the share badge carries `!tile.closed` so the rule is enforced
+ * where it is stated» was therefore only ever true for four statuses. One predicate makes it true
+ * for all of them - and the badge itself is gone (owner, 2026-09-22), so the rule it guarded is
+ * now the CIRCLE's own greyscale and caption.
  */
-const CLOSED_STATUSES = new Set(["CLOSED", "HUB_CLOSED", "EXPIRED", "FORCE_EXPIRED"]);
 
-export function isClosedRequest(status: string): boolean {
-  return CLOSED_STATUSES.has(status.toUpperCase());
-}
-
-/** A group is closed only when every request in it is — one live item keeps the project live. */
-export function isClosedGroup(group: RequestGroup): boolean {
-  return group.items.length > 0 && group.items.every((i) => isClosedRequest(i.status));
+/**
+ * **Every machine of one group, in the order it was asked for** (owner, 2026-09-22: *"for multi
+ * item, make sure all mutli items requests are designed in this way"*).
+ *
+ * 🔴 Lifted out of `railTiles` because the rail stopped being the only surface that stands
+ * for a whole request: the workspace's context bar draws the same montage. Two derivations of
+ * «which machines does this request hold» is how the bar and the tile above it come to name
+ * different machines for one request, and NOTHING would fail when they did.
+ *
+ * ⚠️ A line whose picture never loaded is KEPT, with a null `url`. It is still a machine the
+ * request asked for, it still has a name, and both callers draw the name - dropping it would make
+ * the montage disagree with the ITEMS strip about how many machines this request holds.
+ */
+export function railMachines(group: RequestGroup, ar = false): RailMachine[] {
+  return group.items.map((i) => ({
+    id: i.id,
+    name: (ar ? i.item?.nameAr || i.item?.name : i.item?.name) ?? i.displayId,
+    url: i.item?.imageUrl ?? null,
+    isPhoto: i.item?.imageIsPhoto ?? false,
+    qty: i.item?.qty ?? 1,
+  }));
 }
 
 /** The rail, in the order `groupRequests` produced (newest first). */
@@ -127,16 +155,10 @@ export function railTiles(groups: RequestGroup[], ar = false): RailTile[] {
       return {
         imageUrl: withPic?.imageUrl ?? null,
         imageIsPhoto: withPic?.imageIsPhoto ?? false,
-        machines: g.items.map((i) => ({
-          id: i.id,
-          name: (ar ? i.item?.nameAr || i.item?.name : i.item?.name) ?? i.displayId,
-          url: i.item?.imageUrl ?? null,
-          isPhoto: i.item?.imageIsPhoto ?? false,
-          qty: i.item?.qty ?? 1,
-        })),
+        machines: railMachines(g, ar),
       };
     })(),
-    closed: isClosedGroup(g),
+    closed: groupBiddingClosed(g.items),
   }));
 }
 

@@ -51,7 +51,10 @@ const PROFILE = (over: Partial<RenterProfile> = {}): RenterProfile => ({
   tier: "basic",
   firstName: "Mohammed",
   lastName: "Noor",
-  companyName: null,
+  /* ⚠️ Named, because a FIRST save now requires it (app parity, 2026-09-21 — see the case at the
+     foot of this file). These cases are about which ENDPOINT is called, so the fixture carries a
+     company the way a renter completing his profile does; the refusal has its own case. */
+  companyName: "Al Ghadeer Est.",
   city: "Riyadh",
   jobTitle: "Manager",
   email: "m@example.com",
@@ -125,5 +128,32 @@ describe("the flag reaches the form at all", () => {
 
   it("the form reads BOTH facts, and tests the flag against `false` exactly", () => {
     expect(SRC).toMatch(/tier === "guest" \|\| profile\.hasCompletedOnboarding === false/);
+  });
+});
+
+describe("the company name, on the pass that is asked for it", () => {
+  /**
+   * 🔴 **REQUIRED on a first save, and the app's own split.** `profile_form_page`'s
+   * `_companyNameIsValid` is `!_isComplete || length >= 2`: the complete pass refuses a blank, an
+   * edit does not. Since 2026-09-21 `profile.companyName` is the FOURTH rung of the one naming rule
+   * (`counterparty-name.ts`), so a renter who completes without it is listed among firms under his
+   * own personal name.
+   *
+   * ⚠️ Required on the FORM, never in the database: nothing backfills, so the accounts that
+   * predate the rule keep working and are asked the next time they open this form.
+   */
+  it("Given a FIRST save with no company, Then it is refused and neither endpoint is called", async () => {
+    await save(PROFILE({ hasCompletedOnboarding: false, companyName: null }));
+    await waitFor(() => expect(screen.getByText("Enter your company name.")).toBeTruthy());
+    expect(calls.complete).toBe(0);
+    expect(calls.update).toBe(0);
+  });
+
+  it("Given an ordinary EDIT with no company, Then it saves", async () => {
+    // He came here to change his phone; a field that was optional the day he signed up must not
+    // block him. This is the half of the app's rule that is easy to lose.
+    await save(PROFILE({ hasCompletedOnboarding: true, companyName: null }));
+    await waitFor(() => expect(calls.update).toBe(1));
+    expect(calls.complete).toBe(0);
   });
 });

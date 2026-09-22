@@ -13,7 +13,8 @@ import { readFileSync } from "node:fs";
  *   · a taxonomy drawing — `spider-crane.png`, 1024×559, ratio **1.83, the same shape** — on
  *     `object-contain p-1`: drawn 52×28, a letterbox whose own straight top and bottom edge shows
  *     through a round hole. That edge is the «squared» one, and `p-1` shrank the box first.
- *   · no artwork at all — the `precision_manufacturing` icon. A different state, left alone.
+ *   · no artwork at all — the drawn `MachineGlyph` (~~`precision_manufacturing`~~, 2026-09-22).
+ *     A different state, left alone.
  *
  * `object-cover` for the drawings was TRIED on the live rail and rejected: the crop cut the machine
  * into an unreadable jumble, exactly as the note in the component predicted. Scaling a `contain` fit
@@ -22,7 +23,12 @@ import { readFileSync } from "node:fs";
  * ⚠️ jsdom lays out no images, so this reads the SOURCE. The fit is a rendered fact; what is
  * assertable here is that the two rules are the ones the live test chose.
  */
-const SRC = readFileSync("src/components/workspace/RequestRail.tsx", "utf8");
+/**
+ * 🔴 **2026-09-22: `fitOf` and the single-picture path moved into `CircleArt.tsx`**, because the
+ * workspace's context bar draws the same circle at 32px and two copies of this rule is how the two
+ * discs come to fit one asset differently. The RULE is unchanged; this reads it where it now lives.
+ */
+const SRC = readFileSync("src/components/workspace/CircleArt.tsx", "utf8");
 
 /**
  * The rule that decides the fit.
@@ -47,7 +53,9 @@ describe("the request rail's tile artwork", () => {
     expect(fitRule).toContain("object-cover");
     // The mask is round, so a covered photograph is rounded with it.
     expect(wholeCircle).toContain('fallbackIsPhoto ? "rounded-full" : ""');
-    expect(wholeCircle).toContain("h-[52px] w-[52px]");
+    /* ⚠️ The single picture fills the DISC, whatever the disc is: the rail asks for 52 and the
+       context bar for 32, so the box is the caller's and a literal 52 here would pin one caller. */
+    expect(wholeCircle).toContain("style={{ height: size, width: size }}");
   });
 
   it("fills the circle for a DRAWING by scaling a contain fit, never by cropping it", () => {

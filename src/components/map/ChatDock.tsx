@@ -65,6 +65,8 @@ import {
 } from "@/lib/chat/chat-attachments";
 import { STREAM_API_KEY, leaseStream, watchDealRoom } from "@/lib/chat/stream-connection";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
+import { Dialog, DialogButton } from "@/components/Dialog";
+import { Icon } from "@/components/Icon";
 import { containsPhoneNumber } from "@/lib/contract/contact-guard";
 import type { BidCard } from "@/lib/contract/bids";
 import {
@@ -84,6 +86,7 @@ import {
   buildChatCardView,
   chatCardOfMessage,
   chatCardTime,
+  chatEventLine,
   requestRepliesByRef,
   requestThreadCards,
 } from "@/lib/contract/deal-rounds";
@@ -131,6 +134,43 @@ export interface ChatDockProps {
   bid: BidCard;
   /** Open the dock on arrival — the renter came here FOR the conversation (`?chat=1`), not the map. */
   initialOpen?: boolean;
+  /**
+   * **EMBEDDED — the dock IS the column, rather than floating over one** (owner, 2026-09-22, on the
+   * inbox: *"i want it like the chats inbox look that open each chat beside it so maybe like the
+   * chat pannel in the map but instead of equipments on the left, the chat inbox will be on the
+   * left and on right the chats"*).
+   *
+   * 🔴 **The same component, not a second conversation.** Everything this holds is what the
+   * inbox needs and would otherwise have to grow its own copy of: the Stream connection, the
+   * message list, the custom cards, the composer with its attachments and voice notes, the contact
+   * guard, and the three rules named at the top of this file. A second implementation of any of
+   * them would drift on the day one surface learns something the other does not.
+   *
+   * ⚠️ **Four pieces of floating chrome stand down**, and each because the inbox already
+   * answers what it answers: the dock BUTTON (the conversation is not opened from in here), the
+   * ARRIVAL BUBBLE (the list beside it carries the unread count on every row), the PLACEMENT
+   * control (there is one place — the right-hand column) and the ✕, unless a caller hands one in.
+   *
+   * ⚠️ The tab strip is KEPT. A supplier bidding on three items has three rooms, and the
+   * inbox row that opened this one names a single bid — so the strip is still the only thing that
+   * says the other two exist.
+   */
+  embedded?: boolean;
+  /** What the embedded dock's ✕ does. Absent, no ✕ is drawn rather than one that closes a panel the
+   *  page has no other way to reopen. */
+  onClose?: () => void;
+  /**
+   * Open this bid's EQUIPMENT MAP — the surface this dock normally floats over (owner, 2026-09-22,
+   * choosing it over dropping the route from the inbox entirely).
+   *
+   * ⚠️ Drawn only when a caller hands one in, which in practice means the inbox: on the map
+   * itself the control would point at the page it is already standing on. It is the yards, the
+   * papers and the readiness — everything the conversation is ABOUT — so it belongs in the band
+   * that names the counterparty rather than buried in the ⋮ menu, which needs a live room to open
+   * at all and is therefore absent on exactly the bids that have never been negotiated.
+   */
+  onOpenEquipment?: () => void;
+
   /** The bid's RFQ group, when the route resolved one. Only used when the received-bids feed does not
    *  contain the anchor bid (paging), so the tab strip degrades to "no siblings" rather than to a
    *  wrong group. */
@@ -217,6 +257,9 @@ export interface ChatDockProps {
 export function ChatDock({
   bid,
   initialOpen = false,
+  embedded = false,
+  onClose,
+  onOpenEquipment,
   groupKey = null,
   dealRoomId = null,
   typeWord = null,
@@ -238,7 +281,7 @@ export function ChatDock({
 
   /** Open on arrival when the renter came here FOR the conversation (`?chat=1`); closed otherwise, as
    *  a floating control should be. Initial state only — closing it must stick. */
-  const [open, setOpen] = useState(!!initialOpen);
+  const [open, setOpen] = useState(!!initialOpen || embedded);
   /**
    * WHERE the conversation sits (`rDrawer`'s `chatPlace`, prototype 1573). `fill` is the prototype's
    * default and its stated intent — the conversation *replaces* the map rather than floating over it,
@@ -248,7 +291,7 @@ export function ChatDock({
    * A view preference and nothing more: it moves no selection, fetches nothing, and changes no
    * message. That is why it lives here rather than in the surface's state.
    */
-  const [place, setPlace] = useState<"fill" | "mirror">("fill");
+  const [place, setPlace] = useState<"fill" | "mirror" | "inbox">(embedded ? "inbox" : "fill");
   /** The call sheet — the deal room's own, so the icon in this header behaves as it does there
    *  (owner, 2026-08-19). A view state like `place`: it reaches nothing and writes nothing. */
   const [callOpen, setCallOpen] = useState(false);
@@ -813,7 +856,10 @@ export function ChatDock({
           open: `rChatDock` returns null in that state and says why, *"while the conversation is open
           it IS the affordance — a button under it would be a second one."* The drawer's own ✕ closes
           it, so there is one control for one state rather than two that both claim to toggle. */}
-      {!open && (
+      {/* ⚠️ Withheld when EMBEDDED: the conversation is opened from the list beside it, and a
+          floating control over a column that is already the conversation is a second affordance for
+          a state that has one. */}
+      {!open && !embedded && (
         <button type="button" className="bm-dock" onClick={() => setOpen(true)} aria-expanded={false}>
           <span className="material-icons-outlined">forum</span>
           <span className="bm-dock-label">{t.chatDock.title}</span>
@@ -838,7 +884,10 @@ export function ChatDock({
           chip and the rail down the leading edge, so the one arrival a renter must not miss still
           looks different before it is read — and warm rather than red, because red on this surface
           belongs to availability alone. */}
-      {showNotice && !open && (
+      {/* ⚠️ Withheld when EMBEDDED for the same reason the button is: the list beside this
+          column draws the unread count on every row, so a bubble quoting one of them would be the
+          same news twice, and it has no dock to be anchored to. */}
+      {showNotice && !open && !embedded && (
         <div className={`bm-dock-notice${refusal ? " is-refusal" : ""}`} role="status">
           <span className="bm-dock-notice-tail" aria-hidden="true" />
           <div className="bm-dock-notice-head">
@@ -996,21 +1045,47 @@ export function ChatDock({
               </button>
             )}
             {/* ONE control decides the placement (prototype 1590). Not a resize handle — there are two
-                placements, not a continuum, and each is a whole layout rather than a width. */}
-            <button
-              type="button"
-              className="bm-chat-place"
-              onClick={() => setPlace((p) => (p === "fill" ? "mirror" : "fill"))}
-              aria-label={place === "fill" ? t.chatDock.placeMirror : t.chatDock.placeFill}
-              title={place === "fill" ? t.chatDock.placeMirror : t.chatDock.placeFill}
-            >
-              <span className="material-icons-outlined">
-                {place === "fill" ? "vertical_split" : "open_in_full"}
-              </span>
-            </button>
-            <button type="button" className="bm-chat-x" onClick={() => setOpen(false)} aria-label={t.chatDock.close}>
-              <span className="material-icons-outlined">close</span>
-            </button>
+                placements, not a continuum, and each is a whole layout rather than a width.
+                ⚠️ Withheld when EMBEDDED: there is one place, the column it is standing in. */}
+            {!embedded && (
+              <button
+                type="button"
+                className="bm-chat-place"
+                onClick={() => setPlace((p) => (p === "fill" ? "mirror" : "fill"))}
+                aria-label={place === "fill" ? t.chatDock.placeMirror : t.chatDock.placeFill}
+                title={place === "fill" ? t.chatDock.placeMirror : t.chatDock.placeFill}
+              >
+                <span className="material-icons-outlined">
+                  {place === "fill" ? "vertical_split" : "open_in_full"}
+                </span>
+              </button>
+            )}
+            {/* The machine this conversation is about — its yards, its papers, its readiness. One
+                icon, in the band that already names who the talk is with. */}
+            {onOpenEquipment && (
+              <button
+                type="button"
+                className="bm-chat-call"
+                onClick={onOpenEquipment}
+                aria-label={L("View the equipment", "عرض المعدة")}
+                title={L("View the equipment", "عرض المعدة")}
+              >
+                <span className="material-icons-outlined">map</span>
+              </button>
+            )}
+            {/* 🔴 Embedded, closing is the PAGE's to define — `setOpen(false)` would leave an
+                empty column with no control anywhere to fill it again. With no handler the ✕ is not
+                drawn at all, rather than drawn and inert. */}
+            {(!embedded || onClose) && (
+              <button
+                type="button"
+                className="bm-chat-x"
+                onClick={() => (embedded ? onClose?.() : setOpen(false))}
+                aria-label={t.chatDock.close}
+              >
+                <span className="material-icons-outlined">close</span>
+              </button>
+            )}
           </header>
 
           {/* The kebab's menu, a sibling of the header rather than a child — the header is a fixed 64px
@@ -1159,9 +1234,19 @@ export function ChatDock({
                   ) : (
                     // An EVENT in the room — a rate, a counter, an acceptance. It belongs to the
                     // conversation rather than to either party, so it is centred rather than sided.
-                    // The class exists because `ChatCard` centres itself with `align-self`, which a
-                    // wrapper turns inert: without it the "not sided" card silently took a side.
-                    <div key={m.id} className="bm-chat-event">{chatCard}</div>
+                    //
+                    // 🔴 ~~A full `ChatCard` with a coloured rule and a row per figure (RM3-AC-48:
+                    // "never a bare grey pill").~~ A GREY PILL, as the app draws it (owner,
+                    // 2026-09-22: *"show it like how it appears as grey pills on the app not like
+                    // this"*). The app's `DealSystemEvent`: centred, an icon and one line. What made
+                    // AC-48 right is kept: the line is `chatEventLine` of the card VIEW, so it is in
+                    // the thread's language and a counter still shows both of its values; only
+                    // `message.text` would bring the old defects back. The time rides on `title`,
+                    // as the app's pill carries none. The request loop above keeps its cards.
+                    <div key={m.id} {...pin("chat-dock-event")} className="bm-chat-pill" title={view.at}>
+                      <span className="material-icons-outlined" aria-hidden="true">{view.icon}</span>
+                      <span className="bm-chat-pill-t">{chatEventLine(view, ar)}</span>
+                    </div>
                   );
                 }
                 // NOT `if (!m.text) return null`. The dock and `/deal-room/[id]` read the SAME
@@ -1364,27 +1449,33 @@ export function ChatDock({
           ⚠️ Order is deliberate: the way OUT sits first, «Got it» last and filled — in both
           directionalities the primary is the one a thumb lands on. */}
       {contactAsk && (
-        <div className="dl-modal" dir={ar ? "rtl" : "ltr"} onClick={() => setContactAsk(false)}>
-          <div className="dl-modal-card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
-            <div className="dl-modal-head">
-              <span className="dl-modal-ic danger"><span className="material-icons-outlined">privacy_tip</span></span>
-              <div className="dl-modal-tt"><div className="dl-modal-title">{L("Would you like to share your number?", "هل تريد مشاركة رقمك؟")}</div></div>
-              <button className="dl-modal-x" onClick={() => setContactAsk(false)} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
-            </div>
-            <div className="dl-modal-body">
-              {/* Red body text — the warning reads as a warning, not as a notice. */}
-              <p className="dl-modal-msg" style={{ color: "var(--danger)", fontWeight: 600 }}>
-                {L("To protect your privacy, numbers are currently only shown to suppliers you award", "لحماية خصوصيتك، لا تظهر الأرقام حالياً إلا للموردين الذين ترسي عليهم الصفقة")}
-              </p>
-            </div>
-            <div className="dl-modal-foot">
-              <button className="dl-mbtn warn" onClick={() => { setContactWarned(true); setContactAsk(false); void send(); }}>
+        <Dialog
+          open
+          onClose={() => setContactAsk(false)}
+          size="sm"
+          icon={<Icon name="privacy_tip" size={20} className="text-danger" />}
+          title={L("Would you like to share your number?", "هل تريد مشاركة رقمك؟")}
+          footer={
+            <>
+              {/* The quiet red one, and it is deliberately not `tone="danger"`: that is a SOLID red
+                  fill, which would make the escape hatch the loudest control on a privacy warning —
+                  the exact fault the app corrected on 2026-09-20. */}
+              <DialogButton
+                tone="ghost"
+                className="border-danger/30 bg-danger-soft text-danger hover:border-danger/50"
+                onClick={() => { setContactWarned(true); setContactAsk(false); void send(); }}
+              >
                 {L("Share anyway", "مشاركة على أي حال")}
-              </button>
-              <button className="dl-mbtn green" onClick={() => setContactAsk(false)}>{L("Got it", "حسناً")}</button>
-            </div>
-          </div>
-        </div>
+              </DialogButton>
+              <DialogButton tone="primary" onClick={() => setContactAsk(false)}>{L("Got it", "حسناً")}</DialogButton>
+            </>
+          }
+        >
+          {/* Red body text — the warning reads as a warning, not as a notice. */}
+          <p className="text-body font-semibold text-danger">
+            {L("To protect your privacy, numbers are currently only shown to suppliers you award", "لحماية خصوصيتك، لا تظهر الأرقام حالياً إلا للموردين الذين ترسي عليهم الصفقة")}
+          </p>
+        </Dialog>
       )}
     </>
   );

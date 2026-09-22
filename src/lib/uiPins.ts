@@ -109,7 +109,9 @@ export const PIN_REGISTRY = {
      and displayed only under `<html data-season="nd">`, so the overlay numbers them out of season
      too - which is the point: a note about the seam can quote 2.4 in July. */
   "header-season-decor": { n: "2.4", label: "Header — season backdrop (palms, dots, seam)", file: "src/components/AppShell.tsx" },
-  "header-season-mark": { n: "2.5", label: "Header — season mark", file: "src/components/AppShell.tsx" },
+  /* 2.5 RETIRED (2026-09-22): the header's season mark was removed (owner: *"remove this"*).
+     Never reissued — a number that has been quoted in a note must not come back meaning
+     something else, which is the `CarryForwardModal` rule of 2026-09-09. */
   "app-nav": { n: "3", label: "Nav tabs — desktop", file: "src/components/AppNav.tsx" },
   "nav-tab": { n: "3.1", label: "Nav tab — one link", file: "src/components/AppNav.tsx" },
   "app-nav-mobile": { n: "4", label: "Nav tabs — mobile", file: "src/components/AppNav.tsx" },
@@ -185,10 +187,13 @@ export const PIN_REGISTRY = {
   "request-rail": { n: "26", label: "Requests rail (full-bleed band)", file: "src/components/workspace/RequestRail.tsx" },
   "rail-create-tile": { n: "26.1", label: "Rail — create tile", file: "src/components/workspace/RequestRail.tsx" },
   "rail-tiles": { n: "26.2", label: "Rail — request tiles", file: "src/components/workspace/RequestRail.tsx" },
+  "circle-art": { n: "26.4", label: "Circle — the request's machines on one ground", file: "src/components/workspace/CircleArt.tsx" },
+  "circle-zoom": { n: "26.5", label: "Circle — the zoomed view behind a double press", file: "src/components/workspace/RequestRail.tsx" },
   // 27 was the request strip, a full-width band above the tabs. It is the context bar now — the
   // location and the item, and the item switcher the strip used to carry as chips (owner, 2026-08-27).
   "item-tier": { n: "26.3", label: "Item tier — one chip per machine", file: "src/components/workspace/ItemTier.tsx" },
-  "request-context": { n: "27", label: "Request context bar (location + item)", file: "src/components/workspace/RequestContextBar.tsx" },
+  "request-context": { n: "27", label: "Request context bar (location + machines)", file: "src/components/workspace/RequestContextBar.tsx" },
+  "context-machines": { n: "27.1", label: "Context bar — the machines the request asked for", file: "src/components/workspace/RequestContextBar.tsx" },
   "request-details": { n: "28", label: "Request details modal", file: "src/components/workspace/RequestDetailsModal.tsx" },
   "bid-size-filter": { n: "28.5", label: "Bid size filter — include larger equipment", file: "src/components/workspace/BidSizeFilter.tsx" },
   "workspace-bid-cards": { n: "29", label: "Bid cards", file: "src/components/workspace/BidCards.tsx" },
@@ -207,15 +212,16 @@ export const PIN_REGISTRY = {
   "bid-map-workspace": { n: "45", label: "Bid map workspace", file: "src/components/map/BidMapWorkspace.tsx" },
   "bidmap-canvas": { n: "45.1", label: "Bid map — canvas side", file: "src/components/map/BidMapWorkspace.tsx" },
   "bidmap-panel": { n: "45.2", label: "Bid map — side panel", file: "src/components/map/BidMapWorkspace.tsx" },
+  "other-bids": { n: "45.3", label: "Bid map — «Other bids» strip in the back bar", file: "src/components/map/OtherOffers.tsx" },
   "map-canvas": { n: "46", label: "Map canvas", file: "src/components/map/MapCanvas.tsx" },
   "map-pin": { n: "46.1", label: "Map — one machine's marker", file: "src/components/map/MapCanvas.tsx" },
   /* The fleet list's own card, and the parts a restyle actually lands on. `EquipmentList`'s root is a
      fragment and cannot carry a pin (see the note at the top), so the CARD is the surface. */
   "equipment-card": { n: "47", label: "Fleet card (equipment list)", file: "src/components/map/EquipmentList.tsx" },
   "equipment-card-photo": { n: "47.1", label: "Fleet card — photo cell", file: "src/components/map/EquipmentList.tsx" },
-  "equipment-card-head": { n: "47.2", label: "Fleet card — readiness + file icon", file: "src/components/map/EquipmentList.tsx" },
+  "equipment-card-head": { n: "47.2", label: "Fleet card — readiness + «Equipment documents»", file: "src/components/map/EquipmentList.tsx" },
   "equipment-card-yard": { n: "47.3", label: "Fleet card — yard card (distance + availability)", file: "src/components/map/EquipmentList.tsx" },
-  "equipment-filter": { n: "47.5", label: "Fleet list — filter bar", file: "src/components/map/EquipmentList.tsx" },
+  "equipment-filter": { n: "47.5", label: "Fleet list — filter control (end of the count pills row)", file: "src/components/map/EquipmentList.tsx" },
   "equipment-filter-panel": { n: "47.6", label: "Fleet list — filter panel", file: "src/components/map/EquipmentList.tsx" },
   "price-footer": { n: "48", label: "Price footer", file: "src/components/map/PriceFooter.tsx" },
   "price-footer-rate": { n: "48.1", label: "Price footer — the rate", file: "src/components/map/PriceFooter.tsx" },
@@ -252,9 +258,14 @@ export const PIN_REGISTRY = {
   "chat-dock-thread": { n: "57.3", label: "Chat drawer — the thread", file: "src/components/map/ChatDock.tsx" },
   "chat-dock-composer": { n: "57.4", label: "Chat drawer — composer", file: "src/components/map/ChatDock.tsx" },
   "chat-dock-draft": { n: "57.5", label: "Chat drawer — staged request card", file: "src/components/map/ChatDock.tsx" },
+  "chat-dock-event": { n: "57.6", label: "Chat drawer — negotiation event (grey pill)", file: "src/components/map/ChatDock.tsx" },
 
   /* ── 60–69  inbox, stores ─────────────────────────────────────────────────────────────────── */
   "inbox-view": { n: "60", label: "Inbox", file: "src/components/inbox/InboxView.tsx" },
+  "inbox-list": { n: "60.1", label: "Inbox — the chats column", file: "src/components/inbox/InboxView.tsx" },
+  "inbox-row": { n: "60.2", label: "Inbox — one chat row", file: "src/components/inbox/InboxView.tsx" },
+  "inbox-pane": { n: "60.3", label: "Inbox — the conversation beside the list", file: "src/components/inbox/InboxView.tsx" },
+  "inbox-pane-empty": { n: "60.4", label: "Inbox — nothing picked yet", file: "src/components/inbox/InboxView.tsx" },
   "browse-surface": { n: "61", label: "Browse stores", file: "src/components/stores/BrowseSurface.tsx" },
   "browse-controls": { n: "61.1", label: "Browse — heading + search + city, one row", file: "src/components/stores/BrowseSurface.tsx" },
   "browse-categories": { n: "61.2", label: "Browse — category rail", file: "src/components/stores/BrowseSurface.tsx" },

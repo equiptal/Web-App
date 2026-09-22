@@ -17,11 +17,19 @@ import { resolve } from "node:path";
  */
 
 const SRC = resolve(__dirname, "../../src");
-const rail = readFileSync(resolve(SRC, "components/workspace/RequestRail.tsx"), "utf8");
-/** The component's code with its comments stripped — several rules below are NAMED in the prose
- *  that says they must not be used, which is how four assertions in this repo went vacuous. */
-const code = rail.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
-const art = code.slice(code.indexOf("function CircleArt"), code.indexOf("function CircleZoom"));
+/** Comments stripped — several rules below are NAMED in the prose that says they must not be used,
+ *  which is how four assertions in this repo went vacuous. */
+const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+
+/**
+ * 🔴 **The montage lives in its OWN module now** (2026-09-22): the workspace's context bar draws
+ * the same request at 32px, so `CircleArt` stopped being the rail's private business. Every rule
+ * below is unchanged and only its address moved — which is why this file reads two sources rather
+ * than relaxing what it asks. A rule asserted against the wrong file passes on nothing.
+ */
+const code = strip(readFileSync(resolve(SRC, "components/workspace/RequestRail.tsx"), "utf8"));
+const shared = strip(readFileSync(resolve(SRC, "components/workspace/CircleArt.tsx"), "utf8"));
+const art = shared.slice(shared.indexOf("export function CircleArt"));
 
 describe("one machine or many, in one 52px circle", () => {
   it("Given fewer than two pictures, Then the circle is the single image it always was", () => {
@@ -38,7 +46,7 @@ describe("one machine or many, in one 52px circle", () => {
      * is a mark rather than a machine — and the count badge already states how many lines the
      * request really holds, so an overflow marker inside the circle would say it twice.
      */
-    expect(code).toContain("const MAX_IN_CIRCLE = 3;");
+    expect(shared).toContain("export const MAX_IN_CIRCLE = 3;");
     expect(art).toContain("art.slice(0, MAX_IN_CIRCLE)");
     expect(art).not.toContain("+{extra}");
   });
@@ -50,7 +58,10 @@ describe("one machine or many, in one 52px circle", () => {
      * out?"*). Framed thumbnails in a 52px circle read as broken pictures rather than as one
      * request holding several machines.
      */
-    expect(art).toContain("flex h-[52px] w-[52px] items-center justify-center overflow-hidden rounded-full");
+    /* ⚠️ The disc's DIAMETER is the caller's (52 on the rail, 32 on the context bar), so what
+       is pinned is its shape and its clip - a fixed 52 here would fail on the bar for being right. */
+    expect(art).toContain('className="flex items-center justify-center overflow-hidden rounded-full"');
+    expect(art).toContain("style={{ height: size, width: size }}");
     // No cell ground, no hairline, no grid.
     expect(art).not.toContain("bg-border");
     expect(art).not.toContain("gap-px");
@@ -69,8 +80,8 @@ describe("one machine or many, in one 52px circle", () => {
      * and either way the row oversails the disc by the same amount, which the round clip takes.
      * Pinning «66» and «16» instead would go stale the first time the cap moved.
      */
-    expect(code).toContain("const SPREAD = 132;");
-    expect(code).toContain("const OVERLAP = 16;");
+    expect(shared).toContain("const SPREAD = 132;");
+    expect(shared).toContain("const OVERLAP = 16;");
     expect(art).toContain("marginInlineStart: `-${OVERLAP / (shown.length - 1)}%`");
     // ⚠️ Only AFTER the first, or the row is pushed off its own leading edge.
     expect(art).toContain("...(i > 0 ?");
@@ -97,16 +108,16 @@ describe("one machine or many, in one 52px circle", () => {
      * half and shreds the machine (2.7x crop, hard vertical seam where the two meet), and a
      * top-and-bottom fade leaves the left and right edges standing.
      */
-    expect(code).toContain("const CELL_MASK =");
+    expect(shared).toContain("const CELL_MASK =");
     /* 🔴 `closest-side`, and the element must BE the picture - see the case below. An
        ellipse sized in PERCENTAGES is sized to the BOX, and with a box taller than the picture the
        solid core swallowed it whole and faded nothing. */
-    expect(code).toContain("radial-gradient(closest-side, black 68%, transparent 100%)");
+    expect(shared).toContain("radial-gradient(closest-side, black 68%, transparent 100%)");
     const rowImg = art.slice(art.indexOf("{shown.map("));
     expect(rowImg).toContain("maskImage: CELL_MASK");
     expect(rowImg).toContain("WebkitMaskImage: CELL_MASK");
     // ⚠️ Per CELL, never on the disc: the disc's own edge is the circle, and fading that greys the rim.
-    const disc = art.slice(art.indexOf("flex h-[52px]"), art.indexOf("{shown.map("));
+    const disc = art.slice(art.indexOf("flex items-center justify-center"), art.indexOf("{shown.map("));
     expect(disc).not.toContain("maskImage");
   });
 
@@ -142,7 +153,7 @@ describe("one machine or many, in one 52px circle", () => {
     expect(rowImg).not.toContain("object-cover");
     expect(rowImg).not.toContain("scale-[1.34]");
     // …and the single-picture path keeps it, so the two cases have not been collapsed.
-    expect(code).toContain('const fitOf = (isPhoto: boolean) => (isPhoto ? "object-cover" : "scale-[1.34] object-contain");');
+    expect(shared).toContain('const fitOf = (isPhoto: boolean) => (isPhoto ? "object-cover" : "scale-[1.34] object-contain");');
   });
 });
 
@@ -168,7 +179,10 @@ describe("a double press opens the picture and still picks the request", () => {
      */
     const zoom = code.slice(code.indexOf("function CircleZoom"), code.indexOf("export function RequestRail"));
     expect(zoom).toContain("machines.map((m, i) =>");
-    expect(zoom).toContain("precision_manufacturing");
+    /* 🔴 The glyph is a DRAWN component now, not a name from the icon font (owner,
+       2026-09-22: *"use nice icons not this"*). The RULE is unchanged - a machine with no
+       picture still draws a stand-in rather than a broken image - and only its address moved. */
+    expect(zoom).toContain("<MachineGlyph");
     expect(zoom).toContain("{m.name}");
   });
 
@@ -227,5 +241,48 @@ describe("one machine's failure costs only that machine", () => {
     expect(code).not.toContain("new Set(b).add(tile.key)");
     expect(code).toContain("tile.imageUrl && broken.has(tile.imageUrl) ? null :");
     expect(code).toContain("m.url && broken.has(m.url) ? { ...m, url: null } : m");
+  });
+});
+
+describe("the same request, drawn the same way wherever it stands for itself", () => {
+  /**
+   * Owner, 2026-09-22: *"for multi item, make sure all mutli items requests are designed in this
+   * way and can show up to 3 equipments in the same background"*.
+   *
+   * 🔴 So `CircleArt` is SHARED. These cases exist because a copy of it would look right in review
+   * and drift silently: the rail and the context bar sit one row apart, and nothing fails when two
+   * discs fit one asset differently.
+   */
+  const bar = strip(readFileSync(resolve(SRC, "components/workspace/RequestContextBar.tsx"), "utf8"));
+  const details = strip(readFileSync(resolve(SRC, "components/workspace/RequestDetailsModal.tsx"), "utf8"));
+
+  it("Given the context bar, Then it draws this component and holds no artwork of its own", () => {
+    expect(bar).toContain("<CircleArt");
+    expect(bar).not.toContain("<img");
+    expect(bar).not.toContain("scale-[1.34]");
+  });
+
+  it("Given a caller, Then the DIAMETER is all it decides", () => {
+    // Everything else - the fit, the spread, the mask, the cap - stays in one place, and a second
+    // `size`-like escape hatch is how the rail and the bar start disagreeing again.
+    expect(art).toContain("size = 52,");
+    expect(bar).toContain("size={32}");
+    const props = art.slice(art.indexOf("export function CircleArt"), art.indexOf("const art = machines.filter"));
+    expect(props).not.toContain("SPREAD");
+    expect(props).not.toContain("max");
+  });
+
+  it("Given the details modal's rows, Then a DRAWING is contained and only a photograph is cropped", () => {
+    /**
+     * 🔴 ~~`object-cover` for both.~~ Every row of a multi-item request cropped its drawing to a
+     * 56x44 box, which enlarges the artwork's own transparent margin and cuts the machine - the
+     * rail's ruling of 2026-09-12, three surfaces along and never applied here.
+     *
+     * ⚠️ NO scale, unlike the circle: the 1.34 exists to fill a ROUND hole whose curve shows a
+     * drawing's letterbox edge, and this box is a rectangle of nearly the artwork's own aspect.
+     */
+    expect(details).toContain("it.item?.imageIsPhoto");
+    expect(details).toContain('"h-full w-full object-contain"');
+    expect(details).not.toContain("scale-[1.34]");
   });
 });
