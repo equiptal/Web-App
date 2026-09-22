@@ -7,6 +7,7 @@
 
 
 import { mapBidLiveStatus, type BidLiveStatus } from "@/lib/contract/bid-live-status";
+import { mediaUrl } from "@/lib/contract/stores";
 
 export type BidStatus =
   | "PENDING"
@@ -287,6 +288,20 @@ export interface BidCard {
    */
   supplierCompanyId: string | null;
   supplierName: string;
+  /**
+   * The supplier's STORE mark, for the quotation's party box and its navy footer.
+   *
+   * 🔴 THE STORE's logo, never the supplier profile's `companyLogoKey`: that key lives under the
+   * private-documents prefix, so a public URL built from it answers 403 — and an `<img>` absorbs that
+   * as «this firm has no logo», which is a failure nobody can see. The app states the same rule where
+   * it fills this field.
+   *
+   * ⚠️ Read TOLERANTLY across the spellings the two services might land on, and through `mediaUrl`,
+   * which passes a signed http URL through and builds the public one for a bare key — the app's
+   * `S3Url.from`. Null until a projection actually carries one, and then both slots simply draw
+   * nothing, which is the app's own behaviour for a supplier with no mark.
+   */
+  supplierLogoUrl: string | null;
   verified: boolean;
   rating: number | null;
   distanceKm: number | null;
@@ -1066,6 +1081,13 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     supplierCity,
     supplierPhone: s(sup.phone),
     supplierEmail: s(sup.email), // not in the bid-list projection yet → null until the backend adds it
+    supplierLogoUrl:
+      mediaUrl(raw.supplierLogoUrl) ??
+      mediaUrl(raw.storeLogoUrl) ??
+      mediaUrl(obj(sup.store).logoUrl) ??
+      mediaUrl(obj(sup.store).logoKey) ??
+      mediaUrl(sup.logoUrl) ??
+      null,
     matchCount: n(raw.matchCount) ?? 0,
     conflictCount: n(raw.conflictCount) ?? 0,
     dealRoomId: s(raw.dealRoomId),

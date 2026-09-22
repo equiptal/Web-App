@@ -23,7 +23,7 @@ const term = (key: string, labelEn: string, value: string | null, extra?: Partia
 
 const bc = (p: Partial<BidCard>): BidCard =>
   ({
-    id: "b", status: "PENDING", supplierId: null, supplierCompanyId: null, supplierName: "S", verified: false,
+    id: "b", status: "PENDING", supplierId: null, supplierCompanyId: null, supplierName: "S", supplierLogoUrl: null, verified: false,
     rating: null, distanceKm: null, submittedAt: null, validUntil: null, price: 1000, mobPrice: null,
     demobPrice: null, priceUnit: "PER_MONTH", duration: null, numberOfUnits: 1, unitsOffered: 1,
     openingPrice: null, lastCounterBy: null, requestChangedAt: null, liveStatus: null, reqMinYear: null,

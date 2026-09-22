@@ -291,6 +291,9 @@ export function normalizedBidToBidCard(
     supplierId: nb.supplier_user_id != null ? String(nb.supplier_user_id) : null,
     supplierCompanyId: null, // an uploaded quote carries no platform company — it groups by its own name
     supplierName: nb.supplier_name ?? "Uploaded quote",
+    // An off-platform submission was typed into the renter’s own supplier list, so there is no
+    // account behind it and therefore no store mark. The app draws nothing for such a party.
+    supplierLogoUrl: null,
     verified: false,
     rating: null,
     distanceKm: nb.distance_km ?? null,

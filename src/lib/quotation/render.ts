@@ -19,7 +19,7 @@ import { DS_ROOT_CSS } from "@/lib/ds-colors";
 
 export type QLang = "en" | "ar";
 
-/** One `LABEL` over its value in the title bar (the app's `_RefPair`). */
+/** One `LABEL` over its value in the title bar (the app’s _RefPair). */
 export interface QuotationRef {
   label: string;
   value: string;
@@ -40,6 +40,15 @@ export interface QuotationParty {
   /** A green tick beside the NAME. It states a checked company registration and nothing else — the
    *  app refuses it for an individual however much else is on file. */
   verified?: boolean;
+  /**
+   * The party's own mark, drawn at the box's TRAILING edge beside the text column.
+   *
+   * 🔴 **A MARK ONLY EXISTS BEHIND A VERIFIED PARTY**, which is the app's own gate
+   * (`_PartyBox`: `verified && logo != null`). A profile can carry a logo while its firm is
+   * unverified — one set before a rejection, or inherited — and printing it puts a company's brand on
+   * a document beside a party nobody has checked. Absent, NOTHING is drawn: an empty tile reads as a
+   * mark that failed to load.
+   */
   logoUrl?: string | null;
   rows: QuotationPartyRow[];
 }
@@ -96,14 +105,6 @@ export interface QuotationClause {
   /** The bold lead-in (`Maintenance`). Absent on a legal clause, which is plain prose. */
   title?: string | null;
   body: string;
-  /**
-   * Settled in the deal room (`lockedTerms`, strictly `state === "agreed"`), marked inline at the end
-   * of the sentence.
-   *
-   * ⚠️ NOT the room's soft-accepted set. The room paints those green because nobody may act on them,
-   * but nobody agreed to them either, and this is a document a customer keeps.
-   */
-  agreed?: boolean;
 }
 
 /** The navy footer band: the SUPPLIER's mark, name and registration. Nothing else — a platform mark
@@ -116,9 +117,6 @@ export interface QuotationFooter {
   vatNumber?: string | null;
   phone?: string | null;
   email?: string | null;
-  /** The platform's support line, drawn whatever else is on file — it is the reader's only route to
-   *  help, and the C.R. / contact lines legitimately fall out when empty. */
-  supportLine?: string | null;
 }
 
 export interface QuotationDoc {
@@ -130,7 +128,18 @@ export interface QuotationDoc {
   statusStamp?: { label: string; tone: "ok" | "muted" } | null;
   quotationNumber: string;
   dateStr: string;
-  /** The title bar's reference strip, in the caller's order (`NO.` · issue · valid until · site · currency). */
+  /**
+   * The REQUEST's own code, printed on the SIGNATURE STRIP rather than in the reference strip.
+   *
+   * 🔴 App parity, and it is a placement the app arrived at deliberately: that strip is the one band
+   * on the sheet that speaks for the PLATFORM rather than for the supplier, so the request id and the
+   * support address belong on it, and the navy footer below stays the supplier's.
+   */
+  requestRef?: string | null;
+  /** The platform's support address, at the end of the signature strip (app parity). Absent, the
+   *  strip simply ends at the date. */
+  supportEmail?: string | null;
+  /** The title bar's reference strip, in the caller's order (ref · issue · valid until · site · currency). */
   refs: QuotationRef[];
   supplier: QuotationParty;
   rentee: QuotationParty;
@@ -152,6 +161,14 @@ export interface QuotationDoc {
   footer?: QuotationFooter | null;
   /** Appended after the amount-in-words (app parity: "Estimate for one day · Final amount as operated"). */
   amountWordsSuffix?: string;
+  /**
+   * What the amount-in-words line spells out. Defaults to the grand total.
+   *
+   * ⚠️ An OPEN-ENDED bid passes the recurring rental instead (the app's `amountInWordsValue`): the
+   * grand total folds in a one-time mobilisation fee, and spelling that out under a line framed as
+   * "estimate for one period" states a per-period figure that includes a charge paid once.
+   */
+  amountWordsValue?: number;
   /**
    * When set, the document renders as a **DRAFT**: this label as a header badge AND as a diagonal
    * watermark across the page, and the "electronically signed" block is suppressed unconditionally.
@@ -200,8 +217,11 @@ export const QUOTATION_STYLE = `${DS_ROOT_CSS}
   .q-stamp{border:1.2px solid currentColor;border-radius:4px;padding:2px 8px;font-size:10px;font-weight:800;letter-spacing:.04em;white-space:nowrap;}
   .q-stamp.is-ok{color:var(--ok);}
   .q-stamp.is-muted{color:var(--muted-light);}
-  .q-refs{display:flex;flex-wrap:wrap;gap:10px 22px;font-size:12px;color:var(--muted-dark);}
-  .q-ref span{display:block;font-family:'Inter',system-ui,sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.05em;color:var(--muted-light);text-transform:uppercase;}
+  /* ⚠️ The label is NOT upper-cased here. The app’s own _RefPair draws whatever string it is handed, and
+     its own labels are sentence case («Issue date», «Valid until»); a text-transform on top of them
+     shouted five references at a reader who only ever quotes one. */
+  .q-refs{display:flex;flex-wrap:wrap;gap:10px 18px;font-size:12px;color:var(--muted-dark);}
+  .q-ref span{display:block;font-family:'Inter',system-ui,sans-serif;font-size:9.5px;font-weight:700;color:var(--muted-light);}
   .q-ref b{font-weight:800;}
   .q-body{padding:24px 30px 28px;}
 
@@ -209,15 +229,23 @@ export const QUOTATION_STYLE = `${DS_ROOT_CSS}
      Two bordered boxes. ONE FIELD PER LINE, each with its own label — «الرياض · س.ت: 1010… · ض.ق.م:
      3000…» is a sentence a reader has to parse before finding the one number they came for. */
   .q-parties{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:16px;}
-  .q-party{border:1px solid var(--border-hair);border-radius:10px;padding:12px 16px;}
-  .q-eyebrow{font-family:'Inter',system-ui,sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.5px;color:var(--muted-light);text-transform:uppercase;}
-  .q-pname{display:flex;align-items:center;gap:8px;margin-top:5px;}
-  .q-plogo{flex:0 0 auto;width:28px;height:28px;border-radius:6px;object-fit:contain;background:var(--surface);}
-  .q-pn{font-size:14.5px;font-weight:800;color:var(--navy-deep);min-width:0;}
+  /* The mark sits BESIDE the text column, never above it: a row of its own reserves its height whether
+     or not anything follows, which is the band of white the app's owner saw between a party's name and
+     its details. Alongside, the mark costs no vertical space at all. */
+  .q-party{display:flex;align-items:flex-start;gap:10px;border:1px solid var(--border-hair);border-radius:10px;padding:12px 16px;}
+  .q-party-t{flex:1 1 auto;min-width:0;}
+  .q-eyebrow{font-family:'Inter',system-ui,sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.5px;color:var(--muted-light);}
+  .q-pname{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:3px;}
+  /* 48px and NO tile behind it (app). A bordered white square left an empty rectangle whenever the
+     image failed, which reads as a broken mark rather than as no mark. */
+  .q-plogo{flex:0 0 auto;width:48px;height:48px;object-fit:contain;}
+  .q-pn{font-size:14px;font-weight:800;color:var(--navy-deep);line-height:1.25;min-width:0;}
   .q-tick{flex:0 0 auto;display:inline-grid;place-items:center;width:14px;height:14px;border-radius:50%;background:var(--ok);color:var(--surface);font-size:9px;line-height:1;font-weight:900;}
-  .q-prow{display:flex;justify-content:space-between;gap:10px;font-size:11px;line-height:1.7;}
-  .q-prow span{color:var(--muted-light);font-weight:600;flex:0 0 auto;}
-  .q-prow b{font-weight:700;color:var(--muted);min-width:0;text-align:end;overflow-wrap:anywhere;}
+  /* 🔴 ONE RUN, «label: value», never two columns. ~~The label on the start edge and the value pushed
+     to the end.~~ A value long enough to wrap then broke into its own narrow column with the label
+     stranded opposite it; the app sets these as one Text.rich so the pair wraps together. */
+  .q-prow{font-size:10.5px;font-weight:500;line-height:1.5;color:var(--muted);margin-top:3px;overflow-wrap:anywhere;}
+  .q-prow b{font-weight:700;color:var(--muted-light);}
 
   /* ── Items ───────────────────────────────────────────────────────────────────────────────────
      Eight columns, one row per machine. The head is PALE; the three per-unit money columns carry a
@@ -256,10 +284,6 @@ export const QUOTATION_STYLE = `${DS_ROOT_CSS}
   .q-tc li{margin-bottom:14px;padding-inline-start:4px;}
   .q-tc li.rule{padding-top:10px;border-top:1px solid var(--border-hair);}
   .q-tc b{color:var(--navy-deep);font-weight:800;}
-  /* Inline at the end of the sentence, never a badge in the margin: the clause is a sentence, and a
-     floating pill beside it would have to be positioned against a line whose height depends on how
-     that sentence wrapped. */
-  .q-agreed{font-weight:800;color:var(--ok);white-space:nowrap;}
 
   .q-signed{margin-top:16px;display:flex;align-items:center;gap:10px;background:var(--ok-soft);border:1px solid color-mix(in srgb, var(--ok) 35%, transparent);border-radius:10px;padding:10px 14px;}
   .q-signed .tick{flex:0 0 auto;color:var(--ok);font-size:14px;font-weight:900;}
@@ -337,13 +361,20 @@ export function numWordsAr(num: number): string {
 }
 
 function partyHtml(p: QuotationParty): string {
-  const logo = p.logoUrl ? `<img class="q-plogo" src="${esc(p.logoUrl)}" alt="" />` : "";
+  // A mark only exists behind a VERIFIED party, and it is drawn at the box's trailing edge — see
+  // `QuotationParty.logoUrl` for why both halves of that are deliberate.
+  const logo = p.verified && p.logoUrl ? `<img class="q-plogo" src="${esc(p.logoUrl)}" alt="" />` : "";
   const tick = p.verified ? `<span class="q-tick">✓</span>` : "";
   const rows = p.rows
     .filter((r) => (r.value ?? "").toString().trim().length > 0)
-    .map((r) => `<div class="q-prow"><span>${esc(r.label)}</span><b>${esc(r.value)}</b></div>`)
+    .map((r) => `<div class="q-prow"><b>${esc(r.label)}:</b> ${esc(r.value)}</div>`)
     .join("");
-  return `<div class="q-party"><div class="q-eyebrow">${esc(p.label)}</div><div class="q-pname">${logo}<span class="q-pn">${esc(p.name || "—")}</span>${tick}</div>${rows}</div>`;
+  return (
+    `<div class="q-party"><div class="q-party-t">` +
+    `<div class="q-eyebrow">${esc(p.label)}</div>` +
+    `<div class="q-pname"><span class="q-pn">${esc(p.name || "—")}</span>${tick}</div>` +
+    `${rows}</div>${logo}</div>`
+  );
 }
 
 function moneyCellHtml(cell: QuotationMoneyCell, notPriced: string): string {
@@ -382,12 +413,18 @@ export function renderQuotationSection(doc: QuotationDoc): string {
       (it) =>
         `<tr>` +
         `<td class="q-eq">${esc(it.equipment)}</td>` +
-        `<td class="q-desc">${it.description
-          .filter((d) => (d.value ?? "").toString().trim().length > 0)
-          .map((d) => `<b>${esc(d.label)}:</b> ${esc(d.value)}`)
-          .join(" · ")}</td>` +
+        // An empty description prints a DASH, never an empty cell: a blank reads as a column that
+        // failed to render, and the app draws `—` for exactly this row (`_specs`).
+        `<td class="q-desc">${
+          it.description.filter((d) => (d.value ?? "").toString().trim().length > 0).length
+            ? it.description
+                .filter((d) => (d.value ?? "").toString().trim().length > 0)
+                .map((d) => `<b>${esc(d.label)}:</b> ${esc(d.value)}`)
+                .join(" · ")
+            : "—"
+        }</td>` +
         `<td class="c">${esc(it.units)}</td>` +
-        `<td class="c">${esc(it.duration)}</td>` +
+        `<td class="c">${esc(it.duration || "—")}</td>` +
         `<td class="c">${moneyCellHtml(it.rental, notPriced)}</td>` +
         `<td class="c">${moneyCellHtml(it.delivery, notPriced)}</td>` +
         `<td class="c">${moneyCellHtml(it.ret, notPriced)}</td>` +
@@ -397,45 +434,54 @@ export function renderQuotationSection(doc: QuotationDoc): string {
     .join("");
 
   // Amount in words with halalas (app parity), plus an optional suffix ("Estimate for one day · …").
-  const riyals = Math.floor(doc.totals.total + 1e-6);
-  const halalas = Math.round((doc.totals.total - riyals) * 100);
+  const wordsValue = doc.amountWordsValue ?? doc.totals.total;
+  const riyals = Math.floor(wordsValue + 1e-6);
+  const halalas = Math.round((wordsValue - riyals) * 100);
   const wordsBase = isAr
     ? `${numWordsAr(riyals)} ريال سعودي${halalas ? ` و${numWordsAr(halalas)} هللة` : ""}`
     : `${numWords(riyals)} Saudi Riyals${halalas ? ` and ${numWords(halalas)} halalas` : ""}`;
   const words = doc.amountWordsSuffix ? `${wordsBase} · ${doc.amountWordsSuffix}` : wordsBase;
 
-  const grandLabel = doc.totals.label ?? L("Total, VAT included", "الإجمالي شامل الضريبة");
+  const grandLabel = doc.totals.label ?? L("Total · incl. VAT", "الإجمالي · شامل الضريبة");
+  /* ⚠️ NO currency word on the grand row. The app states the currency ONCE, in the reference strip, and
+     repeating it here is what pushed `219,075.00 SAR` past the column the fixed table layout gives it. */
   const grandValue = doc.totals.valueOverride
     ? `<span class="g">${esc(doc.totals.valueOverride)}</span>`
-    : `<span class="g">${money2(doc.totals.total)}</span> <span class="cur">${esc(doc.currency)}</span>`;
+    : `<span class="g">${money2(doc.totals.total)}</span>`;
 
-  // ONE numbered list: the term sentences, then the legal clauses after a hairline.
+  /* ONE numbered list: the term sentences, then the legal clauses after a hairline.
+     🔴 NO per-clause «agreed» mark. It was carried for a day and the app removed it the next: the owner
+     reads this as a legal document, and a clause annotated with its negotiation state is not how a
+     quotation is written. The sheet states the terms as they stand at download, full stop. */
   const clauseItems = doc.clauses
     .filter((c) => (c.body ?? "").trim().length > 0)
-    .map(
-      (c) =>
-        `<li>${c.title ? `<b>${esc(c.title)}:</b> ` : ""}${esc(c.body)}` +
-        `${c.agreed ? ` <span class="q-agreed">✓ ${esc(L("Agreed", "متفق عليه"))}</span>` : ""}</li>`,
-    );
+    .map((c) => `<li>${c.title ? `<b>${esc(c.title)}:</b> ` : ""}${esc(c.body)}</li>`);
   const legalItems = doc.legal.map((t, i) => `<li${i === 0 && clauseItems.length ? ` class="rule"` : ""}>${esc(t)}</li>`);
   const termsHtml = clauseItems.length + legalItems.length
-    ? `<div class="q-th">${esc(L("Terms and conditions", "الشروط والأحكام"))}</div><ol class="q-tc">${clauseItems.join("")}${legalItems.join("")}</ol>`
+    ? `<div class="q-th">${esc(L("Terms and Conditions", "الشروط والأحكام"))}</div><ol class="q-tc">${clauseItems.join("")}${legalItems.join("")}</ol>`
     : "";
 
-  // A draft is never "electronically signed" — suppress the trust block regardless of `showSigned`.
+  /* The signature strip carries the REQUEST number and the support address as well as the quotation's
+     own reference (app parity): this is the one band that speaks for the platform, so the route to help
+     belongs here rather than in the supplier's navy footer. A draft is never "electronically signed",
+     so the block is suppressed for one regardless of `showSigned`. */
   const signed =
     doc.draftLabel || doc.showSigned === false
       ? ""
-      : `<div class="q-signed"><span class="tick">✓</span><div class="txt">${esc(
-          L("This quotation is signed electronically through Moedatech", "تم توقيع هذا العرض إلكترونيًا عبر منصة معداتك"),
-        )} · <span class="q-num">${esc(doc.quotationNumber)}</span> · <span class="q-num">${esc(doc.dateStr)}</span></div>${
-          doc.sealUrl ? `<img class="q-seal" src="${esc(doc.sealUrl)}" alt="" />` : ""
-        }</div>`;
+      : `<div class="q-signed"><span class="tick">✓</span><div class="txt">${[
+          esc(L("Electronically signed via the Moedatech platform", "موقَّع إلكترونيًا عبر منصة معداتك")),
+          `<span class="q-num">${esc(doc.quotationNumber)}</span>`,
+          doc.requestRef ? `${esc(L("Request #", "رقم الطلب"))} <span class="q-num">${esc(doc.requestRef)}</span>` : "",
+          `<span class="q-num">${esc(doc.dateStr)}</span>`,
+          doc.supportEmail ? `<span class="q-num">${esc(doc.supportEmail)}</span>` : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")}</div>${doc.sealUrl ? `<img class="q-seal" src="${esc(doc.sealUrl)}" alt="" />` : ""}</div>`;
 
   const f = doc.footer;
   const reg = f ? [f.crNumber ? `C.R. ${f.crNumber}` : "", f.vatNumber ? `VAT ${f.vatNumber}` : ""].filter(Boolean).join(" · ") : "";
   const contact = f ? [f.phone, f.email].filter(Boolean).join(" · ") : "";
-  const footLines = [reg, contact, f?.supportLine ?? ""].filter(Boolean).map((l) => esc(l)).join("<br />");
+  const footLines = [reg, contact].filter(Boolean).map((l) => esc(l)).join("<br />");
   const footer = f
     ? `<div class="q-foot"><div class="q-foot-l">${f.logoUrl ? `<img class="q-flogo" src="${esc(f.logoUrl)}" alt="" />` : ""}<div><div class="q-fname">${esc(f.name)}</div>${
         f.address ? `<div class="q-faddr">${esc(f.address)}</div>` : ""
@@ -456,8 +502,8 @@ export function renderQuotationSection(doc: QuotationDoc): string {
           <thead><tr>
             <th>${esc(L("Equipment", "المعدة"))}</th>
             <th>${esc(L("Description", "الوصف"))}</th>
-            <th class="c">${esc(L("Units", "الوحدة"))}</th>
-            <th class="c">${esc(L("Period", "المدة"))}</th>
+            <th class="c">${esc(L("Unit", "الوحدة"))}</th>
+            <th class="c">${esc(L("Duration", "المدة"))}</th>
             <th class="c">${esc(L("Rental", "الإيجار"))}<i>${esc(L("/unit", "/وحدة"))}</i></th>
             <th class="c">${esc(L("Delivery", "التوصيل"))}<i>${esc(L("/unit", "/وحدة"))}</i></th>
             <th class="c">${esc(L("Return", "الاسترجاع"))}<i>${esc(L("/unit", "/وحدة"))}</i></th>
@@ -465,13 +511,13 @@ export function renderQuotationSection(doc: QuotationDoc): string {
           </tr></thead>
           <tbody>${rows}</tbody>
           <tfoot>
-            <tr><td colspan="7">${esc(L("Subtotal before VAT", "المجموع قبل الضريبة"))}</td><td class="v">${money2(doc.totals.subtotal)}</td></tr>
+            <tr><td colspan="7">${esc(L("Subtotal before tax", "المجموع قبل الضريبة"))}</td><td class="v">${money2(doc.totals.subtotal)}</td></tr>
             <tr><td colspan="7">${esc(L("VAT (15%)", "ضريبة القيمة المضافة (15٪)"))}</td><td class="v">${money2(doc.totals.vat)}</td></tr>
             <tr class="grand"><td colspan="7">${esc(grandLabel)}</td><td class="v">${grandValue}</td></tr>
           </tfoot>
         </table>
       </div>
-      <div class="q-words">${esc(L("Amount in words", "المبلغ كتابة"))}: <b>${esc(words)}</b></div>
+      <div class="q-words">${esc(L("Amount in words", "المبلغ كتابةً"))}: <b>${esc(words)}</b></div>
       ${termsHtml}
       ${signed}
     </div>
@@ -479,14 +525,20 @@ export function renderQuotationSection(doc: QuotationDoc): string {
   </section>`;
 }
 
-/** The standard Saudi quotation legal clauses (bilingual). */
+/**
+ * The standard Saudi quotation legal clauses (bilingual).
+ *
+ * 🔴 VERBATIM from the app's `quotationTcValidity` / `Vat` / `Safety` / `Law` / `ESignature`, in that
+ * order and WITHOUT the trailing full stops the web had added: they are the same five sentences on both
+ * products, and a document that quotes them differently is two documents.
+ */
 export function quotationLegal(L: (en: string, ar: string) => string): string[] {
   return [
-    L("This quotation is valid for seven (7) days from the issue date and expires automatically thereafter unless confirmed through the Moedatech platform.", "هذا العرض ساري المفعول لمدة سبعة (7) أيام من تاريخ الإصدار، وتسقط صلاحيته تلقائيًا بعد ذلك ما لم يتم تأكيده عبر منصة معداتك."),
-    L("Prices are inclusive of items explicitly listed in the pricing table above. VAT at 15% applies per Saudi tax law.", "الأسعار شاملة لِما ذُكر صراحةً في جدول التسعير أعلاه، وضريبة القيمة المضافة بنسبة 15٪ مفروضة وفقًا للنظام السعودي."),
-    L("The supplier is responsible for the equipment's roadworthiness and technical safety on the delivery date, and for satisfying mandated safety certifications.", "المُورِّد مسؤول عن صلاحية المعدة وسلامتها الفنية في تاريخ التسليم، وعن استيفاء شهادات السلامة والوثائق المطلوبة نظامًا."),
-    L("This quotation is governed by the laws of the Kingdom of Saudi Arabia; competent Saudi courts have exclusive jurisdiction over any dispute.", "يخضع هذا العرض لأنظمة المملكة العربية السعودية، وتختصُّ المحاكم السعودية المختصة بالفصل في أي نزاع."),
-    L("This document is issued electronically via the Moedatech platform and is legally equivalent to a signed document under the Saudi Electronic Transactions Law.", "تَمَّ إصدار هذا المستند إلكترونيًا عبر منصة معداتك، ويُعدّ مكافئًا قانونيًا للمستند الموقَّع وفقًا لنظام التعاملات الإلكترونية السعودي."),
+    L("This quotation is valid for seven (7) days from the issue date and expires automatically thereafter unless confirmed through the Moedatech platform", "هذا العرض ساري المفعول لمدة سبعة (7) أيام من تاريخ الإصدار، وتسقط صلاحيته تلقائيًا بعد ذلك ما لم يتم تأكيده عبر منصة معداتك"),
+    L("Prices are inclusive of items explicitly listed in the pricing table above. VAT at 15% applies per Saudi tax law", "الأسعار شاملة لِما ذُكر صراحةً في جدول التسعير أعلاه، وضريبة القيمة المضافة بنسبة 15٪ مفروضة وفقًا للنظام السعودي"),
+    L("The supplier is responsible for the equipment's roadworthiness and technical safety on the delivery date, and for satisfying mandated safety certifications", "المُورِّد مسؤول عن صلاحية المعدة وسلامتها الفنية في تاريخ التسليم، وعن استيفاء شهادات السلامة والوثائق المطلوبة نظامًا"),
+    L("This quotation is governed by the laws of the Kingdom of Saudi Arabia; competent Saudi courts have exclusive jurisdiction over any dispute", "يخضع هذا العرض لأنظمة المملكة العربية السعودية، وتختصُّ المحاكم السعودية المختصة بالفصل في أي نزاع"),
+    L("This document is issued electronically via the Moedatech platform and is legally equivalent to a signed document under the Saudi Electronic Transactions Law", "تَمَّ إصدار هذا المستند إلكترونيًا عبر منصة معداتك، ويُعدّ مكافئًا قانونيًا للمستند الموقَّع وفقًا لنظام التعاملات الإلكترونية السعودي"),
   ];
 }
 

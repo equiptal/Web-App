@@ -436,16 +436,24 @@
 /* ── header ─────────────────────────────────────────────────────────────────────────────────────
    The running total on the leading edge, the counterparty on the trailing one. */
 .ng-head { flex: 0 0 auto; padding: 14px var(--ng-gutter); background: var(--surface); border-bottom: 1px solid var(--border-hair); }
-.ng-head .ng-inner { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.ng-head-l { flex: 0 0 auto; min-width: 0; }
-.ng-head-cap { font-size: 10px; color: var(--muted-light); font-weight: 600; }
+.ng-head .ng-inner { display: flex; align-items: center; gap: 12px; }
+/* The figure sits at the trailing end, uncaptioned (app parity, 2026-09-17: "price on side and name
+   on side, not price in center"). A caption named what the bar's only number obviously is. */
+.ng-head-l { flex: 0 0 auto; min-width: 0; margin-inline-start: auto; text-align: end; }
 /* «New offer from the supplier» — drawn ONLY when the other side posted the latest round. A caption
    that is always there names what the bar's only number obviously is. */
 .ng-new { display: flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; color: var(--warn-deep); }
-.ng-net { font-size: 17px; font-weight: 800; color: var(--navy); white-space: nowrap; }
+.ng-net { font-size: 19px; font-weight: 800; color: var(--navy); white-space: nowrap; }
 .ng-net .cur { font-size: 11px; font-weight: 600; color: var(--muted); }
-.ng-party { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.ng-party b { font-size: 13px; font-weight: 700; color: var(--navy-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+/* The billing period rides the figure, so the header states the SAME quantity the room's price bar
+   and the bid card do: a rate, not a net-incl-VAT total. */
+.ng-net .per { font-size: 11px; font-weight: 700; color: var(--muted); }
+.ng-party { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ng-who { display: flex; flex-direction: column; min-width: 0; }
+.ng-who b { font-size: 13.5px; font-weight: 700; color: var(--navy-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+/* The request's short code, UNDER the name and never beside it: the name is looked for first, and a
+   renter negotiating several deals with one firm has nothing else to tell the sheets apart. */
+.ng-who .ref { font-size: 10.5px; font-weight: 600; color: var(--muted-light); white-space: nowrap; }
 .ng-ava { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--navy); color: var(--surface); font-size: 11px; font-weight: 800; }
 .ng-x { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
 .ng-x:hover { background: var(--surface2); color: var(--navy); }
@@ -476,7 +484,11 @@
 .ng-row { position: relative; align-items: center; border-bottom: 1px solid var(--surface2); }
 .ng-row.off { opacity: .45; }
 .ng-row .lbl { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ng-row.off .lbl { text-decoration: line-through; }
+/* 🔴 RED, not the muted grey it inherits (owner, on the app, 2026-09-21: "a red line on them like
+   they are omitted"). A grey rule over already-faded text read as the row being disabled rather than
+   dropped. ⚠️ A leg the REQUEST assigns to the renter arrives excluded too, and reads identically —
+   which is the wanted reading: it is equally not in the supplier's offer. */
+.ng-row.off .lbl { text-decoration: line-through; text-decoration-color: var(--danger); text-decoration-thickness: 2px; }
 .ng-row .dur { text-align: center; font-size: 12px; font-weight: 600; color: var(--muted-dark); }
 .ng-row .dur .sub { display: block; font-size: 9.5px; font-weight: 600; color: var(--muted-light); }
 /* The ✕ that strikes a transport leg out, and the + that restores it. It sits on the row's START
@@ -499,9 +511,19 @@
 .ng-row .out { text-align: end; font-size: 11px; font-weight: 700; color: var(--muted-light); }
 
 /* ── the summary band + the net box ───────────────────────────────────────────────────────────── */
+/* Stated ABOVE the table, so it is read before the typing rather than under it, after. */
+.ng-exvat { margin: 0; padding: 10px 16px 0; font-size: 11.5px; font-weight: 600; color: var(--muted-light); }
 .ng-sum { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; background: var(--surface2); }
 .ng-sum .item, .ng-sum .line { display: flex; justify-content: space-between; gap: 10px; }
 .ng-sum .item { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
+.ng-sum .item .lbl { display: flex; flex-direction: column; min-width: 0; }
+/* The factors behind the figure, as the bid card prints them: «2,000 × 12». A row whose own numbers
+   do not multiply is the one thing a customer checks. */
+.ng-sum .item .fx { margin-top: 2px; font-size: 10.5px; font-weight: 600; color: var(--muted-light); }
+/* 🔴 THE COUNT, APPLIED ONCE, AT THE END. Everything above it describes one machine. */
+.ng-overall { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; }
+.ng-overall .k { font-size: 12.5px; font-weight: 800; color: var(--navy-deep); }
+.ng-overall .v { font-size: 15px; font-weight: 800; color: var(--navy); }
 .ng-sum .item.off { opacity: .45; }
 .ng-sum .item span:last-child { color: var(--muted); }
 .ng-sum .rule { border-top: 1px solid var(--border-hair); margin: 2px 0; }
@@ -518,8 +540,14 @@
 .ng-t.done .k { font-size: 12px; font-weight: 600; color: var(--muted); }
 .ng-t.done .v { font-size: 11.5px; font-weight: 700; color: var(--ok); }
 .ng-t.done .v.changed { color: var(--danger); }
-.ng-t.now { padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--border-hair); }
-.ng-t.now .h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+/* 🔴 **THE GROUND CARRIES THE VERDICT**, so the state reads without a word (app parity): a conflict
+   is red on sight, before anyone acts; a pending row is white; and a picker being open tints it the
+   same red, because opening «Change» is choosing to disagree. */
+.ng-t.now { padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--border-hair); transition: background .15s ease, border-color .15s ease; }
+.ng-t.now.clash, .ng-t.now.picking { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 25%, transparent); }
+.ng-t.done { cursor: pointer; }
+.ng-t .acts button:disabled { opacity: .45; cursor: default; }
+.ng-t.now .h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; max-width: 820px; margin-bottom: 8px; }
 .ng-t.now .h .k { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
 .ng-t.now .h .side { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ng-t.now .h .side b { color: var(--navy-deep); font-weight: 700; }
@@ -536,9 +564,10 @@
 .ng-t .opts button { border: 0; border-radius: 7px; padding: 8px 10px; background: var(--surface-alt); font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted-dark); text-align: start; cursor: pointer; }
 .ng-t .opts button:hover { background: var(--surface2); }
 .ng-t .opts button.on { color: var(--ok); }
-.ng-t.later { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; background: var(--surface-alt); border: 1px dashed var(--border-hair); opacity: .55; }
-.ng-t.later .k { font-size: 12px; font-weight: 600; color: var(--muted-light); }
-.ng-t.later .w { font-size: 10.5px; color: var(--muted-light); }
+/* 🔴 ~~`.ng-t.later` — a dashed, dimmed «waiting for the one above» row for every term the walk had
+   not reached.~~ **Deleted with the app's own** (owner: *"don't show any other term except the
+   opened one"*). A placeholder is still a row to read past, and the section header's `(n/m)` count
+   carries everything those rows were saying. */
 /* Where a term's value came from, and the last move on it — the two sub-lines the web has carried
    since the terms table. Kept: the prototype states neither, and a renter reading «24h» has no other
    way to learn whether it is his ask, the supplier's declaration or the platform's default. */
@@ -547,12 +576,30 @@
 /* Reopen a term the renter settled himself. */
 .ng-t .undo { margin-inline-start: 6px; border: 0; background: none; padding: 0; font-size: 12px; color: var(--muted-light); cursor: pointer; }
 
-/* ── the two collapsible groups: acknowledged, and agreed ──────────────────────────────────────── */
-.ng-grp { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 10px; padding: 11px 12px; border: 1px solid var(--border-hair); border-radius: 8px; background: var(--surface2); font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted); cursor: pointer; }
-.ng-grp.agreed { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 35%, transparent); color: var(--ok); }
-.ng-grp .chev { font-size: 13px; transition: transform .2s ease; }
-.ng-grp .chev.open { transform: rotate(-90deg); }
-.ng-grow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; padding: 8px 12px; border-radius: 8px; background: var(--surface-alt); }
+/* ── the term SECTIONS (app parity, `_SectionHeader`) ───────────────────────────────────────────
+   Each is a header BAND with its rows inside the same card — one border, one radius — so a section's
+   rows read as its body rather than as loose cards that happened to follow a heading. The header
+   carries `(resolved/total)`, which is what lets a section whose turn has not come draw its heading
+   alone and still say everything it needs to.
+
+   ⚠️ **Two strip treatments only**: «Agreed terms ✓» is the green one, everything else the grey.
+   The rest of this page is a row, so the remaining kinds take grey rather than inventing a third and
+   fourth colour. */
+.ng-sect-title { margin: 2px 0 6px; font-size: 12.5px; font-weight: 800; color: var(--navy); }
+.ng-sect { margin-top: 10px; border: 1px solid var(--border-hair); border-radius: 10px; overflow: hidden; }
+.ng-sect-h { display: flex; align-items: center; gap: 8px; width: 100%; padding: 11px 12px; border: 0; background: var(--surface2); font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted); text-align: start; cursor: pointer; }
+.ng-sect-h .t { flex: 1 1 auto; min-width: 0; }
+.ng-sect-h .chev { flex: 0 0 auto; font-size: 13px; transition: transform .2s ease; }
+.ng-sect-h .chev.open { transform: rotate(-90deg); }
+.ng-sect.agreed .ng-sect-h { background: var(--ok-soft); color: var(--ok); }
+/* Breathing room INSIDE the card: without the top gap the first row's border touches the header's
+   hairline and the two read as one smudged edge. */
+.ng-sect-b { padding: 8px 10px 10px; background: var(--surface); }
+.ng-sect-b:empty { display: none; }
+.ng-grow { display: flex; align-items: center; justify-content: space-between; gap: 10px; max-width: 820px; margin-top: 4px; padding: 8px 12px; border-radius: 8px; background: var(--surface-alt); }
+.ng-grow:first-child { margin-top: 0; }
+.ng-grow.live { cursor: pointer; }
+.ng-grow.live:hover { background: var(--surface2); }
 .ng-grow .k { font-size: 12px; font-weight: 600; color: var(--muted); }
 .ng-grow .v { font-size: 12px; font-weight: 700; color: var(--muted-dark); }
 .ng-grow.agreed { background: color-mix(in srgb, var(--ok-soft) 45%, var(--surface)); }
@@ -560,29 +607,53 @@
 .ng-grow.agreed .v { color: var(--ok); }
 
 /* ── the supplier's standing offer, against yours ───────────────────────────────────────────────
-   A navy card: the two totals as the two ends of ONE measurement, with the gap on the rule between
-   them. The pill is amber when they differ and green when they agree — the matched case used to say
-   nothing at all, which read as unfinished. */
-.ng-cmp { background: var(--navy); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
-.ng-cmp-duo { display: flex; align-items: center; gap: 8px; }
-.ng-cmp-side { flex: 0 0 auto; }
-.ng-cmp-side .k { font-size: 10px; color: var(--text-on-dark); margin-bottom: 2px; }
-.ng-cmp-side .v { font-size: 19px; font-weight: 800; color: var(--surface); }
-.ng-cmp-side.me { text-align: end; }
-.ng-cmp-rule { flex: 1; height: 1.5px; background: linear-gradient(to left, var(--surface), var(--navy-mid)); }
-.ng-cmp-rule.b { background: linear-gradient(to right, var(--surface), var(--navy-mid)); }
-.ng-gap { flex: 0 0 auto; border-radius: 20px; padding: 3px 10px; font-size: 10.5px; font-weight: 800; background: var(--brand-light); color: var(--navy); }
-.ng-gap.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok-soft); }
-.ng-cmp-more { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 12px; padding: 10px 0 0; border: 0; border-top: 1px solid color-mix(in srgb, var(--surface) 15%, transparent); background: none; font-family: inherit; font-size: 11px; font-weight: 700; color: var(--text-on-dark); cursor: pointer; }
-.ng-cmp-more .chev { transition: transform .2s ease; }
-.ng-cmp-more .chev.open { transform: rotate(-90deg); }
-.ng-cmp-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 0; white-space: nowrap; }
-.ng-cmp-row .k { font-size: 12px; font-weight: 700; color: var(--surface); }
-.ng-cmp-row .sides { display: flex; align-items: center; gap: 6px; }
-.ng-cmp-row .sides span { font-size: 11px; color: var(--text-on-dark); }
-.ng-cmp-row .sides b { color: var(--surface); }
-.ng-delta { border-radius: 20px; padding: 2px 7px; font-size: 10.5px; font-weight: 700; background: color-mix(in srgb, var(--brand-light) 30%, transparent); color: var(--brand-light); }
-.ng-delta.ok { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok-soft); }
+   🔴 **THE APP'S 2026-09-21 MOCK.** A WHITE card, the two totals side by side across a VERTICAL
+   hairline, the gap pill riding the card's TOP EDGE, and one row per leg beneath, always open.
+
+   ~~A navy card with the pill on a horizontal rule BETWEEN the two totals, and the per-leg rows
+   behind a «gap, line by line» expander.~~ Three faults, and the mock fixes all three: the sheet
+   around it is light, so the one navy block read as a foreign panel dropped onto the page; the
+   expander cost a press to reach the only content anyone can act on; and a pill on a rule between
+   the totals made the rule look like a divider with a label rather than a measurement between two
+   ends. */
+/* 🔴 **CAPPED AND CENTRED, and that is the DESKTOP half of this port.** The app draws this on a
+   phone, where the two totals are a thumb apart and the rule between them reads as a measurement.
+   Run across a 1500px sheet they sit at opposite edges with a field of white between, and the card
+   stops being a comparison at all. Capping ONE summary card is not the column cap this sheet
+   withdrew on 2026-09-19: the bands, the table and the sections still run the width. */
+.ng-cmp { position: relative; max-width: 940px; margin: 11px auto 16px; padding: 20px 14px 6px; background: var(--surface); border: 1px solid var(--border-hair); border-radius: 14px; }
+/* Overhangs the card's top edge by half its height. The card's own border runs behind it, so the
+   pill carries one of its own or it reads as a hole punched in the edge. */
+.ng-cmp-pill { position: absolute; top: -11px; inset-inline-start: 50%; transform: translateX(-50%); border-radius: 100px; padding: 3px 12px; font-size: 11px; font-weight: 800; white-space: nowrap; background: var(--brand-soft); border: 1px solid var(--brand-soft); color: var(--brand-deep); }
+[dir="rtl"] .ng-cmp-pill { transform: translateX(50%); }
+.ng-cmp-pill.ok { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 35%, transparent); color: var(--ok); }
+.ng-cmp-duo { display: grid; grid-template-columns: 1fr 1px 1fr; align-items: stretch; }
+.ng-cmp-duo::before { content: ""; grid-column: 2; background: var(--border-hair); }
+.ng-cmp-side { grid-column: 3; text-align: center; }
+/* ⚠️ THEIRS leads and carries the emphasis: it is the figure on the table, the one being answered,
+   and in both directionalities the leading slot is read first. Mine is muted beside it — not because
+   it matters less, but because I already know it. */
+.ng-cmp-side.lead { grid-column: 1; }
+.ng-cmp-side .k { font-size: 11px; font-weight: 700; color: var(--muted-light); margin-bottom: 4px; }
+.ng-cmp-side .v { font-size: 24px; font-weight: 800; color: var(--muted); }
+.ng-cmp-side.lead .v { color: var(--navy); }
+.ng-cmp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 0; border-top: 1px solid var(--surface2); }
+.ng-cmp-row:first-of-type { margin-top: 12px; }
+.ng-cmp-row .k { flex: 0 0 auto; font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
+.ng-cmp-row .sides { flex: 1 1 auto; min-width: 0; font-size: 11.5px; color: var(--muted); text-align: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ng-cmp-row .sides .lab { color: var(--muted-light); }
+.ng-cmp-row .sides b { font-weight: 800; color: var(--navy-deep); }
+/* ⏳ while they have not answered — the delta pill says nothing in that case, so this is the only
+   signal. */
+.ng-cmp-row .sides b.wait { color: var(--warn-deep); }
+.ng-delta { flex: 0 0 auto; border-radius: 100px; padding: 2px 8px; font-size: 10.5px; font-weight: 800; background: var(--brand-soft); color: var(--brand-deep); }
+.ng-delta.ok { background: var(--ok-soft); color: var(--ok); }
+/* Did the SUPPLIER move since his own last round, and which way. Nothing at all on his first round:
+   without it the card answers "how far apart are we" and never "did he move". */
+.ng-cmp-prev { flex: 1 0 100%; text-align: end; font-size: 10.5px; font-weight: 800; }
+.ng-cmp-prev.ok { color: var(--ok); }
+.ng-cmp-prev.bad { color: var(--danger); }
+.ng-cmp-prev.flat { color: var(--muted-light); }
 
 /* ── the review step ────────────────────────────────────────────────────────────────────────────
    Two cards, each under a NAVY header of the same shape (app parity): the price you are about to
@@ -601,16 +672,25 @@
 .ng-bar { display: flex; height: 6px; margin: 6px 0 8px; border-radius: 100px; overflow: hidden; background: var(--surface2); }
 .ng-bar .ok { background: var(--ok); }
 .ng-bar .df { background: var(--danger); }
-.ng-legend { display: flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; color: var(--muted); }
-.ng-legend .d { width: 7px; height: 7px; border-radius: 50%; }
-.ng-legend .d.ok { background: var(--ok); }
-.ng-legend .d.df { background: var(--danger); }
-.ng-gcat { margin-top: 8px; }
-.ng-gcat-h { display: flex; align-items: center; gap: 6px; width: 100%; padding: 7px 0; border: 0; background: none; font-family: inherit; font-size: 11.5px; font-weight: 800; color: var(--muted-dark); cursor: pointer; }
-.ng-gcat-h .cnt { margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: var(--muted-light); }
-.ng-gcat-h .chev { font-size: 16px; color: var(--muted-light); transition: transform .2s ease; }
-.ng-gcat-h .chev.open { transform: rotate(180deg); }
-.ng-gnrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 7px; background: var(--surface-alt); margin-bottom: 4px; font-size: 11.5px; }
+/* ⚠️ FOUR segments, not two: two left the unanswered rows invisible on the bar, which is the half
+   the reader is here to see. */
+.ng-bar .pd { background: var(--border-strong); }
+/* 🔴 ~~A legend under the bar.~~ Removed with the app's own: it was the THIRD statement of one fact —
+   the ready count is on the title row and the bar is the same numbers drawn to scale. */
+.ng-guide-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 0; border: 0; background: none; font-family: inherit; font-size: 11.5px; font-weight: 800; color: var(--muted); cursor: pointer; }
+.ng-guide-h .chev { font-size: 18px; color: var(--muted-light); transition: transform .2s ease; }
+.ng-guide-h .chev.open { transform: rotate(180deg); }
+/* The row's status as a WORD, in the bar's own colours — the app's shape, and it says in words what
+   the bar says to scale. */
+.ng-gst { font-size: 10.5px; font-weight: 800; }
+.ng-gst.locked { color: var(--muted); }
+.ng-gst.match { color: var(--ok); }
+.ng-gst.conflict { color: var(--danger); }
+.ng-gst.pending { color: var(--info); }
+/* 🔴 ~~`.ng-gcat*` — the guide grouped by category, each group its own collapsible with a count.~~
+   **Gone**: the app's guide is one flat list behind a single «Matched» toggle, and the categories
+   were a web-only layer over it. */
+.ng-gnrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; max-width: 820px; padding: 6px 8px; border-radius: 7px; background: var(--surface-alt); margin-bottom: 4px; font-size: 11.5px; }
 .ng-gnrow .k { color: var(--muted-dark); font-weight: 600; }
 .ng-badge { border-radius: 100px; padding: 2px 8px; font-size: 10px; font-weight: 800; background: var(--surface2); color: var(--muted); }
 .ng-badge.match, .ng-badge.locked { background: var(--ok-soft); color: var(--ok); }
@@ -622,26 +702,34 @@
 .ng-err { margin-top: 8px; font-size: 12.5px; font-weight: 700; color: var(--danger); }
 
 /* ── footer ─────────────────────────────────────────────────────────────────────────────────────
-   The switcher is centred in the BAR, never in what the buttons leave over: it is absolutely placed,
-   so the accept button on one side and the log on the other cannot push it off the middle. */
+   🔴 **EVERY STEP NAMES ITS ACTION** (owner, on the app, 2026-09-19). ~~A centred `‹ step ›`
+   switcher, with the forward action hidden in a chevron.~~ The chevron never said where it went, and
+   on the last step it fired the one irreversible act in the sheet while looking like navigation.
+
+     🕘 · [Back] · [✓ Accept, when allowed] · [Next: Terms / Review & send / Send to the supplier]
+
+   The primary grows into whatever is left, so on a desktop width it is the widest thing on the bar
+   and unmistakably the thing to press; Back and Accept size to their own words. */
 .ng-foot { flex: 0 0 auto; padding: 10px var(--ng-gutter); background: var(--surface); border-top: 1px solid var(--border-hair); }
-.ng-foot .ng-inner { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.ng-accept { flex: 0 0 auto; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--ok); color: var(--surface); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.ng-accept:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
-/* The review step's own act, and the only irreversible one on the sheet — so it is LABELLED with
-   whom it goes to rather than drawn as a chevron. Navy, never the accept button's green: green here
-   means «I take your position», and sending a reply is the opposite of that. */
-.ng-send { flex: 0 1 auto; min-width: 0; border: 0; border-radius: 10px; padding: 10px 16px; background: var(--navy); color: var(--surface); font-family: inherit; font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.ng-send:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
-.ng-nav { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; }
-.ng-nav .step { font-size: 11px; font-weight: 700; color: var(--muted-light); white-space: nowrap; }
-.ng-chev { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface2); color: var(--muted-dark); font-size: 15px; font-family: inherit; cursor: pointer; }
-.ng-chev:disabled { color: var(--border-strong); cursor: default; }
+.ng-foot .ng-inner { display: flex; align-items: center; gap: 8px; }
 .ng-log { flex: 0 0 auto; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface); color: var(--muted-dark); cursor: pointer; }
+.ng-back { flex: 0 0 auto; min-width: 110px; height: 44px; border: 1px solid var(--border-hair); border-radius: 12px; background: var(--surface); color: var(--navy); font-family: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
+.ng-accept { flex: 0 0 auto; height: 44px; border: 0; border-radius: 12px; padding: 0 18px; background: var(--ok); color: var(--surface); font-family: inherit; font-size: 13.5px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.ng-accept:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
+/* Navy, never the accept button's green: green on this sheet means «I take your position», and
+   sending a reply is the opposite of that. */
+.ng-primary { flex: 1 1 auto; min-width: 0; height: 44px; border: 0; border-radius: 12px; padding: 0 18px; background: var(--navy); color: var(--surface); font-family: inherit; font-size: 13.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.ng-primary:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
+/* ⚠️ Grey on the LAST step when there is nothing to send, and still PRESSABLE — so the press says
+   why rather than doing nothing. A button that looks live and then refuses is worse than one that
+   says up front it has nothing to do. */
+.ng-primary.blocked { background: var(--disabled-bg); color: var(--disabled-fg); }
+.ng-foot-err { margin: 8px 0 0; }
 .ng-log:hover { background: var(--surface2); }
 .ng-log .material-icons-outlined { font-size: 18px; }
 /* The chevrons are DIRECTION, so they mirror with the script. */
-.qp-scrim[dir="rtl"] .ng-chev { transform: scaleX(-1); }
+/* `.ng-chev` is gone with the `‹ step ›` switcher; the footer's controls are all words now, and a
+   word needs no mirror rule. */
 
 
 /* ── the negotiation LOG, unchanged: its own modal, opened from the footer ─────────────── */
@@ -663,6 +751,9 @@
 .qp-log-list { list-style: none; margin: 0; padding: 6px 0; max-height: 60vh; overflow-y: auto; }
 .qp-log-row { display: flex; align-items: flex-start; gap: 9px; padding: 10px 16px; border-bottom: 1px solid var(--line,var(--surface3)); }
 .qp-log-row:last-child { border-bottom: 0; }
+/* The band that separates one round's entries from the next. Without it ten entries read as ten
+   unrelated events and nothing said which round any of them belonged to. */
+.qp-log-round { position: sticky; top: 0; padding: 6px 16px; background: var(--surface2); font-size: 10.5px; font-weight: 800; color: var(--muted); letter-spacing: .04em; }
 .qp-log-ic { font-size: 16px; color: var(--rentee,var(--action)); flex: 0 0 auto; margin-top: 1px; }
 .qp-log-txt { flex: 1; font-size: 12.5px; font-weight: 600; color: var(--navy,var(--navy)); line-height: 1.5; }
 .qp-log-time { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; color: var(--muted,var(--muted)); white-space: nowrap; }

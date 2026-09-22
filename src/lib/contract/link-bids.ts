@@ -493,6 +493,9 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     // same firm look like one counterparty with one chat, which off-platform offers do not have.
     supplierCompanyId: null,
     supplierName: sub.companyName || "Supplier",
+    // An off-platform submission was typed into the renter’s own supplier list, so there is no
+    // account behind it and therefore no store mark. The app draws nothing for such a party.
+    supplierLogoUrl: null,
     /**
      * The number the supplier typed into the form's «The supplier's details» step.
      *

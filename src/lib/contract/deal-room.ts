@@ -4,12 +4,14 @@
  * rentee party. Live chat runs over GetStream (channel = streamChannelId; token via stream-token).
  */
 import { computeRentalTotal, divisorNote, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
-import { cityLabel, urgencyLabel, rentalTypeLabel, fulfillmentLabel, latinDigits, nationalityLabel, termValueLabel } from "@/lib/contract/labels";
+import { cityLabel, urgencyLabel, rentalTypeLabel, fulfillmentLabel, latinDigits, termValueLabel } from "@/lib/contract/labels";
 import { partyToken } from "./labels";
 // Type-only — the deal-room quotation BUILDER lives here (pure, testable in the node suite); the
 // rendering itself stays in the shared template module.
 import type { QuotationDoc, QuotationLineItem, QuotationMoneyCell, QuotationPartyRow } from "@/lib/quotation/render";
 import { CLAUSE, ClauseList, extraTermClauses, resolveTerm, type TermSource as ClauseTermSource } from "@/lib/quotation/clauses";
+import { quotationLegal } from "@/lib/quotation/render";
+import { SUPPORT_EMAIL } from "@/lib/quotation/bid-quotation";
 
 export type DealRoomStatus = "OPEN" | "NEGOTIATING" | "AWAITING_SUPPLIER_CONFIRMATION" | "CLOSED" | "ABANDONED" | string;
 
@@ -98,6 +100,51 @@ export interface DealTerm {
    *  when countering a non-binary / non-price term. */
   options: { value: string; labelEn: string; labelAr: string }[];
 }
+
+/* ── A term's state as the READER meets it, not as the server last stamped it ────────────────────
+   App parity: `TermModel.bothSidesDiffer` / `.isConflicting` / `.isSettledByValues`
+   (`deal_room_models.dart:608-654`, 2026-09-21).
+
+   🔴 **The server sets `disputed` exactly ONCE**, in `buildTermsArray`, comparing the request
+   against the bid at room creation. Every later move — `counter`, `propose_update`, `reopen` —
+   writes `pending` (`deal-room.service.ts:2304`). So a clash created in round two arrived here as
+   `pending`, the sheet drew it as «Not set» with two contradictory values sitting on it, and the
+   accept gate let it through. ⚠️ Values, not timing: `disputed` says when the clash was noticed,
+   these say whether there is one now. */
+
+/** Case- and whitespace-folded, because these are enum-shaped values written by two different
+ *  producers: `NET_30` from the request and `net_30` from the bid are ONE schedule, not a
+ *  disagreement. A raw compare reports a clash the two surfaces render with the SAME label — red,
+ *  unresolvable, and blocking Accept for good. */
+const fold = (v: unknown): string => (v == null ? "" : String(v)).trim().toLowerCase();
+
+/** Both sides named a value and the two differ. */
+export function bothSidesDiffer(t: DealTerm): boolean {
+  const mine = fold(t.renteePreference);
+  const theirs = fold(t.supplierDeclared);
+  if (!mine || !theirs) return false;
+  return mine !== theirs;
+}
+
+/** Both sides named the SAME value — the mirror of {@link bothSidesDiffer}, folded the same way. */
+export function bothSidesAgree(t: DealTerm): boolean {
+  const mine = fold(t.renteePreference);
+  const theirs = fold(t.supplierDeclared);
+  if (!mine || !theirs) return false;
+  return mine === theirs;
+}
+
+/** A conflict as the reader meets it: declared at birth, or created by a later counter.
+ *  ⚠️ Excludes anything already settled — an `agreed` term is not in conflict however its two
+ *  sides once looked. */
+export const isConflictingTerm = (t: DealTerm): boolean =>
+  t.state === "disputed" || (t.state === "pending" && bothSidesDiffer(t));
+
+/** 🔴 **Nothing left to ask.** A counter that lands ON the other side's value writes `pending`,
+ *  never `agreed` — so two identical values sat in the queue asking the renter to answer a question
+ *  both parties had already answered the same way. */
+export const isSettledByValues = (t: DealTerm): boolean =>
+  t.state === "agreed" || (t.state === "pending" && bothSidesAgree(t));
 
 export interface DealRoomView {
   id: string;
@@ -820,22 +867,23 @@ export function buildDealRoomQuotationDoc(
     ),
   );
   if (dd.operatorIncluded === true) {
-    const detail = [
-      dd.operatorNationality ? nationalityLabel(dd.operatorNationality, L) : null,
-      ...(dd.operatorCerts ?? []),
-    ].filter(Boolean).join(" · ");
-    clauses.add(CLAUSE.operatorTitle(L), CLAUSE.operatorIncluded(L, detail || null), "operator_included", src);
+    // 🔴 **THE NATIONALITY IS NOT PRINTED** — same ruling as `bid-quotation.ts`, and it has to be
+    // made in BOTH: the two documents are built by two builders, and the app forbids exactly that
+    // drift (*"two rentee routes to «the quotation» must not land on two different documents"*).
+    // `operatorNationality` stays on the view and is still parsed; only the paper stops saying it.
+    const detail = (dd.operatorCerts ?? []).filter(Boolean).join(" · ");
+    clauses.add(CLAUSE.operatorTitle(L), CLAUSE.operatorIncluded(L, detail || null), "operator_included");
   } else if (dd.operatorIncluded === false) {
-    clauses.add(CLAUSE.operatorTitle(L), CLAUSE.operatorNone(L), "operator_included", src);
+    clauses.add(CLAUSE.operatorTitle(L), CLAUSE.operatorNone(L), "operator_included");
   }
   const certs = (dd.equipmentCerts ?? []).filter(Boolean).join(ar ? "، " : ", ");
-  if (certs) clauses.add(CLAUSE.certsTitle(L), CLAUSE.certs(L, certs), "safety_certifications", src);
+  if (certs) clauses.add(CLAUSE.certsTitle(L), CLAUSE.certs(L, certs), "safety_certifications");
   const pay = resolveTerm(src, "payment_terms");
-  if (pay) clauses.add(CLAUSE.paymentTitle(L), CLAUSE.payment(L, src.value("payment_terms", pay)), "payment_terms", src);
+  if (pay) clauses.add(CLAUSE.paymentTitle(L), CLAUSE.payment(L, src.value("payment_terms", pay)), "payment_terms");
   const sla = resolveTerm(src, "breakdown_response_sla");
-  if (sla) clauses.add(CLAUSE.breakdownTitle(L), CLAUSE.breakdown(L, src.value("breakdown_response_sla", sla)), "breakdown_response_sla", src);
+  if (sla) clauses.add(CLAUSE.breakdownTitle(L), CLAUSE.breakdown(L, src.value("breakdown_response_sla", sla)), "breakdown_response_sla");
   const maint = partyWord(resolveTerm(src, "maintenance_responsibility"));
-  if (maint) clauses.add(CLAUSE.maintenanceTitle(L), CLAUSE.maintenance(L, maint), "maintenance_responsibility", src);
+  if (maint) clauses.add(CLAUSE.maintenanceTitle(L), CLAUSE.maintenance(L, maint), "maintenance_responsibility");
 
   // 🔴 EVERY OTHER TERM THE ROOM HOLDS (owner, 2026-09-18, on the app: *"just make sure agreed and all
   // terms of deal room is mentioned, we will not miss anything"*). ~~Two cards, "Agreed terms" and the
@@ -858,20 +906,23 @@ export function buildDealRoomQuotationDoc(
           : null,
     quotationNumber: qnum,
     dateStr,
+    // The app's own pairs and wording; the REQUEST number rides the signature strip with the support
+    // address, because that band speaks for the platform and the navy footer speaks for the supplier.
     refs: [
-      { label: L("NO.", "الرقم"), value: qnum },
-      { label: L("REQUEST", "الطلب"), value: room.shortCode ?? "" },
-      { label: L("DATE", "تاريخ الإصدار"), value: dateStr },
-      { label: L("WORK SITE", "موقع العمل"), value: site ?? "" },
-      { label: L("CURRENCY", "العملة"), value: sar },
+      { label: "QUOTATION REF", value: qnum },
+      { label: L("Issue date", "تاريخ الإصدار"), value: dateStr },
+      { label: L("Work site", "موقع العمل"), value: site ?? "" },
+      { label: L("Currency", "العملة"), value: sar },
     ],
+    requestRef: room.shortCode ?? null,
+    supportEmail: SUPPORT_EMAIL,
     supplier: {
       label: ar ? "SUPPLIER / المورد" : "SUPPLIER",
       name: room.supplier.name,
       verified: room.supplier.isVerified === true,
       rows: partyRows([
         // Live — the deal-room payload always carries the supplier's phone; the snapshot only backstops.
-        [L("Phone", "الجوال"), room.supplier.phone ?? q?.supplierPhone ?? null],
+        [L("Phone", "الهاتف"), room.supplier.phone ?? q?.supplierPhone ?? null],
         // SNAPSHOT-ONLY: nothing on the live room payload carries the supplier's e-mail, so a preview
         // omits the row rather than inventing one.
         [L("Email", "البريد"), q?.supplierEmail ?? null],
@@ -882,14 +933,14 @@ export function buildDealRoomQuotationDoc(
       name: rentee.name,
       rows: partyRows([
         [L("Work site", "موقع العمل"), site],
-        [L("Phone", "الجوال"), rentee.phone ?? q?.renteePhone ?? null],
+        [L("Phone", "الهاتف"), rentee.phone ?? q?.renteePhone ?? null],
         [L("Email", "البريد"), rentee.email ?? q?.renteeEmail ?? null],
       ]),
     },
     lineItems,
     currency: sar,
     totals: { subtotal: t.subtotal, vat: t.vat, total: t.grand },
-    clauses: [...clauses.out, ...extras, ...(notes ? [{ title: L("Renter notes", "ملاحظات المستأجر"), body: notes }] : [])],
+    clauses: [...clauses.out, ...extras, ...(notes ? [{ title: L("Rentee notes", "ملاحظات المُستأجِر"), body: notes }] : [])],
     showSigned: kind === "final",
     // The mark the caller already passes for this document, sealing the signature strip.
     sealUrl: opts?.logoUrl ?? null,
@@ -897,16 +948,23 @@ export function buildDealRoomQuotationDoc(
       name: room.supplier.name,
       phone: room.supplier.phone ?? q?.supplierPhone ?? null,
       email: q?.supplierEmail ?? null,
-      supportLine: "support@moedatech.com",
     },
-    // Short disclaimer instead of the full legal clause list (app parity for this document).
+    /**
+     * 🔴 THE SAME FIVE CLAUSES the bid quotation prints. ~~A two-sentence disclaimer, on the
+     * reasoning that this document is the shorter one.~~ The app has ONE quotation: `_TermsList`
+     * appends `quotationTcValidity` … `quotationTcESignature` whatever surface asked for it, and its
+     * deal room opens that same document by bid id rather than a second one. A sheet whose terms
+     * depend on which button opened it is two sheets.
+     *
+     * ⚠️ The DRAFT sentence stays, ahead of them, and is web-only. The app has no preview/final split
+     * on this paper; the web does, and the badge and the watermark alone do not survive being read
+     * aloud down the phone.
+     */
     legal: [
-      // A preview says so ON the paper, in the app's own words (`dealViewQuotationDraftHint`). The link
-      // label alone does not survive a print-out or a forward.
       ...(kind === "preview"
-        ? [L("Draft — reflects the current offer, final once the supplier confirms.", "مسودة — تعكس العرض الحالي، وتُعتمد بعد تأكيد المورد.")]
+        ? [L("Draft — reflects the current offer, final once the supplier confirms", "مسودة — تعكس العرض الحالي، وتُعتمد بعد تأكيد المورد")]
         : []),
-      L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة 7 أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة 15٪ وفقًا للنظام السعودي."),
+      ...quotationLegal(L),
     ],
   };
 }

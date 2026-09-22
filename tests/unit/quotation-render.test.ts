@@ -60,7 +60,7 @@ function baseDoc(): QuotationDoc {
     currency: "SAR",
     totals: { subtotal: 13000, vat: 1950, total: 14950 },
     clauses: [
-      { title: "Payment", body: "Payment terms Net 30 days. A formal purchase order is issued on approval of this quotation", agreed: true },
+      { title: "Payment", body: "Payment terms Net 30 days. A formal purchase order is issued on approval of this quotation" },
       { title: "Maintenance", body: "Routine maintenance is carried by the supplier for the rental period" },
     ],
     legal: quotationLegal(L),
@@ -70,7 +70,6 @@ function baseDoc(): QuotationDoc {
       crNumber: "1010101010",
       vatNumber: "300000000000003",
       phone: "+966500000000",
-      supportLine: "support@moedatech.com",
     },
   };
 }
@@ -98,7 +97,7 @@ describe("the q3 quotation renderer", () => {
      own under the rental; on a multi-item bid that read as a list of charges rather than a quotation. */
   it("draws the eight columns with delivery and return among them, one row per machine", () => {
     const html = renderQuotationSection(baseDoc());
-    for (const head of ["Equipment", "Description", "Units", "Period", "Rental", "Delivery", "Return", "Total"]) {
+    for (const head of ["Equipment", "Description", "Unit", "Duration", "Rental", "Delivery", "Return", "Total"]) {
       expect(html).toContain(`>${head}<`);
     }
     expect(html.match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1].match(/<tr>/g)?.length).toBe(1);
@@ -126,12 +125,13 @@ describe("the q3 quotation renderer", () => {
     expect(html).toContain("&lt;b&gt;320&lt;/b&gt;");
   });
 
-  /* Settled in the deal room. The app dropped the padlock with the redesign and the owner put the mark
-     back on 2026-09-18, inline in the clause rather than as a badge in the margin. */
-  it("marks a clause the two sides settled, and leaves the others unmarked", () => {
+  /* 🔴 A settled clause is marked in NO way. ~~An inline «✓ Agreed» at the end of the sentence.~~
+     Added on 2026-09-18 and withdrawn by the app the next day: the owner reads this as a legal
+     document, and a clause annotated with its negotiation state is not how a quotation is written. */
+  it("marks a settled clause in no way at all", () => {
     const html = renderQuotationSection(baseDoc());
-    expect(html.match(/q-agreed/g)?.length).toBe(1);
-    expect(html).toContain("✓ Agreed");
+    expect(html).not.toContain("q-agreed");
+    expect(html).not.toContain("Agreed");
   });
 
   /* ONE numbered list: the term sentences, then the legal clauses after a hairline. */
@@ -153,22 +153,39 @@ describe("the q3 quotation renderer", () => {
   it("drops a reference pair that repeats a value already in the strip", () => {
     const doc = baseDoc();
     doc.refs = [
-      { label: "NO.", value: "REQ-00042" },
+      { label: "QUOTATION REF", value: "REQ-00042" },
       { label: "REQUEST", value: "REQ-00042" },
-      { label: "CURRENCY", value: "SAR" },
+      { label: "Currency", value: "SAR" },
     ];
     const html = renderQuotationSection(doc);
-    expect(html).toContain("NO.");
+    expect(html).toContain("QUOTATION REF");
     expect(html).not.toContain("REQUEST");
     expect(html.match(/REQ-00042/g)?.length).toBe(1);
   });
 
-  it("carries the supplier's own registration into the navy footer", () => {
+  it("carries the supplier's own registration into the navy footer, and NOTHING of the platform's", () => {
     const html = renderQuotationSection(baseDoc());
     expect(html).toContain('class="q-foot"');
     expect(html).toContain("C.R. 1010101010");
     expect(html).toContain("VAT 300000000000003");
-    expect(html).toContain("support@moedatech.com");
+    /* 🔴 The support address is NOT in this band. The sheet is the supplier's document, and a platform
+       line in its own footer credits the wrong party; the route to help lives on the signature strip
+       directly above, which is the one band that speaks for the platform (app, 2026-09-16). */
+    const foot = html.slice(html.indexOf('class="q-foot"'));
+    expect(foot).not.toContain("support@moedatech.com");
+  });
+
+  /* The strip carries the quotation's reference, the REQUEST's own code, the date and the route to
+     help — the app's `_SignatureBar`, which is where all four belong. */
+  it("puts the request number and the support address on the signature strip", () => {
+    const doc = baseDoc();
+    doc.requestRef = "REQ-00042";
+    doc.supportEmail = "support@moedatech.com";
+    const strip = renderQuotationSection(doc);
+    const signed = strip.slice(strip.indexOf('class="q-signed"'));
+    expect(signed).toContain("Request #");
+    expect(signed).toContain("REQ-00042");
+    expect(signed).toContain("support@moedatech.com");
   });
 
   /* A live quotation gets NO stamp: a sheet that stamps its own normal state teaches the reader to
@@ -208,21 +225,21 @@ describe("the q3 quotation renderer", () => {
     expect(html).toContain('class="q-draft"');
     expect(html).toContain('class="q-wm"');
     expect(html).toContain("Draft, not final");
-    expect(html).not.toContain("signed electronically");
+    expect(html).not.toContain("Electronically signed");
   });
 
   it("keeps the signed block on a final quotation (draft marking is opt-in)", () => {
     const html = renderQuotationSection(baseDoc());
     expect(html).not.toContain('class="q-draft"');
     expect(html).not.toContain('class="q-wm"');
-    expect(html).toContain("signed electronically");
+    expect(html).toContain("Electronically signed");
   });
 
   it("suppresses the signed block for a draft even when showSigned is explicitly true", () => {
     const doc = baseDoc();
     doc.draftLabel = "Draft";
     doc.showSigned = true;
-    expect(renderQuotationSection(doc)).not.toContain("signed electronically");
+    expect(renderQuotationSection(doc)).not.toContain("Electronically signed");
   });
 
   it("escapes HTML in values (no injection)", () => {

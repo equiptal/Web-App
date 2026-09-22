@@ -21,7 +21,7 @@ import type { BidCard } from "@/lib/contract/bids";
  */
 
 const bc = (p: Partial<BidCard>): BidCard => ({
-  id: "b1", status: "PENDING", supplierId: "sup-1", supplierCompanyId: null, supplierName: "Acme Cranes",
+  id: "b1", status: "PENDING", supplierId: "sup-1", supplierCompanyId: null, supplierName: "Acme Cranes", supplierLogoUrl: null,
   verified: true, rating: null, distanceKm: null, submittedAt: null, validUntil: "2026-09-01T00:00:00.000Z",
   price: 1200, mobPrice: 500, demobPrice: 400, priceUnit: "PER_DAY", duration: null,
   numberOfUnits: 3, unitsOffered: 3, openingPrice: null, lastCounterBy: null, requestChangedAt: null, liveStatus: null, reqMinYear: null,
@@ -248,11 +248,32 @@ describe("the document carries the content the request view used to omit", () =>
   });
 
   it("defaults the request reference to the codes it covers, and takes an RFQ override", () => {
-    expect(ref(build([groupEntry(bc({}))]), "REQUEST")).toBe("REQ-00042");
+    // 🔴 The request code rides the SIGNATURE STRIP, not the reference strip (app parity), so it is
+    // read off `requestRef` rather than off a pair.
+    expect(build([groupEntry(bc({}))]).requestRef).toBe("REQ-00042");
     const multi = build([groupEntry(bc({}), { requestCode: "REQ-1" }), groupEntry(bc({ id: "b2" }), { requestCode: "REQ-2" })]);
-    expect(ref(multi, "REQUEST")).toBe("REQ-1 +1");
+    expect(multi.requestRef).toBe("REQ-1 +1");
     const grouped = build([groupEntry(bc({}))], { reference: "RFQ-00007" });
-    expect(ref(grouped, "REQUEST")).toBe("RFQ-00007");
+    expect(grouped.requestRef).toBe("RFQ-00007");
+  });
+});
+
+describe("the supplier's mark", () => {
+  /* 🔴 ONE logo, TWO slots — the party box and the navy footer — because the app draws the same store
+     mark in both, and a sheet whose letterhead and whose footer name the same firm with two different
+     marks is a sheet nobody proof-read. */
+  it("reaches the party box and the footer from the bid's own store", () => {
+    const doc = build([groupEntry(bc({ supplierLogoUrl: "https://cdn.example/af.png" }))]);
+    expect(doc.supplier.logoUrl).toBe("https://cdn.example/af.png");
+    expect(doc.footer!.logoUrl).toBe("https://cdn.example/af.png");
+  });
+
+  /* ⚠️ Absent, NOTHING is drawn in either slot — the app's own behaviour for a supplier with no mark,
+     and the state every bid is in until the projection carries one. */
+  it("is null on a bid that carries none, in both slots", () => {
+    const doc = build([groupEntry(bc({}))]);
+    expect(doc.supplier.logoUrl).toBeNull();
+    expect(doc.footer!.logoUrl).toBeNull();
   });
 });
 
@@ -262,7 +283,7 @@ describe("the terms ladder: locked beats a counter beats the declaration beats t
      soft-accepted set. */
   const withTerms = (p: Partial<BidCard>) => build([groupEntry(bc(p))]);
 
-  it("prints the SETTLED value and marks it agreed", () => {
+  it("prints the SETTLED value, and marks it in no way at all", () => {
     const doc = withTerms({
       lockedTerms: [{ key: "payment_terms", value: "net_90" }],
       counters: [{ key: "payment_terms", value: "net_60" }],
@@ -270,13 +291,15 @@ describe("the terms ladder: locked beats a counter beats the declaration beats t
     });
     const pay = doc.clauses.find((c) => c.title === "Payment")!;
     expect(pay.body).toContain("Net 90 days");
-    expect(pay.agreed).toBe(true);
+    /* 🔴 A settled clause carries NO mark (app parity). The «✓ Agreed» tag was added on 2026-09-18
+       and withdrawn the next day: a quotation is a legal document, and a clause annotated with its
+       negotiation state is not how one is written. */
+    expect(Object.keys(pay)).toEqual(["title", "body"]);
   });
 
-  it("falls to the counter, then the declaration, then the request — unmarked each time", () => {
+  it("falls to the counter, then the declaration, then the request", () => {
     const counter = withTerms({ counters: [{ key: "payment_terms", value: "net_60" }], t3Declarations: { payment_terms: "net_0" } });
     expect(counter.clauses.find((c) => c.title === "Payment")!.body).toContain("Net 60 days");
-    expect(counter.clauses.find((c) => c.title === "Payment")!.agreed).toBe(false);
 
     const declared = withTerms({ t3Declarations: { payment_terms: "net_0" } });
     expect(declared.clauses.find((c) => c.title === "Payment")!.body).toContain("Net 0");
@@ -295,8 +318,8 @@ describe("the terms ladder: locked beats a counter beats the declaration beats t
     const swept = doc.clauses.filter((c) => c.title === "Working Hours" || c.title === "Insurance");
     expect(swept.map((c) => c.title)).toEqual(["Working Hours", "Insurance"]); // settled first
     expect(swept[0].body).toBe("10"); // the locked value, not the declared 8
-    expect(swept[0].agreed).toBe(true);
-    expect(swept[1].agreed).toBe(false);
+    // Settled FIRST is the only thing the locked set decides here — it marks nothing on the paper.
+    expect(swept.every((c) => !("agreed" in c))).toBe(true);
   });
 
   it("never prints a retired or priced term key", () => {

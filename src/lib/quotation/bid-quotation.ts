@@ -95,9 +95,22 @@ export interface BuildBidQuotationInput {
   /** The platform's mark for the signature strip (an ABSOLUTE URL — the document renders in a blank
    *  window, where a relative path resolves to nothing). */
   sealUrl?: string | null;
+  /**
+   * The SUPPLIER's store mark, printed in its party box and in the navy footer (one logo, two slots,
+   * exactly as the app does it).
+   *
+   * 🔴 BACKEND, owed: `BidCard` carries no supplier logo. The received-bids projection has had
+   * `supplierLogoUrl` all along and the BID projection has not, so this arrives null today and both
+   * slots simply draw nothing — which is the app's own behaviour for a supplier with no mark.
+   */
+  supplierLogoUrl?: string | null;
   /** Issue date. Injectable so the document is deterministic under test. */
   now?: Date;
 }
+
+/** The platform's support address. ONE spelling, shared by both documents' signature strips — a
+ *  second literal is how the two come to disagree. */
+export const SUPPORT_EMAIL = "support@moedatech.com";
 
 /** 2-decimal money (app parity: quotation totals show halalas, e.g. 250.00 / 37.50). */
 const m2 = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -184,20 +197,24 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
   const supVat = ld.vat ?? sup.supplierVatNumber;
   const supPhone = ld.contact ?? sup.supplierPhone;
   const supEmail = sup.compliance.entityType === "company" ? sup.supplierEmail : null;
+  // ONE logo, TWO slots — the party box and the navy footer, exactly as the app draws it. The bid's
+  // own store mark wins; the caller's override is the way a surface that already holds one (the
+  // deal room, a store page) can hand it in without a second read.
+  const supLogo = sup.supplierLogoUrl ?? input.supplierLogoUrl ?? null;
   const supplierRows = rows([
     [L("Address", "العنوان"), supAddress],
-    [L("C.R.", "س.ت"), supCr],
-    [L("VAT", "ض.ق.م"), supVat],
-    [L("Phone", "الجوال"), supPhone],
+    [L("CR #", "س.ت"), supCr],
+    [L("VAT #", "ض.ق.م"), supVat],
+    [L("Phone", "الهاتف"), supPhone],
     [L("Email", "البريد"), supEmail],
   ]);
   const renteeRows = rows([
-    ...(renteeCompany && input.rentee.personName ? ([[L("Renter", "المستأجر"), input.rentee.personName]] as [string, string][]) : []),
+    ...(renteeCompany && input.rentee.personName ? ([[L("Rentee", "المُستأجِر"), input.rentee.personName]] as [string, string][]) : []),
     ...(input.workSite ? ([[L("Work site", "موقع العمل"), input.workSite]] as [string, string][]) : []),
     [L("Address", "العنوان"), input.rentee.nationalAddress],
-    [L("C.R.", "س.ت"), input.rentee.crNumber],
-    [L("VAT", "ض.ق.م"), input.rentee.vatNumber],
-    [L("Phone", "الجوال"), input.rentee.phone],
+    [L("CR #", "س.ت"), input.rentee.crNumber],
+    [L("VAT #", "ض.ق.م"), input.rentee.vatNumber],
+    [L("Phone", "الهاتف"), input.rentee.phone],
     [L("Email", "البريد"), input.rentee.email],
   ]);
 
@@ -359,35 +376,38 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
   clauses.add(CLAUSE.transportTitle(L), CLAUSE.transport(L, toSite, fromSite));
 
   // Operator.
+  //
+  // 🔴 **THE NATIONALITY IS NOT PRINTED** (app parity, `kHiddenTermKeys`, 2026-09-21; owner, on the
+  // app: *"remove operator nationality from all surfaces now, in request, bid, deal room"*). The
+  // supplier still DECLARES it on the bid and the field is still stored — this is display only —
+  // but the paper no longer states it, exactly as `live_quotation_document.dart` no longer does.
+  // ⚠️ So a supplier who declared no certificate either gets the bare «operator included» sentence
+  // rather than a specification he never gave, which is the fallback that was already here.
   const opIncluded = (sup.requestTerms.operatorIncluded ?? "").toUpperCase();
   if (opIncluded === "YES") {
-    const nat = resolveTerm(src, "operator_nationality");
     const cert = resolveTerm(src, "operator_certification");
-    const detail = [
-      nat ? src.value("operator_nationality", nat) : null,
-      cert,
-    ].filter(Boolean).join(" · ");
-    clauses.add(CLAUSE.operatorTitle(L), CLAUSE.operatorIncluded(L, detail || null), "operator_included", src);
+    const detail = [cert].filter(Boolean).join(" · ");
+    clauses.add(CLAUSE.operatorTitle(L), CLAUSE.operatorIncluded(L, detail || null), "operator_included");
   } else if (opIncluded === "NO") {
-    clauses.add(CLAUSE.operatorTitle(L), CLAUSE.operatorNone(L), "operator_included", src);
+    clauses.add(CLAUSE.operatorTitle(L), CLAUSE.operatorNone(L), "operator_included");
   }
 
   // The safety certifications the RENTER asked for.
   const certCodes = sup.equipmentCertCodes?.length ? sup.equipmentCertCodes : sup.heldCertCodes;
   const certs = (certCodes ?? []).map((c) => (isAr ? CERT_LABEL[c]?.ar : CERT_LABEL[c]?.en)).filter(Boolean).join(isAr ? "، " : ", ");
-  if (certs) clauses.add(CLAUSE.certsTitle(L), CLAUSE.certs(L, certs), "safety_certifications", src);
+  if (certs) clauses.add(CLAUSE.certsTitle(L), CLAUSE.certs(L, certs), "safety_certifications");
 
   // Attachments.
   const attachments = resolveTerm(src, "attachments");
-  if (attachments) clauses.add(CLAUSE.attachmentsTitle(L), attachments, "attachments", src);
+  if (attachments) clauses.add(CLAUSE.attachmentsTitle(L), attachments, "attachments");
 
   // Contract terms.
   const payRaw = resolveTerm(src, "payment_terms");
-  if (payRaw) clauses.add(CLAUSE.paymentTitle(L), CLAUSE.payment(L, src.value("payment_terms", payRaw)), "payment_terms", src);
+  if (payRaw) clauses.add(CLAUSE.paymentTitle(L), CLAUSE.payment(L, src.value("payment_terms", payRaw)), "payment_terms");
   const sla = resolveTerm(src, "breakdown_response_sla");
-  if (sla) clauses.add(CLAUSE.breakdownTitle(L), CLAUSE.breakdown(L, src.value("breakdown_response_sla", sla)), "breakdown_response_sla", src);
+  if (sla) clauses.add(CLAUSE.breakdownTitle(L), CLAUSE.breakdown(L, src.value("breakdown_response_sla", sla)), "breakdown_response_sla");
   const maint = partyWord(resolveTerm(src, "maintenance_responsibility"));
-  if (maint) clauses.add(CLAUSE.maintenanceTitle(L), CLAUSE.maintenance(L, maint), "maintenance_responsibility", src);
+  if (maint) clauses.add(CLAUSE.maintenanceTitle(L), CLAUSE.maintenance(L, maint), "maintenance_responsibility");
 
   /**
    * Everything else the bid holds, so NO TERM IS MISSING (owner, 2026-09-18).
@@ -423,20 +443,25 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
     title: L("Quotation", "عرض سعر"),
     quotationNumber: input.quotationNumber,
     dateStr,
+    // 🔴 The app's own five pairs, in its own order and its own wording (`_refPairs`). The REQUEST
+    // number is NOT among them: it rides the signature strip, which is the one band on the sheet that
+    // speaks for the platform rather than for the supplier.
     refs: [
-      { label: L("NO.", "الرقم"), value: input.quotationNumber },
-      { label: L("REQUEST", "الطلب"), value: input.reference ?? reqLabel },
-      { label: L("DATE", "تاريخ الإصدار"), value: dateStr },
-      { label: L("VALID UNTIL", "صالح حتى"), value: fmtRefDate(validRaw) },
-      { label: L("WORK SITE", "موقع العمل"), value: input.workSite ?? "" },
-      { label: L("CURRENCY", "العملة"), value: sar },
+      { label: "QUOTATION REF", value: input.quotationNumber },
+      { label: L("Issue date", "تاريخ الإصدار"), value: dateStr },
+      { label: L("Valid until", "صالح حتى"), value: fmtRefDate(validRaw) },
+      { label: L("Work site", "موقع العمل"), value: input.workSite ?? "" },
+      { label: L("Currency", "العملة"), value: sar },
     ],
+    requestRef: input.reference ?? reqLabel,
+    supportEmail: SUPPORT_EMAIL,
     supplier: {
       label: isAr ? "SUPPLIER / المورد" : "SUPPLIER",
       name: sup.supplierName,
       // The tick states a CHECKED company registration. An individual never gets one however much else
       // is on file — the document would be making a claim nobody made.
       verified: sup.verified === true && sup.compliance.entityType === "company",
+      logoUrl: supLogo,
       rows: supplierRows,
     },
     rentee: {
@@ -462,8 +487,12 @@ export function buildBidQuotationDoc(input: BuildBidQuotationInput): QuotationDo
       vatNumber: supVat ?? null,
       phone: supPhone ?? null,
       email: supEmail ?? null,
-      supportLine: "support@moedatech.com",
+      logoUrl: supLogo,
     },
     amountWordsSuffix: allOpenEnded ? L("Estimate for one day · Final amount as operated", "تقدير ليوم واحد · المبلغ النهائي حسب التشغيل") : undefined,
+    // ⚠️ The words follow the SUFFIX. An open-ended sheet is framed as an estimate for one period,
+    // and the grand total folds in a mobilisation fee paid ONCE — spelling that out under that frame
+    // states a per-period figure that is not one. The app resolves the same pair in `amountInWordsValue`.
+    amountWordsValue: allOpenEnded ? openRate! * offeredUnits(head.bid) : undefined,
   };
 }

@@ -357,14 +357,19 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     expect(beforeSending).not.toMatch(/\bsend\(\)/);
   });
 
-  it("invokes `send()` from exactly two places, both of them the renter pressing send", () => {
+  /* The rule is unchanged — every invocation is a RENTER PRESS and none is a lifecycle hook — but
+     the shape moved: the composer's two presses now go through `sendTyped`, the contact guard's
+     wrapper, and the guard's own «Share anyway» calls `send` directly (`contactWarned` is read off
+     the closure, so coming back through the wrapper would re-ask the question it just answered). */
+  it("invokes the text sender from presses only, never from a hook", () => {
     const callSites = dockSrc
       .split("\n")
-      .filter((line) => /\bvoid send\(\)/.test(line));
-    expect(callSites).toHaveLength(2);
-    // The Enter key and the send button. Neither is a lifecycle hook, and no third caller exists.
+      .filter((line) => /\bvoid (send|sendTyped)\(\)/.test(line));
+    expect(callSites).toHaveLength(3);
+    // The Enter key, the send button, and the contact guard's way through. All three are handlers.
     expect(callSites.filter((l) => /onKeyDown=/.test(l))).toHaveLength(1);
-    expect(callSites.filter((l) => /onClick=/.test(l))).toHaveLength(1);
+    expect(callSites.filter((l) => /onClick=/.test(l))).toHaveLength(2);
+    expect(callSites.every((l) => /onKeyDown=|onClick=/.test(l))).toBe(true);
   });
 
   it("switches tab by setting state and nothing else (the press an unlocked offer cannot survive)", () => {

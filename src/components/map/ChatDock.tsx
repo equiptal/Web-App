@@ -65,6 +65,7 @@ import {
 } from "@/lib/chat/chat-attachments";
 import { STREAM_API_KEY, leaseStream, watchDealRoom } from "@/lib/chat/stream-connection";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
+import { containsPhoneNumber } from "@/lib/contract/contact-guard";
 import type { BidCard } from "@/lib/contract/bids";
 import {
   arrivalNotice,
@@ -276,6 +277,11 @@ export function ChatDock({
   /** A refused or failed attachment, stated above the composer rather than inside it — this row is
    *  ~340px wide and an error squeezed into it would push the input to nothing. */
   const [fileErr, setFileErr] = useState<string | null>(null);
+  /** The contact-guard question, and whether it has already been answered this session. `warned` is
+   *  per-dock rather than per-message: a renter who has read the warning and chosen to share is not
+   *  asked again on the next line of the same address. */
+  const [contactAsk, setContactAsk] = useState(false);
+  const [contactWarned, setContactWarned] = useState(false);
   /** Mic active → the composer hands its whole row to the recorder (deal-room parity). */
   const [voiceRecording, setVoiceRecording] = useState(false);
   const [dismissedNotice, setDismissedNotice] = useState<string | null>(null);
@@ -716,11 +722,43 @@ export function ChatDock({
     }
   }
 
-  /** The typed message. */
+  /**
+   * The typed message.
+   *
+   * 🔴 **CONTACT GUARD — the renter is WARNED, never blocked** (app parity, `deal_room_page.dart`
+   * `_confirmContactShare`, 2026-09-21). The deal room's contact policy is asymmetric and enforced
+   * on the server: `getDealRoom` always hands the renter the SUPPLIER's number and withholds the
+   * RENTER's until the deal closes (T10 / AC-09). The chat is Stream and never passes through that
+   * gate, so a number typed here walks straight past it.
+   *
+   * Sharing hers early is her call; the platform's job is to say she does not need to. (The app's
+   * other half — a supplier is refused outright, because she already has his number and what he is
+   * doing is moving the deal off-platform — has no home here: this client is the renter's.)
+   *
+   * ⚠️ **Client-side, so it is a nudge and not enforcement.** The half that covers old builds and
+   * anything we do not own is the same rule in Stream's pre-send hook, which is owed and not built.
+   */
   async function send() {
     const body = text.trim();
     if (!body) return;
     if (await deliver(async (channel) => { await channel.sendMessage({ text: body }); })) setText("");
+  }
+
+  /**
+   * The composer's own press: the contact guard, then {@link send}.
+   *
+   * ⚠️ **A wrapper, not a branch inside `send`.** `send` is one of the three senders RM3-AC-47 pins
+   * to the single `deliver` seam — the one function allowed to create a deal room — so the guard
+   * sits in FRONT of it rather than inside it, and the seam keeps exactly its three callers.
+   * ⚠️ And `contactWarned` is read off the CLOSURE, which is why the dialog's «Share anyway» calls
+   * `send` directly: coming back through here, this test would still see `false` on the render that
+   * opened the dialog and would re-ask the question it has just answered.
+   */
+  async function sendTyped() {
+    const body = text.trim();
+    if (!body) return;
+    if (containsPhoneNumber(body) && !contactWarned) { setContactAsk(true); return; }
+    await send();
   }
 
   /**
@@ -1269,14 +1307,14 @@ export function ChatDock({
                   className="bm-chat-input"
                   value={text}
                   onChange={(e) => setText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendTyped(); } }}
                   placeholder={t.chatDock.placeholder}
                   disabled={busy || uploading || !active}
                 />
                 <button
                   type="button"
                   className="bm-chat-send"
-                  onClick={() => void send()}
+                  onClick={() => void sendTyped()}
                   disabled={busy || uploading || !text.trim() || !active}
                   aria-label={t.chatDock.send}
                   title={t.chatDock.send}
@@ -1316,6 +1354,37 @@ export function ChatDock({
           onSubmit={(reason) => void cancelDeal(activeRoomId, reason)}
           onClose={() => { setCancelOpen(false); setCancelErr(null); }}
         />
+      )}
+
+      {/* ── the contact guard (app parity, `_confirmContactShare`) ────────────────────────────────
+          🔴 **RED, and the SAFE action is the primary** (owner, on the app, 2026-09-20). The app's
+          first cut painted the renter's half amber and made the escape hatch the filled navy button,
+          so the loudest control on a privacy warning was the one that ignores it. «Share anyway» is
+          the quiet red one; «Got it» is filled and dismisses without sending.
+          ⚠️ Order is deliberate: the way OUT sits first, «Got it» last and filled — in both
+          directionalities the primary is the one a thumb lands on. */}
+      {contactAsk && (
+        <div className="dl-modal" dir={ar ? "rtl" : "ltr"} onClick={() => setContactAsk(false)}>
+          <div className="dl-modal-card" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div className="dl-modal-head">
+              <span className="dl-modal-ic danger"><span className="material-icons-outlined">privacy_tip</span></span>
+              <div className="dl-modal-tt"><div className="dl-modal-title">{L("Would you like to share your number?", "هل تريد مشاركة رقمك؟")}</div></div>
+              <button className="dl-modal-x" onClick={() => setContactAsk(false)} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
+            </div>
+            <div className="dl-modal-body">
+              {/* Red body text — the warning reads as a warning, not as a notice. */}
+              <p className="dl-modal-msg" style={{ color: "var(--danger)", fontWeight: 600 }}>
+                {L("To protect your privacy, numbers are currently only shown to suppliers you award", "لحماية خصوصيتك، لا تظهر الأرقام حالياً إلا للموردين الذين ترسي عليهم الصفقة")}
+              </p>
+            </div>
+            <div className="dl-modal-foot">
+              <button className="dl-mbtn warn" onClick={() => { setContactWarned(true); setContactAsk(false); void send(); }}>
+                {L("Share anyway", "مشاركة على أي حال")}
+              </button>
+              <button className="dl-mbtn green" onClick={() => setContactAsk(false)}>{L("Got it", "حسناً")}</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

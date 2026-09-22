@@ -63,8 +63,15 @@ export function resolveTerm(src: TermSource, key: string): string | null {
   );
 }
 
-/** Settled in the room. `lockedTerms` and nothing else — the room's SOFT-ACCEPTED set is "nobody may
- *  act on this", never "both sides agreed", and this is a document a customer keeps. */
+/**
+ * Settled in the room. `lockedTerms` and nothing else — the room's SOFT-ACCEPTED set is "nobody may
+ * act on this", never "both sides agreed".
+ *
+ * ⚠️ It ORDERS the sweep below and marks NOTHING on the paper. ~~Each settled clause carried a
+ * green «✓ Agreed» at the end of its sentence.~~ The app added that on 2026-09-18 and removed it the
+ * next day, on the owner's reading: a quotation is a legal document, and a clause annotated with its
+ * negotiation state is not how one is written. The sheet states the terms as they stand at download.
+ */
 export const isAgreedTerm = (src: TermSource, key: string): boolean => src.locked.has(key);
 
 /** One clause, with its term key recorded so the sweep below does not print it twice. */
@@ -72,9 +79,9 @@ export class ClauseList {
   readonly out: QuotationClause[] = [];
   readonly covered = new Set<string>();
 
-  add(title: string, body: string, termKey?: string, src?: TermSource) {
+  add(title: string, body: string, termKey?: string) {
     if (termKey) this.covered.add(termKey);
-    this.out.push({ title, body, agreed: !!(termKey && src && isAgreedTerm(src, termKey)) });
+    this.out.push({ title, body });
   }
 }
 
@@ -138,7 +145,7 @@ export function extraTermClauses(src: TermSource, covered: ReadonlySet<string>):
   for (const key of keys) {
     const raw = resolveTerm(src, key);
     if (!raw) continue;
-    out.push({ title: src.label(key), body: src.value(key, raw), agreed: isAgreedTerm(src, key) });
+    out.push({ title: src.label(key), body: src.value(key, raw) });
   }
   return out;
 }

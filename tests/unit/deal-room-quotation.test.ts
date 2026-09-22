@@ -232,7 +232,43 @@ describe("terms the app retired are stripped from the snapshot too", () => {
     // them and the app did not.
     const out = html(room({ status: "CLOSED" }), staleSnapshot());
     expect(out).not.toMatch(/operator nationality/i);
-    expect(out).not.toMatch(/safety certifications/i);
+    /* ⚠️ The CLAUSE, not the words. The platform’s own third legal clause reads "… satisfying
+       mandated safety certifications", so a bare text match hits the standing legal text and passes
+       for the wrong reason; what must not print is the retired TERM, which would carry a bold title. */
+    expect(out).not.toMatch(/<b>Safety Certifications:<\/b>/i);
+  });
+
+  /* 🔴 **THE OPERATOR CLAUSE REACHED THE PAPER BY A SECOND ROUTE, and the hidden-key filter never
+     touched it.** `HIDDEN_DEAL_ROOM_TERM_KEYS` strips the term ROW out of the sweep; the nationality
+     also arrived as `details.operatorNationality` and was joined into the operator clause's own
+     detail line, so the web went on printing «Saudi · TÜV» after the app had stopped
+     (`kHiddenTermKeys`, 2026-09-21; owner: *"remove operator nationality from all surfaces now, in
+     request, bid, deal room"*). Nothing pinned it, which is why the removal needs this case.
+     ⚠️ The CERTIFICATE still prints — only the nationality went — and a supplier who declared
+     neither gets the bare «operator included» sentence rather than a specification he never gave. */
+  it("names the certificate in the operator clause and never the nationality", () => {
+    // The three fields ride the request item, which is where `mapDealRoom`'s `pick` reads them from.
+    const raw = rawRoom();
+    const req = raw.request as Record<string, unknown>;
+    const doc = buildDealRoomQuotationDoc(
+      mapDealRoom({
+        ...raw,
+        status: "CLOSED",
+        request: {
+          ...req,
+          equipmentItems: [{
+            ...(req.equipmentItems as Record<string, unknown>[])[0],
+            operatorIncluded: true,
+            operatorNationality: "SAUDI",
+            operatorSafetyCertifications: ["TUV"],
+          }],
+        },
+      }),
+      null, RENTEE, false, L,
+    );
+    const clauses = clauseText(doc);
+    expect(clauses).toMatch(/TUV/);
+    expect(clauses).not.toMatch(/saudi/i);
   });
 });
 

@@ -2,6 +2,259 @@
 
 ## Change log
 
+- **2026-09-22 - The deal room is read off the APP again: the sheet's header, its footer, its terms page and its compare card, plus a contact guard on the chat and TWO term predicates that were silently wrong.**
+  Owner: *"can u check the deal room in the app, it has some changes in the ui - in behaviours - terms
+  etc can u follow it exactly and align here"*, then, on the scope question, **"all but with web
+  desktop ui screen"**. Read against `c9af28a3` (the app's own deal-room commit),
+  `docs/plans/deal-room-negotiate-redesign.md` and the current Dart; the web ported this sheet on
+  2026-09-18 and the app has moved a long way since.
+  🔴 **TWO of these are BEHAVIOUR, not styling, and they are the ones worth reading.**
+  `isConflictingTerm` and `isSettledByValues` (new, `contract/deal-room.ts`, app parity
+  `TermModel`): **the server stamps `disputed` exactly ONCE**, in `buildTermsArray`, comparing the
+  request against the bid at room creation — every later move writes `pending`
+  (`deal-room.service.ts:2304`). So a clash raised in round TWO arrived here as `pending`, `decide()`
+  called it «Not set» with two contradictory values sitting on the card, and **the accept gate let it
+  through**. Its mirror: a counter that lands ON the supplier's value ALSO writes `pending`, so two
+  identical values were reported as an open question and held the gate shut for good. Both fold case
+  and whitespace, because `NET_30` from the request and `net_30` from the bid are one schedule.
+  ⚠️ **Behavioural cases, deliberately** (`deal-term-state.test.ts`, 11): the sheet's own suite reads
+  the SOURCE, and a source test cannot tell a right predicate from a wrong one — proved by mutating
+  the rule and watching `negotiation-sheet.test.ts` stay green. Both mutations kill the new file.
+  **The sheet, item by item:**
+  (1) **The header is the RATE with its period, not the net incl. VAT** (app, 2026-09-20: *"show the
+  price at top header without VAT/duration/units so it shows the same number as in the bid card
+  exactly"*). Both figures were right and they were different quantities, so the room said «50/day»
+  and the sheet said «58» over one deal. The request's **short code is restored under the name** —
+  the redesign dropped the block carrying it and left no reference anywhere in the sheet.
+  🔴 **The «🔔 New offer» eyebrow and the «Total» caption are BOTH withdrawn**, following the app's
+  own removal of 2026-09-19. The turn cue survives where a renter meets it first: the room's price
+  bar still draws «🔔 New reply».
+  (2) 🔴 **The footer is rebuilt and the `‹ step ›` switcher is gone** (app, 2026-09-19: *"in the
+  footer can't we get back to the live one, which has a next button explicitly, with log and accept
+  if it is allowed"*). `🕘 · Back · ✓ Accept · [Next: Terms / Review & send / Send to the supplier]`.
+  The chevron never said where it went, and on the last step it fired the one irreversible act in the
+  sheet drawn as navigation. **The send greys when nothing has moved** (*"I sent the same bid 4 times
+  in a row, no changes"*) and stays PRESSABLE, so the press says why.
+  ⚠️ **Unanswered terms are NOT a gate, and never were one in the app** — checked against
+  `negotiation_sheet.dart` rather than assumed: `onAllReviewedChanged` is an empty callback and
+  `_next()` is an unconditional `setState`. The server accepts a reply with terms still `pending`.
+  ~~`page === 1 ? unresolvedCount === 0 : true`.~~
+  (3) **The price step**: the «All prices below are before VAT» caption ABOVE the table (read before
+  the typing rather than under it, after); **per-unit rows with the count applied once at the end**
+  when all three counts agree, which is the bid card's own shape; the factors under each leg
+  («2,000 × 12»); and an excluded leg struck in **RED at 2px**, where a grey rule on faded text read
+  as disabled rather than dropped.
+  ⚠️ **Per-unit ONLY when the counts agree.** The room negotiates rental, delivery and return counts
+  INDEPENDENTLY — 2 machines, 1 delivery, 2 returns is legal — and one multiplier at the end cannot
+  describe that. A bid card never faces this; it carries one count.
+  (4) **The compare card is the app's 2026-09-21 mock**: white, the gap pill riding the TOP EDGE, the
+  two totals across a VERTICAL hairline with THEIRS leading in navy, and the per-leg rows **always
+  open** — the «gap, line by line» expander is deleted, with the «did he move since his last round»
+  line restored under each. ⚠️ It is drawn only when there are TWO positions (`supRound && myRound`);
+  ~~`lastCounterBy === "supplier"`~~ asked who moved last, not whether there is anything to compare,
+  and drawing it early echoes his own numbers back under «Your total».
+  (5) **The terms page is the app's six sections**: `Pending · not specified by you` → `Conflict` →
+  `Agreed ✓` → `Pending · not specified by the supplier` → `Acknowledged 🔒` **last**, each a header
+  band carrying `(resolved/total)` with its rows inside the same card. **Only the OPEN card is
+  drawn**; the dashed «waiting for the one above» placeholder is deleted from the markup AND the
+  stylesheet. The Change button has **three labels** (`Choose another` / `Keep my choice` / `Change`),
+  because they answer three different situations.
+  (6) **The review guide is flat**, behind one collapsed «Matched» toggle with a status WORD per row,
+  its header one line, its legend gone and its bar **four segments** — matched, differs, pending,
+  needs-confirm. ~~Grouped by category with badge pills.~~ That grouping was a web-only layer.
+  (7) **The room's CTA never says «Negotiate»** (app, 2026-08-17, restated 2026-09-20): it is
+  «Edit your counter-offer» once the renter has countered and «Counter this price» / «اطلب سعراً أقل»
+  before. The word named neither the act nor whose it was.
+  (8) **The activity log is grouped by ROUND**, with «Round N» bands. The rounds were derived,
+  collapsed and then FLATTENED, so ten entries read as ten unrelated events.
+  (9) 🔴 **A CONTACT GUARD on the chat composer** (`contract/contact-guard.ts`, ported VERBATIM from
+  the app's `contact_guard.dart`). A message carrying a Saudi mobile raises a red warning: the renter
+  is **warned, never blocked**, because she already has the supplier's number and sharing hers early
+  is her call. ⚠️ **Client-side, so it is a nudge and not enforcement** — the half covering old builds
+  is the same rule in Stream's pre-send hook, which is owed and NOT built. The app's own file says so.
+  ⚠️ **A WRAPPER (`sendTyped`), not a branch inside `send`.** `send` is one of the three senders
+  RM3-AC-47 pins to the single `deliver` seam, so the guard sits in front of it and the seam keeps
+  exactly its three callers. And «Share anyway» calls `send` directly: `contactWarned` is read off the
+  closure, so coming back through the wrapper would re-ask the question it just answered.
+  ⚠️ **The fixture list IS the contract** (`contact-guard.test.ts`, 11). The rule is now written
+  twice; a case added here must be added to the app's `contact_guard_test.dart`.
+  ⚠️ **`(053) 757 6005` does NOT match, in both clients**: `)` then a space is two separators in a
+  row, which ends the run. Written down rather than "fixed", because the obvious fix diverges the two.
+  **THE DESKTOP HALF, which is where this departs from the app on purpose** (his instruction). The
+  app draws all of this in a phone column; run across a 1500px sheet, `space-between` puts related
+  facts a screen apart. So the compare card is **capped at 940px and centred**, and the term card's
+  header, the settled rows and the guide rows at **820px**. ⚠️ That is a cap on ANSWERS and one
+  summary card — **not** the column cap this sheet withdrew on 2026-09-19; the bands, the table, the
+  sections and the footer still run the width.
+  Files: `src/lib/contract/contact-guard.ts` (new), `src/lib/quotation/bid-quotation.ts`,
+  `src/lib/contract/deal-room.ts`
+  (`bothSidesDiffer` / `bothSidesAgree` / `isConflictingTerm` / `isSettledByValues`),
+  `src/components/deal-room/DealRoom.tsx`, `src/components/deal-room/deal-room-proto.css`,
+  `src/components/map/ChatDock.tsx`, `tests/unit/{contact-guard,deal-term-state}.test.ts` (new, 22),
+  `tests/unit/negotiation-sheet.test.ts` (6 cases rewritten to the reversals, 3 new; 23 passing),
+  `tests/unit/chat-dock.test.ts` (RM3-AC-47's call-site case re-shaped, not weakened),
+  `tests/unit/deal-room-quotation.test.ts` (1 new case for the operator clause; 20 passing).
+  🔴 **A `not.toContain` failed on its own explanation for the FIFTH time in this repo.** The case
+  pinning the eyebrow's removal read `not.toContain("theirsIsLatest")`, and the note recording the
+  removal names it. It asserts the DECLARATION now.
+  ⚠️ Verified: `NODE_OPTIONS= npx next build` clean (a stylesheet fault is invisible to typecheck,
+  lint and jsdom — this log's own rule of 2026-09-19), typecheck clean, lint 0 errors, **385 passing**
+  across the ten sheet / chat / compare / guard suites, and the full suite serially at **3617 passing,
+  7 skipped**. The 2 failures are the same PRE-EXISTING pair this log already records
+  (`cancel-confirmation`'s CRLF vacuous-slice trap, `ui-pins`'s CRLF staleness); neither file was
+  touched. Both new predicates break-checked — dropping the pending arm kills 1 case, un-folding the
+  comparison kills 3.
+  ⚠️ **SEEN RENDERED at 1568px**, all three steps plus the RTL review, as static markup carrying the
+  real class names and the COMPILED stylesheet — which is how the desktop stranding was found and how
+  the caps were judged. Measured rather than eyeballed: the card at 940px, the pill centred to the
+  pixel in BOTH directions (945/945 ltr, 960/960 rtl) and overhanging the top edge by half its height,
+  the vertical rule 1px `--border-hair`, and «theirs» on the reading-start side under `rtl`.
+  ⚠️ **A false bug was nearly reported**: the conflict tint measured white because `getComputedStyle`
+  was read mid-`transition`. With transitions disabled it is `#f7e3e3` on a 25% danger border. Measure
+  a transitioned property with transitions OFF.
+  🔴 **NOT seen on a real room**, which needs a signed-in renter with a live deal room and a
+  supplier's standing round, so the three steps are pinned by cases and by the specimen rather than
+  watched in place.
+  (10) 🔴 **`operator_nationality` leaves the QUOTATION too, by its SECOND route** (app,
+  `kHiddenTermKeys`, 2026-09-21; owner: *"remove operator nationality from all surfaces now, in
+  request, bid, deal room"*). `HIDDEN_DEAL_ROOM_TERM_KEYS` strips the term ROW out of the sweep and
+  had done since 2026-09-18 — but the nationality ALSO arrived as `details.operatorNationality` and
+  was joined into the operator clause's own detail line, which that filter never touched. So the web
+  went on printing «Saudi · TÜV» on the paper after the app had stopped. **Nothing pinned it**, which
+  is why a case now does, break-checked by putting the value back.
+  ⚠️ **Both builders, in one change.** The bid quotation and the deal-room one are two functions, and
+  the app forbids exactly that drift (*"two rentee routes to «the quotation» must not land on two
+  different documents"*). The CERTIFICATE still prints; a supplier who declared neither gets the bare
+  «operator included» sentence rather than a specification he never gave, which was already the
+  fallback. `operatorNationality` stays on the view and is still parsed — display only, as the app's
+  own note says.
+  ⚠️ Done after the other session left the tree; `nationalityLabel` went with it rather than being
+  left imported and unread.
+  ⚠️ **NOT changed, and it is already satisfied**: the app appends «per unit» to the price bar's rate
+  above one unit. The web's bar carries an All / Per-unit segmented control plus a caption saying
+  which, which is strictly more; removing it to match would be a regression nobody asked for.
+  🔴 **ANOTHER SESSION IS WRITING TO THIS TREE.** `git status` was clean at session start and now
+  carries an in-flight quotation alignment across `bid-quotation.ts`, `clauses.ts`, `render.ts`,
+  `bids.ts`, `link-bids.ts`, `agent-bids.ts`, `golden.ts` and six test files — plus its own edits to
+  `deal-room.ts`, which this change also touches. The two do not overlap textually and both survived,
+  but the counts above were taken against a tree holding both.
+  🔴 **APP DEFECT, reported not copied**: `negotiation_review_step.dart:277` calls
+  `l10n.dealGuideReady(total, matched)` against `dealGuideReady(int done, int total)`, so the app's
+  guide header prints «8/3 ready» where it means «3/8». The web prints it the right way round.
+
+- **2026-09-22 - The quotation is read off the APP again, line by line: the party rows, the marks, the reference strip, the signature strip and every word on them.**
+  Owner: *"check the logic - entry point - ui - structure and everything in the qoutation of the app and
+  use it exacly"*. Read against `quotation_document.dart` (2,558 lines), `live_quotation_document.dart`,
+  `bid_quotation_page.dart` and the deal room's own `quotation_button.dart`; ten things had drifted since
+  the 2026-09-18 port and each is named below.
+  🔴 **THE ENTRY POINT, checked first and the most interesting finding.** The app's deal-room link has
+  TWO destinations - `onViewSigned` on a CLOSED room, `onPreviewDraft` before - and **both push
+  `RouteNames.bidQuotation` with the bid id**. Its own comment says why: *"Two rentee routes to «the
+  quotation» must not land on two different documents."* The web has two BUILDERS
+  (`buildBidQuotationDoc` and `buildDealRoomQuotationDoc`), which is the split the app forbids, and the
+  two had drifted apart exactly where nobody looks.
+  ⚠️ **The two builders are KEPT and made to agree**, rather than collapsed. The deal-room document is
+  priced off the ROOM (`computeQuoteTotals` over the negotiated rounds) and the bid one off the BID; one
+  builder would mean the deal room reading its figures back out of a bid payload that does not carry the
+  counter, which is a pricing change wearing a layout change's clothes. What is now identical is
+  everything a reader sees: the clauses, the legal list, the refs, the strip and the wording.
+  (1) 🔴 **The «✓ Agreed» mark is DELETED**, which reverses 2026-09-18 on the app's own reversal. The
+  app added it that day and removed it the next: *"a quotation is a legal document, and a clause
+  annotated with its negotiation state is not how one is written"*. `isAgreedTerm` survives and still
+  ORDERS the sweep - settled terms first - so nothing about which terms print, or in what order, moved.
+  (2) **A party row is ONE RUN, `label: value`.** ~~The label on the start edge and the value pushed to
+  the end by `justify-between`.~~ A value long enough to wrap then broke into its own narrow column with
+  its label stranded opposite it; the app sets the pair as a single `Text.rich` so they wrap together.
+  (3) **The party's MARK is 48px, at the box's trailing edge, and only behind a VERIFIED party.**
+  ~~28px on a tile, before the name, drawn whenever a URL was present.~~ Three faults in one element:
+  above-the-text reserves its height whether or not anything follows (the band of white the app's owner
+  reported), a tile paints an empty white rectangle when the image 403s, and a logo can outlive the
+  verification it was uploaded under - printing it puts a firm's brand beside a party nobody checked.
+  (4) 🔴 **The REQUEST number leaves the reference strip for the SIGNATURE strip**, with the support
+  address beside it. That strip is the one band on the sheet that speaks for the PLATFORM; the navy
+  footer speaks for the supplier, and `footer.supportLine` is deleted because a platform line in the
+  supplier's own footer credits the wrong party (the app's own 2026-09-16 ruling, which the web had
+  carried only half of).
+  (5) **Five reference pairs, in the app's order and its own casing**: `QUOTATION REF` (Latin in both
+  locales - it is the app's string), `Issue date`, `Valid until`, `Work site`, `Currency`. The CSS
+  `text-transform: uppercase` on the label went with them: the app's labels are already cased, and
+  shouting all five at a reader who quotes one was the web adding emphasis the design does not have.
+  (6) **The grand total prints NO currency word.** The app states the currency once, in the strip - and
+  repeating it here is what pushed `219,075.00 SAR` past its own column on 2026-09-18.
+  (7) **The deal-room document prints THE SAME FIVE LEGAL CLAUSES.** ~~A two-sentence disclaimer, on the
+  reasoning that this document is the shorter one.~~ `_TermsList` appends `quotationTcValidity` …
+  `quotationTcESignature` on every surface that opens it; a sheet whose terms depend on which button
+  opened it is two sheets. ⚠️ The DRAFT sentence stays ahead of them and is web-only, because the app has
+  no preview/final split on this paper and a badge does not survive being read aloud down the phone.
+  (8) **Every string re-read off the ARB**, both locales: `Unit` not `Units`, `Duration` not `Period`,
+  `Subtotal before tax`, `Total · incl. VAT` / `الإجمالي · شامل الضريبة`, `المبلغ كتابةً` (the web had
+  dropped the tanwin), `Terms and Conditions`, `CR #` / `VAT #`, `الهاتف` not `الجوال`, `Rentee` /
+  `المُستأجِر`, and the five legal clauses WITHOUT the trailing full stops the web had added.
+  (9) **An empty description cell prints `—`**, and so does an empty duration. A blank reads as a column
+  that failed to render rather than as a machine with nothing recorded against it.
+  (10) **The amount in words takes its own value.** On an OPEN-ENDED bid it spells the recurring rental
+  rather than the grand total: the line is framed as an estimate for one period and the total folds in a
+  mobilisation fee paid once, so spelling it there states a per-period figure that is not one. That is
+  the app's `amountInWordsValue` exactly.
+  Files: `src/lib/quotation/render.ts` (the template; `requestRef`, `supportEmail` and
+  `amountWordsValue` are new, `QuotationFooter.supportLine` and `QuotationClause.agreed` are gone),
+  `src/lib/quotation/clauses.ts`, `src/lib/quotation/bid-quotation.ts` (`SUPPORT_EMAIL`,
+  `supplierLogoUrl`), `src/lib/contract/deal-room.ts`,
+  `tests/unit/{quotation-render,quotation-unified,deal-room-quotation}.test.ts`.
+  (11) 🔴 **The supplier's MARK reaches the sheet at last, and it was never backend work.** Owner,
+  on the first report of this: *"i didnt underant , it didnt render the supplier logo?"* — and he is
+  right to ask, because the template drew it in the specimen and nothing drew it on a real bid.
+  ~~Reported here as owed backend work.~~ **Wrong, and checked rather than assumed**: the app reads
+  `bid.supplier.store.logoKey` — off the BID PAYLOAD itself, nested under the supplier — so the field
+  is on the wire and `mapBid` was dropping it. `BidCard.supplierLogoUrl` reads it now, TOLERANTLY
+  across the spellings the two services might land on (`supplierLogoUrl`, `storeLogoUrl`,
+  `supplier.store.logoUrl`, `supplier.store.logoKey`, `supplier.logoUrl`) and through `mediaUrl`,
+  which passes a signed http URL through and builds the public one for a bare key — the app's own
+  `S3Url.from`.
+  ⚠️ **ONE logo, TWO slots**: the party box and the navy footer take the same value, so a sheet
+  cannot name one firm with two different marks.
+  🔴 **The STORE's logo, never the profile's `companyLogoKey`.** That key lives under the private
+  documents prefix, so a public URL built from it answers 403 — and an `<img>` absorbs that as «this
+  firm has no mark», which is a failure nobody can see. The app states the same rule where it fills
+  the field.
+  ⚠️ **An off-platform submission is `null` EXPLICITLY**, at both construction sites: it was typed
+  into the renter's own supplier list, so there is no account behind it and no store to have a mark.
+  Same ruling the dashboard's bid rail took on 2026-09-19.
+  🔴 **NOT observed against a live bid** — this machine has no session, so the read is proved by
+  cases and by the app's own source rather than by a payload. If the slots are still empty on the next
+  deploy, that is the projection and not the sheet.
+  🔴 **A backtick inside the CSS template literal ended the string AGAIN**, four days after this log
+  recorded it. Three comments I wrote into `QUOTATION_STYLE` quoted class and API names in backticks and
+  the compiler then read the stylesheet after them as expressions. **A template literal holding a
+  stylesheet may contain neither a backtick nor a `${`** - there is no third rule to learn, and this is
+  the second time.
+  ⚠️ **A `not.toMatch` in the deal-room suite went VACUOUS the moment the legal clauses landed.** It
+  asserted the retired `safety_certifications` term never prints, by matching the WORDS - and the
+  platform's own third clause reads *"… satisfying mandated safety certifications"*, so it would have
+  passed on a document that printed the term as well. It matches the clause's own bold title now.
+  ⚠️ **Nothing about the money moved.** Same `computeRentalTotal` / `computeQuoteTotals`, same three
+  money-cell states, same halalas rule, same unit arithmetic, same VAT. A test block pins each, because a
+  wording sweep is exactly when a figure changes unnoticed.
+  ⚠️ Verified: **`NODE_OPTIONS= npx next build` clean**, typecheck clean, lint 0 errors,
+  **212 files / 3587 passing, 7 skipped** serially, 212 passing across the seven suites this change
+  reaches, and the logo path break-checked (the bid's own value cut out of the chain — one case went
+  red).
+  ⚠️ **The 6 failures are in THREE files and NONE is from this change**, each proved rather than
+  assumed: `cancel-confirmation` and `ui-pins` are the pre-existing CRLF pair (stashed this work and
+  they still failed), and `negotiation-sheet`'s four are **another session's work in flight** — it
+  removed `theirsIsLatest` and reworked the term queue in `DealRoom.tsx` today, following the app's own
+  removal, and has not updated that suite yet. Reported, not touched: mending somebody's half-finished
+  change silently is how it ships broken.
+  ⚠️ **Something outside this session is writing to this tree**, which this log has recorded before:
+  `src/lib/contract/contact-guard.ts` is untracked and not mine, and `DealRoom.tsx` changed under me
+  mid-run.
+  ⚠️ **SEEN RENDERED**, EN and AR, from a throwaway specimen carrying the real builder and the compiled
+  tokens: the party rows as single runs, the mark at the trailing edge in both scripts, the five refs,
+  the strip reading «… · Q-2026-00321-1693 · Request # REQ-00042 · 9 Sept 2026 · support@moedatech.com»
+  with the seal at its end, and a supplier-only footer.
+  🔴 **NOT seen on a real bid or a real room**: both surfaces need a signed-in renter, so the figures
+  are pinned by cases and the layout by the specimen.
+
 - **2026-09-22 - The circle's machines are bigger and overlap; the zoomed view is named by them and drawn on their own ground.**
   Owner, on the montage and on the dialog it opens: *"u can make them a little bigger and closer and
   when openin them show their names at top instead of the rfq and the images must show like in the
