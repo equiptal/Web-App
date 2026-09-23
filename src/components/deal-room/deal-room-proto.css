@@ -464,6 +464,8 @@
    half what this sheet had - the live header is a BAND, not a section. */
 .ng-head { flex: 0 0 auto; padding: 7px var(--ng-gutter) 6px; background: var(--surface); border-bottom: 1px solid var(--border-hair); }
 .ng-head .ng-inner { display: flex; align-items: center; gap: 14px; }
+/* Beta lets the identity and running offer use the full header band; only the sheet body is paper-capped. */
+.ng-head .ng-inner, .ng-foot .ng-inner { max-width: none; }
 /* The title block: 14px/800 truncating, a 10.5px/600 line under it. The live sheet's own. */
 .ng-htitle { min-width: 0; flex: 1; }
 .ng-htitle .t { font-size: 14px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -524,11 +526,17 @@
 
    ⚠️ It is `aria-hidden`: the footer's button already names the next step in words, and a rail
    that reads out «one, Price, two, Terms» before every screen is three labels for one fact. */
-/* 🔴 **`.ng-steps` and `.ng-step` are DELETED** (owner, 2026-09-22: *"remove the 3 steps
-   process bar"*). ~~The numbered rail under the header: a badge per step, the label beside it and
-   a growing rule between.~~ Deleted rather than left inert, which is this repo's rule for a
-   withdrawn motif - an unused block is one edit away from coming back by accident. The FOOTER's
-   named press carries the step now. */
+/* The beta sheet frame — a status rail, never a second navigation path. */
+.ng-steps { flex: 0 0 auto; padding: 14px var(--ng-gutter); background: color-mix(in srgb, var(--brand) 7%, var(--surface)); border-bottom: 1px solid var(--border-hair); }
+.ng-steps .ng-inner { display: flex; align-items: center; gap: 12px; }
+.ng-step { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 14px; font-weight: 800; white-space: nowrap; }
+.ng-step .badge { display: grid; place-items: center; width: 34px; height: 34px; border: 2px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--muted-dark); font-size: 14px; }
+.ng-step.on { color: var(--action); }
+.ng-step.on .badge { background: var(--action); border-color: var(--action); color: var(--surface); }
+.ng-step.done { color: var(--navy-mid); }
+.ng-step.done .badge { border-color: var(--success); background: var(--ok-soft); color: var(--success); }
+.ng-step-bar { flex: 1 1 auto; min-width: 24px; height: 3px; border-radius: 999px; background: var(--border); }
+.ng-step-bar.done { background: var(--success); }
 
 /* ── body ───────────────────────────────────────────────────────────────────────────────────── */
 /* ⚠️ **The gutter is on the BAND, not on the paper column** — as it is on the head, the rail and

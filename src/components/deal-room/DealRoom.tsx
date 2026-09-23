@@ -2320,15 +2320,22 @@ function CounterFlow({
           </div>
         </div>
 
-        {/* 🔴 **NO STEP RAIL** (owner, 2026-09-22: *"remove the 3 steps process bar"*).
-            ~~① Price —— ② Terms —— ③ Review, a band under the header, argued that morning as
-            «what makes three pages read as three SHEETS».~~ It cost a whole band of a sheet whose
-            body is the thing worth reading, and it was `aria-hidden` and unpressable - so it was
-            decoration that took height from the content.
-            ⚠️ **The FOOTER carries the step now, and that was his pick** when the cost was put
-            to him: «Next: Terms» / «Review & send» / «Send to the supplier». It names where the
-            press GOES rather than where the reader is, which is the half the rail used to add;
-            he took that trade explicitly rather than a heading standing in for it. */}
+        {/* The beta frame: a readable, non-interactive three-sheet rail. Navigation remains
+            exclusively in the footer, so staging's validation and term-resolution behavior stays
+            the only way to advance. */}
+        <div className="ng-steps" aria-hidden="true">
+          <div className="ng-inner">
+            {[L("Price", "السعر"), L("Terms", "الشروط"), L("Review", "المراجعة")].map((label, index) => (
+              <Fragment key={index}>
+                {index > 0 && <span className={`ng-step-bar${index <= page ? " done" : ""}`} />}
+                <span className={`ng-step${index === page ? " on" : index < page ? " done" : ""}`}>
+                  <span className="badge">{index < page ? "✓" : index + 1}</span>
+                  <span className="lbl">{label}</span>
+                </span>
+              </Fragment>
+            ))}
+          </div>
+        </div>
 
         <div className="ng-body">
           <div className="ng-inner">

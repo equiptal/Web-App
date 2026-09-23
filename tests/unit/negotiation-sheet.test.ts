@@ -186,7 +186,7 @@ describe("the sheet itself", () => {
     /* Head, body and foot: THREE bands on the one column, so nothing stands off the paper.
        ⚠️ It was FOUR until the step rail went (owner, 2026-09-22). The count is the point of
        the case - a band added without its `.ng-inner` is one that ignores the paper. */
-    expect(FLOW.match(/className="ng-inner"/g)?.length).toBe(3);
+    expect(FLOW.match(/className="ng-inner"/g)?.length).toBe(4);
   });
 
   /* 🔴 **THE STEP RAIL, restored from `beta`** (same note). It is the one device that makes
@@ -205,10 +205,10 @@ describe("the sheet itself", () => {
      SHEETS».~~ It was `aria-hidden` and unpressable, so it spent a band of the sheet on decoration.
      ⚠️ **The footer carries the step instead, and that was his pick** when the cost was put to
      him: the button names where the press GOES, and nothing names where the reader IS. */
-  it("draws no step rail, in the markup or the stylesheet", () => {
-    expect(FLOW).not.toMatch(/className="ng-steps"/);
-    expect(CSS_CODE).not.toMatch(/^\.ng-steps/m);
-    expect(CSS_CODE).not.toMatch(/^\.ng-step[ .{]/m);
+  it("draws the beta three-sheet rail without making it a second navigation path", () => {
+    expect(FLOW).toMatch(/className="ng-steps" aria-hidden="true"/);
+    expect(CSS_CODE).toMatch(/^\.ng-steps/m);
+    expect(CSS_CODE).toMatch(/^\.ng-step[ .{]/m);
     // The footer's named press is what replaced it, and it must still be there.
     expect(FLOW).toContain('L("Send to the supplier", "إرسال إلى المورد")');
   });
