@@ -160,6 +160,9 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**55.6** | Negotiation sheet \u2014 the open term card | `src/components/deal-room/DealRoom.tsx` |
 | &nbsp;&nbsp;**55.7** | Negotiation sheet \u2014 \u2462 review & send | `src/components/deal-room/DealRoom.tsx` |
 | &nbsp;&nbsp;**55.8** | Negotiation sheet \u2014 footer: log, quotation, the acts | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.9** | Negotiation sheet — the header figure's breakdown chevron | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.10** | Negotiation sheet — the header breakdown panel | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.11** | Negotiation sheet — the desk's zoom rail | `src/components/deal-room/DealRoom.tsx` |
 | **56** | Chat card | `src/components/deal-room/ChatCard.tsx` |
 | **57** | Chat drawer (map) | `src/components/map/ChatDock.tsx` |
 | &nbsp;&nbsp;**57.1** | Chat drawer — identity + phase + kebab | `src/components/map/ChatDock.tsx` |

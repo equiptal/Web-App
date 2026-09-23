@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, Fragment } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Dropdown } from "@/components/Dropdown";
 import { Dialog, DialogButton } from "@/components/Dialog";
 import { Icon } from "@/components/Icon";
@@ -1384,12 +1384,15 @@ function PriceCell({ val, onChange, refVal, live, supplierWord }: {
   val: string; onChange: (s: string) => void; refVal: number | null; live: boolean; supplierWord: string;
 }) {
   const edited = changedFrom(numOf(val), refVal);
-  if (!live) return <div className="ng-price"><b>{nf(numOf(val))}</b></div>;
+  if (!live) return <b className="tot">{nf(numOf(val))}</b>;
   return (
-    <div className={`ng-price${edited ? " edited" : ""}`}>
-      <input type="number" inputMode="numeric" min={0} value={val} placeholder="0" onChange={(e) => onChange(e.target.value)} />
-      {refVal != null && <div className="ref">{supplierWord}: {nf(refVal)}</div>}
-    </div>
+    <>
+      <span className={`qp-pricebox${edited ? " edited" : ""}`}>
+        <span className="material-icons-outlined ic">edit</span>
+        <input className="qp-price-in" type="number" inputMode="numeric" min={0} value={val} placeholder="0" onChange={(e) => onChange(e.target.value)} />
+      </span>
+      {refVal != null && <div className={`qp-ref${edited ? " changed" : ""}`}>{supplierWord}: {nf(refVal)}</div>}
+    </>
   );
 }
 
@@ -1474,6 +1477,14 @@ function CounterFlow({
   // Accept is gated behind a binding-commitment warning first (app parity). Counter skips it.
   const [bindingOk, setBindingOk] = useState(mode === "counter");
   const [page, setPage] = useState(0); // 0 = Terms, 1 = Price, 2 = Summary
+  /**
+   * The paper's zoom on the desk. **Opens at 1** (owner, 2026-09-23: *"make it zoomed at 100% on
+   * open, so follow beta here too"*) - beta opened at 0.85, which showed a document already pushed
+   * away from the reader.
+   */
+  const [paperZoom, setPaperZoom] = useState(1);
+  /** The header figure's arithmetic, closed until asked for - the map price footer's own device. */
+  const [brkOpen, setBrkOpen] = useState(false);
   // Price seeds from the LIVE position too (app resolveLivePosition: latest?.rate ?? room.lastProposedRate
   // ?? bid.priceAmount). room.rate already collapses lastProposedRate → bid.priceAmount, so preferring the
   // latest reconstructed round first guards against any lag between the DB column and the chat message.
@@ -1892,25 +1903,93 @@ function CounterFlow({
      «🔔 New reply» on `supplierCountered`, which is where a renter meets it before opening this. */
 
 
+  /**
+   * 🔴 **The letterhead** (owner, 2026-09-23: *"i want the same as beta ui"*). beta's own
+   * `qhead()`, restored: who the quotation is from, where they are, and the number it is filed
+   * under.
+   * ⚠️ **The room's short code IS the quotation number.** There is no quotation id in the
+   * deal-room payload and none is invented here; the code is the one identifier both sides already
+   * quote at each other. It is the same fact the header deliberately leaves OUT of its sub-line
+   * (note 7) - on a letterhead it is what the reader is looking for, beside the name it belongs to.
+   * ⚠️ **Latin digits in the Arabic date too** (`-nu-latn`): the house rule for every figure
+   * this app prints, and a quotation number beside an Arabic-Indic date reads as two systems.
+   */
+  const issuedOn = new Intl.DateTimeFormat(ar ? "ar-u-ca-gregory-nu-latn" : "en-GB", { day: "numeric", month: "short", year: "numeric" }).format(new Date());
+  const qhead = () => (
+    <div className="qp-qhead">
+      <div className="qp-qco">
+        <div className="qp-qlogo">{(room.supplier.name || "?").trim().charAt(0).toUpperCase()}</div>
+        <div className="qp-qcoinfo">
+          <b>{room.supplier.name}</b>
+          {room.details.location && <span className="ln">{room.details.location}</span>}
+        </div>
+      </div>
+      <div className="qp-qno" dir="ltr">
+        <div className="lbl">{L("QUOTATION №", "عرض سعر رقم")}</div>
+        <div className="num">{room.shortCode ?? "—"}</div>
+        <div className="sub">{L("Issued", "التاريخ")} {issuedOn}</div>
+      </div>
+    </div>
+  );
+
   /** One line of the price table: the machine, then each transport leg. */
   const priceRow = (o: {
     key: string; label: string; duration: string; durationSub?: string | null;
     qty: number; qtyMin: number; qtyMax: number; onQty: (v: number) => void;
-    val: string; onVal: (s: string) => void; refVal: number | null;
+    val: string; onVal: (s: string) => void; refVal: number | null; line: number;
     excluded?: boolean; onExclude?: (b: boolean) => void; exTitle?: string;
   }) => (
-    <div key={o.key} className={`ng-row${o.excluded ? " off" : ""}`}>
-      {o.onExclude && editable && (
-        <button type="button" className={`ng-rm${o.excluded ? " on" : ""}`} title={o.excluded ? L("Restore", "استعادة") : L("Exclude", "استبعاد")}
-          onClick={() => (o.excluded ? o.onExclude!(false) : setPendingEx({ title: o.exTitle ?? "", onYes: () => o.onExclude!(true) }))}>
-          {o.excluded ? "+" : "✕"}
-        </button>
+    <tr key={o.key} className={o.excluded ? "ex" : undefined}>
+      <td>
+        <div className="qp-itemcell">
+          {o.onExclude && editable && (
+            <button type="button" className={`qp-legx${o.excluded ? " on" : ""}`} title={o.excluded ? L("Restore", "استعادة") : L("Exclude", "استبعاد")}
+              onClick={() => (o.excluded ? o.onExclude!(false) : setPendingEx({ title: o.exTitle ?? "", onYes: () => o.onExclude!(true) }))}>
+              {o.excluded ? "+" : "✕"}
+            </button>
+          )}
+          <div className="lbl" title={o.label}>{o.label}</div>
+        </div>
+      </td>
+      <td className="mut">{o.duration}{o.durationSub ? <div className="sub">{o.durationSub}</div> : null}</td>
+      <td className="ctr">{o.excluded ? <span className="qp-ref">{L("Excluded", "مستبعد")}</span> : <div className="qp-qty"><Qty value={o.qty} min={o.qtyMin} max={o.qtyMax} onChange={o.onQty} live={editable} /></div>}</td>
+      <td>{o.excluded ? <span className="qp-ref">—</span> : <PriceCell val={o.val} onChange={o.onVal} refVal={o.refVal} live={editable} supplierWord={L("Supplier", "المورد")} />}</td>
+      <td><b className="tot">{nf(o.excluded ? 0 : o.line)}</b></td>
+    </tr>
+  );
+
+  /**
+   * The arithmetic under the price, in ONE place. The paper prints it under the table and the
+   * header's breakdown prints the same rows, so the two cannot come to different totals.
+   */
+  const totalRows = () => (
+    <>
+      <div className="qp-trow">
+        <span className="l">{room.details.equipmentLabel ?? L("Base rental", "الإيجار الأساسي")}{hasDuration ? ` · ${rentalDays} ${L("days", "يوم")}` : ""}
+          {factorLine("rental") && <span className="fx">{factorLine("rental")}</span>}
+        </span>
+        <span className="v">{nf(unitsAligned ? lines.perUnit.rental : rentalLine)}</span>
+      </div>
+      <div className={`qp-trow${mEx ? " off" : ""}`}>
+        <span className="l">{L("Delivery to site", "التوصيل إلى الموقع")}
+          {factorLine("mob") && <span className="fx">{factorLine("mob")}</span>}
+        </span>
+        <span className="v">{mEx ? L("not priced", "غير مسعّر") : nf(unitsAligned ? lines.perUnit.mob : mobLine)}</span>
+      </div>
+      <div className={`qp-trow${dEx ? " off" : ""}`}>
+        <span className="l">{L("Return from site", "الإرجاع من الموقع")}
+          {factorLine("demob") && <span className="fx">{factorLine("demob")}</span>}
+        </span>
+        <span className="v">{dEx ? L("not priced", "غير مسعّر") : nf(unitsAligned ? lines.perUnit.demob : demobLine)}</span>
+      </div>
+      <div className="qp-trow"><span className="l">{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span className="v">{nf(unitsAligned ? lines.perUnit.subtotal : subtotal)}</span></div>
+      <div className="qp-trow"><span className="l">{L("VAT 15%", "ضريبة القيمة المضافة 15٪")}</span><span className="v">{nf(Math.round(unitsAligned ? lines.perUnit.vat : vat))}</span></div>
+      <div className="qp-trow net"><span className="l">{unitsAligned ? L("Net incl. VAT per unit", "الصافي شامل الضريبة للوحدة") : L("Net incl. VAT", "الصافي شامل الضريبة")}</span><span className="v">{nf(unitsAligned ? Math.round(lines.perUnit.total) : total)}</span></div>
+      {/* 🔴 **THE COUNT, APPLIED ONCE, AT THE END.** Everything above it describes one machine. */}
+      {unitsAligned && (
+        <div className="qp-trow grand"><span className="l">{L("Overall total", "الإجمالي الكلي")} · {L(`${rNU} units agreed`, `تم الاتفاق على ${rNU} وحدة`)}</span><span className="v">{nf(total)}</span></div>
       )}
-      <span className="lbl" title={o.label}>{o.label}</span>
-      <span className="dur">{o.duration}{o.durationSub ? <span className="sub">{o.durationSub}</span> : null}</span>
-      {o.excluded ? <span className="out">{L("Excluded", "مستبعد")}</span> : <Qty value={o.qty} min={o.qtyMin} max={o.qtyMax} onChange={o.onQty} live={editable} />}
-      {o.excluded ? <span className="out">—</span> : <PriceCell val={o.val} onChange={o.onVal} refVal={o.refVal} live={editable} supplierWord={L("Supplier", "المورد")} />}
-    </div>
+    </>
   );
 
   /* ── the supplier's standing offer, against yours ─────────────────────────────────────────────
@@ -2309,37 +2388,59 @@ function CounterFlow({
               ⚠️ **Before → after rides the same block** (note 8): the supplier's standing rate
               struck through, his own after it, and only once `changedFrom` says something moved. */}
           <div className="ng-htotal">
-            <div className="k">{L("Your offer", "إجمالي عرضك")}</div>
+            {/* 🔴 ~~«Your offer», a 9.5px caption over the figure.~~ Removed on the owner's word
+                (2026-09-23: *"remove this word from header"*), and it is the same removal the app made
+                to its own «Total» caption: the only figure in a band headed by the supplier's name,
+                struck through against its replacement, is not mistakable for anything else. */}
             <div className="v" dir="ltr">
               {counterRate != null && <span className="was">{nf(rate)}</span>}
               {nf(counterRate ?? rate)} <span className="cur">{sar}</span><span className="per">/{periodLabel}</span>
+              {/* 🔴 **THE ARITHMETIC FOLDS** (owner, 2026-09-23, with the map's own footer beside it:
+                  *"details breakdonw that expand it like the details in the price footer of the map"*).
+                  ~~A permanent 9.5px caption under the figure.~~ It printed `10,000×2 +200×2` on every
+                  screen of every round, in the one band that has to stay short, and a reader who wanted
+                  the arithmetic wanted the WHOLE of it - the legs, the VAT, the total - not a formula.
+                  ⚠️ It is 48.2's device exactly: the figure stays put and the detail unfolds UNDER the
+                  band, so nothing in this row moves when it opens. */}
+              {headBreakdown && (
+                <button type="button" {...pin("ng-head-break-btn")} className="qp-brk-btn" onClick={() => setBrkOpen((o) => !o)}
+                  aria-expanded={brkOpen} aria-label={L("Price details", "تفاصيل السعر")}>
+                  <span className="material-icons-outlined">{brkOpen ? "expand_less" : "expand_more"}</span>
+                </button>
+              )}
             </div>
-            {headBreakdown && <div className="bd" dir="ltr">{headBreakdown}</div>}
           </div>
           <button type="button" className="ng-x" onClick={() => !busy && onClose()} aria-label={L("Close", "إغلاق")}><span className="material-icons-outlined">close</span></button>
           </div>
         </div>
 
-        {/* 🔴 **NO STEP RAIL** (owner, 2026-09-22: *"remove the 3 steps process bar"*).
-            ~~① Price —— ② Terms —— ③ Review, a band under the header, argued that morning as
-            «what makes three pages read as three SHEETS».~~ It cost a whole band of a sheet whose
-            body is the thing worth reading, and it was `aria-hidden` and unpressable - so it was
-            decoration that took height from the content.
-            ⚠️ **The FOOTER carries the step now, and that was his pick** when the cost was put
-            to him: «Next: Terms» / «Review & send» / «Send to the supplier». It names where the
-            press GOES rather than where the reader is, which is the half the rail used to add;
-            he took that trade explicitly rather than a heading standing in for it. */}
+        {brkOpen && headBreakdown && (
+          <div {...pin("ng-head-break")} className="qp-brk">
+            <div className="ng-inner">{totalRows()}</div>
+          </div>
+        )}
 
-        <div className="ng-body">
-          <div className="ng-inner">
+        {/* 🔴 **NO STEP RAIL** (owner, 2026-09-23: *"remove the process bar"*).
+            ~~① Price ── ② Terms ── ③ Review, a band under the header, restored from beta the day
+            before.~~ Its own design note calls it `aria-hidden` and non-interactive, so it spent a
+            whole band of a sheet whose body is the thing worth reading and gave back decoration.
+            ⚠️ **The FOOTER names the step**, which is the trade he took: «Next: Terms» /
+            «Review & send» / «Send to the supplier» say where the press GOES rather than where the
+            reader is - the half the rail was adding. */}
+
+        {/* 🔴 **A DESK HOLDING A SHEET OF PAPER** (owner, 2026-09-23: *"i want the same as beta
+            ui"*, then *"make it zoomed at 100% on open, so follow beta here too"*).
+            ~~`.ng-body` + `.ng-inner`: a 940px column of cards on a grey band.~~ What this sheet is
+            FOR is a quotation, and beta drew one: an 800px document with a letterhead, a navy table
+            head and the amount in words, lying on a desk the reader can zoom. Put side by side, that
+            is the one he chose. */}
+        <div className="qp-desk">
+          <div className="qp-deskpad">
           {/* ── ① the price ─────────────────────────────────────────────────────────────────── */}
           {page === 0 && (
-            <div {...pin("ng-sheet-price")}>
-              {showCompare && (
-                <div className="ng-pad">{compareCard()}</div>
-              )}
-
-              <div className="ng-card">
+            <div {...pin("ng-sheet-price")} className="qp-paper" style={{ zoom: String(paperZoom) }}>
+              {showCompare && compareCard()}
+              {qhead()}
                 {/* 🔴 **These fields are EX-VAT and nothing said so** (app parity, `dealPricesExVat`).
                     The bid price sheet asks the supplier outright which basis he is quoting on and
                     shows him the other figure; this screen asks nothing and silently treats every
@@ -2349,13 +2450,18 @@ function CounterFlow({
                     ⚠️ Deliberately a caption, not a second basis control: the basis is an input
                     convenience that belongs where a bid is composed, and two controls on two screens
                     is how the two drift. */}
-                <p className="ng-exvat">{L("All prices below are before VAT", "جميع الأسعار أدناه بدون ضريبة")}</p>
-                <div className="ng-thead">
-                  <span>{L("Item", "البند")}</span>
-                  <span className="c">{L("Duration", "المدة")}</span>
-                  <span className="c">{L("Count", "العدد")}</span>
-                  <span className="e">{L("Price / unit", "السعر/وحدة")}</span>
-                </div>
+                {/* ⚠️ The ex-VAT statement rides the section caption, so it is read BEFORE the
+                    typing rather than found under the table after it. */}
+                <div className="qp-sech">{L("Price quotation", "عرض السعر")} · {L("all prices before VAT", "جميع الأسعار بدون ضريبة")}</div>
+                <div className="qp-scrollx"><table className="qp-table">
+                  <thead><tr>
+                    <th>{L("Item", "البند")}</th>
+                    <th>{L("Duration", "المدة")}</th>
+                    <th className="ctr">{L("Count", "العدد")}</th>
+                    <th>{L("Price / unit", "السعر/وحدة")}</th>
+                    <th>{L("Total", "الإجمالي")}</th>
+                  </tr></thead>
+                  <tbody>
 
                 {priceRow({
                   key: "rental",
@@ -2366,14 +2472,14 @@ function CounterFlow({
                   durationSub: hasDuration && !rentalCalc.raw ? `${periods} ${L("days, Fridays out", "يوم، دون الجمعة")}` : rentalDivisorNote,
                   qty: rNU, qtyMin: 1, qtyMax: cap,
                   onQty: guardQty(rNU, (v) => { setRentalUnits(v); setMobUnitsN((u) => Math.min(u, v)); setDemobUnitsN((u) => Math.min(u, v)); }),
-                  val: editable ? rateStr : String(room.rate ?? 0), onVal: setRateStr, refVal: refRate,
+                  val: editable ? rateStr : String(room.rate ?? 0), onVal: setRateStr, refVal: refRate, line: rentalLine,
                 })}
                 {priceRow({
                   key: "mob",
                   label: L("Delivery to site", "التوصيل إلى الموقع"),
                   duration: L("trip", "رحلة"),
                   qty: mNU, qtyMin: 0, qtyMax: rNU, onQty: guardQty(mNU, setMobUnitsN),
-                  val: editable ? mobStr : String(room.mobPrice ?? 0), onVal: setMobStr, refVal: refMobPrice,
+                  val: editable ? mobStr : String(room.mobPrice ?? 0), onVal: setMobStr, refVal: refMobPrice, line: mobLine,
                   excluded: mEx, onExclude: setMobExcluded,
                   exTitle: L("Cancel delivery to site from the supplier?", "إلغاء التوصيل إلى الموقع من المورد؟"),
                 })}
@@ -2382,7 +2488,7 @@ function CounterFlow({
                   label: L("Return from site", "الإرجاع من الموقع"),
                   duration: L("trip", "رحلة"),
                   qty: dNU, qtyMin: 0, qtyMax: rNU, onQty: guardQty(dNU, setDemobUnitsN),
-                  val: editable ? demobStr : String(room.demobPrice ?? 0), onVal: setDemobStr, refVal: refDemobPrice,
+                  val: editable ? demobStr : String(room.demobPrice ?? 0), onVal: setDemobStr, refVal: refDemobPrice, line: demobLine,
                   excluded: dEx, onExclude: setDemobExcluded,
                   exTitle: L("Cancel the return leg from the supplier?", "إلغاء الإرجاع من الموقع من المورد؟"),
                 })}
@@ -2397,51 +2503,31 @@ function CounterFlow({
                     legal position — and a single multiplier at the end cannot describe that. When
                     they diverge the block keeps its per-leg totals, which are the only honest shape
                     for it. The bid card never faces this: a bid carries one count. */}
-                <div {...pin("ng-sheet-sum")} className="ng-sum">
-                  <div className="item">
-                    <span className="lbl">{room.details.equipmentLabel ?? L("Base rental", "الإيجار الأساسي")}{hasDuration ? ` · ${rentalDays} ${L("days", "يوم")}` : ""}
-                      {factorLine("rental") && <span className="fx">{factorLine("rental")}</span>}
-                    </span>
-                    <span>{nf(unitsAligned ? lines.perUnit.rental : rentalLine)}</span>
-                  </div>
-                  <div className={`item${mEx ? " off" : ""}`}>
-                    <span className="lbl">{L("Delivery to site", "التوصيل إلى الموقع")}
-                      {factorLine("mob") && <span className="fx">{factorLine("mob")}</span>}
-                    </span>
-                    <span>{mEx ? L("not priced", "غير مسعّر") : nf(unitsAligned ? lines.perUnit.mob : mobLine)}</span>
-                  </div>
-                  <div className={`item${dEx ? " off" : ""}`}>
-                    <span className="lbl">{L("Return from site", "الإرجاع من الموقع")}
-                      {factorLine("demob") && <span className="fx">{factorLine("demob")}</span>}
-                    </span>
-                    <span>{dEx ? L("not priced", "غير مسعّر") : nf(unitsAligned ? lines.perUnit.demob : demobLine)}</span>
-                  </div>
-                  <div className="rule" />
-                  <div className="line"><span>{L("Subtotal before VAT", "المجموع قبل الضريبة")}</span><span>{nf(unitsAligned ? lines.perUnit.subtotal : subtotal)}</span></div>
-                  <div className="line"><span>{L("VAT 15%", "ضريبة القيمة المضافة 15٪")}</span><span>{nf(Math.round(unitsAligned ? lines.perUnit.vat : vat))}</span></div>
-                  <div className="ng-net-box">
-                    <span className="k">{unitsAligned ? L("Net incl. VAT per unit", "الصافي شامل الضريبة للوحدة") : L("Net incl. VAT", "الصافي شامل الضريبة")}</span>
-                    <span className="v">{nf(unitsAligned ? Math.round(lines.perUnit.total) : total)}</span>
-                  </div>
-                  {/* 🔴 **THE COUNT, APPLIED ONCE, AT THE END.** Everything above it describes one
-                      machine. */}
-                  {unitsAligned && (
-                    <div className="ng-overall">
-                      <span className="k">{L("Overall total", "الإجمالي الكلي")} · {L(`${rNU} units agreed`, `تم الاتفاق على ${rNU} وحدة`)}</span>
-                      <span className="v">{nf(total)}</span>
-                    </div>
-                  )}
+                  </tbody>
+                </table></div>
+                <div {...pin("ng-sheet-sum")} className="qp-totals">
+                  {totalRows()}
                 </div>
-
-                {payTerms.length > 0 && <div style={{ padding: "0 16px 14px" }}>{payTerms.map(payCard)}</div>}
-                {editable && !rateValid && <p className="ng-err" style={{ padding: "0 16px 14px" }}>{L("Enter a rate to continue", "أدخل سعرًا للمتابعة")}</p>}
-              </div>
+                {/* The amount in words, beta's own line. On a document meant to be read back at a
+                    supplier, the figure and the words for it are what make it quotable. */}
+                <div className="qp-words"><span className="k">{L("Amount in words", "المبلغ بالحروف")}</span>{nf(total)} {L("Saudi Riyals only", "ريال سعودي فقط لا غير")}</div>
+                {payTerms.length > 0 && <div style={{ marginTop: 14 }}>{payTerms.map(payCard)}</div>}
+                {editable && !rateValid && <p className="ng-err" style={{ marginTop: 12 }}>{L("Enter a rate to continue", "أدخل سعرًا للمتابعة")}</p>}
             </div>
           )}
 
           {/* ── ② the terms ─────────────────────────────────────────────────────────────────── */}
           {page === 1 && (
-            <div {...pin("ng-sheet-terms")} className="ng-card pad">
+            <div {...pin("ng-sheet-terms")} className="qp-paper" style={{ zoom: String(paperZoom) }}>
+              {/* 🔴 **THE STAGING WALK, ON BETA'S PAPER** (owner, 2026-09-23: *"only for terms use
+                  the staging one but folded in the beta sheet style"*). beta printed the terms as rows
+                  of a document with a match badge at the end - readable, and impossible to negotiate
+                  from. What survives is this sheet's own walk: sections that count what is left, one
+                  open card at a time, the two positions and the two acts. What changes is the SURFACE
+                  under it, so the three steps are three faces of one document rather than a document,
+                  a list, and a document. */}
+              {qhead()}
+              <div className="qp-sech">{L("Operating terms", "شروط التشغيل")}</div>
               {operatingTerms.length === 0 ? (
                 <p style={{ padding: "20px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>{L("No operating terms.", "لا توجد شروط تشغيل.")}</p>
               ) : (
@@ -2499,7 +2585,8 @@ function CounterFlow({
 
           {/* ── ③ the review ────────────────────────────────────────────────────────────────── */}
           {page === 2 && (
-            <div {...pin("ng-sheet-review")} className="ng-pad" style={{ paddingBottom: 14 }}>
+            <div {...pin("ng-sheet-review")} className="qp-paper" style={{ zoom: String(paperZoom) }}>
+              {qhead()}
               <div className="ng-rcard">
                 <div className="ng-rcard-h"><span className="material-icons-outlined">receipt_long</span>{L("The price you are sending", "السعر الذي سترسله")}</div>
                 <div className="ng-rbody">
@@ -2588,6 +2675,15 @@ function CounterFlow({
               {error && <p className="ng-err">{error}</p>}
             </div>
           )}
+          </div>
+          {/* ⚠️ **The zoom is the DESK's, not the sheet's**: it scales the paper and leaves the
+              header, the footer and this rail at their own size, which is what makes it a document on
+              a table rather than a page that resizes. The percentage is a PRESS - it returns to 100,
+              so there is always one way back to the size it opened at. */}
+          <div {...pin("ng-sheet-zoom")} className="qp-zoom">
+            <button type="button" onClick={() => setPaperZoom((z) => Math.min(1.8, Math.round((z + 0.1) * 10) / 10))} disabled={paperZoom >= 1.8} aria-label={L("Zoom in", "تكبير")}>+</button>
+            <button type="button" className="pct" onClick={() => setPaperZoom(1)}>{Math.round(paperZoom * 100)}%</button>
+            <button type="button" onClick={() => setPaperZoom((z) => Math.max(0.5, Math.round((z - 0.1) * 10) / 10))} disabled={paperZoom <= 0.5} aria-label={L("Zoom out", "تصغير")}>−</button>
           </div>
         </div>
 

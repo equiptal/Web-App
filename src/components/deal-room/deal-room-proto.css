@@ -464,6 +464,8 @@
    half what this sheet had - the live header is a BAND, not a section. */
 .ng-head { flex: 0 0 auto; padding: 7px var(--ng-gutter) 6px; background: var(--surface); border-bottom: 1px solid var(--border-hair); }
 .ng-head .ng-inner { display: flex; align-items: center; gap: 14px; }
+/* Beta lets the identity and running offer use the full header band; only the sheet body is paper-capped. */
+.ng-head .ng-inner, .ng-foot .ng-inner { max-width: none; }
 /* The title block: 14px/800 truncating, a 10.5px/600 line under it. The live sheet's own. */
 .ng-htitle { min-width: 0; flex: 1; }
 .ng-htitle .t { font-size: 14px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -474,7 +476,6 @@
 .ng-hnote .material-icons-outlined { font-size: 14px; }
 /* The total: a 9.5px caption over a 16px figure, pinned to the end. */
 .ng-htotal { flex: 0 0 auto; text-align: end; }
-.ng-htotal .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
 .ng-htotal .v { font-size: 16px; font-weight: 800; color: var(--navy); }
 .ng-htotal .v .cur { font-size: 10px; font-weight: 600; color: var(--muted); }
 .ng-htotal .v .per { font-size: 10px; font-weight: 700; color: var(--muted); }
@@ -510,25 +511,100 @@
 .ng-note.danger { color: var(--danger); }
 .ng-note .material-icons-outlined { font-size: 13px; }
 
-/* ── the step rail ─────────────────────────────────────────────────────────
-   🔴 **RESTORED from `beta` (owner, 2026-09-22).** It is the one device that makes three pages
-   read as THREE SHEETS rather than as a page that keeps replacing itself: ① Price —— ② Terms ——
-   ③ Review, each badge filling as it is passed, the bar between them turning green behind it.
-   Without it the only thing naming the step was the footer's own button, which says where you are
-   GOING and never where you are.
+/* 🔴 **NO STEP RAIL.** ~~`.ng-steps` / `.ng-step` / `.ng-step-bar`, a band under the header,
+   restored from beta on 2026-09-22.~~ Withdrawn by the owner on 2026-09-23: *"remove the process
+   bar"*. It was `aria-hidden` and unpressable, so it spent a whole band of a sheet whose body is
+   the thing worth reading and gave back decoration.
+   ⚠️ **The FOOTER names the step instead** - «Next: Terms» / «Review & send» / «Send to the
+   supplier». It says where the press GOES rather than where the reader is, which is the half the
+   rail added; he took that trade knowing the cost. */
 
-   ⚠️ **Tokens direct — `--brand` for the step you are on, `--ok` for one you have finished.** beta
-   remapped `--action` and `--rentee` locally inside the sheet to reach the same two colours, and a
-   local remap of `--action` is exactly the drift `palette-drift` and RM3-AC-33 exist to stop: that
-   token is the bid map's ask and means one thing in this product.
+/* === THE QUOTATION PAPER (owner, 2026-09-23: *"i want the same as beta ui"*) ==================
+   🔴 **The body is a DESK holding a sheet of PAPER, not a column of cards.** This is beta's
+   own `.qp-*` document restored in full - letterhead, navy table head, the green price pill, the
+   amount in words - because that is what he picked when the two were put side by side.
+   ⚠️ **Tokens, not beta's aliases.** beta declared `--line`, `--paper-2`, `--success`,
+   `--rentee` and `--warning` on its own shell and painted through them. They are resolved here to
+   the real tokens (`--surface3`, `--surface`, `--ok`, `--brand`, `--warn`), so no rule depends on a
+   var that one wrapper happens to set, and a local remap of `--action` never reappears.
+   ⚠️ **`zoom`, not `transform: scale`.** Scale leaves the paper's original box in the flow,
+   so the desk would scroll a 100% area around an 80% sheet. `zoom` reflows it. */
+.qp-desk { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--surface2); }
+.qp-deskpad { min-height: 100%; display: flex; flex-direction: column; align-items: center; padding: 22px 0 46px; }
+.qp-paper { width: 800px; max-width: 100%; flex-shrink: 0; background: var(--surface); border: 1px solid var(--surface3); border-radius: var(--radius-sm); padding: 28px 30px 38px; }
+.qp-paper + .qp-paper { margin-top: 16px; }
 
-   ⚠️ It is `aria-hidden`: the footer's button already names the next step in words, and a rail
-   that reads out «one, Price, two, Terms» before every screen is three labels for one fact. */
-/* 🔴 **`.ng-steps` and `.ng-step` are DELETED** (owner, 2026-09-22: *"remove the 3 steps
-   process bar"*). ~~The numbered rail under the header: a badge per step, the label beside it and
-   a growing rule between.~~ Deleted rather than left inert, which is this repo's rule for a
-   withdrawn motif - an unused block is one edit away from coming back by accident. The FOOTER's
-   named press carries the step now. */
+/* The zoom rail, in the desk's side margin. It opens at 100% (owner: *"make it zoomed at 100% on
+   open, so follow beta here too"*) - beta itself opened at 85%, which read as a sheet already
+   pushed away from the reader. */
+.qp-zoom { position: absolute; top: 50%; inset-inline-start: 20px; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 6; }
+.qp-zoom button { width: 52px; height: 52px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--navy); font: inherit; font-size: 26px; font-weight: 800; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.qp-zoom button:disabled { color: var(--border-strong); cursor: default; }
+.qp-zoom .pct { width: auto; height: auto; border-radius: var(--radius-sm); padding: 6px 9px; font-size: 11px; font-weight: 700; color: var(--muted-dark); background: var(--surface); border: 1px solid var(--surface3); cursor: pointer; }
+
+/* The letterhead. The room's own short code IS the quotation number: nothing here is fabricated. */
+.qp-qhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--surface3); padding-bottom: 14px; margin-bottom: 16px; }
+.qp-qco { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.qp-qlogo { width: 46px; height: 46px; border-radius: var(--radius-md); background: var(--navy-deep); color: var(--surface); font-weight: 800; font-size: 18px; display: grid; place-items: center; flex: 0 0 auto; }
+.qp-qcoinfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.qp-qcoinfo b { font-size: 17px; font-weight: 800; color: var(--navy); }
+.qp-qcoinfo .ln { font-size: 11px; font-weight: 600; color: var(--muted); }
+.qp-qno { text-align: end; flex: 0 0 auto; }
+.qp-qno .lbl { font-size: 10px; font-weight: 800; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
+.qp-qno .num { font-size: 15px; font-weight: 800; color: var(--brand-deep); direction: ltr; }
+.qp-qno .sub { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+.qp-sech { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 4px 0 8px; }
+.qp-scrollx { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.qp-table { width: 100%; border-collapse: collapse; }
+.qp-table th { background: var(--navy); color: var(--surface); font-size: 11px; font-weight: 800; padding: 9px 10px; text-align: start; }
+.qp-table th:last-child, .qp-table td:last-child { text-align: end; }
+.qp-table td { border-bottom: 1px solid var(--surface3); padding: 11px 10px; font-size: 12.5px; vertical-align: middle; }
+.qp-table .lbl { font-weight: 800; color: var(--navy); }
+.qp-table .sub { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }
+.qp-table .tot { font-weight: 800; color: var(--navy); direction: ltr; }
+.qp-table td.mut { color: var(--muted); }
+.qp-table td.ctr { text-align: center; }
+/* An excluded leg keeps its ROW and loses its figures - struck, not deleted, so the reader can see
+   what was taken out and put it back. */
+.qp-table tr.ex td { background: var(--surface2); color: var(--muted); }
+.qp-table tr.ex .lbl { text-decoration: line-through; text-decoration-color: var(--danger); text-decoration-thickness: 2px; }
+.qp-itemcell { display: flex; align-items: flex-start; gap: 9px; }
+.qp-legx { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--danger-soft); color: var(--danger); font-size: 12px; font-weight: 800; cursor: pointer; display: grid; place-items: center; margin-top: 1px; }
+.qp-legx.on { background: var(--ok-soft); color: var(--ok); }
+.qp-qty { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+/* The price editor: beta's green pill, with the pencil inside it. */
+.qp-pricebox { display: inline-flex; align-items: center; gap: 3px; background: var(--ok-soft); border: 1.5px solid color-mix(in srgb, var(--ok) 50%, transparent); border-radius: var(--radius-sm); padding: 3px 9px; }
+.qp-pricebox .ic { font-size: 14px; color: var(--ok); }
+.qp-price-in { width: 62px; border: 0; background: transparent; padding: 2px 0; font: inherit; font-size: 14px; font-weight: 800; text-align: end; color: var(--ok); outline: 0; }
+/* ⚠️ Edited turns the whole pill BRAND, which is the one signal saying «you have moved this».
+   beta recoloured only the reference line under it, and a reader scanning figures never reads it. */
+.qp-pricebox.edited { background: var(--brand-soft); border-color: color-mix(in srgb, var(--brand) 50%, transparent); }
+.qp-pricebox.edited .ic, .qp-pricebox.edited .qp-price-in { color: var(--brand-deep); }
+.qp-ref { font-size: 10px; font-weight: 700; color: var(--muted); margin-top: 4px; }
+.qp-ref.changed { color: var(--warn-deep); }
+
+.qp-totals { margin-top: 16px; border-top: 1.5px solid var(--border); padding-top: 10px; }
+.qp-trow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 13px; }
+.qp-trow .l { color: var(--navy-mid); font-weight: 600; }
+.qp-trow .v { font-weight: 700; direction: ltr; }
+.qp-trow .fx { margin-inline-start: 8px; font-size: 10.5px; font-weight: 600; color: var(--muted-light); }
+.qp-trow.off .l, .qp-trow.off .v { color: var(--muted-light); }
+.qp-trow.net { border-top: 1px solid var(--surface3); margin-top: 5px; padding-top: 9px; font-size: 15px; }
+.qp-trow.net .l { font-weight: 800; color: var(--navy); }
+.qp-trow.net .v { color: var(--ok); font-weight: 800; }
+.qp-trow.grand { font-size: 14px; }
+.qp-trow.grand .l, .qp-trow.grand .v { font-weight: 800; color: var(--navy); }
+.qp-words { margin-top: 10px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--navy-mid); }
+.qp-words .k { color: var(--muted); font-weight: 800; margin-inline-end: 6px; }
+
+/* The header's own breakdown, the map price footer's device (48.2). The figure stays put and the
+   arithmetic unfolds UNDER the whole header band, so nothing in the row moves when it opens. */
+.qp-brk-btn { display: inline-flex; align-items: center; gap: 3px; border: 0; background: none; padding: 0; margin-inline-start: 4px; font: inherit; font-size: 11px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.qp-brk-btn .material-icons-outlined { font-size: 16px; }
+.qp-brk { flex: 0 0 auto; padding: 8px var(--ng-gutter) 10px; background: var(--surface2); border-bottom: 1px solid var(--border-hair); }
+.qp-brk .ng-inner { display: flex; flex-direction: column; gap: 2px; }
 
 /* ── body ───────────────────────────────────────────────────────────────────────────────────── */
 /* ⚠️ **The gutter is on the BAND, not on the paper column** — as it is on the head, the rail and
@@ -538,37 +614,18 @@
    1020 against 940 before, 940 across all four after. */
 /* The DESK the paper sits on (owner, 2026-09-23). The live sheet paints it `--border-mid`; this is
    the house step nearest it, and the paper's own border is what draws the card's edge on top. */
-.ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-inline: var(--ng-gutter); background: var(--surface2); }
-.ng-body .ng-inner { padding: 14px 0 20px; }
-.ng-pad { padding: 0; }
 /* The white card is a CARD here, not the phone's full-bleed band: on a wide screen a band that
    reaches both edges stops reading as one object among others. */
-.ng-card { background: var(--surface); border-radius: 10px; overflow: hidden; }
-.ng-card + .ng-card, .ng-cmp + .ng-card { margin-top: 12px; }
-.ng-card.pad { padding: 14px 16px; }
 
 /* ── the price table ────────────────────────────────────────────────────────────────────────────
    Four columns on the prototype's own weights, the head band a shade under the paper. */
-.ng-thead, .ng-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 4px; padding: 8px 16px; }
-.ng-thead { background: var(--surface-alt); border-bottom: 1px solid var(--border-hair); }
-.ng-thead span { font-size: 10px; font-weight: 700; color: var(--muted-light); }
-.ng-thead span.c { text-align: center; }
-.ng-thead span.e { text-align: end; }
-.ng-row { position: relative; align-items: center; border-bottom: 1px solid var(--surface2); }
-.ng-row.off { opacity: .45; }
-.ng-row .lbl { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 🔴 RED, not the muted grey it inherits (owner, on the app, 2026-09-21: "a red line on them like
    they are omitted"). A grey rule over already-faded text read as the row being disabled rather than
    dropped. ⚠️ A leg the REQUEST assigns to the renter arrives excluded too, and reads identically —
    which is the wanted reading: it is equally not in the supplier's offer. */
-.ng-row.off .lbl { text-decoration: line-through; text-decoration-color: var(--danger); text-decoration-thickness: 2px; }
-.ng-row .dur { text-align: center; font-size: 12px; font-weight: 600; color: var(--muted-dark); }
-.ng-row .dur .sub { display: block; font-size: 9.5px; font-weight: 600; color: var(--muted-light); }
 /* The ✕ that strikes a transport leg out, and the + that restores it. It sits on the row's START
    edge — over the item's own name — because the END edge is the price input, and a 16px circle on top
    of a field the renter is typing in is a control that eats the first tap meant for the number. */
-.ng-rm { position: absolute; top: 4px; inset-inline-start: 12px; display: grid; place-items: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; font-size: 9px; line-height: 1; cursor: pointer; background: var(--danger-soft); color: var(--danger); }
-.ng-rm.on { background: var(--ok-soft); color: var(--ok); }
 /* count stepper */
 .ng-qty { display: flex; align-items: center; justify-content: center; gap: 3px; }
 .ng-qty b { min-width: 13px; text-align: center; font-size: 12px; font-weight: 700; color: var(--navy-deep); }
@@ -576,19 +633,9 @@
 .ng-qty button:disabled { color: var(--border-strong); cursor: default; }
 /* 🔴 The input's own colours ARE the state: green while the figure still matches the supplier's,
    amber the moment it is edited. The reference line under it turns with them. */
-.ng-price input { width: 100%; max-width: 150px; margin-inline-start: auto; display: block; border: 1.5px solid var(--ok); background: color-mix(in srgb, var(--ok) 6%, var(--surface)); border-radius: 7px; padding: 4px 6px; font-size: 12px; font-weight: 700; color: var(--navy-deep); text-align: end; font-family: inherit; }
-.ng-price.edited input { border-color: var(--brand); background: var(--brand-soft); }
-.ng-price .ref { margin-top: 1px; font-size: 9.5px; text-align: end; color: var(--muted-light); }
-.ng-price.edited .ref { color: var(--warn-deep); font-weight: 700; }
-.ng-price b { display: block; text-align: end; font-size: 12.5px; font-weight: 800; color: var(--navy-deep); }
-.ng-row .out { text-align: end; font-size: 11px; font-weight: 700; color: var(--muted-light); }
 
 /* ── the summary band + the net box ───────────────────────────────────────────────────────────── */
 /* Stated ABOVE the table, so it is read before the typing rather than under it, after. */
-.ng-exvat { margin: 0; padding: 10px 16px 0; font-size: 11.5px; font-weight: 600; color: var(--muted-light); }
-.ng-sum { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; background: var(--surface2); }
-.ng-sum .item, .ng-sum .line { display: flex; justify-content: space-between; gap: 10px; }
-.ng-sum .item { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
 /* 🔴 **The factors sit BESIDE the name, not under it** (owner, 2026-09-22: *"for price put the
    formula beside the title not below it"*). ~~`flex-direction: column`, so «2,000 × 32 × 1» was a
    second line under «Crawler Excavator · 32 days».~~ Three rows each two lines tall made the
@@ -596,21 +643,9 @@
    fact of its own.
    ⚠️ `wrap`, so a long machine name and a three-factor formula drop rather than overflow the
    row - which would push the figure at the far end off its own column. */
-.ng-sum .item .lbl { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
 /* The factors behind the figure, as the bid card prints them: «2,000 × 12». A row whose own numbers
    do not multiply is the one thing a customer checks. */
-.ng-sum .item .fx { font-size: 10.5px; font-weight: 600; color: var(--muted-light); }
 /* 🔴 THE COUNT, APPLIED ONCE, AT THE END. Everything above it describes one machine. */
-.ng-overall { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; }
-.ng-overall .k { font-size: 12.5px; font-weight: 800; color: var(--navy-deep); }
-.ng-overall .v { font-size: 15px; font-weight: 800; color: var(--navy); }
-.ng-sum .item.off { opacity: .45; }
-.ng-sum .item span:last-child { color: var(--muted); }
-.ng-sum .rule { border-top: 1px solid var(--border-hair); margin: 2px 0; }
-.ng-sum .line { font-size: 12px; font-weight: 600; color: var(--muted); }
-.ng-net-box { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--navy); border-radius: 10px; }
-.ng-net-box .k { font-size: 13px; font-weight: 700; color: var(--navy-deep); }
-.ng-net-box .v { font-size: 18px; font-weight: 800; color: var(--navy); }
 
 /* ── a term, in its three states ─────────────────────────────────────────────────────────────────
    Settled (a quiet strip), active (the card with the two acts), and waiting (dashed, dimmed). One
@@ -669,7 +704,7 @@
 .ng-t .acts button:disabled { opacity: .45; cursor: default; }
 /* The name has the row to itself now, so it WRAPS rather than squeezing the two values that
    used to share it (see `.side` below). */
-.ng-t.now .h { max-width: 820px; margin-bottom: 4px; }
+.ng-t.now .h { max-width: 820px; margin-bottom: 4px; text-align: center; }
 .ng-t.now .h .k { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
 /* 🔴 **THE TWO POSITIONS TAKE THEIR OWN CENTRED ROW** (owner, 2026-09-22: *"show the terms
    values clear and bigger"*, then 2026-09-23 on «Your choice: not set · Supplier: 24 hours»:
@@ -711,7 +746,12 @@
 /* ⚠️ No rule above them any more: the menu now REPLACES the two acts rather than standing
    under them, so there is nothing to divide it from. Metrics are the app's `NegOptionPills`:
    12/7 padding, a full round, 13px/700. */
-.ng-t .opts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+/* 🔴 **The name and the values sit in the MIDDLE of the card** (owner, 2026-09-23: *"i want
+   the term name to appear at middle of the card too not on the left ... even the values of the term
+   when user click another show them all centered"*). The two positions and the two acts were
+   already centred, so a start-aligned name and a start-aligned picker left the card reading as two
+   columns that disagree about where its axis is. */
+.ng-t .opts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 2px; }
 .ng-t .opts button { border: 1px solid var(--border-hair); border-radius: 999px; padding: 7px 12px; background: var(--surface); font-family: inherit; font-size: 13px; font-weight: 700; color: var(--muted-dark); text-align: center; cursor: pointer; }
 .ng-t .opts button:hover { background: var(--surface2); }
 /* The chosen chip carries the same green the Accept button does - one colour for the position
@@ -885,10 +925,13 @@
    glyph - it is the one control on the bar a reader would otherwise have to guess at. */
 .ng-foot-sp { flex: 1 1 auto; }
 .ng-foot-main { display: flex; align-items: center; gap: 10px; }
+/* 🔴 **ONE rule for the log chip.** ~~A second `.ng-log`, the icon-only 44px square this footer
+   carried before the chip was labelled, left standing after it.~~ It came LATER in the file, so it won:
+   the labelled pill was forced into a 44×44 grid cell and the word fell under the glyph and out of
+   the box (owner, 2026-09-23, with the screenshot: *"fix the icons of the footer"*). */
 .ng-log { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); padding: 8px 12px; font: inherit; font-size: 12.5px; font-weight: 800; color: var(--navy-mid); cursor: pointer; }
 .ng-log .material-icons-outlined { font-size: 16px; }
 .ng-foot .ng-inner { display: flex; align-items: center; gap: 8px; }
-.ng-log { flex: 0 0 auto; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface); color: var(--muted-dark); cursor: pointer; }
 .ng-back { flex: 0 0 auto; min-width: 110px; height: 44px; border: 1px solid var(--border-hair); border-radius: 12px; background: var(--surface); color: var(--navy); font-family: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
 .ng-accept { flex: 0 0 auto; height: 44px; border: 0; border-radius: 12px; padding: 0 18px; background: var(--ok); color: var(--surface); font-family: inherit; font-size: 13.5px; font-weight: 800; white-space: nowrap; cursor: pointer; }
 .ng-accept:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
@@ -902,7 +945,6 @@
 .ng-primary.blocked { background: var(--disabled-bg); color: var(--disabled-fg); }
 .ng-foot-err { margin: 8px 0 0; }
 .ng-log:hover { background: var(--surface2); }
-.ng-log .material-icons-outlined { font-size: 18px; }
 /* The chevrons are DIRECTION, so they mirror with the script. */
 /* `.ng-chev` is gone with the `‹ step ›` switcher; the footer's controls are all words now, and a
    word needs no mirror rule. */

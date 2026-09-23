@@ -55,10 +55,16 @@ describe("the header", () => {
      Both figures were right and they were different quantities, so the room said «50/day» and the
      sheet said «58» over the same deal and read as a contradiction. */
   it("states the rate with its period, the same number the room's price bar prints", () => {
-    const head = FLOW.slice(FLOW.indexOf('className="ng-head"'), FLOW.indexOf('className="ng-body"'));
+    // The band now ends at the DESK, which took `.ng-body`'s place.
+    const head = FLOW.slice(FLOW.indexOf('className="ng-head"'), FLOW.indexOf('className="qp-desk"'));
     expect(head).toContain("{nf(rate)}");
     expect(head).toContain("{periodLabel}");
-    expect(head).not.toContain("nf(total)");
+    /* ⚠️ **The net total is still not the FIGURE**, but it is reachable from it: the breakdown
+       panel prints the same rows the paper does (`totalRows`), and it is closed until asked for. So
+       the figure in the band is the rate, as the app has it, and nothing in the band contradicts it. */
+    const figure = head.slice(0, head.indexOf("qp-brk-btn"));
+    expect(figure).not.toContain("nf(total)");
+    expect(head).toContain("{totalRows()}");
   });
 
   /* 🔴 **The request's short code is RESTORED, under the name.** The redesign dropped the block that
@@ -161,13 +167,17 @@ describe("the sheet itself", () => {
      two readings he meant: *"keep the desk, whiten the paper"*). ~~One white surface edge to edge.~~
      I read «all in white» as the whole screen, and it removed the framing he was pointing at. */
   it("keeps the grey desk under a white paper", () => {
+    /* 🔴 **The desk is `.qp-desk` and the white is a SHEET OF PAPER** (owner, 2026-09-23:
+       *"i want the same as beta ui"*). ~~`.ng-body` holding `.ng-card`s.~~ Same two tones, different
+       object: one 800px document per step instead of a column of cards, which is what beta drew and
+       what he picked with the two side by side. */
     expect(CSS).toMatch(/\.ng-shell \{[\s\S]*?background: var\(--surface2\);/);
-    expect(CSS).toMatch(/\.ng-body \{[^}]*background: var\(--surface2\); \}/);
-    // The cards on it are the white, which is what «all in white» was about.
-    expect(CSS).toMatch(/\.ng-card \{[^}]*background: var\(--surface\)/);
+    expect(CSS).toMatch(/\.qp-desk \{[^}]*background: var\(--surface2\); \}/);
+    expect(CSS).toMatch(/\.qp-paper \{[^}]*background: var\(--surface\)/);
+    expect(CSS).toMatch(/\.qp-paper \{[^}]*width: 800px/);
   });
 
-  it("holds the cards to a paper column, centred on the desk", () => {
+  it("holds the bands to a paper column, centred on the desk", () => {
     expect(CSS).toMatch(/--ng-paper: 940px;/);
     expect(CSS).toMatch(/\.ng-inner \{ width: 100%; max-width: var\(--ng-paper\); margin-inline: auto; \}/);
     // The gutter SURVIVES the cap: it is what keeps the paper off the window's edge below 940.
@@ -181,11 +191,13 @@ describe("the sheet itself", () => {
        here, so that one column measured 940 of CONTENT while the rest measured 940 including their
        padding, and the cards stood 40px inside the header's own verticals. Measured at a 1920
        window: 1020 against 940 before, 940 across all four after. */
-    expect(CSS).toMatch(/\.ng-body \{[^}]*padding-inline: var\(--ng-gutter\)/);
-    expect(CSS).toMatch(/\.ng-body \.ng-inner \{ padding: 14px 0 20px; \}/);
-    /* Head, body and foot: THREE bands on the one column, so nothing stands off the paper.
-       ⚠️ It was FOUR until the step rail went (owner, 2026-09-22). The count is the point of
-       the case - a band added without its `.ng-inner` is one that ignores the paper. */
+    /* 🔴 ~~`.ng-body` carried the gutter and its own `.ng-inner` padding.~~ Gone with the card
+       column: the paper centres itself on the desk (`.qp-deskpad`) and carries its own 28/30/38, so a
+       band gutter under it would only push the sheet off centre. */
+    /* Head, breakdown and foot: THREE bands on the one column, so nothing stands off the paper.
+       ⚠️ It was four with the step rail and four again with the body; it is three now that the
+       body is a desk and the breakdown band has taken its place on the column. The count is the
+       point of the case - a band added without its `.ng-inner` is one that ignores the paper. */
     expect(FLOW.match(/className="ng-inner"/g)?.length).toBe(3);
   });
 
@@ -206,6 +218,9 @@ describe("the sheet itself", () => {
      ⚠️ **The footer carries the step instead, and that was his pick** when the cost was put to
      him: the button names where the press GOES, and nothing names where the reader IS. */
   it("draws no step rail, in the markup or the stylesheet", () => {
+    /* 🔴 **Withdrawn again on 2026-09-23**: *"remove the process bar"*. It had been restored
+       from beta the day before, and the argument for it - that it makes three pages read as three
+       sheets - is answered by the paper instead: each step IS a sheet now. */
     expect(FLOW).not.toMatch(/className="ng-steps"/);
     expect(CSS_CODE).not.toMatch(/^\.ng-steps/m);
     expect(CSS_CODE).not.toMatch(/^\.ng-step[ .{]/m);
@@ -241,7 +256,10 @@ describe("the sheet itself", () => {
     expect(CSS).toMatch(/\.ng-t \.acts \{[^}]*margin-inline: auto/);
     expect(CSS).toMatch(/\.ng-t \.opts \{[^}]*flex-wrap: wrap/);
     expect(CSS_CODE).not.toMatch(/\.ng-t \.opts \{[^}]*flex-direction: column/);
-    expect(CSS).toMatch(/\.ng-price input \{[^}]*max-width: 150px/);
+    /* 🔴 ~~`.ng-price input`, 150px wide with its own green border.~~ The price editor is the
+       paper's pill now (`.qp-pricebox`), 62px of input inside a bordered chip, because the figure sits
+       in a table cell rather than in a grid column that could give it 150. */
+    expect(CSS).toMatch(/\.qp-price-in \{[^}]*width: 62px/);
   });
 
   /* 🔴 **The options stay BEHIND the press** (owner, 2026-09-23, correcting me: *"now the
@@ -280,12 +298,14 @@ describe("the price sheet", () => {
       expect(at, `${decl} moved back inside the render body: the price box loses focus per keystroke`).toBeLessThan(body);
     }
     // And the body must not re-declare one under any name that renders the money input.
-    expect(SRC.slice(body)).not.toMatch(/const \w+ = \([^)]*\) => \(?\s*<div className=\{?`?ng-price/);
+    expect(SRC.slice(body)).not.toMatch(/const \w+ = \([^)]*\) => \(?\s*<(?:div|span) className=\{?`?qp-pricebox/);
   });
 
   it("paints an edited price differently from one that still matches", () => {
-    expect(CSS).toMatch(/\.ng-price input \{[^}]*border: 1\.5px solid var\(--ok\)/);
-    expect(CSS).toMatch(/\.ng-price\.edited input \{[^}]*border-color: var\(--brand\)/);
+    /* The rule survives the move onto the paper: green while it matches the supplier, brand the
+       moment it is edited. ~~`.ng-price input` / `.ng-price.edited input`.~~ */
+    expect(CSS).toMatch(/\.qp-pricebox \{[^}]*border: 1\.5px solid color-mix\(in srgb, var\(--ok\)/);
+    expect(CSS).toMatch(/\.qp-pricebox\.edited \{[^}]*background: var\(--brand-soft\)/);
     /* ⚠️ The RULE is unchanged and the EXPRESSION moved: `changedFrom` carries the null test
        itself now, so a leg the supplier never priced still reads as unedited. One comparator, at
        module scope with the cell it serves. */
@@ -493,5 +513,98 @@ describe("what the rebuild did NOT change", () => {
   it("keeps the negotiation log on the footer", () => {
     expect(FLOW).toContain('className="ng-log"');
     expect(FLOW).toContain("qp-log-tabs");
+  });
+});
+
+describe("the paper", () => {
+  /**
+   * 🔴 **beta's document, restored whole** (owner, 2026-09-23: *"i want the same as beta ui"*,
+   * and, on the zoom, *"make it zoomed at 100% on open, so follow beta here too"*).
+   */
+  it("gives every step a letterhead, and files it under the room's own code", () => {
+    expect(FLOW).toContain('className="qp-qhead"');
+    expect(FLOW).toContain("{room.shortCode ?? ");
+    // Three papers, three letterheads: the price, the terms and the review are one document.
+    expect(FLOW.match(/\{qhead\(\)\}/g)?.length).toBe(3);
+    expect(FLOW.match(/className="qp-paper"/g)?.length).toBe(3);
+  });
+
+  it("opens at 100% and can always be put back there", () => {
+    expect(FLOW).toContain("const [paperZoom, setPaperZoom] = useState(1);");
+    // The percentage is itself the press back to 1, so there is one way home from any zoom.
+    expect(FLOW).toContain("onClick={() => setPaperZoom(1)}");
+    expect(FLOW).toContain('style={{ zoom: String(paperZoom) }}');
+  });
+
+  it("prints the table head on navy and the price in a green pill", () => {
+    expect(CSS).toMatch(/\.qp-table th \{[^}]*background: var\(--navy\)/);
+    expect(CSS).toMatch(/\.qp-pricebox \{[^}]*background: var\(--ok-soft\)/);
+    // Edited turns the pill brand, which beta left to the reference line alone.
+    expect(CSS).toMatch(/\.qp-pricebox\.edited \{[^}]*var\(--brand-soft\)/);
+  });
+
+  it("states the amount in words, as a quotation has to", () => {
+    expect(FLOW).toContain('className="qp-words"');
+    expect(FLOW).toContain('L("Amount in words"');
+  });
+
+  /* ⚠️ beta painted through `--line`, `--paper-2`, `--success`, `--rentee` and `--warning`,
+     declared on its own shell. A local remap of `--action` is the drift RM3-AC-33 exists to stop, so
+     the paper is written on the real tokens and nothing in the file depends on a wrapper's vars. */
+  it("paints the paper with the product's tokens, not beta's local aliases", () => {
+    const paper = CSS.slice(CSS.indexOf(".qp-desk {"), CSS.indexOf(".qp-words .k"));
+    expect(paper).not.toMatch(/var\(--rentee\)/);
+    expect(paper).not.toMatch(/var\(--paper-2\)/);
+    expect(paper).not.toMatch(/var\(--success[)-]/);
+  });
+});
+
+describe("the header's breakdown", () => {
+  /**
+   * 🔴 **The arithmetic FOLDS** (owner, 2026-09-23: *"header show the price and the counters
+   * ... with details breakdonw that expand it like the details in the price footer of the map"*).
+   * ~~A permanent 9.5px caption printing `10,000x2 +200x2` under the figure.~~ It was in the one band
+   * that has to stay short, on every screen of every round, and it gave a formula where a reader
+   * wanting the arithmetic wants the whole of it.
+   */
+  it("hides the arithmetic behind a chevron, the map footer's own device", () => {
+    expect(FLOW).toContain("const [brkOpen, setBrkOpen] = useState(false);");
+    expect(FLOW).toContain('className="qp-brk-btn"');
+    expect(FLOW).toContain("aria-expanded={brkOpen}");
+    // ~~`<div className="bd">`, drawn whenever there was a breakdown at all.~~
+    expect(FLOW).not.toContain('className="bd"');
+  });
+
+  it("prints the SAME rows the paper prints, so the two cannot disagree", () => {
+    expect(FLOW.match(/\{totalRows\(\)\}/g)?.length).toBe(2);
+    const panel = FLOW.slice(FLOW.indexOf('className="qp-brk"'), FLOW.indexOf('className="qp-desk"'));
+    expect(panel).toContain("{totalRows()}");
+  });
+});
+
+describe("the term card reads down one axis", () => {
+  /**
+   * 🔴 **The name and the values are CENTRED** (owner, 2026-09-23: *"i want the term name to
+   * appear at middle of the card too not on the left ... even the values of the term when user click
+   * another show them all centered"*). The two positions and the two acts were already centred, so a
+   * start-aligned name over a start-aligned picker left the card disagreeing with itself about where
+   * its axis is.
+   */
+  it("centres the name, the positions, the acts and the options", () => {
+    expect(CSS).toMatch(/\.ng-t\.now \.h \{[^}]*text-align: center/);
+    expect(CSS).toMatch(/\.ng-t\.now \.side \{[^}]*text-align: center/);
+    expect(CSS).toMatch(/\.ng-t \.acts \{[^}]*margin-inline: auto/);
+    expect(CSS).toMatch(/\.ng-t \.opts \{[^}]*justify-content: center/);
+  });
+
+  it("keeps the staging walk, on the paper", () => {
+    /* ⚠️ *"only for terms use the staging one but folded in the beta sheet style"*. beta
+       printed terms as document rows with a match badge - readable, impossible to negotiate from. The
+       walk survives; the surface under it is the paper. */
+    const terms = FLOW.slice(FLOW.indexOf('pin("ng-sheet-terms")'), FLOW.indexOf('pin("ng-sheet-review")'));
+    expect(terms).toContain('className="qp-paper"');
+    expect(terms).toContain("{qhead()}");
+    expect(terms).toContain("activeCardIn(openPending)");
+    expect(terms).toContain("activeCardIn(openConflicts)");
   });
 });

@@ -7,6 +7,64 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-23 - The negotiation sheet becomes beta's QUOTATION PAPER: a letterhead, a navy table and the amount in words on a zoomable desk, with staging's terms walk folded onto it, no step rail, and the header's arithmetic behind a chevron.**
+  Owner, after a side-by-side of the two deployed sheets: *"i want the same as beta ui, only for terms
+  use the staging one but folded in the beta sheet style"*, *"remove the process bar"*, *"header show
+  the price and the counters ... with details breakdonw that expand it like the details in the price
+  footer of the map"*, *"i want the term name to appear at middle of the card too not on the left ...
+  even the values of the term when user click another show them all centered"*, and *"make it zoomed
+  at 100% on open, so follow beta here too"*.
+  🔴 **The body is a DESK holding PAPER, not a column of cards.** ~~`.ng-body` + `.ng-inner`, a
+  940px column of white cards on grey.~~ What this sheet is FOR is a quotation, and beta drew one: an
+  800px document per step with a letterhead (`qhead()`), a navy table head, the green price pill and
+  the amount in words, lying on a grey desk with a zoom rail. Asked to choose between the two he
+  picked that one whole, so it is restored whole - and each of the three steps is now a sheet of the
+  same document rather than a document, a list and a document.
+  ⚠️ **Tokens, not beta's aliases.** beta declared `--line`, `--paper-2`, `--success`,
+  `--rentee` and `--warning` on its own shell and painted through them. Every rule here is written on
+  the real tokens instead, because a local remap of `--action` is exactly the drift RM3-AC-33 and
+  `palette-drift` exist to stop. A case pins that none of the three aliases came back.
+  ⚠️ **The room's short code IS the quotation number.** There is no quotation id in the deal
+  room payload and none is invented. The header still leaves the code out of its sub-line (note 7 of
+  2026-09-22); on a letterhead it is the thing a reader looks for, beside the name it belongs to.
+  ⚠️ **The Arabic date carries Latin digits** (`ar-u-ca-gregory-nu-latn`): beta printed
+  Arabic-Indic, and a Latin quotation number beside an Arabic-Indic date is two systems on one line.
+  🔴 **NO STEP RAIL, again.** ~~① Price ── ② Terms ── ③ Review, restored from beta on
+  2026-09-22 as *"the one device that makes three pages read as three SHEETS"*.~~ Its own design note
+  admits it is `aria-hidden` and unpressable, so it spent a band of the sheet on decoration - and the
+  argument for it is answered by the paper, because each step now IS a sheet. The footer keeps naming
+  where the press goes.
+  🔴 **The header's arithmetic FOLDS.** ~~A permanent 9.5px caption printing `10,000x2
+  +200x2` under the figure.~~ It sat in the one band that has to stay short, on every screen of every
+  round, and it gave a formula to a reader who wanted the whole sum. It is 48.2's device now: a
+  chevron on the figure, and a panel under the WHOLE header so nothing in the row moves when it opens.
+  ⚠️ **One `totalRows()` feeds both** the panel and the paper, so the header and the document
+  can never print different totals. A case counts the two call sites.
+  🔴 **The terms step keeps staging's walk on beta's paper** (*"only for terms use the staging
+  one"*). beta printed terms as document rows with a match badge: readable, and impossible to
+  negotiate from. The sections, the one-open-card rule, the two positions and the two acts survive
+  unchanged; only the surface under them is new.
+  **The term card reads down ONE axis**: the name is centred to join the positions, the acts and the
+  options, which were already centred. A start-aligned name over a start-aligned picker left the card
+  disagreeing with itself about where its middle was.
+  ⚠️ **The caret fix is kept.** `PriceCell` and `Qty` stay at module scope: beta's sheet
+  predates the 2026-09-22 hoist, and a straight revert would have brought back *"i cant write into
+  price box it takes me out after each character"*. `PriceCell` now renders the pill, still at module
+  scope, and a case still pins the position rather than the name.
+  ⚠️ **Dead stylesheet deleted, not left behind**: `.ng-thead`, `.ng-row`, `.ng-rm`,
+  `.ng-price`, `.ng-sum`, `.ng-net-box`, `.ng-overall`, `.ng-exvat`, `.ng-pad`, `.ng-card`, `.ng-body`
+  and the rail's own rules went with the markup that used them.
+  Files: `src/components/deal-room/DealRoom.tsx`, `src/components/deal-room/deal-room-proto.css`,
+  `src/lib/uiPins.ts`, `docs/ui-pins.md`, `docs/ui-surface-map.md`,
+  `tests/unit/negotiation-sheet.test.ts`. New pins: 55.9 the breakdown chevron, 55.10 the breakdown
+  panel, 55.11 the zoom rail.
+  ⚠️ Five cases moved to the new rulings rather than being weakened: the rail case now
+  asserts its ABSENCE, the desk case reads `.qp-desk` / `.qp-paper`, the band count is 3, and the two
+  price-skin cases read the pill. 53 pass in that file, 206 across the deal-room suites.
+  ⚠️ Not changed, and worth knowing: the FOOTER is staging's, already reshaped to the live
+  one on 2026-09-23, so its primary stays navy where beta's is orange. Say so if the orange was part
+  of what you picked.
+
 - **2026-09-23 - The term card is read off the app BEHAVIOUR FIRST: the two positions get their own line, the panel carries the colour, the menu replaces the acts, and every settled row can be re-opened.**
   Owner, on a card reading «Fuel Responsibility  Your choice: not set · Supplier: 24 hours»: *"even
   these make it middle and more visible + add borders to the buttons and make the red or the gree on
