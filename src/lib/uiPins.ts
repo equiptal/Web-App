@@ -259,6 +259,9 @@ export const PIN_REGISTRY = {
   "ng-sheet-terms": { n: "55.5", label: "Negotiation sheet \u2014 \u2461 the terms step", file: "src/components/deal-room/DealRoom.tsx" },
   "ng-term-card": { n: "55.6", label: "Negotiation sheet \u2014 the open term card", file: "src/components/deal-room/DealRoom.tsx" },
   "ng-sheet-review": { n: "55.7", label: "Negotiation sheet \u2014 \u2462 review & send", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-head-break-btn": { n: "55.9", label: "Negotiation sheet — the header figure's breakdown chevron", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-head-break": { n: "55.10", label: "Negotiation sheet — the header breakdown panel", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-zoom": { n: "55.11", label: "Negotiation sheet — the desk's zoom rail", file: "src/components/deal-room/DealRoom.tsx" },
   "ng-sheet-foot": { n: "55.8", label: "Negotiation sheet \u2014 footer: log, quotation, the acts", file: "src/components/deal-room/DealRoom.tsx" },
   "chat-card": { n: "56", label: "Chat card", file: "src/components/deal-room/ChatCard.tsx" },
   /* `ChatDock`'s root is a fragment; the DRAWER is the surface, and its four parts are what a note
