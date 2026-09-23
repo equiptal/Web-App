@@ -2388,7 +2388,10 @@ function CounterFlow({
               ⚠️ **Before → after rides the same block** (note 8): the supplier's standing rate
               struck through, his own after it, and only once `changedFrom` says something moved. */}
           <div className="ng-htotal">
-            <div className="k">{L("Your offer", "إجمالي عرضك")}</div>
+            {/* 🔴 ~~«Your offer», a 9.5px caption over the figure.~~ Removed on the owner's word
+                (2026-09-23: *"remove this word from header"*), and it is the same removal the app made
+                to its own «Total» caption: the only figure in a band headed by the supplier's name,
+                struck through against its replacement, is not mistakable for anything else. */}
             <div className="v" dir="ltr">
               {counterRate != null && <span className="was">{nf(rate)}</span>}
               {nf(counterRate ?? rate)} <span className="cur">{sar}</span><span className="per">/{periodLabel}</span>

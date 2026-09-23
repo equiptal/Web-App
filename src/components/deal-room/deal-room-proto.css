@@ -476,7 +476,6 @@
 .ng-hnote .material-icons-outlined { font-size: 14px; }
 /* The total: a 9.5px caption over a 16px figure, pinned to the end. */
 .ng-htotal { flex: 0 0 auto; text-align: end; }
-.ng-htotal .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
 .ng-htotal .v { font-size: 16px; font-weight: 800; color: var(--navy); }
 .ng-htotal .v .cur { font-size: 10px; font-weight: 600; color: var(--muted); }
 .ng-htotal .v .per { font-size: 10px; font-weight: 700; color: var(--muted); }
@@ -926,10 +925,13 @@
    glyph - it is the one control on the bar a reader would otherwise have to guess at. */
 .ng-foot-sp { flex: 1 1 auto; }
 .ng-foot-main { display: flex; align-items: center; gap: 10px; }
+/* 🔴 **ONE rule for the log chip.** ~~A second `.ng-log`, the icon-only 44px square this footer
+   carried before the chip was labelled, left standing after it.~~ It came LATER in the file, so it won:
+   the labelled pill was forced into a 44×44 grid cell and the word fell under the glyph and out of
+   the box (owner, 2026-09-23, with the screenshot: *"fix the icons of the footer"*). */
 .ng-log { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); padding: 8px 12px; font: inherit; font-size: 12.5px; font-weight: 800; color: var(--navy-mid); cursor: pointer; }
 .ng-log .material-icons-outlined { font-size: 16px; }
 .ng-foot .ng-inner { display: flex; align-items: center; gap: 8px; }
-.ng-log { flex: 0 0 auto; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface); color: var(--muted-dark); cursor: pointer; }
 .ng-back { flex: 0 0 auto; min-width: 110px; height: 44px; border: 1px solid var(--border-hair); border-radius: 12px; background: var(--surface); color: var(--navy); font-family: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
 .ng-accept { flex: 0 0 auto; height: 44px; border: 0; border-radius: 12px; padding: 0 18px; background: var(--ok); color: var(--surface); font-family: inherit; font-size: 13.5px; font-weight: 800; white-space: nowrap; cursor: pointer; }
 .ng-accept:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
@@ -943,7 +945,6 @@
 .ng-primary.blocked { background: var(--disabled-bg); color: var(--disabled-fg); }
 .ng-foot-err { margin: 8px 0 0; }
 .ng-log:hover { background: var(--surface2); }
-.ng-log .material-icons-outlined { font-size: 18px; }
 /* The chevrons are DIRECTION, so they mirror with the script. */
 /* `.ng-chev` is gone with the `‹ step ›` switcher; the footer's controls are all words now, and a
    word needs no mirror rule. */
