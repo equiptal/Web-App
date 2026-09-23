@@ -184,7 +184,17 @@ export interface QuotationDoc {
    * e-mail: it is an invitation to the one person reading it in the app, and on a paper handed to a
    * counterparty it would be a note about the reader's own account printed on someone else's copy.
    */
-  ownerPrompt?: { text: string; actionLabel?: string | null; href?: string | null } | null;
+  /* 🔴 ~~`ownerPrompt` — a full-width amber banner across the top of the sheet saying the
+     renter's company had no logo, or was not verified, with a link.~~ REMOVED (owner, 2026-09-23:
+     *"this is not how the app design it … renter logo or verifixation will be on the renter side
+     like the app"*).
+
+     The app has no banner. `_PartyBox` answers both in PLACE: `_AddLogoSlot` stands in the mark's
+     own slot, and `_VerifyChip` sits exactly where the verification tick would be — its own note
+     says why, *"the reader looks at one spot to learn whether this party is verified, and finds
+     either the answer or the way to fix it"*. `QuotationParty.asks` already carried both; the
+     banner was a SECOND answer to a question the party box was already answering, at the top of a
+     document that is going to a customer. */
   footer?: QuotationFooter | null;
   /** Appended after the amount-in-words (app parity: "Estimate for one day · Final amount as operated"). */
   amountWordsSuffix?: string;
@@ -318,10 +328,6 @@ export const QUOTATION_STYLE = `${DS_ROOT_CSS}
      reader and not part of the paper anyone is handed.
      ⚠️ NO BACKTICKS in this block: it lives inside a template literal, and one ends the string —
      the same trap this file hit on 2026-09-18. */
-  .q-prompt{margin-top:16px;display:flex;align-items:center;gap:10px;background:var(--brand-soft);border:1px solid var(--brand-light);border-radius:10px;padding:10px 14px;font-size:12px;font-weight:600;color:var(--brand-deep);}
-  .q-prompt .material{flex:0 0 auto;font-size:14px;}
-  .q-prompt .txt{flex:1 1 auto;min-width:0;}
-  .q-prompt .act{flex:0 0 auto;font-weight:800;color:var(--brand-deep);text-decoration:underline;}
   .q-signed{margin-top:16px;display:flex;align-items:center;gap:10px;background:var(--ok-soft);border:1px solid color-mix(in srgb, var(--ok) 35%, transparent);border-radius:10px;padding:10px 14px;}
   .q-signed .tick{flex:0 0 auto;color:var(--ok);font-size:14px;font-weight:900;}
   .q-signed .txt{flex:1;font-size:10.5px;color:var(--navy);line-height:1.5;}
@@ -342,7 +348,7 @@ export const QUOTATION_STYLE = `${DS_ROOT_CSS}
   .q-tools{position:sticky;top:0;z-index:5;display:flex;justify-content:flex-end;gap:8px;max-width:900px;margin:0 auto;padding:12px 16px;background:var(--background);}
   .q-tools button{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);color:var(--navy);font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
   .q-tools button.pri{background:var(--brand);border-color:var(--brand);color:var(--surface);}
-  @media print{body{background:var(--surface);}.q-doc{margin:0;border-radius:0;max-width:none;}.q-prompt,.q-addlogo,.q-verify,.q-tools{display:none;}}
+  @media print{body{background:var(--surface);}.q-doc{margin:0;border-radius:0;max-width:none;}.q-addlogo,.q-verify,.q-tools{display:none;}}
   @media (max-width:640px){.q-parties{grid-template-columns:minmax(0,1fr);}.q-head,.q-body,.q-foot{padding-inline:18px;}}`;
 
 const esc = (str: unknown) => String(str ?? "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] as string));
@@ -533,16 +539,6 @@ export function renderQuotationSection(doc: QuotationDoc): string {
           .filter(Boolean)
           .join(" · ")}</div>${doc.sealUrl ? `<img class="q-seal" src="${esc(doc.sealUrl)}" alt="" />` : ""}</div>`;
 
-  /* Above the signature strip, which is where the document stops being the offer and starts being
-     the platform speaking. A prompt among the TERMS would read as one. */
-  const prompt = doc.ownerPrompt
-    ? `<div class="q-prompt"><span class="material">⚠</span><span class="txt">${esc(doc.ownerPrompt.text)}</span>${
-        doc.ownerPrompt.href && doc.ownerPrompt.actionLabel
-          ? `<a class="act" href="${esc(doc.ownerPrompt.href)}">${esc(doc.ownerPrompt.actionLabel)}</a>`
-          : ""
-      }</div>`
-    : "";
-
   const f = doc.footer;
   const reg = f ? [f.crNumber ? `C.R. ${f.crNumber}` : "", f.vatNumber ? `VAT ${f.vatNumber}` : ""].filter(Boolean).join(" · ") : "";
   const contact = f ? [f.phone, f.email].filter(Boolean).join(" · ") : "";
@@ -584,7 +580,6 @@ export function renderQuotationSection(doc: QuotationDoc): string {
       </div>
       <div class="q-words">${esc(L("Amount in words", "المبلغ كتابةً"))}: <b>${esc(words)}</b></div>
       ${termsHtml}
-      ${prompt}
       ${signed}
     </div>
     ${footer}

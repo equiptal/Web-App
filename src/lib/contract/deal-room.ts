@@ -10,7 +10,7 @@ import { companyNamePartsOf, counterpartyDisplayName } from "./counterparty-name
 import { mediaUrl } from "./stores";
 // Type-only — the deal-room quotation BUILDER lives here (pure, testable in the node suite); the
 // rendering itself stays in the shared template module.
-import type { QuotationDoc, QuotationLineItem, QuotationMoneyCell, QuotationPartyRow } from "@/lib/quotation/render";
+import type { QuotationDoc, QuotationLineItem, QuotationMoneyCell, QuotationParty, QuotationPartyRow } from "@/lib/quotation/render";
 import { CLAUSE, ClauseList, extraTermClauses, resolveTerm, type TermSource as ClauseTermSource } from "@/lib/quotation/clauses";
 import { quotationLegal } from "@/lib/quotation/render";
 import { SUPPORT_EMAIL } from "@/lib/quotation/bid-quotation";
@@ -746,8 +746,22 @@ export function buildDealRoomQuotationDoc(
   room: DealRoomView,
   /** The confirmed Quotation row, when one exists. `null` for every pre-close preview. */
   q: QuotationView | null,
-  /** The signed-in rentee, from `/api/me` — the live source for the buyer block. */
-  rentee: { name: string; phone?: string | null; email?: string | null },
+  /**
+   * The signed-in rentee, from `/api/me` — the live source for the buyer block.
+   *
+   * 🔴 **The mark and the two asks belong to the RENTER'S PARTY BOX**, which is the app's own
+   * arrangement (owner, 2026-09-23: *"renter logo or verifixation will be on the renter side like
+   * the app"*). `quotation_document.dart` puts the mark beside the name inside `_PartyBox`, an
+   * `_AddLogoSlot` in its place when there is none, and a `_VerifyChip` where the tick would be.
+   */
+  rentee: {
+    name: string;
+    phone?: string | null;
+    email?: string | null;
+    logoUrl?: string | null;
+    verified?: boolean;
+    asks?: QuotationParty["asks"];
+  },
   ar: boolean,
   L: (en: string, arr: string) => string,
   opts?: { logoUrl?: string },
@@ -960,6 +974,14 @@ export function buildDealRoomQuotationDoc(
     rentee: {
       label: ar ? "RENTER / المستأجر" : "RENTER",
       name: rentee.name,
+      /* 🔴 **A MARK ONLY EXISTS BEHIND A VERIFIED COMPANY** — the app's rule, verbatim: *"how
+         can a user have a logo but not verified … otherwise no logo will be shown and it will take
+         him to company verification"*. A profile CAN carry a `companyLogoUrl` while its firm is
+         unverified (one set before a rejection, or inherited), and printing it would put a company's
+         brand on a document beside a party nobody has checked. */
+      logoUrl: rentee.verified ? (rentee.logoUrl ?? null) : null,
+      verified: rentee.verified ?? false,
+      asks: rentee.asks,
       rows: partyRows([
         [L("Work site", "موقع العمل"), site],
         [L("Phone", "الهاتف"), rentee.phone ?? q?.renteePhone ?? null],

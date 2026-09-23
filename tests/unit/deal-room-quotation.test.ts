@@ -362,35 +362,83 @@ describe("the supplier's mark reaches BOTH documents", () => {
   });
 });
 
-describe("the renter's own prompt", () => {
-  const withPrompt = () => {
-    const doc = buildDealRoomQuotationDoc(room(), null, RENTEE, false, L);
-    doc.ownerPrompt = { text: "Your company is not verified yet", actionLabel: "Verify your company", href: "/profile" };
-    return renderQuotationSection(doc);
-  };
+describe("the renter's own gap sits on the RENTER'S SIDE", () => {
+  /**
+   * 🔴 ~~A full-width amber banner (`ownerPrompt` / `.q-prompt`) above the signature strip,
+   * naming the gap and linking to the profile.~~ REMOVED (owner, 2026-09-23: *"this is not how the
+   * app design it \u2026 renter logo or verifixation will be on the renter side like the app"*).
+   *
+   * The app has no banner. `quotation_document.dart` answers both IN PLACE inside `_PartyBox`:
+   * `_AddLogoSlot` stands in the mark's own slot, and `_VerifyChip` sits exactly where the
+   * verification tick would be \u2014 *"the reader looks at one spot to learn whether this party is
+   * verified, and finds either the answer or the way to fix it"*. `QuotationParty.asks` already
+   * carried both, so the banner was a SECOND answer to a question the party box was answering, at
+   * the top of a document that goes to a customer.
+   */
+  const rentee = (over: Record<string, unknown>) => ({ ...RENTEE, ...over });
 
-  it("names the gap and the way to fix it", () => {
-    const out = withPrompt();
-    expect(out).toContain("q-prompt");
-    expect(out).toContain("Your company is not verified yet");
+  it("Given an unverified renter, Then the VERIFY chip stands where the tick would", () => {
+    const doc = buildDealRoomQuotationDoc(room(), null, rentee({
+      verified: false,
+      asks: { verify: { href: "/profile?verify=1", label: "Verify your company" } },
+    }), false, L);
+    const out = renderQuotationSection(doc);
+    expect(out).toContain("q-verify");
     expect(out).toContain("Verify your company");
+    expect(out).not.toContain("q-prompt");
   });
 
-  /* 🔴 **SCREEN ONLY.** It invites the reader to fix his OWN account, and a paper handed to a
-     counterparty must not carry a note about the other side's profile. */
-  it("is dropped by the print stylesheet", () => {
-    /* ⚠️ A substring, not a `[^}]*` regex: the print block nests rules, so a negated-class match
-       stops at the first inner `}` and fails on a stylesheet that is perfectly correct. */
+  it("Given a VERIFIED renter with no mark, Then the add-logo chip fills the slot", () => {
+    const doc = buildDealRoomQuotationDoc(room(), null, rentee({
+      verified: true,
+      asks: { addLogo: { href: "/profile?logo=1", label: "Add a logo" } },
+    }), false, L);
+    const out = renderQuotationSection(doc);
+    expect(out).toContain("q-addlogo");
+    expect(out).toContain("Add a logo");
+  });
+
+  it("Given a verified renter WITH a mark, Then it prints and no chip is drawn", () => {
+    const doc = buildDealRoomQuotationDoc(room(), null, rentee({
+      verified: true,
+      logoUrl: "https://example.test/renter.png",
+    }), false, L);
+    expect(doc.rentee.logoUrl).toBe("https://example.test/renter.png");
+    const out = renderQuotationSection(doc);
+    expect(out).toContain("q-plogo");
+    expect(out).not.toContain("q-addlogo");
+  });
+
+  it("Given an UNVERIFIED renter who has a logo, Then the mark is REFUSED", () => {
+    /**
+     * 🔴 The app's rule, verbatim: *"how can a user have a logo but not verified \u2026 otherwise
+     * no logo will be shown and it will take him to company verification"*. A profile can carry a
+     * `companyLogoUrl` while its firm is unverified \u2014 one set before a rejection, or inherited \u2014 and
+     * printing it would put a company's brand beside a party nobody has checked.
+     */
+    const doc = buildDealRoomQuotationDoc(room(), null, rentee({
+      verified: false,
+      logoUrl: "https://example.test/renter.png",
+    }), false, L);
+    expect(doc.rentee.logoUrl).toBeNull();
+    expect(renderQuotationSection(doc)).not.toContain("https://example.test/renter.png");
+  });
+
+  it("Given a complete renter, Then the sheet carries no chip and no banner", () => {
+    const out = renderQuotationSection(buildDealRoomQuotationDoc(room(), null, rentee({ verified: true, logoUrl: "x" }), false, L));
+    for (const cls of ["q-prompt", "q-addlogo", "q-verify"]) expect(out).not.toContain(cls);
+  });
+
+  /* 🔴 **SCREEN ONLY**, which is the app's rule too: *"drawn ONLY where a tap can do something
+     about it \u2026 it never reaches the PDF"*. A sheet handed to a customer must not carry the renter's
+     own to-do list. */
+  it("Given print, Then both chips are dropped", () => {
+    /* ⚠️ A substring, not a `[^}]*` regex: the print block nests rules, so a negated-class
+       match stops at the first inner `}` and fails on a stylesheet that is perfectly correct. */
     const print = QUOTATION_STYLE.slice(QUOTATION_STYLE.indexOf("@media print{"));
-    // One grouped rule since 2026-09-23: the prompt, the renter's two asks and the Download/Share
-    // toolbar are all screen only.
     const hidden = print.match(/([.\w,-]+)\{display:none;\}/)?.[1].split(",") ?? [];
-    for (const sel of [".q-prompt", ".q-addlogo", ".q-verify", ".q-tools"]) expect(hidden).toContain(sel);
-  });
-
-  /* ⚠️ Absent by default: every existing caller passes nothing, and a document that always carried a
-     prompt would nag a renter whose account is complete. */
-  it("draws nothing when there is no gap", () => {
-    expect(renderQuotationSection(buildDealRoomQuotationDoc(room(), null, RENTEE, false, L))).not.toContain("q-prompt");
+    for (const sel of [".q-addlogo", ".q-verify", ".q-tools"]) expect(hidden).toContain(sel);
+    // The banner is gone entirely, so it is no longer something the print rule has to hide.
+    expect(QUOTATION_STYLE).not.toContain("q-prompt");
   });
 });

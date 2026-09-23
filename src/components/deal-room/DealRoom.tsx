@@ -74,19 +74,16 @@ type LFn = (en: string, arr: string) => string;
 function buildQuotationHtml(
   room: DealRoomView,
   q: QuotationView | null,
-  rentee: { name: string; phone?: string | null; email?: string | null },
+  rentee: Parameters<typeof buildDealRoomQuotationDoc>[2],
   ar: boolean,
   L: LFn,
   /** The room’s live position, so the paper and the price bar cannot print two different deals. */
   live?: DealRound | null,
-  /** The RENTER's own gap — screen only, dropped by the print stylesheet. */
-  ownerPrompt?: { text: string; actionLabel?: string | null; href?: string | null } | null,
 ): string {
   const kind = quotationLinkKind(room.status) ?? "preview";
   const doc = buildDealRoomQuotationDoc(room, q, rentee, ar, L, {
     logoUrl: typeof window !== "undefined" ? `${window.location.origin}/moedatech-logomark.svg` : undefined,
   }, live ? roundOverride(room, live) : null);
-  if (ownerPrompt) doc.ownerPrompt = ownerPrompt;
   return wrapQuotationPage(renderQuotationSection(doc), {
     lang: doc.lang,
     title: kind === "final" ? L("Final quotation", "عرض السعر النهائي") : L("Preview quotation", "معاينة عرض السعر"),
@@ -265,12 +262,11 @@ export function DealRoom({ id, onTitle, initialFlow }: {
     try {
       const q = await fetchQuotation(id).catch(() => null);
       // The buyer block, live from the signed-in rentee (the app fills it from the profile the same way).
-      let rentee: { name: string; phone?: string | null; email?: string | null } = { name: "" };
+      let rentee: Parameters<typeof buildDealRoomQuotationDoc>[2] = { name: "" };
       /* 🔴 **The renter's OWN gap, named on his own document** (owner, 2026-09-22). His side of the
          header prints as a bare name beside a supplier carrying a logo and a tick, and nothing told
          him why or what to do. His gap only — a strip naming a missing SUPPLIER mark would tell him
          to fix something only the supplier can, on a document the supplier wrote. */
-      let ownerPrompt: { text: string; actionLabel?: string | null; href?: string | null } | null = null;
       try {
         const meRes = await fetch("/api/me", { cache: "no-store" });
         if (meRes.ok) {
@@ -292,24 +288,31 @@ export function DealRoom({ id, onTitle, initialFlow }: {
             }),
             phone: u.phone ?? null,
             email: u.email ?? null,
+            logoUrl: u.companyLogoUrl ?? null,
+            verified: u.tier === "verified",
+            /* 🔴 **BOTH ASKS SIT IN THE RENTER'S OWN PARTY BOX**, which is the app's design and
+               not an approximation of it (owner, 2026-09-23: *"renter logo or verifixation will be on
+               the renter side like the app"*). ~~A full-width amber banner across the top of the
+               sheet.~~ `_AddLogoSlot` stands in the mark's own slot; `_VerifyChip` sits exactly where
+               the verification tick would be, and its note in the app says why: *"the reader looks at
+               one spot to learn whether this party is verified, and finds either the answer or the way
+               to fix it"*.
+
+               ⚠️ **Unverified outranks "no mark"**, and only one is ever offered: there is no point
+               asking for a logo from an account that has not established a company to put one on — and
+               the party box refuses to print a mark behind an unverified party anyway.
+
+               ⚠️ Screen only. The print stylesheet drops `.q-addlogo` and `.q-verify`, because a
+               sheet that reaches the customer must not carry the renter's own to-do list. The app
+               states the same rule: *"drawn ONLY where a tap can do something about it … it never
+               reaches the PDF"*. */
+            asks:
+              u.tier !== "verified"
+                ? { verify: { href: `${window.location.origin}/profile?verify=1`, label: L("Verify your company", "وثّق شركتك") } }
+                : !u.companyLogoUrl
+                  ? { addLogo: { href: `${window.location.origin}/profile?logo=1`, label: L("Add a logo", "أضف شعارًا") } }
+                  : undefined,
           };
-          // Unverified outranks "no mark": there is no point asking for a logo from an account that
-          // has not established a company to put one on.
-          if (u.tier !== "verified") {
-            ownerPrompt = {
-              text: L("Your company is not verified yet, so this quotation carries your name without a mark.",
-                      "لم يُوثّق ملف شركتك بعد، لذلك يحمل عرض السعر اسمك دون علامة."),
-              actionLabel: L("Verify your company", "وثّق شركتك"),
-              href: `${window.location.origin}/profile?verify=1`,
-            };
-          } else if (!u.companyLogoUrl) {
-            ownerPrompt = {
-              text: L("Your company has no logo on file, so this quotation shows your name alone.",
-                      "لا يوجد شعار لشركتك، لذلك يظهر اسمك وحده على عرض السعر."),
-              actionLabel: L("Add your logo", "أضف شعارك"),
-              href: `${window.location.origin}/profile?logo=1`,
-            };
-          }
         }
       } catch {
         /* the buyer block is best-effort */
@@ -321,7 +324,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       }
       // The SAME live position the price bar prices on — a paper that re-derived from the room’s
       // columns would print the last agreement under a heading the renter just read a counter on.
-      w.document.write(buildQuotationHtml(room, q, rentee, ar, L, liveRoundOf(room, messages), ownerPrompt));
+      w.document.write(buildQuotationHtml(room, q, rentee, ar, L, liveRoundOf(room, messages)));
       w.document.close();
     } catch (e) {
       setQuoteErr(errMsg(e, L("Couldn’t load the quotation.", "تعذّر تحميل عرض السعر.")));

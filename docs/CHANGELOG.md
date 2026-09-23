@@ -7,6 +7,52 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-23 - The quotation's renter gap moves ONTO THE RENTER'S SIDE, and the banner across the sheet is deleted.**
+  Owner, on an amber band reading «Your company has no logo on file»: *"this is not how the app design
+  it, check the qoutation in the app and let the web follow it ecxactly, this banner at bottom is
+  signed by moedtaech not renetr logo, renter logo or verifixation will be on the renter side like
+  the app"*.
+  **Read off `quotation_document.dart` before anything was written**, and the app has NO banner. It
+  answers both gaps IN PLACE, inside `_PartyBox`:
+   — **`_AddLogoSlot`** stands in the mark's own slot — a small red chip, *"RED, and it says what it
+     wants … a missing piece of the firm's own paperwork, and the sheet goes to a customer without
+     it"*.
+   — **`_VerifyChip`** sits exactly where the verification TICK would be, and its own note says why:
+     *"the reader looks at one spot to learn whether this party is verified, and finds either the
+     answer or the way to fix it"*.
+  🔴 **`QuotationParty.asks` already carried both** and the web's `partyHtml` already drew them — so
+  the banner was a SECOND answer to a question the party box was answering, across the top of a
+  document that goes to a customer. The deal-room path simply never filled `asks`: it built
+  `ownerPrompt` instead and the renter's mark was never passed to his own box at all.
+  **What changed**: the deal room now puts `logoUrl`, `verified` and `asks` on the rentee party, and
+  `ownerPrompt` is deleted — the field, the markup, its four CSS rules and its slot in the template.
+  🔴 **A MARK ONLY EXISTS BEHIND A VERIFIED COMPANY**, the app's rule verbatim: *"how can a user have
+  a logo but not verified … otherwise no logo will be shown and it will take him to company
+  verification"*. A profile CAN carry `companyLogoUrl` while its firm is unverified (one set before a
+  rejection, or inherited), and printing it would put a company's brand beside a party nobody has
+  checked. Break-checked — the gate removed, one case went red.
+  ⚠️ **Unverified outranks «no mark», and only ONE ask is ever offered**: there is no point asking for
+  a logo from an account with no company to put one on.
+  ⚠️ **Screen only.** The print stylesheet drops `.q-addlogo` and `.q-verify`, which is the app's own
+  rule: *"drawn ONLY where a tap can do something about it … it never reaches the PDF"*. A sheet
+  handed to a customer must not carry the renter's own to-do list.
+  ⚠️ **The navy FOOTER was already right and is untouched**: the SUPPLIER's mark or nothing at all.
+  Checked rather than assumed — the app's `_PlatformFooter` says *"why the footer show moedatech logo,
+  here is logo of supplier and if he doesn't have just don't show anything"*, and Moedatech lives on
+  the SIGNATURE STRIP above it with the support address. The web does both already.
+  🔴 **A STALE COMMENT in the app nearly sent this the wrong way.** `supplierLogoUrl`'s own doc says
+  *"Null falls back to the Moedatech mark, so the footer is never a hole"* — and the code twenty
+  lines down does the opposite, under a struck-through note recording the owner's reversal. The
+  struck version won; the doc above it was never updated. Reported, not fixed: it is the app's file.
+  Files: `src/components/deal-room/DealRoom.tsx`, `src/lib/contract/deal-room.ts`,
+  `src/lib/quotation/render.ts`, `tests/unit/deal-room-quotation.test.ts` (the banner's block
+  rewritten to the removal, 6 cases; 29 passing).
+  ⚠️ Verified: typecheck clean of this work, lint 0 errors, **77 passing across the three quotation
+  suites**, and the verified gate break-checked.
+  🔴 **NOT seen rendered**: the sheet needs a signed-in renter with a live room, and the browser
+  extension is still disconnected. What wants a look is the red chip's weight inside the party box at
+  the real size.
+
 - **2026-09-23 - The negotiation sheet becomes beta's QUOTATION PAPER: a letterhead, a navy table and the amount in words on a zoomable desk, with staging's terms walk folded onto it, no step rail, and the header's arithmetic behind a chevron.**
   Owner, after a side-by-side of the two deployed sheets: *"i want the same as beta ui, only for terms
   use the staging one but folded in the beta sheet style"*, *"remove the process bar"*, *"header show
