@@ -7,6 +7,45 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-23 - Browse's category pills lead with the categories that have the most stores.**
+  Owner: *"what is this warehouse category from where? i want the stores categoris to show the ones
+  that have greatest number of stores at begiiing"*. The pills were the backend taxonomy in its own
+  order, and its first entry, «Warehouse Equipment», had 0 stores in production (119 stores counted).
+  The taxonomy carries no count, so `/api/stores/taxonomy?sort=stores` reads the store directory
+  (100 a page, 10 pages max) and orders by how many stores list each top-level category
+  (`sortByStoreCount`). Ties keep the backend order; empty categories go LAST, not hidden (no ruling
+  asked for hiding).
+  Files: `src/app/api/stores/taxonomy/route.ts`, `src/lib/contract/stores.ts`,
+  `src/components/stores/BrowseSurface.tsx`, `tests/unit/stores.test.ts`.
+  ⚠️ OPT-IN on purpose: the intake rail, the processing screen and the store page read the same route
+  only to find icons by id, and must not pay for a directory read.
+  ⚠️ Costs 2 backend calls per Browse load today, growing with the directory. The clean fix is a
+  `storeCount` on `/public/equipment/taxonomy`, which is BACKEND work and not done.
+  ⚠️ A failed directory read returns the tree unsorted rather than failing the pills.
+
+- **2026-09-23 - `/?signin=1` opens the sign-in modal for a guest; the home bounce to Browse kept only the path.**
+  Found by the production smoke test after the beta promotion. The marketing site links `/?signin=1`.
+  A cold guest on `/` is replaced to `/browse`, and `router.replace("/browse")` dropped the query: the
+  auth gate had opened the modal on `/`, and the page change unmounted it. `/browse?signin=1` and
+  `/create?signin=1` always worked, which is why the unit-level reasoning looked right.
+  Fix: the bounce carries `window.location.search`. HomeHub's effect runs before the auth gate's
+  (child before parent), so the parameter is still there when it is read.
+  Files: `src/components/home/HomeHub.tsx`. Verified in a real browser against a production build:
+  `/?signin=1` lands on `/browse` with the modal open, and a plain `/` is unchanged.
+  ⚠️ Every query on a cold `/` now rides to Browse, including `city`, `category` and `search`, which
+  Browse reads. That is intended.
+
+- **2026-09-23 - Beta is production: `main` now serves the beta build, and the old `main` is `archive/main-2026-09`.**
+  PR #103 (`promote/beta-to-main`, merge `06e98626`, Amplify main job 60). The merge used
+  `git merge -s ours origin/main` on a branch cut from beta, so `main` fast-forwarded to a tree
+  byte-identical to beta: no force push, and history is kept. Rejected: resetting `main` to beta and force
+  pushing, which rewrites shared history. `staging`, `beta` and `main` all sat on the same tree after this.
+  ⚠️ `main`'s one commit beta lacked (`4c242520`, larger-size bids) changed `GroupBids`/`RequestBids`,
+  which beta only has commented out; the requests workspace has the feature. It lives on in the archive.
+  ⚠️ `AGENTS_API_URL` differs between the main and beta Amplify branches only in name: the beta one is a
+  custom domain mapped to the same API Gateway. Not a different backend.
+  Rollback: revert to `archive/main-2026-09`.
+
 - **2026-09-23 - The quotation's renter gap moves ONTO THE RENTER'S SIDE, and the banner across the sheet is deleted.**
   Owner, on an amber band reading «Your company has no logo on file»: *"this is not how the app design
   it, check the qoutation in the app and let the web follow it ecxactly, this banner at bottom is
