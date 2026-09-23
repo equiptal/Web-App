@@ -3,11 +3,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
+import { Dropdown } from "@/components/Dropdown";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
 import { postAuth, type AuthKind } from "@/components/auth/authClient";
 import { COUNTRY_CODES, SAUDI_DIAL } from "@/components/auth/PhoneEntry";
 import type { RenterUser } from "@/lib/contract/auth";
+import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 interface Opt {
   value: string;
@@ -55,6 +58,7 @@ export function OnboardingForm({
   showEmail = true,
   phoneVerify,
   onSignIn,
+  onAbandon,
 }: {
   next: string;
   /** When provided, called after the account is created instead of navigating (e.g. modal flow). */
@@ -79,6 +83,16 @@ export function OnboardingForm({
   /** Case 1: if the typed phone already has an account, we show "sign in instead" — clicking it calls
    *  this to drop back to Modal 1 (phone sign-in). */
   onSignIn?: () => void;
+  /**
+   * Abandon the signup outright - drawn only when the caller supplies it.
+   *
+   * ⚠️ It is NOT «close». This form is the second half of one act (owner, 2026-09-13: *"make the
+   * login and create account as one step but 2 modals"*), and the dialog around it cannot be
+   * dismissed while it is on screen; so the renter who genuinely wants to stop needs a control that
+   * says what stopping DOES. `AccountModal` signs him out on the way, because a phone-first signup
+   * already has a session by now and closing without that is what left people as guests.
+   */
+  onAbandon?: () => void;
 }) {
   const t = useT();
   const o = t.onboarding;
@@ -164,6 +178,8 @@ export function OnboardingForm({
     if (lastName.trim().length < 2 || lastName.trim().length > 50) next_fe.lastName = o.errors.lastName;
     if (!city.trim()) next_fe.city = o.errors.city;
     if (!jobTitle.trim()) next_fe.jobTitle = o.errors.jobTitle;
+    // App parity (`profile_form_page._companyNameIsValid`): two characters, on the COMPLETE pass.
+    if (companyName.trim().length < 2) next_fe.companyName = o.errors.companyName;
     // Email is optional by default, required in the combined create gate, and omitted entirely when
     // showEmail is false (already collected + persisted at the phone/OTP step). When shown + present,
     // it must be a valid address.
@@ -190,7 +206,7 @@ export function OnboardingForm({
         lastName: lastName.trim(),
         city: city.trim(),
         jobTitle: jobTitle.trim(),
-        companyName: companyName.trim() || undefined,
+        companyName: companyName.trim(),
         whatsapp: whatsapp.trim() || undefined,
       });
       setBusy(false);
@@ -219,8 +235,8 @@ export function OnboardingForm({
           lastName: lastName.trim(),
           city: city.trim(),
           jobTitle: jobTitle.trim(),
-          companyName: companyName.trim() || undefined,
-          email: showEmail ? email.trim() || undefined : undefined,
+          companyName: companyName.trim(),
+            email: showEmail ? email.trim() || undefined : undefined,
           whatsapp: whatsapp.trim() || undefined,
         }),
       });
@@ -245,38 +261,38 @@ export function OnboardingForm({
   };
 
   const inputCls =
-    "h-[46px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[14px] outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]";
-  const labelCls = "mb-[6px] block text-[12.5px] font-bold text-navy-mid";
+    "h-[46px] w-full rounded-md border border-border bg-surface px-4 text-body outline-0 focus:border-brand";
+  const labelCls = "mb-2 block text-meta font-semibold text-navy-mid";
 
   return (
-    <form onSubmit={submit} noValidate>
-      <div className="flex items-start gap-3 border-b border-border p-[22px]">
+    <form {...pin("onboarding-form")} onSubmit={submit} noValidate>
+      <div className="flex items-start gap-3 border-b border-border p-6">
         {/* Back to step 1 (OTP entry) — keeps the two steps tied so the user can return to the code step. */}
         {onSignIn && (
-          <button type="button" onClick={onSignIn} aria-label={t.common.back} className="grid h-10 w-10 flex-none place-items-center rounded-[10px] border border-border text-navy-mid transition hover:bg-surface2">
+          <button type="button" onClick={onSignIn} aria-label={t.common.back} className="grid h-10 w-10 flex-none place-items-center rounded-sm border border-border text-navy-mid transition hover:bg-surface2">
             <Icon name="arrow_back" size={20} className="rtl:-scale-x-100" />
           </button>
         )}
-        <span className="grid h-10 w-10 flex-none place-items-center rounded-[10px] bg-brand-soft text-brand">
+        <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-brand-soft text-brand">
           <Icon name="person_add" size={22} />
         </span>
         <div>
-          <h1 className="text-[20px] font-extrabold text-navy">{headline ?? o.title}</h1>
-          <p className="mt-1 text-[13.5px] text-muted">{subhead ?? o.subtitle}</p>
+          <h1 className="text-display font-extrabold text-navy">{headline ?? o.title}</h1>
+          <p className="mt-1 text-body text-muted">{subhead ?? o.subtitle}</p>
         </div>
       </div>
 
-      <div className="flex flex-col gap-[14px] p-[22px]">
-        <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+      <div className="flex flex-col gap-4 p-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className={labelCls}>{o.firstName}</label>
             <input className={inputCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={30} />
-            {fe.firstName && <p className="mt-1 text-[12px] text-danger">{fe.firstName}</p>}
+            {fe.firstName && <p className="mt-1 text-meta text-danger">{fe.firstName}</p>}
           </div>
           <div>
             <label className={labelCls}>{o.lastName}</label>
             <input className={inputCls} value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={50} />
-            {fe.lastName && <p className="mt-1 text-[12px] text-danger">{fe.lastName}</p>}
+            {fe.lastName && <p className="mt-1 text-meta text-danger">{fe.lastName}</p>}
           </div>
         </div>
 
@@ -286,20 +302,17 @@ export function OnboardingForm({
           <div>
             <label className={labelCls}>
               {o.phone} <span className="text-danger">*</span>
-              {phoneVerified && <span className="ms-2 text-[11px] font-bold text-ok">✓ {t.auth.phoneVerified}</span>}
+              {phoneVerified && <span className="ms-2 text-label font-semibold text-ok">✓ {t.auth.phoneVerified}</span>}
             </label>
-            <div className="flex gap-[10px]" dir="ltr">
-              <select
-                aria-label={t.auth.countryLabel}
+            <div className="flex gap-3" dir="ltr">
+              <Dropdown
+                label={t.auth.countryLabel}
+                placeholder="—"
                 value={dial}
-                onChange={(e) => { setDial(e.target.value); resetPhone(); }}
                 disabled={phoneVerified}
-                className="h-[46px] rounded-[10px] border border-border bg-surface px-[10px] text-[13.5px] font-bold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)] disabled:opacity-60"
-              >
-                {COUNTRY_CODES.map((c) => (
-                  <option key={c.dial} value={c.dial}>{c.flag} {c.dial}</option>
-                ))}
-              </select>
+                onChange={(v) => { setDial(v); resetPhone(); }}
+                options={COUNTRY_CODES.map((c) => ({ value: c.dial, label: `${c.flag} ${c.dial}` }))}
+              />
               <input
                 className={`${inputCls} flex-1 ${phoneVerified ? "bg-surface2 text-muted" : ""}`}
                 type="tel"
@@ -317,14 +330,14 @@ export function OnboardingForm({
                 type="button"
                 onClick={sendPhoneCode}
                 disabled={phoneBusy || !phoneDigits.trim()}
-                className="mt-[10px] inline-flex items-center gap-1.5 rounded-[10px] border border-brand px-4 py-2 text-[13px] font-bold text-brand transition hover:bg-brand-soft disabled:opacity-50"
+                className={btn("secondary", "md", { className: "mt-3 transition" })}
               >
                 <Icon name="sms" size={16} /> {phoneBusy ? t.auth.sending : t.auth.sendCode}
               </button>
             ) : (
-              <div className="mt-[10px]">
-                <p className="mb-2 text-[12px] text-muted">{sentPre}<b className="text-navy" dir="ltr">{phoneE164}</b>{sentPost}</p>
-                <div className="flex gap-[10px]">
+              <div className="mt-3">
+                <p className="mb-2 text-meta text-muted">{sentPre}<b className="text-navy" dir="ltr">{phoneE164}</b>{sentPost}</p>
+                <div className="flex gap-3">
                   <input
                     className={`${inputCls} flex-1`}
                     inputMode="numeric"
@@ -339,20 +352,20 @@ export function OnboardingForm({
                     type="button"
                     onClick={verifyPhone}
                     disabled={phoneBusy || otpCode.replace(/\D/g, "").length < 4}
-                    className="flex-none rounded-[10px] border border-brand bg-brand px-4 text-[13px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
+                    className={btn("primary", "md", { className: "flex-none transition" })}
                   >
                     {phoneBusy ? t.auth.verifying : t.auth.verifyPhone}
                   </button>
                 </div>
-                <button type="button" onClick={sendPhoneCode} className="mt-2 text-[12.5px] font-bold text-info">{t.auth.resend}</button>
+                <button type="button" onClick={sendPhoneCode} className="mt-2 text-meta font-semibold text-info">{t.auth.resend}</button>
               </div>
             )}
-            {fe.phone && <p className="mt-1 text-[12px] text-danger">{fe.phone}</p>}
+            {fe.phone && <p className="mt-1 text-meta text-danger">{fe.phone}</p>}
             {phoneErr && (
-              <p className="mt-1 text-[12px] text-danger">
+              <p className="mt-1 text-meta text-danger">
                 {t.auth.errors[phoneErr]}
                 {phoneErr === "phone_taken" && onSignIn && (
-                  <> <button type="button" onClick={onSignIn} className="font-bold text-info underline">{t.auth.signInInstead}</button></>
+                  <> <button type="button" onClick={onSignIn} className="font-semibold text-info underline">{t.auth.signInInstead}</button></>
                 )}
               </p>
             )}
@@ -360,43 +373,68 @@ export function OnboardingForm({
         ) : (
           <div>
             <label className={labelCls}>
-              {o.phone} <span className="ms-1 text-[11px] font-bold text-ok">✓ {o.verified}</span>
+              {o.phone} <span className="ms-1 text-label font-semibold text-ok">✓ {o.verified}</span>
             </label>
             <input className={`${inputCls} bg-surface2 text-muted`} value={user?.phone ?? ""} readOnly dir="ltr" />
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className={labelCls}>{o.city}</label>
-            <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
-              <option value="">{o.selectCity}</option>
-              {cities.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-            {fe.city && <p className="mt-1 text-[12px] text-danger">{fe.city}</p>}
+            <Dropdown
+              label={o.city}
+              placeholder={o.selectCity}
+              value={city || null}
+              onChange={setCity}
+              options={cities.map((c) => ({ value: c.value, label: c.label }))}
+            />
+            {fe.city && <p className="mt-1 text-meta text-danger">{fe.city}</p>}
           </div>
           <div>
             <label className={labelCls}>{o.jobTitle}</label>
-            <select className={inputCls} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)}>
-              <option value="">{o.selectJobTitle}</option>
-              {jobs.map((j) => (
-                <option key={j.value} value={j.value}>{j.label}</option>
-              ))}
-            </select>
-            {fe.jobTitle && <p className="mt-1 text-[12px] text-danger">{fe.jobTitle}</p>}
+            <Dropdown
+              label={o.jobTitle}
+              placeholder={o.selectJobTitle}
+              value={jobTitle || null}
+              onChange={setJobTitle}
+              options={jobs.map((j) => ({ value: j.value, label: j.label }))}
+            />
+            {fe.jobTitle && <p className="mt-1 text-meta text-danger">{fe.jobTitle}</p>}
           </div>
         </div>
 
+        {/* 🔴 **THE COMPANY NAME IS BACK, and it is REQUIRED here** (app parity,
+            `profile_form_page.dart`, 2026-09-21).
+
+            ~~Removed on 2026-09-07 (*"remove it from the form UI now"*), on the reasoning that the
+            FIRM he later verifies carries its own name and the typed one had no reader left.~~ That
+            reasoning stopped being true on 2026-09-21, when `counterpartyDisplayName` made
+            `profile.companyName` the FOURTH rung of the one naming rule: it is what every surface
+            shows a renter by when no verified firm stands behind him. Left blank, he is listed among
+            firms under his personal name.
+
+            ⚠️ **Required on the FORM, not in the database.** `completeProfileSchema` keeps it
+            optional and nothing backfills, so the accounts that never had it keep working and are
+            asked the next time they open a profile form — which is the app's own rule, stated in the
+            same words.
+
+            ⚠️ Two characters, matching `_companyNameIsValid`. */}
         <div>
           <label className={labelCls}>
-            {o.companyName} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+            {o.companyName} <span className="text-danger">*</span>
           </label>
-          <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={o.companyNamePlaceholder} />
+          <input
+            className={inputCls}
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            maxLength={200}
+            placeholder={o.companyNamePlaceholder}
+          />
+          {fe.companyName && <p className="mt-1 text-meta text-danger">{fe.companyName}</p>}
         </div>
 
-        <div className={`grid grid-cols-1 gap-[12px] ${showEmail ? "sm:grid-cols-2" : ""}`}>
+        <div className={`grid grid-cols-1 gap-3 ${showEmail ? "sm:grid-cols-2" : ""}`}>
           {showEmail && (
             <div>
               <label className={labelCls}>
@@ -404,34 +442,50 @@ export function OnboardingForm({
                 {requireEmail ? (
                   <span className="text-danger">*</span>
                 ) : (
-                  <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+                  <span className="text-label font-semibold text-muted">— {o.optional}</span>
                 )}
               </label>
               <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
-              {fe.email && <p className="mt-1 text-[12px] text-danger">{fe.email}</p>}
+              {fe.email && <p className="mt-1 text-meta text-danger">{fe.email}</p>}
             </div>
           )}
           <div>
             <label className={labelCls}>
-              {o.whatsapp} <span className="text-[11px] font-medium text-muted">— {o.optional}</span>
+              {o.whatsapp} <span className="text-label font-semibold text-muted">— {o.optional}</span>
             </label>
             <input className={inputCls} inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+9665XXXXXXXX" dir="ltr" />
-            {fe.whatsapp && <p className="mt-1 text-[12px] text-danger">{fe.whatsapp}</p>}
+            {fe.whatsapp && <p className="mt-1 text-meta text-danger">{fe.whatsapp}</p>}
           </div>
         </div>
 
-        {err && <p className="text-[13px] font-semibold text-danger">{err}</p>}
+        {err && <p className="text-body font-semibold text-danger">{err}</p>}
       </div>
 
-      <div className="border-t border-border p-[22px]">
+      <div className="border-t border-border p-6">
         <button
           type="submit"
           disabled={busy || (!!phoneVerify && !phoneVerified)}
-          className="flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:opacity-50"
+          className={btn("primary", "lg", { full: true, className: "flex transition" })}
         >
           {busy ? o.submitting : o.submit}
           {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}
         </button>
+
+        {/* ── The way out, named for what it does ────────────────────────────────────────────────
+            A quiet text link under the act, not a second button beside it: finishing is the thing
+            to do here and the two must not read as a pair of equal choices. It says «sign out»
+            rather than «cancel» because that is what it performs - the code is already verified and
+            the session already exists. */}
+        {onAbandon && (
+          <button
+            type="button"
+            onClick={onAbandon}
+            disabled={busy}
+            className="mx-auto mt-3 block text-meta font-semibold text-muted underline transition hover:text-navy disabled:text-disabled-fg disabled:no-underline"
+          >
+            {o.leave}
+          </button>
+        )}
       </div>
     </form>
   );

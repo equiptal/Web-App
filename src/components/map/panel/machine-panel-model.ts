@@ -31,11 +31,11 @@ export interface Bilingual {
 }
 
 /**
- * The numeral as every surface now prints it: **Latin, in Arabic too** (owner, via the app's
- * `1aabf6db` of 2026-09-04: *"the numbers should be in eng even in arabic"*).
+ * The numeral as every surface now prints it: **Latin, in Arabic too** (owner, 2026-09-04: *"the
+ * numbers should be in eng even in arabic"*, swept through the app in `1aabf6db`).
  *
  * It used to convert to Arabic-Indic. The name and the call sites stay so the ruling landed as one
- * edit rather than a dozen; this is the place to delete once they call `String(n)` themselves.
+ * edit rather than thirty; this is the place to delete once they call `String(n)` themselves.
  */
 export function arDigits(n: number | string): string {
   return String(n);
@@ -812,6 +812,13 @@ export function heroPhotoUrl(machine: Pick<FleetMachine, "photoKeys">): string |
 }
 
 /**
+ * ⚠️ **NO CALLER since 2026-09-08.** The band word («قريب» / «متوسط» / «بعيد») was the second half of
+ * the machine detail's distance line, and that line is now the fleet card's yard card, which states
+ * the distance and the availability and nothing else (owner: *"similar to how it appears in the fleet
+ * cards"*). Kept rather than deleted because it is the only definition of this vocabulary and its
+ * thresholds are the prototype's own, tested below; delete it with its tests if the band never comes
+ * back.
+ *
  * **«قريب · متوسط · بعيد»** — the word the detail's availability line puts after the kilometres.
  *
  * The prototype's own helper and its own thresholds (`distBand`, decoded line 340): ≤ 30 km near,
@@ -948,6 +955,18 @@ export interface DocRow {
    * papers, and a second route to the same answer is how the two numbers start to disagree.
    */
   anyOfGroup?: string;
+  /**
+   * **This row is absent, and its question is already answered** (owner, 2026-09-10: *"if at least
+   * one document from proof of ownership … then don't show missing proof as red"*).
+   *
+   * Set on the empty siblings of a satisfied {@link DocRow.anyOfGroup}. The row keeps `status:
+   * "missing"` and stays askable — a renter who wants the customs card as well as the istimara can
+   * still ask for it, and the batch's «select all missing» still reaches it — but it is drawn
+   * NEUTRAL rather than red: a proof that is one of four alternatives is not a gap once another of
+   * the four is on the file, which is the rule {@link attentionCount} has counted by since
+   * 2026-08-12. Only the paint was still judging each row alone.
+   */
+  answeredElsewhere?: boolean;
 }
 
 /** The one `anyOfGroup` this surface has. Named rather than inlined so the row builder and
@@ -1212,7 +1231,19 @@ const PHOTO_LABEL: Record<PhotoSlot, Bilingual> = {
  * nowhere, so they follow the not-required rule: shown when uploaded, and absent they are simply not a
  * row. This repo's `computeUnitReadiness` derives `photosPresent` from the same two slots.
  */
-const REQUIRED_PHOTO_SLOTS = new Set<PhotoSlot>(["front", "plate"]);
+/**
+ * ⚠️ **The FRONT shot alone, since 2026-09-10** (owner: *"if at least one document from proof of
+ * ownership or the front image at least, then don't show missing proof and missing images as red"*).
+ *
+ * ~~`["front", "plate"]`~~, the app's `kMandatoryPhotoSlots`. A machine photographed from the front
+ * read RED here and «Missing plate / serial» in the cell, which is the surface telling a renter that
+ * a supplier who HAS shown him the machine has shown him nothing. The plate row still exists in the
+ * documents tab and can still be asked for; it is no longer what fails the machine.
+ *
+ * ⚠️ `computeUnitReadiness` (`bid-readiness.ts`) derives `photosPresent` from the same rule, and the
+ * two must move together: they are read side by side on the bid card and on this panel.
+ */
+const REQUIRED_PHOTO_SLOTS = new Set<PhotoSlot>(["front"]);
 
 /**
  * The rows' status lines — **the app's two phrases, and a tail it has no word for**.
@@ -1325,34 +1356,40 @@ function equipmentCertRowLabel(code: string): Bilingual {
 /**
  * The wire type a **not-yet-uploaded** row asks for.
  *
- * **Deliberately coarse, and this is the reversible half of a thing this repo cannot verify.** An ask
- * is validated server-side against `EquipmentDocumentType.documentKey` and one unknown type fails the
- * whole request (`rentee-request.ts` — `assertKnownDocTypes`, and `canonicalDocType`'s note that an
- * unaliased name is "passed through untouched and refused by the backend if it is unknown"). The only
- * operator/equipment names *proven* to resolve into that catalogue are the ones `DOC_TYPE_ALIASES`
- * maps — `tuv → tuv_cert`, `spsp → spsp_cert`, `equipment_safety_certificate → safety_cert`,
- * `operator_safety_certificate → operator_license`, `istimara`. `operator_tuv` and friends are the
- * *upload* vocabulary (`web-handoff.md:16`); whether they are also catalogue keys cannot be checked
- * from this repo, and guessing wrong turns the renter's most common ask into a 400 he can do nothing
- * with.
+ * ── It names the PAPER now, not the category (owner, 2026-09-05) ────────────────────────────────
  *
- * So the **rows** stay per-certificate — the renter sees exactly which paper is missing and opens
- * exactly the one that is there — while the outgoing type names the category. Swapping in precise keys
- * once someone confirms the catalogue is a one-line change to these two maps.
+ * *"When the renter asks about a specific document of the equipment, it is sent as a general safety
+ * document — the request card in the chat must mention exactly the requested document name."*
  *
- * ~~⚠️ **Known gap** — `documentAskSatisfied` matches an ask to a held paper by exact `canonicalDocType`
- * equality, and the operator category resolves to `operator_license` while a machine's own operator papers
- * are typed `operator_tuv` / `operating_license`, none of which canonicalise to it, so an operator document
- * ask reads *waiting* even after the lessor uploads.~~ **Out of this file's reach since 2026-08-08** and
- * further out of it since the UAT of 2026-08-11, which removed the operator's rows from this tab
- * entirely (see {@link equipmentDocGroups}), so this surface emits no operator ask for that mismatch to
- * strand. The gap is kept written down rather
- * than deleted because it is real for whoever *does* raise one — the fix is one alias
- * (`operating_license → operator_license`) or catalogue rows per operator cert, and it belongs with
- * whoever owns `DOC_TYPE_ALIASES`. `tuv` and `spsp` never had the problem: both sides fold to
- * `tuv_cert` / `spsp_cert`, which is why they are named precisely above.
+ * ~~Deliberately coarse: only `tuv` and `spsp` were sent precisely and every other certificate went
+ * out as `equipment_safety_certificate`, which the card renders as «Safety certificate».~~ The reason
+ * was real at the time — an ask is validated server-side and ONE unknown type fails the whole
+ * request, and this repo could not check the catalogue — but it stopped being true on 2026-08-12,
+ * when the backend started judging an ask against the LISTING vocabulary as well as the catalogue
+ * (`apps/backend/src/services/utils/document-type.ts`, `ASKABLE_DOCUMENT_TYPES`, built from the same
+ * enums the upload path validates: `tuv` · `spsp` · `saso` · `saso_registration` ·
+ * `saso_technical_inspection` · `insurance`, plus the ownership papers and the photo slots).
+ *
+ * So every certificate the platform can actually store on a machine is named by its own key, and the
+ * supplier reads «SASO certificate» or «Equipment insurance» instead of a category.
+ *
+ * ⚠️ **`aramco` still goes out coarse, and that is not an oversight.** A request may require an
+ * Aramco certificate (`options.ts`), but the platform has nowhere to file one: it is in neither
+ * `EQUIPMENT_CERT_TYPES` nor the seeded catalogue, so naming it would be a 400 on the renter's most
+ * ordinary act. It needs a backend row before this map can carry it — see the note in
+ * `docs/` / the change log. The same fallback covers a free-text «other» cert for the same reason.
+ *
+ * ⚠️ The row CODES are `canonicalCertCode`'s (`tuv` · `spsp` · `saso` · `aramco` · `insurance`), so
+ * the SASO family arrives here already folded to `saso` — which is why one entry covers the
+ * certificate under all its spellings. `saso_registration` never reaches this map: it is an ownership
+ * paper, it keeps its own code, and its row sends its own name.
  */
-const EQUIPMENT_ASK_TYPE: Record<string, string> = { tuv: "tuv", spsp: "spsp" };
+const EQUIPMENT_ASK_TYPE: Record<string, string> = {
+  tuv: "tuv",
+  spsp: "spsp",
+  saso: "saso",
+  insurance: "insurance",
+};
 const equipmentAskType = (code: string): string => EQUIPMENT_ASK_TYPE[code] ?? "equipment_safety_certificate";
 
 const filesOf = (docs: OfferedUnitDoc[]): DocFile[] =>
@@ -1384,8 +1421,9 @@ function certRow(args: {
   required: boolean;
   askType: string;
   anyOfGroup?: string;
+  answeredElsewhere?: boolean;
 }): DocRow {
-  const { key, label, held, required, askType, anyOfGroup } = args;
+  const { key, label, held, required, askType, anyOfGroup, answeredElsewhere } = args;
   const files = filesOf(held);
   const status: PresenceStatus = held.length === 0 ? "missing" : required ? "present" : "on_file";
   return {
@@ -1400,6 +1438,8 @@ function certRow(args: {
     // You can only ask for what is not there — held or unrequired, there is nothing to chase.
     requestable: status === "missing",
     ...(anyOfGroup ? { anyOfGroup } : {}),
+    // Only ever true on an ABSENT row: a held paper says so itself.
+    ...(answeredElsewhere && status === "missing" ? { answeredElsewhere: true } : {}),
   };
 }
 
@@ -1562,6 +1602,8 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
       // `saso_registration` are active catalogue rows).
       askType: code,
       anyOfGroup: OWNERSHIP_ANY_OF,
+      // One paper answers the group; the rest are alternatives, not gaps (owner, 2026-09-10).
+      answeredElsewhere: ownershipHeld.length > 0,
     }),
   );
 

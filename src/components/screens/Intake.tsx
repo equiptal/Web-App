@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
+import { RequestsRail, ProjectFloorChips, useRequestRail } from "@/components/create/RequestsRail";
+import { IntakeBack } from "@/components/create/CreateBack";
+import { Mansour } from "@/components/Mansour";
+import { ProjectPills } from "@/components/create/ProjectPills";
+import { warmAgentCache } from "@/lib/api/client";
 import { useSession } from "@/lib/session";
-import { Button, Card, TextArea, Icon } from "@/components/ui";
+import { Icon } from "@/components/ui";
 import { AccountModal } from "@/components/onboarding/AccountModal";
 import { bumpAgentUse, guestLimitReached } from "@/lib/access/agent-quota";
+import { pin } from "@/lib/uiPins";
 
 /** Accepted file types (AC-05/07): PDF, image, Word, Excel. No size/count/length limit (AC-08). */
 const ACCEPT_ATTR =
@@ -21,27 +27,299 @@ function isAccepted(file: File): boolean {
   return /\.(pdf|png|jpe?g|gif|webp|bmp|tiff?|doc|docx|xls|xlsx)$/i.test(file.name);
 }
 
-function fileGlyph(type: string): string {
-  if (type.includes("pdf")) return "picture_as_pdf";
-  if (type.startsWith("image/")) return "image";
-  if (type.includes("sheet") || type.includes("excel")) return "table_chart";
-  return "description";
+/**
+ * A file's size, read back off the data URL the store already holds.
+ *
+ * The store keeps `{ name, type, data }` and never kept the byte count. Rather than widen that
+ * contract for a caption, the size is recovered from the base64 payload: 4 characters carry 3 bytes,
+ * less the padding. Exact, and it costs nothing at the call site.
+ */
+function sizeOf(dataUrl: string | undefined): string {
+  // A file whose read failed is stored with no payload — it still lists, it just has no size to state.
+  if (!dataUrl) return "";
+  const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  if (!b64) return "";
+  const pad = b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0;
+  const bytes = Math.max(0, (b64.length * 3) / 4 - pad);
+  return bytes > 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
 }
 
-const FILE_CHIPS = ["PDF", "Word", "Excel", "Image"];
+/**
+ * RFQ intake (web-app/002, AC-01/05/07/08) — the Intake prototype (owner, 2026-08-30).
+ *
+ * ── ONE box, centred, and nothing beside it ─────────────────────────────────────────────────────
+ *
+ * It was a two-pane card: DESCRIBE on the left, a dashed dropzone on the right, an «OR» on the rule
+ * between them. That laid out a choice the renter does not have to make — attaching is what you do
+ * when you already have a document, and until you do, half the card was an advert for a path you are
+ * not on. So the dropzone collapses to *Upload RFQ*, a quiet button on the floor of the box, and the
+ * box gets the whole width. Dropping a file anywhere on the card still works and the file list still
+ * appears inside it: the capability did not shrink, only its footprint.
+ *
+ * ── What sits under the box ─────────────────────────────────────────────────────────────────────
+ *
+ * The renter's own SITES, and nothing else (owner, 2026-08-31). ~~A row of example sentences that
+ * wrote themselves in.~~ Withdrawn: the placeholder already types itself through those examples —
+ * this screen's whole difficulty is that a renter does not know how much to write, and a real
+ * sentence answers that faster than any instruction — so the chips repeated the lesson for one press
+ * a renter makes on their first visit and never again. A site fills in half the request, every visit
+ * after the first.
+ *
+ * Files can be DROPPED, not only browsed — a card that rejects a dragged file is a worse lie than
+ * no target at all.
+ */
+/**
+ * Typography and box metrics shared by the intake field and its colour mirror.
+ *
+ * ⚠️ ONE string, used twice, on purpose. The mirror technique fails as visible double-vision the
+ * moment the two disagree about a font, a line-height or a padding, and the cheapest guarantee that
+ * they never disagree is that there is only one place to change.
+ */
+const FIELD_TEXT = "px-5 pb-2 pt-5 text-subhead leading-relaxed";
 
 /**
- * RFQ intake (web-app/002, AC-01/05/07/08). Two mode cards (Upload/Paste — active; Fill Manually —
- * coming soon), a paste card with a char count, an orange attach dropzone with file-type chips, and
- * a footer Continue. Paste text and/or attach files, then Continue to parse.
+ * Mansour's size on the caret, in px.
+ *
+ * \u26a0\ufe0f ONE number, read by the element AND by the gap that keeps him off the letter just typed \u2014 a
+ * second copy is how he comes to sit half a character into the word after somebody resizes him.
+ * 22 beside 15px type: the kit sizes him from 20px up, and at the text's own size he reads as a
+ * letter in the sentence rather than as somebody standing in it.
  */
+const MANSOUR_CARET = 22;
+
 export function Intake() {
   const t = useT();
+
   const { state, actions } = useRfq();
+  const mirror = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  const well = useRef<HTMLDivElement>(null);
+
+  /**
+   * Where Mansour stands: the insertion point, in the well's own coordinates. Null draws nothing.
+   *
+   * 🔴 **HE IS THE CARET** (owner, 2026-09-22, with a picture of the box reading «5 dump trucks in
+   * NEOM for 6 weeks» and his head sitting after the last word): *"can u show this mansour icon as our
+   * cursor when typing in the text box"*. ~~A PERCH: a fixed spot on the box's rim, held only while
+   * the AGENT typed.~~ That ruling (2026-09-13) rested on a measurement claim - *"this field is a
+   * mirrored textarea whose glyphs are transparent, there is no element to measure against"* - and
+   * the claim was FALSE about this file even then: the mirror below renders the full text at the
+   * field's own metrics, so the caret's rectangle is one `Range` away.
+   *
+   * ⚠️ The kit's own warning is the thing to respect here, not to ignore: *"a FIXED spot, not a
+   * moving one: his original complaint was that he drifted while you typed"*. Drift is LAG, so there
+   * is no transition on his position and the measurement runs in a LAYOUT effect - he is placed in
+   * the same frame as the character that moved him, and never eases toward it.
+   */
+  const [caret, setCaret] = useState<{ x: number; y: number } | null>(null);
+
+  /* Split the box's text around the line the site typed — see `projectTypedLine` in the store.
+     `lastIndexOf`, because the template appends: if the same machine name also appears in something
+     the renter wrote earlier, the coloured one is the one that just arrived. Not found means they
+     have edited it, and then none of it is coloured, which is the honest answer. */
+  const typedLine = state.projectTypedLine;
+  const at = typedLine ? state.text.lastIndexOf(typedLine) : -1;
+  const before = at >= 0 ? state.text.slice(0, at) : state.text;
+  const marked = at >= 0 ? typedLine : null;
+  const after = at >= 0 ? state.text.slice(at + (typedLine as string).length) : "";
+
+  /**
+   * Hand over to the processing screen only if the parse is still running after 8 seconds (W-T23).
+   *
+   * Taking the whole page for something that finishes in 400 ms is a flash of a screen nobody had
+   * time to read; leaving a spinner in a corner for eleven seconds is a page that looks broken.
+   * Eight is past the fast paths and short of a renter deciding it has hung.
+   */
+  useEffect(() => {
+    if (!state.busy) return;
+    const id = setTimeout(() => actions.escalateProcessing(), 8000);
+    return () => clearTimeout(id);
+  }, [state.busy, actions]);
+
+  /**
+   * Warm the prompt cache when the screen opens with a site selected.
+   *
+   * Best-effort in the strict sense: never awaited, never blocking, never surfaced, and a failure is
+   * invisible. It buys a cache read instead of a write on the call the renter is about to make, and
+   * if it does not land they simply pay what they pay today.
+   */
+  useEffect(() => {
+    if (state.project) warmAgentCache();
+  }, [state.project]);
   const { status } = useSession();
   const [rejected, setRejected] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  /* ⚠️ ONE hook for BOTH surfaces - the rail on the left and the chip row on the box's floor. Two
+     copies of this state would be two fetches and, worse, two answers to «which machine is chosen»,
+     which would disagree the first time either was pressed. */
+  const rail = useRequestRail();
   const fileInput = useRef<HTMLInputElement>(null);
+
+  // ── The typing placeholder ──
+  const examples = t.intake.examples;
+  const [typed, setTyped] = useState("");
+  const cursor = useRef({ phrase: 0, char: 0, deleting: false });
+  useEffect(() => {
+    // It stops the moment the renter starts writing: a placeholder that keeps moving under live text
+    // is a distraction, and it is not visible anyway.
+    if (state.text.length > 0) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const c = cursor.current;
+      const phrase = examples[c.phrase % examples.length];
+      let delay = 45;
+      if (!c.deleting) {
+        c.char++;
+        if (c.char > phrase.length) {
+          c.deleting = true;
+          delay = 1600;
+        }
+      } else {
+        c.char--;
+        delay = 22;
+        if (c.char <= 0) {
+          c.deleting = false;
+          c.phrase = (c.phrase + 1) % examples.length;
+          delay = 300;
+        }
+      }
+      setTyped(phrase.slice(0, Math.max(0, c.char)));
+      timer = setTimeout(tick, delay);
+    };
+    timer = setTimeout(tick, 400);
+    return () => clearTimeout(timer);
+  }, [examples, state.text.length]);
+
+  /**
+   * Measure the caret off the MIRROR, with a `Range` and no injected node.
+   *
+   * 🔴 A zero-width `<span>` at the caret offset is the usual trick and is WRONG here. The mirror
+   * wraps on `break-words`, an inline-block is an atomic inline, and one dropped between two letters
+   * is a break opportunity the textarea does not have - so the two copies of the text would wrap
+   * differently, which is the double-vision this technique fails as, and the one risk the block below
+   * already warns about. A `Range` reads the same layout and adds nothing to it.
+   *
+   * ⚠️ The rect comes off the character BEFORE the caret rather than off a collapsed range: a
+   * collapsed range at a soft wrap reports the END of the line it just left in Chrome, so he would
+   * stand off the right edge for the first letter of every wrapped line. At offset 0 there is no
+   * preceding character, so it takes the leading edge of the first one instead.
+   */
+  const place = useCallback(() => {
+    const box = well.current;
+    const mir = mirror.current;
+    const ta = field.current;
+    if (!box || !mir || !ta) return;
+    // Nothing to ride: the placeholder is not the renter's words, and standing on its first letter
+    // would read as him writing the example.
+    if (!state.text) {
+      setCaret(null);
+      return;
+    }
+    const at = Math.max(0, Math.min(ta.selectionStart ?? state.text.length, state.text.length));
+
+    /* WHICH CHARACTER he is measured against, and which side of it he stands on.
+
+       \u26a0\ufe0f Normally the one BEFORE the caret, on its trailing side - that is the letter just typed,
+       and he follows it. But when that character is a SPACE he is measured against the one AFTER
+       instead, on its leading side, so he stands IN the gap between two words rather than on top of
+       one. That is also what fixes a SOFT WRAP: the caret at the start of a wrapped line follows the
+       space that ended the line above, and anchoring to it would leave him at the end of the previous
+       line, a whole row away from where the next letter will appear. */
+    const prev = at > 0 ? state.text[at - 1] : "";
+    const useNext = (prev === "" || /\s/.test(prev)) && at < state.text.length;
+    const idx = useNext ? at : at - 1;
+    if (idx < 0) {
+      setCaret(null);
+      return;
+    }
+
+    const walker = document.createTreeWalker(mir, NodeFilter.SHOW_TEXT);
+    let seen = 0;
+    let node: Text | null = null;
+    let offset = 0;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const len = (n as Text).length;
+      // `>`, not `>=`: the character at index `idx` lives in the node that CONTAINS it, and an index
+      // sitting exactly on a boundary belongs to the node that starts there.
+      if (seen + len > idx) {
+        node = n as Text;
+        offset = idx - seen;
+        break;
+      }
+      seen += len;
+    }
+    if (!node) {
+      setCaret(null);
+      return;
+    }
+
+    const range = document.createRange();
+    /* 🔴 A DECORATION MUST NEVER TAKE THE SCREEN DOWN. jsdom implements `Range` WITHOUT
+       `getBoundingClientRect`, so this threw inside a LAYOUT effect and the whole intake failed to
+       render - two `canvas-history` cases went red on a change that only moves an icon. Anywhere
+       with no layout engine simply gets no rider, which is the honest answer there anyway. */
+    if (typeof range.getBoundingClientRect !== "function") {
+      setCaret(null);
+      return;
+    }
+    range.setStart(node, offset);
+    range.setEnd(node, offset + 1);
+    const r = range.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    // Out of the scrolled view: he would otherwise be drawn against the card's clipped edge.
+    if (!r.width && !r.height) {
+      setCaret(null);
+      return;
+    }
+    if (r.bottom < b.top || r.top > b.bottom) {
+      setCaret(null);
+      return;
+    }
+
+    /* \U0001f534 He stands BESIDE the character, never on it - half his own width plus a letter of air.
+       Centred on the insertion point his disc covered the character just typed, which is the one the
+       renter is looking at; the reference picture shows daylight between the last word and his head.
+       Seen rendered, not reasoned about.
+
+       \U0001f534 The side is decided by the RUN, not by the page. ~~`getComputedStyle(box).direction`.~~ An
+       English sentence typed into the Arabic build is an LTR run inside an RTL box, and signing the
+       gap by the box put him back on top of «tankers» - the same overlap, arrived at from the other
+       side. Seen on screen. A neutral character (a space, a digit, punctuation) carries no direction
+       of its own, so THAT is the one case the container answers. */
+    const RTL_LETTER = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFE]/;
+    const LTR_LETTER = /[A-Za-z\u00C0-\u024F]/;
+    const ch = state.text[idx];
+    const rtlRun = RTL_LETTER.test(ch)
+      ? true
+      : LTR_LETTER.test(ch)
+        ? false
+        : getComputedStyle(box).direction === "rtl";
+
+    /* Half his width plus a letter of air. It keeps him off the character he follows AND off the
+       native caret, which is drawn at exactly this point (owner, 2026-09-22: *"i want it both the
+       agent icon and the cursor beside each other"*) - one number, because they stand in one place. */
+    const gap = MANSOUR_CARET / 2 + 3;
+    // The edge he hangs off: the character's trailing side when he follows it, its leading side when
+    // he is standing in the space before it. In an RTL run both are mirrored.
+    const rightSide = rtlRun === useNext;
+    const edge = rightSide ? r.right : r.left;
+    const x = edge - b.left + (rightSide ? gap : -gap);
+    setCaret({ x, y: r.top - b.top + r.height / 2 });
+  }, [state.text]);
+
+  /* A LAYOUT effect, not a passive one: he is painted in the same frame as the character that moved
+     him. Keyed on the text, which is what BOTH writers change - the renter's keystroke and the
+     agent's typewriter alike. */
+  useLayoutEffect(() => {
+    place();
+  }, [place, state.projectTypedLine]);
+
+  useEffect(() => {
+    const onResize = () => place();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [place]);
 
   // Server-side guest cap backstop: if localStorage was cleared, the client gate below lets the run
   // through but the BFF blocks it → the store sets guestLimit → open the SAME account modal (no error).
@@ -89,113 +367,365 @@ export function Intake() {
   }
 
   return (
-    <div className="w-full">
-      <h1 className="text-[22px] font-extrabold tracking-tight text-navy">{t.intake.heading}</h1>
-      <p className="mt-1 text-[13.5px] text-muted">{t.intake.subheading}</p>
+    /* ── Two columns: his past requests, and the thing he came here to write ────────────────
+       ⚠️ `items-stretch` is what lets the rail run the full height beside a column that CENTRES its
+       own contents. The centring belongs to the work column alone; a rail told to centre would float
+       a list of projects in the middle of a tall page.
 
-      {/* Mode option cards (AC-01) */}
-      <div className="mt-5">
-        {/* Upload / Paste — the only mode (manual entry removed) */}
-        <div className="flex items-start gap-3 rounded-[14px] border-2 border-brand bg-brand-soft p-4">
-          <span className="grid h-11 w-11 flex-none place-items-center rounded-[10px] bg-brand text-white">
-            <Icon name="upload" size={22} />
-          </span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <b className="text-[14px] font-bold text-navy">{t.intake.optUploadTitle}</b>
-              <span className="inline-flex items-center gap-1 rounded-full bg-warn/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-warn">
-                <Icon name="science" size={12} /> {t.intake.beta}
-              </span>
-            </div>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{t.intake.optUploadDesc}</p>
+       ⚠️ **780, where this column was 880.** Narrowing is half of «smaller»: a shorter box at the
+       full width reads as squashed rather than smaller. It is the one measurement here taken on
+       looks alone, so it is the first thing to put back if the two should match again. */
+    /* ── The rail is a BAND of the screen, not a card on it ────────────────────────────────────
+       Owner, 2026-09-17: *"it must be the same as side panel in the prototype as side panel on the
+       edge of the screen and feels like read panel not a card"*.
+
+       ⚠️ The shell caps its main at `PAGE_MAX` and gutters it, which is right for a page and wrong
+       for a panel: inside that column the rail floated with page ground either side of it. This row
+       breaks out to the window with `mx-[calc(50%-50vw)] w-screen`, which is symmetric and so needs
+       no mirror rule, and pulls up through the main pad so the panel starts at the top of the page.
+       The same argument the requests rail settled on 2026-09-12: a band takes ONE edge, not four. */
+    /* ⚠️ The pull-up cancels the MAIN's top padding, and nothing else has to be cancelled: on this
+       screen the shell draws no Back row (`CreateBack` registers null on the intake and the column
+       below carries `IntakeBack`), so this row is the first thing in `<main>` and the panel starts
+       directly under the 52px bar - which is what `lg:top-[52px] lg:h-[calc(100dvh-52px)]` on the
+       rail has always measured against (owner, 2026-09-19: *"the panel must fit the whole page from
+       the header till the end and dont overlap it with the back button"*). */
+    <div className="relative mx-[calc(50%-50vw)] -mt-6 flex w-screen items-stretch sm:-mt-7">
+      <RequestsRail rail={rail} />
+      {/* ⚠️ The gutter the shell was giving this content comes back HERE, on the column, so the box
+          keeps its margin while the panel keeps the edge. */}
+      <div className="flex min-w-0 flex-1 flex-col px-4 py-6 sm:px-7">
+      <IntakeBack />
+      <div {...pin("create-intake")} className="mx-auto flex w-full min-w-0 max-w-[780px] flex-1 flex-col justify-start">
+      {/* ── He asks the question (owner, 2026-09-13: *"use mansour icon more in the chat intake
+          somewhere, i want it to be attractive"*, then *"put mansour before the question"*) ────────
+          The screen was a heading, a line and a big empty box - correct and characterless. He is
+          `is-waiting`, the kit's own state for exactly this moment: a slow lean-in, *"waiting for
+          the user"*. The heading IS his question, so he is not decoration beside it - he is who is
+          asking, which is why he reads BEFORE it rather than over it.
+
+          ~~Above, centred on the same axis as the box.~~ On its own line he was a mark floating over
+          a page; on the line itself he is the speaker. `inline-flex` with the h1 so the pair stays
+          centred as one object at every width, and `flex-none` so he never squeezes when the
+          question wraps on a phone. */}
+      <h1 className="mb-7 flex flex-wrap items-center justify-center gap-3 text-center text-display font-extrabold leading-tight tracking-[-.02em] text-navy">
+        <Mansour size={44} state="waiting" className="flex-none" />
+        {t.intake.heading}
+      </h1>
+
+      {/* 🔴 ~~The line under the question~~ — «Describe your request, or upload an RFQ…» — is
+          DELETED (owner, 2026-09-16, with the side-panel prototype). The placeholder in the box
+          already types a real request through its example, which is the same lesson said once; the
+          sentence was the second time. It had also become a layout constraint of its own — one line,
+          `sm:whitespace-nowrap`, so its LENGTH could not change freely — for a line nobody read
+          twice. `intake.subheading` is deleted from both dictionaries with it. */}
+
+      {/* ── The box ──
+          The whole card is the drop target, not a rectangle inside it: a renter dragging a file at
+          this screen is aiming at the thing they were typing into. */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={(e) => { e.preventDefault(); setDragging(false); }}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); onFiles(e.dataTransfer.files); }}
+        /* The BOX takes the focus, not the field inside it. The global `:focus-visible` rule draws a
+           2px brand outline on everything focusable, and on a textarea filling a card with
+           `overflow-hidden` that outline was clipped to a single orange bar across the card's floor
+           (owner, 2026-08-31: remove it). Moved to the card's own border, which is one line in the
+           place a border belongs — and a keyboard user still sees where they are. */
+        /* `field-card` is what globals.css hangs the inset focus ring on — see the rule there. The
+           card takes the brand border, every control inside it draws its own ring against its own
+           edge, and neither can be clipped into a bar across the card. */
+        /* `nd-seam` and `relative` — the season's one mark on the first screen a renter meets
+           (owner, 2026-09-16). Inert until `<html data-season="nd">` is written; then the gold
+           Najdi rank finishes the card's bottom edge, which is the kit's own "reads as a finished
+           edge rather than as a pattern".
+
+           ⚠️ `relative` is unconditional and safe: the two absolutely-positioned things in this
+           card (the mirror, and Mansour's perch) both sit inside the inner `relative` wrapper and
+           already measure against that. Adding it seasonally instead would move their anchor for a
+           fortnight, which is the worse of the two.
+
+           ⚠️ A seam and not the corner palm: this card's bottom-trailing corner is where the two
+           round controls are, and a palm behind them is a tint over the one row that is pressed. */
+        className={`nd-seam field-card relative flex flex-col overflow-hidden rounded-lg border bg-surface transition focus-within:border-brand ${
+          dragging ? "border-brand ring-2 ring-brand/25" : "border-border"
+        }`}
+      >
+        {/* The site's values, INSIDE the box and above the line you type on (owner, 2026-08-31:
+            *"they will appear on the text area"*).
+
+            A native `<textarea>` holds text and nothing else, so a dropdown cannot sit among the
+            words — but it can sit in the same bordered container, which is what a renter means by
+            "in the box". Pills at the top, caret below, one border around both. The agent still
+            receives exactly what was typed and nothing else, which is what keeps its input small.
+
+            Renders nothing until a site is picked, so an untouched intake is still a plain box. */}
+        <ProjectPills />
+
+        {/* ── The renter's words, and the site's, in one box ────────────────────────────────────
+
+            A `<textarea>` cannot colour part of its own text, and the site's machine line has to read
+            differently from what the renter typed (owner, 2026-08-31: *"show it in different color
+            font"*) — otherwise the one thing that arrived on its own looks exactly like the six words
+            they wrote themselves.
+
+            So the text is drawn TWICE: a mirror underneath does the colouring, and the textarea on
+            top keeps its caret, its selection, its scrolling and its keyboard while its own glyphs go
+            transparent. Both take `FIELD_TEXT`, one string, so the two can never drift into
+            double-vision — that is the failure mode of this technique and the only real risk in it.
+
+            The mirror always renders the FULL text. When the marked line is not found — the renter
+            edited it, which is exactly when it stops being the site's words — it renders everything
+            in the ordinary colour, which is byte for byte what this box looked like before. */}
+        <div ref={well} className="relative flex min-h-[96px] w-full flex-1">
+          <div
+            aria-hidden
+            ref={mirror}
+            className={`${FIELD_TEXT} pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words text-navy`}
+          >
+            {before}
+            {marked && <span className="text-brand">{marked}</span>}
+            {after}
           </div>
+
+          <textarea
+            ref={field}
+            value={state.text}
+            onChange={(e) => actions.setText(e.target.value)}
+            /* ⚠️ `onSelect` is the one that fires for a caret MOVE - an arrow key, a click into the
+               middle of a word, a selection - and not only for a selection, despite its name. Without
+               it he would follow typing and then stay behind the moment the renter went back to fix a
+               word. `onScroll` and `onBlur` re-place him because both change where that offset SITS. */
+            onSelect={place}
+            onFocus={place}
+            onBlur={place}
+            onScroll={(e) => {
+              if (mirror.current) mirror.current.scrollTop = e.currentTarget.scrollTop;
+              place();
+            }}
+            placeholder={typed}
+            aria-label={t.intake.pasteLabel}
+            /* `text-transparent`: the mirror below draws the glyphs, this owns every interaction.
+               The placeholder stays visible — it is the element's own, not text, so transparency does
+               not reach it.
+
+               🔴 **THE BAR IS BACK, AND MANSOUR STANDS BESIDE IT** (owner, 2026-09-22, later the
+               same day: *"i want it both the agent icon and the cursor beside each other"*).
+               ~~`caret-transparent`, chosen that morning over keeping the bar.~~ Hiding it made him
+               the ONLY insertion point, and a 22px mark cannot stand in a 4px word gap - so
+               mid-sentence he covered the letter beside him and nothing said exactly where the next
+               character would land. With the bar drawn the two split the job: the bar is the precise
+               point, he is the agent standing at it, and the gap that already kept him off the
+               letter is what keeps him off the bar. The blink comes back with it, which is also the
+               only thing that said the box was focused. */
+            className={`${FIELD_TEXT} relative w-full flex-1 resize-none border-0 bg-transparent text-transparent caret-navy outline-none placeholder:text-muted/70 focus-visible:outline-none`}
+          />
+
+          {/* ── Mansour, ON THE CARET (owner, 2026-09-22) ──────────────────────────────
+
+              ~~A PERCH on the box's trailing corner, held only while the AGENT typed (2026-09-13).~~
+              He rides the insertion point now, for the renter's own words as much as for the ones a
+              template writes in - which is what the reference picture shows: a sentence the renter
+              typed, with his head immediately after the last word.
+
+              ⚠️ **`translate(-50%, -50%)` on the measured point**, so what lands on the caret is his
+              CENTRE. Anchored by his corner he would sit a third of a character low and to the right
+              of every letter, which reads as a mark that has not quite caught up - the drift the kit
+              complains about, arrived at by geometry rather than by lag.
+
+              ⚠️ **22px** beside 15px type: the kit sizes him from 20px up, and at the text's own size
+              he reads as a letter in the sentence rather than as somebody standing in it.
+
+              ⚠️ `is-live` whoever is writing. The kit's three states are about what he is DOING, and
+              on the caret he is doing the same thing either way.
+
+              ⚠️ `pointer-events-none`: he sits over a field the renter is typing in, and a decoration
+              that swallows a click on the text is worse than no decoration. */}
+          {caret && (
+            <span
+              {...pin("intake-caret")}
+              aria-hidden
+              className="pointer-events-none absolute z-10"
+              style={{ left: caret.x, top: caret.y, transform: "translate(-50%, -50%)" }}
+            >
+              <Mansour size={MANSOUR_CARET} state="live" />
+            </span>
+          )}
         </div>
 
+        {/* ── The floor: the renter's sites, and the way to hand us a file ─────────────────────
+            The sites moved IN here (owner, 2026-09-01: *"I want the project pills to appear as part
+            of the text box, in the place of the upload RFQ button, and this upload button will be on
+            the most right"*). They sat under the card, where a row of the renter's own data read as
+            furniture on the page; on the floor of the box they read as part of the thing being
+            written, which is what they are — a site fills half the request.
+
+            Upload keeps the row but not the lead. It is the other way in for the renter who has a
+            document rather than a sentence, and it belongs at the end of the row for the same reason
+            it stopped being the only thing on it. */}
+        {/* ── The floor: ONE pill, or nothing at all ─────────────────────────────────────
+            🔴 **The site CHIP STRIP is gone from this row** (owner, 2026-09-16, with the side-panel
+            prototype: *"remove the pills ... just clicking on a project or a request inside it will
+            show a single pill showing project-request in one line, no other pills, just the selected
+            one"*). What it did is the rail's now: every site is in there, each with what has already
+            been hired at it, and the press applies the same defaults and the same template it always
+            did. Nothing about picking moved; only where the picking happens.
+
+            ⚠️ The row is `items-center` and does not WRAP any more. It holds at most one pill and
+            two 26px controls, so there is nothing left to push onto a second line — and the pill
+            truncates rather than growing the row, which is why it can be promised. */}
+        <div className="flex items-center gap-3 px-5 pb-4 pt-1">
+          <ProjectFloorChips rail={rail} />
+
+          <span className="ms-auto flex flex-none items-center gap-2">
+
+            <button
+
+              type="button"
+
+              onClick={() => fileInput.current?.click()}
+
+              aria-label={t.intake.uploadRfq}
+
+              title={t.intake.uploadRfq}
+
+              /* 🔴 **No circle on the `+`** (owner, 2026-09-13, stating the row’s order as a
+
+                 standing rule: *"then + without circule then -> in circule"*). Two ringed controls
+
+                 side by side read as a pair of equals; they are not. The arrow SENDS - it is the act
+
+                 the whole screen exists for - and the `+` hands us a file, which is the other way in.
+
+                 The ring is what says «primary», so only one of them wears it.
+
+                 ⚠️ The 26px HIT AREA stays. A 15px glyph is not a target on a phone; what goes is
+
+                 the border and the ground, not the box. */
+
+              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full text-navy-mid transition hover:bg-surface2 hover:text-brand"
+
+            >
+
+              <Icon name="add" size={15} />
+
+            </button>
+
+
+
+            {/* ⚠️ **What holds it back is on the button itself.** The old Continue had a sentence
+
+                beside it, because a disabled button with nothing near it reads as broken. A round
+
+                control has no room for one, so the reason is its `title`: "add something" while it
+
+                is empty, and what the press will do once it is not. */}
+
+            <button
+
+              type="button"
+
+              disabled={!canStart || state.busy}
+
+              onClick={runAgent}
+
+              aria-label={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
+
+              title={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
+
+              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-brand text-brand-fg transition hover:bg-brand-press disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+
+            >
+
+              <Icon
+
+                name={state.busy ? "hourglass_empty" : "arrow_forward"}
+
+                size={15}
+
+                className={state.busy ? "" : "rtl:scale-x-[-1]"}
+
+              />
+
+            </button>
+
+          </span>
+
+          {/* ⚠️ **Two round controls, and they are the whole floor now** (owner, 2026-09-12:
+              *"remove the continue button, remove upload... instead i want a circle icon for + which
+              will be for upload and beside it a circle arrow to send"*).
+
+              ~~«Upload RFQ» here, and a «Continue» button in a row of its own below.~~ Two rows for
+              two presses, one of them a full-width word for the act every renter is already
+              reaching for. The + hands us a file and the arrow sends: both are what they do, and
+              neither needs a label to say it. */}
+          {/* ── The two controls are a CHIP tall, and they ride the LAST row ────────────────────
+              Owner, 2026-09-12: *"make the buttons on the same size of the project pills … also
+              consider if many projects exist, how the ui will be? the buttons must be on the last
+              row always"*.
+
+              **26px, measured rather than guessed.** A chip is `px-3 py-1 text-label` inside a
+              hairline: 16.5px line box (11px × the body's 1.5) + 8px of padding + 1.6px of border =
+              **26.1px**, and it comes to the same in Arabic because the line box is a RATIO of the
+              font size, not of the face. Checked in the browser at both locales before touching
+              this. The circles were 40px, half again as tall as the row they sit on.
+
+              **The last row is `items-end` on the wrapper above**, which is what makes this hold as
+              the site strip grows: the chips wrap inside their own `flex-1` group, the group gets
+              taller, and these two stay pinned to its bottom edge. They never climb back beside the
+              first row, and they are never pushed onto a row of their own while there is width for
+              them — `flex-none` beside a `min-w-0 flex-1` group is what guarantees that.
+
+              🔴 **The cost, stated: 26px is a small target.** The house guideline is 44, and this
+              row now has two controls well under it — the same fault already logged against a dozen
+              icon-only controls on 2026-09-08. It is what «the same size as the pills» means, and it
+              is his call; the alternative is a 40px circle beside a 26px chip, which is what he is
+              reporting. */}
+
+        </div>
+
+        <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
+
+        {rejected && <p className="px-5 pb-3.5 text-meta font-semibold text-danger">{t.intake.fileRejected}</p>}
+
+        {state.files.length > 0 && (
+          <div className="flex flex-col gap-2 px-5 pb-4">
+            {state.files.map((file, i) => (
+              <div key={`${file.name}-${i}`} className="flex items-center gap-2.5 rounded-sm border border-border bg-surface2/50 px-3.5 py-2.5">
+                <Icon name="description" size={16} className="flex-none text-muted" />
+                <span className="min-w-0 flex-1 truncate text-body font-semibold text-navy">{file.name}</span>
+                <span className="flex-none text-meta text-muted">{sizeOf(file.data)}</span>
+                <button
+                  onClick={() => actions.removeFile(i)}
+                  aria-label={t.common.close}
+                  className="grid h-6 w-6 flex-none place-items-center rounded-full text-muted transition hover:bg-surface2 hover:text-navy"
+                >
+                  <Icon name="close" size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Paste + attach card */}
-      <Card className="mt-5 !p-0">
-        <div className="flex items-center justify-between px-5 pt-5">
-          <b className="text-[14px] font-bold text-navy">{t.intake.pasteLabel}</b>
-          <span className="text-[12.5px] text-muted">{t.intake.orUploadBelow}</span>
-        </div>
 
-        <div className="relative px-5 pt-3">
-          <TextArea rows={6} value={state.text} placeholder={t.intake.pastePlaceholder} onChange={(e) => actions.setText(e.target.value)} />
-          <span className="pointer-events-none absolute bottom-2.5 end-7 text-[11px] text-muted">
-            {state.text.length} {t.intake.chars}
-          </span>
-        </div>
-
-        {/* divider */}
-        <div className="my-4 flex items-center gap-3 px-5 text-[12px] text-muted">
-          <div className="h-px flex-1 bg-border" /> {t.intake.attachDivider} <div className="h-px flex-1 bg-border" />
-        </div>
-
-        {/* dropzone */}
-        <div className="px-5">
-          <button
-            onClick={() => fileInput.current?.click()}
-            className="w-full rounded-[14px] border-[1.5px] border-dashed border-brand/45 bg-brand-soft/50 px-4 py-7 text-center transition-colors hover:border-brand"
-          >
-            <span className="mx-auto grid h-12 w-12 place-items-center rounded-[12px] border border-border bg-surface text-navy-mid">
-              <Icon name="upload" size={22} />
-            </span>
-            <div className="mt-2.5 text-[14px] font-bold text-navy">
-              {t.intake.dropTitle} <span className="text-brand">{t.intake.browse}</span>
-            </div>
-            <div className="mt-0.5 text-[12px] text-muted">{t.intake.dropSub}</div>
-            <div className="mt-3 flex flex-wrap justify-center gap-2">
-              {FILE_CHIPS.map((c) => (
-                <span key={c} className="rounded-md border border-border bg-surface px-2 py-1 text-[11px] font-semibold text-navy-mid">
-                  {c}
-                </span>
-              ))}
-            </div>
-          </button>
-          <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
-
-          {rejected && <p className="mt-2 text-xs text-danger">{t.intake.fileRejected}</p>}
-
-          {state.files.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {state.files.map((f, i) => (
-                <span key={`${f.name}-${i}`} className="flex items-center gap-2 rounded-[10px] border border-border bg-surface px-2.5 py-1.5 text-[12.5px] font-semibold">
-                  <Icon name={fileGlyph(f.type)} size={16} className="text-navy-mid" />
-                  <span className="max-w-[160px] truncate">{f.name}</span>
-                  <button onClick={() => actions.removeFile(i)} className="text-muted hover:text-danger">
-                    <Icon name="close" size={15} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* footer */}
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-4">
-          {hasDraft ? (
-            // Reached from a wizard step ("Your request") — return without re-parsing.
-            <Button variant="secondary" onClick={() => actions.resumeWizard()}>
-              <Icon name="arrow_back" size={16} className="rtl:scale-x-[-1]" /> {t.intake.backToReview}
-            </Button>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[12.5px] text-muted">
-              <Icon name="info" size={15} /> {t.intake.emptyHint}
-            </span>
-          )}
-          <div className="flex items-center gap-3">
-            {hasDraft && <span className="hidden text-[12px] text-muted sm:inline">{t.intake.editReparseNote}</span>}
-            <Button disabled={!canStart} onClick={runAgent} className="px-6 py-3 text-[14px]">
-              {hasDraft ? t.intake.reAnalyze : t.intake.startProcessing}{" "}
-              <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />
-            </Button>
-          </div>
-        </div>
-      </Card>
+      {/*
+        * — «The way on» lived here —
+        *
+        * A row of its own holding «Continue», with «Add a description or a file» opposite it, and
+        * before 2026-09-09 a «Back to review» beside that.
+        *
+        * 🔴 **Removed** (owner, 2026-09-12). It is one press, and it now sits on the floor of the
+        * box beside the file button, where the renter's hand already is. The sentence that had to
+        * stand next to a disabled Continue is the arrow's `title` instead: a round control cannot
+        * carry a sentence, and a tooltip says the same thing to the renter who hovers and to the
+        * screen reader either way.
+        */}
 
       {/* Guest hit the free agent-run limit → create an account, then continue processing. */}
       <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => { setShowAccount(false); void actions.process(); }} title={t.guest.trialTitle} subtitle={t.guest.trialSub} />
+      </div>
+      </div>
     </div>
   );
 }

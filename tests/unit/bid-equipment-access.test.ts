@@ -122,16 +122,42 @@ describe("no entry point offers the link for an off-platform bid (RM3-AC-25, hal
 describe("the route resolves exactly one bidId (RM3-AC-01)", () => {
   const page = src(ROUTE_PAGE);
 
-  it("fetches the one bid by id and nothing that returns a collection of others", () => {
+  it("fetches the one bid by id, and no other list of BIDS to resolve it from", () => {
     expect(page).toContain("fetchBidDetail(bidId)");
-    for (const collection of ["fetchBids", "fetchAllMyRequests", "fetchReceivedBids", "fetchRequestSubmissions"]) {
+    for (const collection of ["fetchBids", "fetchAllMyRequests", "fetchRequestSubmissions"]) {
       expect(page).not.toContain(collection);
     }
   });
 
-  it("hands the workspace one bid, never a list — no sibling offer is reachable from here", () => {
+  it("hands the workspace one bid — the surface still resolves exactly one (RM3-AC-01)", () => {
     expect(page).toContain("bid={bid}");
     expect(page).not.toMatch(/bids=\{/);
+  });
+
+  /**
+   * ~~"No sibling offer is reachable from here."~~ Overturned by the owner on 2026-09-04: *"show
+   * other bids on the equipment request he is checking so he navigates to other suppliers' equipment
+   * maps through it instead of going back and forth."*
+   *
+   * AC-01 is about RESOLUTION, and that is untouched — this route still renders one bid's fleet, one
+   * supplier's yards, one set of pins. What it now also carries is a list of LINKS, and a link is not
+   * a second bid resolved: each one is this same route, entered again with a different id.
+   *
+   * So `fetchReceivedBids` is allowed here and is pinned to what it may do — feed `siblings`, which
+   * the workspace draws as chips in its header. Anything wider (a second `bid=`, a fleet fetched for
+   * an id that is not this route's) would break the two assertions above.
+   */
+  it("may list the other offers on the request, as links and nothing more", () => {
+    expect(page).toContain("fetchReceivedBids");
+    /* The list must be DRAWN, but not by a prop name this test owns: the strip moved from a
+       `siblings=` prop on the workspace to `<OtherOffers>` portalled beside the Back control, and a
+       test that pins the plumbing fails on a refactor that kept the behaviour. What matters is that
+       the fetched list reaches the render. */
+    expect(page).toMatch(/offers=\{siblings\}|siblings=\{siblings\}/);
+    /* The scoping is what keeps the strip about THIS request rather than the renter's whole inbox.
+       `otherOffers(bids, rid, bidId)` is where that now lives — the route reads the request id and
+       hands it to the helper along with the bid it must not list twice. */
+    expect(page).toMatch(/otherOffers\(\s*r\.bids,\s*rid|b\.request\.id === rid/);
   });
 });
 

@@ -1,0 +1,339 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup, within } from "@testing-library/react";
+import { LocaleProvider } from "@/lib/i18n";
+import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
+import type { BidCard } from "@/lib/contract/bids";
+import type { BidFormData, LinkBidSubmission } from "@/lib/contract/link-bids";
+import { computeRentalTotal, durationDaysBetween } from "@/lib/pricing/rental";
+import { vatLines } from "@/lib/contract/vat-inclusive";
+
+/**
+ * «View quote» — the off-platform submission, drawn as the bid form the supplier filled (owner,
+ * 2026-09-04: *"I want the view bid submission on the bid card to render the same UI as this form
+ * but with the filled values of the supplier answers"*).
+ *
+ * The form's spine is three numbered steps and a rail. These pin that spine, and the four things the
+ * old markup got to state and this one must not lose: what the renter asked beside every answer, a
+ * term the supplier never answered reading as neither Yes nor No, the rate prorated over the
+ * request's own period, and VAT as `total − subtotal` rather than a fresh 15%.
+ */
+
+const form: BidFormData = {
+  token: "tok",
+  status: "open",
+  closedReason: null,
+  deadline: "2026-09-20T00:00:00Z",
+  renter: { name: "EQ Rental", contactName: null, city: "Riyadh", verified: true, logoUrl: null },
+  projectTerms: {
+    location: "An Narjis, Riyadh",
+    lat: 24.9,
+    lng: 46.6,
+    rentalBasis: "MONTHLY",
+    startDate: "2026-09-01",
+    endDate: "2026-12-31",
+    hoursPerDay: 10,
+    workingDaysPerWeek: 6,
+    extendable: true,
+  },
+  contractTerms: [{ key: "payment", label: "Payment Terms", labelAr: "شروط الدفع", value: "net_30", valueAr: null }],
+  notes: "Gate access before 7am",
+  items: [
+    {
+      requestItemId: "m1",
+      label: "Crawler excavator",
+      labelAr: null,
+      size: "20 ton",
+      sizeAr: null,
+      numberOfUnits: 2,
+      priceUnit: "PER_MONTH",
+      deliveryBy: "RENTER",
+      returnBy: "SUPPLIER",
+      notes: null,
+      // `fuelType` is no longer shown to a supplier, so it can no longer be the unanswered term.
+      // `nationality` takes its place: asked by the renter, left unconfirmed by the supplier.
+      requiredTerms: { operator: "YES", nationality: "any", fuel: "RENTER", year: "2020", equipmentCert: "tuv" },
+    },
+  ],
+};
+
+const submission: LinkBidSubmission = {
+  id: "s1",
+  requestId: "r1",
+  quotationRef: "Q-2026-CEX-4F21",
+  rfqRef: "REQ-030992",
+  groupRef: null,
+  createdAt: "2026-09-03T09:00:00Z",
+  companyName: "Al Faisal Heavy Equipment",
+  crNumber: "1010101010",
+  vatNumber: null,
+  nationalAddress: null,
+  contactInfo: "+966501112233",
+  contactEmail: "bids@alfaisal.sa",
+  city: "Riyadh",
+  notes: "Mobilisation within 48 hours",
+  validUntil: "2026-10-15T00:00:00Z",
+  grandTotal: null,
+  companyDocuments: [{ key: "https://files.test/vat.pdf", type: "vat_cert", filename: "vat.pdf" }],
+  items: [
+    {
+      requestItemId: "m1",
+      label: "Crawler excavator",
+      numberOfUnits: 2,
+      offeredUnits: 1,
+      priceUnit: "PER_MONTH",
+      rentalRate: 18000,
+      deliveryPrice: 1500,
+      returnPrice: null,
+      total: null,
+      // `fuelType` is deliberately absent: a term the supplier never answered.
+      confirmations: { operator: true, fuel: false, year: true, equipmentCert: true, payment: true },
+      // `fuelType` is no longer shown to a supplier, so it can no longer be the unanswered term.
+      // `nationality` takes its place: asked by the renter, left unconfirmed by the supplier.
+      requiredTerms: { operator: "YES", nationality: "any", fuel: "RENTER", year: "2020", equipmentCert: "tuv" },
+      photos: [{ key: "https://files.test/front.jpg", type: "front_photo", filename: "front.jpg" }],
+      documents: [{ key: "https://files.test/istimara.pdf", type: "istimara", filename: "istimara.pdf" }],
+    },
+  ],
+};
+
+const card = { bidId: "b1", supplierName: "Al Faisal Heavy Equipment" } as unknown as BidCard;
+
+vi.mock("@/lib/api/client", () => ({ fetchBidFormData: () => Promise.resolve(form) }));
+
+beforeEach(() => vi.stubGlobal("print", vi.fn()));
+afterEach(cleanup);
+
+const L = (e: string) => e;
+const draw = (over: Partial<LinkBidSubmission> = {}) =>
+  render(
+    <LocaleProvider initialLocale="en">
+      <SharedBidSubmissionModal bid={card} submission={{ ...submission, ...over }} ar={false} L={L} onClose={() => {}} />
+    </LocaleProvider>,
+  );
+
+/** Draw, then hand back the numbered step whose heading this is. */
+const step = async (title: string) => {
+  draw();
+  // A generous window: the viewer fetches the request's own form payload before it can draw, and
+  // under the whole suite that lands well past the default second. A slow machine is not a defect.
+  return (await screen.findByRole("heading", { name: title }, { timeout: 5000 })).closest("section")!;
+};
+
+/** What this fixture's money must come to, from the same pricing contract the viewer uses. */
+const money = (() => {
+  const rental = computeRentalTotal({
+    rate: 18000,
+    priceUnit: "PER_MONTH",
+    startDate: "2026-09-01",
+    durationDays: durationDaysBetween("2026-09-01", "2026-12-31"),
+  });
+  const units = 2;
+  const subtotal = (rental.total + 1500) * units;
+  return { rental, ...vatLines(subtotal, null) };
+})();
+
+describe("it is the bid form's own shape", () => {
+  it("draws the three steps, in the form's order", async () => {
+    draw();
+    const headings = [...document.querySelectorAll("section h3")].map((h) => h.textContent);
+    expect(headings).toEqual(["Terms", "The price", "The supplier's details"]);
+  });
+
+  it("names who the bid is from, with the quotation's own code", async () => {
+    draw();
+    expect(await screen.findByText("Bid from")).toBeTruthy();
+    // The dialog's own title says it too, so the name is on the page twice by design.
+    expect(screen.getAllByText("Al Faisal Heavy Equipment").length).toBeGreaterThan(1);
+    expect(screen.getByText("Q-2026-CEX-4F21")).toBeTruthy();
+  });
+
+  /**
+   * ~~"Carries the rail: the request, then the quotation."~~ Overturned by the owner on 2026-09-05:
+   * *"I want the view submission quote to not show the right request details, no need, just the
+   * submission values."*
+   *
+   * The rail is the SUPPLIER's figures alone now. The renter's own request — its rental basis, its
+   * period, its working days, its site — is a thing he wrote and can read on the request itself, and
+   * here it was pushing the total he came for below the fold.
+   */
+  it("puts the bid's quality at the top, beside who the bid is from", async () => {
+    /* Owner, 2026-09-07. It sat beside «Photos and documents», three sections down — which is where
+       the SUPPLIER meets it while filling the form. Reading a bid back, how complete it arrived is
+       what decides how much of the rest the renter trusts, so it belongs in the masthead. */
+    const { container } = draw();
+    await screen.findByText("Bid from");
+    // The masthead is the card that carries «Bid from»; the ring must be inside THAT card, not
+    // three sections down beside «Photos and documents».
+    // The ring is an `svg[role="img"]`; find it by that rather than by the first svg on the page,
+    // which is any icon the masthead happens to draw.
+    const ring = container.querySelector('svg[role="img"]');
+    expect(ring, "the quality ring renders").toBeTruthy();
+    // «Bid from» and the ring share the masthead card: walk up from the label until the node holds
+    // both, and assert that node is the card and not the whole dialog.
+    const card = screen.getByText("Bid from").closest("div")?.parentElement?.parentElement ?? null;
+    expect(card?.contains(ring!) ?? false).toBe(true);
+  });
+
+  it("carries a rail of the supplier's figures, and nothing of the renter's request", async () => {
+    draw();
+    expect(await screen.findByText("The quotation")).toBeTruthy();
+    expect(screen.queryByText("The request")).toBeNull();
+    for (const gone of ["Rental basis", "Working days / week", "Bids close", "An Narjis, Riyadh"]) {
+      expect(screen.queryByText(gone), gone).toBeNull();
+    }
+  });
+});
+
+describe("the terms step reads back as answered", () => {
+  it("counts the answered terms over the asked ones", async () => {
+    /* 🔴 **FIVE asked now, not six** (owner, 2026-09-22): `nationality` left the form's
+       own TERM_KEYS with the term itself, so it is no longer put to the supplier and no longer
+       counted against him — the ruling `fuelType` took on 2026-09-04. One contract term plus
+       four item terms, all five answered. */
+    const terms = await step("Terms");
+    // `findBy`, not `getBy`: the heading is drawn from the submission alone, but the COUNT needs the
+    // request's form payload, which lands a tick later (and later still under the whole suite).
+    expect(await within(terms).findByText("5 / 5", {}, { timeout: 5000 })).toBeTruthy();
+    expect(within(terms).getByText("answered")).toBeTruthy();
+  });
+
+  it("puts the contract term in the group the form marks «Applies to every item»", async () => {
+    const terms = await step("Terms");
+    // The contract term comes from the request's form payload, so it arrives after the heading.
+    expect(await within(terms).findByText("Applies to every item", {}, { timeout: 5000 })).toBeTruthy();
+    const row = within(terms).getByText("Payment Terms").closest("div")!;
+    expect(row.textContent).toContain("net_30");
+  });
+
+  it("states what the renter asked beside every answer", async () => {
+    const terms = await step("Terms");
+    const row = within(terms).getByText("Fuel responsibility").closest("div")!;
+    expect(row.textContent).toContain("you asked");
+    expect(row.textContent).toContain("On renter");
+    // He declined this one, and it says so rather than colouring the whole row.
+    expect(within(row as HTMLElement).getByText("No")).toBeTruthy();
+  });
+
+  /* 🔴 ~~«leaves a term the supplier never answered as neither Yes nor No».~~ Its subject
+     was `Operator nationality`, the one term this fixture leaves unanswered, and that term is hidden
+     on every surface now (2026-09-22). The RULE it pinned — an unanswered term reads as neither —
+     is untouched and has no other unanswered term in this fixture to be shown on, so it is asserted
+     the only honest way left: the retired term draws no row at all. */
+  it("draws no row for a term retired from the form", async () => {
+    const terms = await step("Terms");
+    expect(within(terms).queryByText("Operator nationality")).toBeNull();
+  });
+});
+
+describe("the price step is the form's, frozen", () => {
+  it("shows the units offered against the units asked for", async () => {
+    const price = await step("The price");
+    expect(within(price).getByText("Units offered")).toBeTruthy();
+    expect(within(price).getByText(/^1$/)).toBeTruthy();
+    expect(within(price).getByText("/ 2")).toBeTruthy();
+  });
+
+  it("shows the rate with its unit, and the days it was prorated over", async () => {
+    const price = await step("The price");
+    expect(within(price).getByText("18,000")).toBeTruthy();
+    expect(within(price).getByText(/SAR \/ month/)).toBeTruthy();
+    // 1 Sept → 31 Dec is 122 days; the rate is monthly, so the form prorates rather than charging one
+    // month. The day count needs the request's own period, which lands with the form payload.
+    expect((await within(price).findAllByText(/billable days/, {}, { timeout: 5000 })).length).toBeGreaterThan(0);
+  });
+
+  it("adds the transport leg the supplier priced, and no leg he did not", async () => {
+    const price = await step("The price");
+    expect(within(price).getByText("Delivery to site")).toBeTruthy();
+    expect(within(price).queryByText("Return from site")).toBeNull();
+  });
+});
+
+describe("the money", () => {
+  it("prorates the rate over the request's own period", async () => {
+    const price = await step("The price");
+    // A monthly rate on a 1 Sept → 31 Dec hire is not one month's money: the form prorated it, and
+    // the viewer states the same day count under the rate so the two pages reconcile.
+    expect(money.rental.raw).toBe(false);
+    expect(within(price).getAllByText(new RegExp(`${money.rental.billable} billable days`)).length).toBeGreaterThan(0);
+  });
+
+  it("prints three rows that add up, to the riyal", async () => {
+    // `vatLines` derives VAT as `total − subtotal`; rounding the three ends independently for display
+    // would undo that and print rows a renter cannot add. Read the printed figures back and add them.
+    draw();
+    await screen.findByText("The quotation");
+    // The card draws from the submission alone, but its FIGURES need the request's period, which
+    // arrives with the form payload — so wait for the prorated caption, not just the heading.
+    await screen.findAllByText(new RegExp(`${money.rental.billable} billable days`), {}, { timeout: 5000 });
+    const card = screen.getByText("The quotation").closest("div")!.parentElement!;
+    const text = (card.textContent ?? "").replace(/\s+/g, " ");
+    // The first figure printed after each label. Each of the three appears once in this card.
+    const figure = (label: string) => {
+      const after = text.split(label)[1] ?? "";
+      const digits = after.match(/[0-9,]+/)?.[0] ?? "";
+      return Number(digits.replace(/,/g, ""));
+    };
+    const subtotal = figure("Subtotal");
+    const vat = figure("VAT 15%");
+    const total = figure("Total incl. VAT");
+    expect(subtotal).toBe(Math.round(money.subtotal));
+    expect(total).toBe(Math.round(money.total));
+    expect(subtotal + vat).toBe(total);
+  });
+
+  it("splits the quotation into the lines the supplier priced", async () => {
+    draw();
+    await screen.findByText("The quotation");
+    // The card draws from the submission alone, but its FIGURES need the request's period, which
+    // arrives with the form payload — so wait for the prorated caption, not just the heading.
+    await screen.findAllByText(new RegExp(`${money.rental.billable} billable days`), {}, { timeout: 5000 });
+    const card = screen.getByText("The quotation").closest("div")!.parentElement!;
+    const text = (card.textContent ?? "").replace(/\s+/g, " ");
+    expect(text).toContain("Rental");
+    expect(text).toContain("Delivery to site");
+    // He priced no return leg, and an unpriced leg is left out rather than shown as zero.
+    expect(text).not.toContain("Return from site");
+  });
+});
+
+describe("the details step", () => {
+  it("fills the form's fields, and says «not entered» where the supplier left one blank", async () => {
+    const details = await step("The supplier's details");
+    expect(within(details).getByText("+966501112233")).toBeTruthy();
+    expect(within(details).getByText("bids@alfaisal.sa")).toBeTruthy();
+    expect(within(details).getByText("1010101010")).toBeTruthy();
+    // No national address was given, as text or as a file.
+    const na = within(details).getByText("National address").parentElement!;
+    expect(na.textContent).toContain("not entered");
+  });
+
+  it("renders a field the supplier answered with a FILE as that file", async () => {
+    const details = await step("The supplier's details");
+    // He gave no VAT number but attached the certificate.
+    expect(within(details).getByText(/vat\.pdf/).closest("a")!.getAttribute("href")).toBe("https://files.test/vat.pdf");
+  });
+
+  it("groups the attachments the way the form uploads them", async () => {
+    const details = await step("The supplier's details");
+    expect(within(details).getByText("Photos and documents")).toBeTruthy();
+    expect(within(details).getByText("Equipment photos")).toBeTruthy();
+    expect(within(details).getByText("Proof of ownership")).toBeTruthy();
+    expect(within(details).getByAltText("Front photo").getAttribute("src")).toBe("https://files.test/front.jpg");
+  });
+
+  it("keeps the supplier's own notes", async () => {
+    const details = await step("The supplier's details");
+    expect(within(details).getByText("Mobilisation within 48 hours")).toBeTruthy();
+  });
+});
+
+describe("nothing on it can be changed", () => {
+  it("offers no input, no select and no textarea — it is a read-only document", async () => {
+    draw();
+    await screen.findByText("The price");
+    expect(document.querySelectorAll("input, select, textarea").length).toBe(0);
+    // And none of the form's own actions: no «Yes to all», no «Send bid», no «Change».
+    for (const word of ["Yes to all", "Send bid", "Change"]) expect(screen.queryByText(word)).toBeNull();
+  });
+});

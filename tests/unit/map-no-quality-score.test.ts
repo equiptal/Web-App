@@ -128,10 +128,15 @@ describe("the surface cannot reach a bid-quality score (RM3-AC-29)", () => {
     // `BidFormClient.tsx`, and the quality import moved with the rendering — the surface still shows a
     // score, one file further in. Re-pointed rather than dropped: losing an entry quietly shrinks the
     // control until it proves nothing.
+    // `BidComparisonWorkspace.tsx` and `RequestBids.tsx` used to be on this list. Both were switched
+    // off with the old requests surfaces (docs/requests-workspace-disabled.md) — their code is intact
+    // but line-commented, so they import nothing at all now and would fail this control for a reason
+    // that has nothing to do with quality scores. Replaced with two live surfaces that still render
+    // one, rather than dropped: losing an entry quietly shrinks the control until it proves nothing.
     const siblings = [
       "src/app/bid/[token]/BidFormClient.tsx",
-      "src/components/compare/BidComparisonWorkspace.tsx",
-      "src/components/requests/RequestBids.tsx",
+      "src/components/requests/SharedBidSubmissionModal.tsx",
+      "src/components/requests/SharedLinkBidCard.tsx",
     ];
     for (const sibling of siblings) {
       const specs = importSpecifiers(resolve(ROOT, sibling)).join(" ");
@@ -243,7 +248,7 @@ describe("no view model on this surface exposes a score field (RM3-AC-29, §E)",
   it("the price footer carries no score key", () => {
     const model = priceFooterModel(
       {
-        price: 1000, priceUnit: "PER_DAY", unitsOffered: 3, agreedUnits: null,
+        price: 1000, priceUnit: "PER_DAY", unitsOffered: 3, agreedUnits: null, currentRentalUnits: null, numberOfUnits: 3,
         mobPrice: 500, demobPrice: 400, mobUnits: null, demobUnits: null,
         mobExcluded: false, demobExcluded: false, dealRoomId: null,
       },

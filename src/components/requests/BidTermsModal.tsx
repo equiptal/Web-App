@@ -1,24 +1,120 @@
 "use client";
 
 import { useState } from "react";
-import { bucketBidTerms, type TermRow, type TermState } from "@/lib/contract/bids";
+import { Dialog, DialogButton } from "@/components/Dialog";
+import { Icon } from "@/components/Icon";
+import { bucketBidTerms, termSides, CERT_LABEL, COUNTED_TERM_GROUP, type CertCode, type TermRow, type TermState } from "@/lib/contract/bids";
 
 /**
- * Per-term status modal (app parity: "Terms — <supplier>"). Every term the bid touches — equipment,
- * project, documents — is bucketed by STATE into three tabs, mirroring the mobile app: Conflict /
- * Pending review / Matched. matched+agreed → Matched; conflict → Conflict; grey+negotiating (still
- * being worked out) → Pending review. The footer opens the deal room.
+ * ── THE TERMS PAGE, READ OFF THE APP ────────────────────────────────────────────────────────────
+ * Owner: *"for terms panel ui from the terms in bid card, can u check how it is structured in the
+ * app and align, like structure and language"*. Ported from
+ * `features/marketplace/presentation/widgets/terms_modal.dart` (`TermsModalPage`, `_TermsByStatus`,
+ * `_TermsLegendHeader`, `_TermsStatusSection`) and `core/widgets/term_attribution_block.dart`.
+ *
+ * 🔴 **THE TABS ARE GONE, and that is the structural change.** ~~Three buttons, one bucket on screen
+ * at a time, opening on the first non-empty one.~~ The app stacks all three: a summary card, then one
+ * colour-headed section per non-empty state, Conflict → Pending review → Matched. A tab hides two
+ * thirds of the answer behind a press, and the question this page exists for — what is still open on
+ * this offer — is read by looking DOWN the three groups, not by choosing one.
+ *
+ * 🔴 **EVERY ROW NAMES BOTH SIDES.** ~~The renter's value alone in red, with the supplier's added
+ * only when he had proposed something else.~~ That rule (2026-09-06) was written for the COMPARISON's
+ * one-line cells, where a second half restated the colour; this page has room, and the app's own row
+ * carries two chips — «Renter» over her ask, «Supplier» over his — with the standing side filled and
+ * a side that has answered nothing reading «Not selected yet» in italic. Under them, one muted line
+ * saying who moved the value and when.
+ *
+ * ⚠️ **The FOOTER is the web's and stays.** The app's terms page is a route with its own back
+ * control; this is a dialog opened from the bid card, and the button under it is the renter's way
+ * from reading the terms to acting on them.
+ *
+ * ⚠️ **The buckets are NOT re-derived here.** `bucketBidTerms` is the same call the bid card's own
+ * tally makes, so the counts on this page can never disagree with the card that opened it.
  */
-type Tone = { word: (ok: string) => string; ar: string; c: string; mark: string };
-const STATE: Record<TermState, Tone> = {
-  matched: { word: (ok) => ok, ar: "مطابق", c: "#1daf58", mark: "✓" },
-  agreed: { word: (ok) => ok, ar: "متفق", c: "#1daf58", mark: "✓" },
-  negotiating: { word: () => "In deal room", ar: "في غرفة الصفقة", c: "#d4780a", mark: "↻" },
-  conflict: { word: () => "Conflict", ar: "تعارض", c: "#d9362a", mark: "!" },
-  grey: { word: () => "Pending review", ar: "بانتظار المراجعة", c: "#9AA7B8", mark: "–" },
-};
 
 type Bucket = "conflict" | "pending" | "matched";
+
+/** The renter's own ask behind the two collapsible rows, straight off `BidCard`. */
+export interface TermsAsk {
+  certsRequested: CertCode[];
+  certsHeld: CertCode[];
+  operatorIncluded: boolean;
+  /** The operator certificates the request asked for, comma-joined (`BidCard.operatorCertReq`). */
+  operatorCertReq: string | null;
+  fatFood: "supplier" | "me" | null;
+  fatAccommodation: "supplier" | "me" | null;
+}
+
+/** The app's own tones for the three states (`AppColors.danger` / `.warning` / `.success`).
+ *
+ * 🔴 **PENDING is the SLATE, not the mustard** (owner, 2026-09-23: *"pending terms in the terms
+ * modal must be grey or light blue not this yellow"*). ~~`--warn` on `--warn-soft`.~~ Two reasons
+ * beyond the instruction, and both matter:
+ *
+ *   · **`--warn` in this palette is a MUSTARD** (#b98a1d), not the amber the app draws — the same
+ *     mismatch the canvas's provenance ring was corrected for on 2026-09-08 and the off-catalogue
+ *     box on 2026-09-12. It is also a FILL token; `--warn-deep` is the one that may carry text.
+ *   · **Pending is not a WARNING.** It is «nobody has answered this yet», which is the absence of a
+ *     verdict rather than a bad one — and painted the colour of caution it read as a problem beside
+ *     the red bucket directly above it.
+ *
+ * ⚠️ `--info` is this palette's slate, in the ink family: it has no true blue by design, which
+ * is the 2026-09-06 ruling. The COMPARISON's terms band already uses it (2026-09-13), so a term
+ * awaiting an answer is one colour across the two surfaces that count them. */
+const TONE: Record<Bucket, { c: string; soft: string }> = {
+  conflict: { c: "var(--danger)", soft: "var(--danger-soft)" },
+  pending: { c: "var(--info)", soft: "var(--info-soft)" },
+  matched: { c: "var(--ok)", soft: "var(--ok-soft)" },
+};
+
+/**
+ * The app's `termsItemLabelFor`, which is a SEPARATE vocabulary from the deal room's `termLabel` —
+ * the same two-map split the app keeps. Keyed on `COUNTED_TERM_GROUP`, because a group can be filled
+ * by either of two rows (`operator_included` or `operator`) and the app names the GROUP.
+ *
+ * ⚠️ A row outside the six falls back to its own label, which is what an off-platform bid needs:
+ * `allTerms` counts every answered required term, and those carry keys this map has never heard of.
+ */
+const TERMS_ITEM_LABEL: Record<string, { en: string; ar: string }> = {
+  payment: { en: "Payment Terms", ar: "شروط الدفع" },
+  breakdown: { en: "Breakdown Response SLA", ar: "سرعة الاستجابة للأعطال" },
+  overtime: { en: "Overtime", ar: "العمل الإضافي" },
+  fuel: { en: "Fuel Responsibility", ar: "مسؤولية الوقود" },
+  certs: { en: "Equipment Certifications", ar: "شهادات المعدات" },
+  operator: { en: "Operator", ar: "المشغّل" },
+};
+
+const rowLabel = (r: TermRow, ar: boolean): string => {
+  const app = TERMS_ITEM_LABEL[COUNTED_TERM_GROUP[r.key] ?? ""];
+  if (app) return ar ? app.ar : app.en;
+  return ar ? r.labelAr : r.labelEn;
+};
+
+/**
+ * ⚠️ **Latin, in both locales.** `ar` formats a date with Arabic-Indic digits, and this product
+ * prints Latin figures everywhere (2026-09-04). The app draws `DateFormat.MMMd`; this is its shape.
+ */
+const shortDate = (iso: string | null | undefined): string | null => {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(d);
+};
+
+/** Which side's value currently stands (app parity: `TermResolvedSide`). */
+type Side = "rentee" | "supplier" | "both" | "none";
+
+function resolvedSide(state: TermState, asked: string | null, offered: string | null): Side {
+  // Locked in the room → the parties converged, and only that reads as a green pair. An equal but
+  // un-locked pair is the supplier's offer STANDING, not an agreement — the app says so explicitly.
+  if (state === "agreed") return "both";
+  if (state === "matched") return offered ? "supplier" : "rentee";
+  if (state === "conflict" || state === "negotiating") return "none";
+  if (asked && !offered) return "rentee";
+  if (offered && !asked) return "supplier";
+  return "none";
+}
 
 export function BidTermsModal({
   supplier,
@@ -32,6 +128,7 @@ export function BidTermsModal({
   hidePending,
   negotiable,
   allTerms,
+  ask,
 }: {
   supplier: string;
   terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] };
@@ -41,97 +138,308 @@ export function BidTermsModal({
   onNegotiate: () => void;
   negotiateLabel?: string;
   onClose: () => void;
-  /** Off-platform (shared-link) bids have no deal room → no "Pending review" state; hide that tab. */
+  /** Off-platform (shared-link) bids have no deal room → no "Pending review" state; hide that group. */
   hidePending?: boolean;
   /** The comparison's specific negotiable terms (safety cert, operator cert, FAT, fuel resp, …) — the
    *  app-accurate rows. When present they replace the vague equipment "certs"/"operator" lumped rows. */
   negotiable?: TermRow[];
   /** Off-platform: count/show EVERY answered required term (not just the app's 6 negotiable ones), so the
-   *  tabs match the card tally + the full submission view. */
+   *  groups match the card tally + the full submission view. */
   allTerms?: boolean;
+  /** The renter's own ask behind the two collapsible rows (app parity: `_CertParentTile`,
+   *  `_OperatorFlatTile`). Optional — a caller that has no bid card in hand passes nothing and both
+   *  rows draw flat, which is exactly the app's own legacy fallback. */
+  ask?: TermsAsk;
 }) {
-  // Shared bucketing (bids.ts bucketBidTerms) — the SAME logic the bid card's tally uses, so the tab
-  // counts here always equal the card's "Conflict N · Matched N".
   const { byBucket } = bucketBidTerms(terms, negotiable, { all: allTerms });
 
-  const tabs: { key: Bucket; label: string; c: string; bg: string }[] = [
-    { key: "conflict", label: L("Conflict", "تعارض"), c: "#d9362a", bg: "#fdecea" },
-    // Hidden for off-platform bids — no deal room means terms are answered Yes/No, never "pending review".
-    ...(hidePending ? [] : [{ key: "pending" as Bucket, label: L("Pending review", "بانتظار المراجعة"), c: "#d4780a", bg: "#fff3e0" }]),
-    { key: "matched", label: L("Matched", "مطابق"), c: "#1daf58", bg: "#e7f7ee" },
+  const groups: { key: Bucket; label: string }[] = [
+    { key: "conflict", label: L("Conflict", "تعارض") },
+    ...(hidePending ? [] : [{ key: "pending" as Bucket, label: L("Pending review", "قيد المراجعة") }]),
+    { key: "matched", label: L("Matched", "مطابق") },
   ];
-  // Open on the first tab that has something (Conflict → Pending → Matched), else Matched.
-  const firstNonEmpty = tabs.find((t) => byBucket[t.key].length)?.key ?? "matched";
-  const [active, setActive] = useState<Bucket>(firstNonEmpty);
-  const rows = byBucket[active];
 
   return (
-    <div
-      dir={ar ? "rtl" : "ltr"}
-      onClick={onClose}
-      style={{ position: "fixed", inset: 0, zIndex: 70, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+    <Dialog
+      open
+      onClose={onClose}
+      size="lg"
+      title={L("Terms", "الشروط")}
+      subtitle={supplier}
+      footer={
+        <DialogButton tone="primary" full disabled={busy} onClick={onNegotiate}>
+          {negotiateLabel ?? L("Negotiate terms", "التفاوض على الشروط")}
+        </DialogButton>
+      }
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 560, maxHeight: "90vh", display: "flex", flexDirection: "column", background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)" }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "20px 22px 14px" }}>
-          <h3 style={{ fontSize: 18, fontWeight: 900, color: "#1c3550", margin: 0 }}>{L("Terms", "الشروط")} — {supplier}</h3>
-          <button onClick={onClose} aria-label={L("Close", "إغلاق")} style={{ width: 36, height: 36, borderRadius: 10, border: "none", background: "#eff4f9", color: "#6b8fa8", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <span className="material-icons-outlined" style={{ fontSize: 20 }}>close</span>
-          </button>
-        </div>
+      <SummaryHeader groups={groups} counts={byBucket} L={L} />
 
-        {/* 3 state tabs (Conflict / Pending review / Matched) with counts */}
-        <div style={{ display: "flex", gap: 8, padding: "0 22px 4px" }}>
-          {tabs.map((t) => {
-            const on = active === t.key;
-            const n = byBucket[t.key].length;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setActive(t.key)}
-                style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 8px", borderRadius: 11, border: `1.5px solid ${on ? t.c : "#e6ebf2"}`, background: on ? t.bg : "#fff", color: on ? t.c : "#6b8fa8", fontFamily: "inherit", fontWeight: 800, fontSize: 12.5, cursor: "pointer", whiteSpace: "nowrap" }}
-              >
-                {t.label} <span style={{ fontWeight: 900 }}>{n}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div style={{ overflowY: "auto", padding: "10px 22px 18px" }}>
-          {rows.length === 0 ? (
-            <div style={{ padding: "26px 0", textAlign: "center", fontSize: 13.5, fontWeight: 600, color: "#9AA7B8" }}>
-              {active === "conflict" ? L("No conflicts.", "لا تعارضات.") : active === "pending" ? L("Nothing pending review.", "لا شيء بانتظار المراجعة.") : L("Nothing matched yet.", "لا مطابقات بعد.")}
-            </div>
-          ) : (
-            rows.map((r, i) => {
-              const st = STATE[r.state];
-              const okWord = active === "matched" ? L("Matched", "مطابق") : st.word("");
-              const word = ar ? st.ar : st.word(active === "matched" ? "Matched" : "");
-              return (
-                <div key={`${r.key}-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "13px 0", borderBottom: "1px solid #EFF2F6" }}>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: "#1c3550" }}>
-                    {ar ? r.labelAr : r.labelEn}
-                    {r.detail && (r.state === "conflict" || r.state === "negotiating") && <span style={{ color: "#6b8fa8", fontWeight: 500 }}> · {ar ? r.detail.ar : r.detail.en}</span>}
-                  </span>
-                  <span style={{ fontSize: 14.5, fontWeight: 800, color: st.c, whiteSpace: "nowrap" }}>{st.mark} {word || okWord}</span>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <div style={{ padding: "14px 22px 20px", borderTop: "1px solid #EFF2F6" }}>
-          <button
-            onClick={onNegotiate}
-            disabled={busy}
-            style={{ width: "100%", padding: "14px", borderRadius: 14, border: "none", background: "#1c3550", color: "#fff", fontWeight: 800, fontSize: 15, cursor: busy ? "default" : "pointer", fontFamily: "inherit", opacity: busy ? 0.7 : 1 }}
-          >
-            {negotiateLabel ?? L("Negotiate terms", "التفاوض على الشروط")}
-          </button>
-        </div>
+      <div className="mt-3 flex flex-col gap-3">
+        {groups
+          .filter((g) => byBucket[g.key].length > 0)
+          .map((g) => (
+            <section key={g.key} className="overflow-hidden rounded-md border border-border">
+              {/* The band carries the state ONCE, for every row under it — which is why the rows
+                  themselves no longer repeat a verdict word beside each value. */}
+              <header className="flex items-center gap-2 px-3.5 py-2.5" style={{ background: TONE[g.key].soft }}>
+                <span aria-hidden="true" className="h-2.5 w-2.5 flex-none rounded-full" style={{ background: TONE[g.key].c }} />
+                <span className="text-body font-extrabold" style={{ color: TONE[g.key].c }}>
+                  {g.label}
+                </span>
+                <span className="text-meta font-extrabold tabular-nums" style={{ color: TONE[g.key].c }}>
+                  {byBucket[g.key].length}
+                </span>
+              </header>
+              {byBucket[g.key].map((r, i) => (
+                <TermTile key={`${r.key}-${i}`} row={r} ar={ar} L={L} ask={ask} />
+              ))}
+            </section>
+          ))}
       </div>
+    </Dialog>
+  );
+}
+
+/**
+ * The app's `_TermsLegendHeader`: a segmented proportion bar over three stat pills. All three are
+ * drawn whatever the counts, so the renter reads the whole picture rather than only what is wrong —
+ * a zero pill greys out rather than disappearing, which keeps the row the same shape on every bid.
+ */
+function SummaryHeader({
+  groups,
+  counts,
+  L,
+}: {
+  groups: { key: Bucket; label: string }[];
+  counts: Record<Bucket, TermRow[]>;
+  L: (en: string, arr: string) => string;
+}) {
+  const total = groups.reduce((n, g) => n + counts[g.key].length, 0);
+  return (
+    <div className="rounded-lg border border-border bg-surface p-4">
+      <div className="flex h-2 gap-[3px] overflow-hidden rounded-full">
+        {total === 0 ? (
+          <span className="flex-1 rounded-full bg-surface2" />
+        ) : (
+          groups
+            .filter((g) => counts[g.key].length > 0)
+            .map((g) => (
+              <span
+                key={g.key}
+                className="rounded-full"
+                style={{ flex: counts[g.key].length, background: TONE[g.key].c }}
+              />
+            ))
+        )}
+      </div>
+      <div className="mt-3.5 flex gap-2">
+        {groups.map((g) => {
+          const n = counts[g.key].length;
+          const tone = n > 0 ? TONE[g.key].c : "var(--muted-light)";
+          return (
+            <div
+              key={g.key}
+              className="flex flex-1 flex-col items-center rounded-md px-2.5 py-2.5"
+              style={{ background: n > 0 ? TONE[g.key].soft : "var(--surface2)" }}
+            >
+              <span className="text-title font-extrabold leading-none tabular-nums" style={{ color: tone }}>
+                {n}
+              </span>
+              <span className="mt-1.5 flex min-w-0 items-center gap-1.5">
+                <span aria-hidden="true" className="h-[7px] w-[7px] flex-none rounded-full" style={{ background: tone }} />
+                <span className={`truncate text-label font-semibold ${n > 0 ? "text-navy" : "text-muted"}`}>{g.label}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <span className="sr-only">{L("Terms by status", "الشروط حسب الحالة")}</span>
     </div>
   );
+}
+
+/** One row: the label, the two sides, and what the deal room did to it. */
+function TermTile({
+  row,
+  ar,
+  L,
+  ask,
+}: {
+  row: TermRow;
+  ar: boolean;
+  L: (en: string, arr: string) => string;
+  ask?: TermsAsk;
+}) {
+  const [open, setOpen] = useState(false);
+  const group = COUNTED_TERM_GROUP[row.key] ?? "";
+  const children = ask ? childRows(group, ask, L) : [];
+  const canOpen = children.length > 0;
+
+  return (
+    <div className="border-t border-border">
+      <div className="px-3.5 py-2.5">
+        <button
+          type="button"
+          disabled={!canOpen}
+          onClick={() => setOpen((o) => !o)}
+          className={`flex w-full items-start gap-2 text-start ${canOpen ? "" : "cursor-default"}`}
+        >
+          {canOpen && (
+            <Icon name={open ? "keyboard_arrow_up" : "keyboard_arrow_down"} size={18} className="mt-0.5 flex-none text-muted" />
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block text-subhead font-semibold text-navy">{rowLabel(row, ar)}</span>
+            {canOpen && <span className="mt-0.5 block text-label font-semibold text-muted">{subtitle(group, ask!, L)}</span>}
+          </span>
+        </button>
+        <Attribution row={row} ar={ar} L={L} />
+      </div>
+      {open &&
+        children.map((c) => (
+          <div key={c.label} className="flex items-center gap-2 border-t border-border bg-surface2 py-2 pe-3.5 ps-9">
+            {c.held != null && (
+              <Icon
+                name={c.held ? "check_circle" : "radio_button_unchecked"}
+                size={c.held ? 15 : 10}
+                className={c.held ? "flex-none text-ok" : "flex-none text-muted-light"}
+              />
+            )}
+            <span className="min-w-0 flex-1 truncate text-meta font-semibold text-muted">{c.label}</span>
+            {c.value && <span className="flex-none text-meta font-semibold text-navy">{c.value}</span>}
+            {c.held === true && (
+              <span className="flex-none rounded-full bg-ok-soft px-2 py-0.5 text-label font-extrabold text-ok">
+                {L("Held", "متوفرة")}
+              </span>
+            )}
+          </div>
+        ))}
+    </div>
+  );
+}
+
+/**
+ * The renter's ask and the supplier's answer, side by side (app: `TermAttributionBlock`).
+ *
+ * ⚠️ `termSides` is what tells the two apart, and it returns `offered: null` for a REFUSAL — a dash,
+ * an empty half, or the words this codebase uses for "not confirmed". That null is what makes the
+ * supplier's chip read «Not selected yet» rather than echoing a refusal back as an offer.
+ */
+function Attribution({ row, ar, L }: { row: TermRow; ar: boolean; L: (en: string, arr: string) => string }) {
+  const { asked, offered } = termSides(row, ar);
+
+  // Neither side has said anything: one muted line, and no pair of empty chips.
+  if (!asked && !offered) {
+    return <p className="mt-1.5 text-label font-semibold text-muted-light">{L("Not determined", "غير محدَّد")}</p>;
+  }
+
+  const side = resolvedSide(row.state, asked, offered);
+  const both = side === "both";
+  const when = shortDate(row.updatedAt);
+  /* ⚠️ Every counter that reaches a row is the SUPPLIER's — `mapBid` drops a renter's own counter
+     before the overlay writes it into the value column — so the role in this caption is not a
+     variable. It is named anyway rather than folded into the sentence, because the app's string
+     takes the role as a placeholder and the day a renter's counter is surfaced it fills here. */
+  const caption =
+    row.state === "agreed"
+      ? join(L("Agreed in deal room", "تم الاتفاق في غرفة الصفقة"), when)
+      : row.counterSide
+        ? join(
+            row.counterSide === "rentee"
+              ? L("Updated by Renter", "تم التحديث بواسطة المستأجر")
+              : L("Updated by Supplier", "تم التحديث بواسطة المؤجر"),
+            when,
+          )
+        : asked && !offered
+          ? L("Supplier hasn't responded", "لم يرد المورد بعد")
+          : null;
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-start gap-2">
+        <Chip role={L("Renter", "مستأجر")} value={asked} placeholder={L("Not selected yet", "لم يُحدَّد بعد")} highlight={!!asked && (both || side === "rentee")} matched={both && !!asked} />
+        <Chip role={L("Supplier", "مؤجر")} value={offered} placeholder={L("Not selected yet", "لم يُحدَّد بعد")} highlight={!!offered && (both || side === "supplier")} matched={both && !!offered} />
+      </div>
+      {caption && (
+        <p className="mt-1.5 flex items-center gap-1 text-label font-semibold text-muted">
+          <Icon name={row.state === "agreed" ? "check_circle" : "history"} size={13} className="flex-none text-muted/70" />
+          {caption}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const join = (what: string, when: string | null): string => (when ? `${what} · ${when}` : what);
+
+/** One side's value. Navy when it stands, green with a tick when the room locked the pair. */
+function Chip({
+  role,
+  value,
+  placeholder,
+  highlight,
+  matched,
+}: {
+  role: string;
+  value: string | null;
+  placeholder: string;
+  highlight: boolean;
+  matched: boolean;
+}) {
+  const empty = !value;
+  const bg = empty ? "bg-surface2/60" : matched ? "bg-ok-soft" : highlight ? "bg-info-soft/60" : "bg-surface2";
+  const ink = empty ? "text-muted-light" : matched ? "text-ok-deep" : highlight ? "text-navy" : "text-muted";
+  return (
+    <span className={`min-w-0 flex-1 rounded-sm px-2.5 py-1.5 ${bg}`}>
+      <span className="block text-label font-semibold text-muted">{role}</span>
+      <span className="mt-0.5 flex items-center gap-1">
+        {matched && <Icon name="check" size={12} className="flex-none text-ok" />}
+        <span className={`min-w-0 truncate text-meta ${empty ? "font-semibold italic" : "font-semibold"} ${ink}`}>
+          {value ?? placeholder}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+/** The header's second line on a collapsible row: what the renter asked for, counted. */
+function subtitle(group: string, ask: TermsAsk, L: (en: string, arr: string) => string): string {
+  if (group === "certs") {
+    return ask.certsRequested.length
+      ? L(`${ask.certsRequested.length} requested`, `${ask.certsRequested.length} مطلوبة`)
+      : L("No certificates requested", "لا توجد شهادات مطلوبة");
+  }
+  return ask.operatorIncluded ? L("Yes", "نعم") : L("No", "لا");
+}
+
+/**
+ * The children behind the two collapsible rows.
+ *
+ * 🔴 **The cert rows are the renter's REQUEST, with a «Held» badge where the platform tracks the
+ * supplier's status** — informational, exactly as the app has it: a requested cert never gates a bid.
+ *
+ * ⚠️ The app's child row OPENS the supplier's uploaded certificate when one exists
+ * (`bid.equipment.certDocUrls`). That map is not on `BidCard`, so these rows carry the badge and no
+ * press. See the report.
+ */
+function childRows(
+  group: string,
+  ask: TermsAsk,
+  L: (en: string, arr: string) => string,
+): { label: string; value?: string; held?: boolean }[] {
+  if (group === "certs") {
+    const held = new Set(ask.certsHeld);
+    return ask.certsRequested.map((c) => ({ label: CERT_LABEL[c]?.en ?? c, held: held.has(c) }));
+  }
+  if (group === "operator" && ask.operatorIncluded) {
+    const fat = (v: "supplier" | "me" | null) =>
+      v == null ? L("Not specified", "غير محدد") : v === "supplier" ? L("On Supplier", "على المورد") : L("On Renter", "على المستأجر");
+    return [
+      ...(ask.operatorCertReq ? [{ label: L("Operator Certifications", "شهادات المشغل"), value: ask.operatorCertReq }] : []),
+      ...(ask.fatFood != null ? [{ label: L("Food", "الطعام"), value: fat(ask.fatFood) }] : []),
+      ...(ask.fatAccommodation != null
+        ? [{ label: L("Accommodation / Transport", "الإقامة / النقل"), value: fat(ask.fatAccommodation) }]
+        : []),
+    ];
+  }
+  return [];
 }

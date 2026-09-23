@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useT, useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
+import { BellIcon, CountBadge } from "@/components/HeaderIcons";
 import {
   fetchNotifications,
   fetchNotificationsUnreadCount,
@@ -11,6 +12,7 @@ import {
   markAllNotificationsRead,
 } from "@/lib/api/client";
 import { notificationHref, type NotificationItem, type NotificationFilter } from "@/lib/contract/notifications";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Top-bar notifications bell (app parity). Distinct from the inbox icon (deal-room unread). The badge
@@ -19,6 +21,17 @@ import { notificationHref, type NotificationItem, type NotificationFilter } from
  * clicking an item marks it read (optimistic) and deep-links via `notificationHref`.
  */
 const POLL_MS = 30_000;
+
+/**
+ * The bell's own element id, so the home page's bubble can measure where the bell IS and hang itself
+ * under it. A measured anchor rather than a guessed offset: the header is 52px today, the gutter is
+ * `px-4` on a phone and `px-7` from `sm`, and the bell is not the last control on the row.
+ */
+export const BELL_ANCHOR_ID = "notifications-bell-anchor";
+
+/** «+2 more» on the bubble opens this dropdown. The bell owns `open`, so the ask travels as an
+ *  event rather than as a prop through a shell that does not render the bubble. */
+export const OPEN_BELL_EVENT = "moeda:open-notifications";
 
 type DayGroup = "today" | "yesterday" | "earlier";
 
@@ -34,7 +47,8 @@ function dayGroupOf(iso: string): DayGroup {
   return "earlier";
 }
 
-function relativeTime(iso: string, locale: string, justNow: string): string {
+/** Shared with the home bubble, which prints the same age in the same words. */
+export function relativeTime(iso: string, locale: string, justNow: string): string {
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) return "";
   const diffMs = Date.now() - then.getTime();
@@ -109,6 +123,13 @@ export function NotificationsBell() {
     if (href) router.push(href);
   };
 
+  // «+n more» on the home bubble, and anything else that wants the full list open.
+  useEffect(() => {
+    const openIt = () => setOpen(true);
+    window.addEventListener(OPEN_BELL_EVENT, openIt);
+    return () => window.removeEventListener(OPEN_BELL_EVENT, openIt);
+  }, []);
+
   const onMarkAll = () => {
     setItems((prev) => prev.map((x) => ({ ...x, isRead: true })));
     setUnread(0);
@@ -137,21 +158,29 @@ export function NotificationsBell() {
   const isEmpty = !loading && !error && items.length === 0;
 
   return (
-    <div className="relative">
+    <div {...pin("notifications-bell")} id={BELL_ANCHOR_ID} className="relative">
+      {/* The bell is the header prototype's outline, not Material's glyph, and it inherits the bar's
+          `var(--muted-dark)` rather than setting its own colour — it and the inbox are one pair, and the pair
+          is coloured by the group that holds them (owner, 2026-08-25). */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative grid h-9 w-9 place-items-center rounded-full text-navy-mid transition hover:bg-surface2"
+        /* ── The hover was painting it OUT (owner, 2026-09-06) ────────────────────────────────
+           `hover:text-navy-deep` on a `bg-navy` bar: the glyph darkened into its own background, so
+           pointing at the bell made it vanish and leave a hole where the icon had been. Its
+           neighbour in the same group has always used `hover:text-white`, which is the bar's rule —
+           these two are one pair and are coloured by the group that holds them. */
+        className="grid h-[30px] w-[30px] place-items-center rounded-full transition hover:text-white"
         aria-label={t.notifications.title}
         aria-haspopup="menu"
         aria-expanded={open}
         title={t.notifications.title}
       >
-        <Icon name="notifications" size={20} />
-        {unread > 0 && (
-          <span className="absolute -end-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white ring-2 ring-surface">
-            {unread > 99 ? "99+" : unread}
-          </span>
-        )}
+        {/* 34px box, 20px glyph — the bar's one size for a standalone icon control. The badge hangs
+            off the glyph rather than the box, or it would float clear of the bell. */}
+        <span className="relative inline-flex">
+          <BellIcon />
+          <CountBadge count={unread} />
+        </span>
       </button>
 
       {open && (
@@ -159,14 +188,14 @@ export function NotificationsBell() {
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
             role="menu"
-            className="absolute end-0 z-40 mt-1 flex max-h-[70vh] w-[340px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[12px] border border-border bg-surface shadow-lg"
+            className="absolute end-0 z-40 mt-1 flex max-h-[70vh] w-[340px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-sm border border-border bg-surface"
           >
             <div className="flex items-center justify-between gap-2 border-b border-border px-3.5 py-2.5">
-              <b className="text-[14px] font-extrabold text-navy">{t.notifications.title}</b>
+              <b className="text-body font-extrabold text-navy">{t.notifications.title}</b>
               {unread > 0 && (
                 <button
                   onClick={onMarkAll}
-                  className="text-[12px] font-bold text-brand transition hover:brightness-110"
+                  className="text-meta font-semibold text-brand transition"
                 >
                   {t.notifications.markAllRead}
                 </button>
@@ -178,7 +207,7 @@ export function NotificationsBell() {
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`rounded-full px-3 py-1 text-[12px] font-bold transition ${
+                  className={`rounded-full px-3 py-1 text-meta font-semibold transition ${
                     filter === f ? "bg-navy text-white" : "bg-surface2 text-muted hover:text-navy-mid"
                   }`}
                 >
@@ -194,10 +223,10 @@ export function NotificationsBell() {
                 </div>
               )}
               {error && !loading && (
-                <p className="px-4 py-10 text-center text-[13px] font-semibold text-muted">{t.notifications.loadError}</p>
+                <p className="px-4 py-10 text-center text-body font-semibold text-muted">{t.notifications.loadError}</p>
               )}
               {isEmpty && (
-                <p className="px-4 py-10 text-center text-[13px] font-semibold text-muted">
+                <p className="px-4 py-10 text-center text-body font-semibold text-muted">
                   {filter === "unread" ? t.notifications.emptyUnread : t.notifications.empty}
                 </p>
               )}
@@ -206,7 +235,7 @@ export function NotificationsBell() {
                 order.map((key) =>
                   groups[key].length ? (
                     <div key={key}>
-                      <div className="bg-surface2/60 px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted">
+                      <div className="bg-surface2/60 px-3.5 py-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
                         {groupLabel[key]}
                       </div>
                       {groups[key].map((n) => (
@@ -221,14 +250,14 @@ export function NotificationsBell() {
                           />
                           <span className="min-w-0 flex-1">
                             <span className="flex items-baseline justify-between gap-2">
-                              <b className={`truncate text-[13px] ${n.isRead ? "font-semibold text-navy-mid" : "font-extrabold text-navy"}`}>
+                              <b className={`truncate text-body ${n.isRead ? "font-semibold text-navy-mid" : "font-extrabold text-navy"}`}>
                                 {n.title}
                               </b>
-                              <small className="flex-none text-[11px] font-semibold text-muted">
+                              <small className="flex-none text-label font-semibold text-muted">
                                 {relativeTime(n.createdAt, locale, t.notifications.justNow)}
                               </small>
                             </span>
-                            {n.body && <span className="mt-0.5 block text-[12px] leading-snug text-muted">{n.body}</span>}
+                            {n.body && <span className="mt-0.5 block text-meta leading-snug text-muted">{n.body}</span>}
                           </span>
                         </button>
                       ))}

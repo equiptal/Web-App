@@ -5,7 +5,7 @@
  * chatted first) before the renter ever taps: `dealRoomStatus === "OPEN"` + `unreadCount > 0` is the
  * "supplier started" signal. Reuses the app-backend; no new backend.
  */
-import { readSupplierCompanyId, readSupplierId } from "./bids";
+import { readSupplierCompanyId, readSupplierDisplayName, readSupplierId } from "./bids";
 
 export type InboxDealRoomStatus = "OPEN" | "NEGOTIATING" | "AWAITING_SUPPLIER_CONFIRMATION" | "CLOSED" | "ABANDONED" | string;
 
@@ -33,6 +33,19 @@ export interface InboxBid {
    *  is null until the backend projects it on received-bids — grouping falls back to the request id. */
   request: { id: string; displayId: string | null; shortCode: string | null; equipmentSummary: string | null; groupId: string | null; location: string | null };
   equipmentType: { id: string | null; name: string | null };
+  /**
+   * The machine as the REQUEST names it: its SUBTYPE and its SIZE, in both locales (owner,
+   * 2026-09-05: *"show equipment subtype and size, not model and year"*).
+   *
+   * `equipmentName` above is the supplier's LISTING — «Caterpillar 320» — which answers a different
+   * question: it says which machine he is offering, not which machine was asked for. On a renter's
+   * rail of incoming bids the second is what he is scanning for, and two suppliers offering the same
+   * 20-ton excavator under different model numbers read as two unrelated machines.
+   *
+   * Both halves come off the request's own enriched item (`subtypeName` / `capacityName`), so they
+   * are the same words the request card and the workspace print.
+   */
+  equipment: { subtype: string | null; subtypeAr: string | null; size: string | null; sizeAr: string | null };
   createdAt: string | null;
   /** Derived: a supplier opened the room and messaged before the renter entered (OPEN + unread). */
   supplierStarted: boolean;
@@ -49,8 +62,13 @@ function mapRow(raw: Record<string, unknown>): InboxBid {
   const eq = (raw.equipment ?? {}) as Record<string, unknown>;
   const items = Array.isArray(req.equipmentItems) ? (req.equipmentItems as Record<string, unknown>[]) : [];
   const item0 = items[0] ?? {};
+  /* His own words, read ONLY when the line carries no taxonomy name (owner, 2026-09-12) — in both
+     locales, since he typed one language. Not keyed on `isUndefined`: a hidden line is undefined and
+     still has a catalogue name, and the name is what a row is read by. */
+  const custom = s(item0.subtypeName) || s(item0.categoryName) ? null : s(item0.customEquipmentName);
   const equipmentName =
     [s(eq.manufacturer), s(eq.modelName)].filter(Boolean).join(" ") ||
+    custom ||
     s(item0.subtypeName) ||
     s(item0.categoryName) ||
     null;
@@ -66,7 +84,9 @@ function mapRow(raw: Record<string, unknown>): InboxBid {
     priceUnit: s(raw.priceUnit),
     agreedUnits: n(raw.agreedUnits),
     unitsOffered: Array.isArray(raw.unitsOffered) ? raw.unitsOffered.length : (n(raw.unitsOffered) ?? 1),
-    supplierName: s(raw.supplierDisplayName) ?? s(raw.supplierName) ?? "Supplier",
+    // The FIRM, by the same derivation the bid card uses — `readSupplierDisplayName` says why one
+    // counterparty cannot have two names (owner, 2026-09-07).
+    supplierName: readSupplierDisplayName(raw),
     // The SAME derivation the bid list uses (`mapBid`), not a second one that reads the flat keys
     // only. The chat dock keys its anchor tab from a `BidCard` and its rows from these `InboxBid`s
     // (004a §2); on any projection that nests the company id, a narrower reader here made the anchor
@@ -80,12 +100,18 @@ function mapRow(raw: Record<string, unknown>): InboxBid {
       id: s(req.id) ?? "",
       displayId: s(req.displayId),
       shortCode: s(req.shortCode),
-      equipmentSummary: s(item0.subtypeName) ?? equipmentName,
+      equipmentSummary: custom ?? s(item0.subtypeName) ?? equipmentName,
       // `requestGroupId` collapses a multi-item RFQ's fan-out siblings — null until the backend adds it.
       groupId: s(req.requestGroupId) ?? s(req.groupId),
       location: s(req.projectAddressLabel),
     },
-    equipmentType: { id: s(item0.subtypeId) ?? s(item0.categoryId), name: s(item0.subtypeName) ?? s(item0.categoryName) ?? equipmentName },
+    equipmentType: { id: s(item0.subtypeId) ?? s(item0.categoryId), name: custom ?? s(item0.subtypeName) ?? s(item0.categoryName) ?? equipmentName },
+    equipment: {
+      subtype: custom ?? s(item0.subtypeName) ?? s(item0.categoryName),
+      subtypeAr: custom ?? s(item0.subtypeNameAr) ?? s(item0.categoryNameAr),
+      size: s(item0.capacityName),
+      sizeAr: s(item0.capacityNameAr),
+    },
     createdAt: s(raw.createdAt) ?? s(raw.lastUpdatedAt),
     supplierStarted: dealRoomStatus === "OPEN" && unreadCount > 0,
   };

@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<title>Renter Dashboard — Moedatech</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap"
+  rel="stylesheet"
+/>
+
+<!--
+  Moedatech — RENTER DASHBOARD · v1
+
+  One page, three tabs, one evergreen strip:
+    My Requests   — procurement. What went out, what came back, what needs deciding.
+    My Projects   — operations. Site rail + Gantt of the machines those requests won.
+    My Suppliers  — the private record. Only what the backend will show BECAUSE you
+                    have a relationship: what they quoted you, how fast they answer,
+                    the terms you agreed, and their papers (bid-scoped read).
+    Stores        — the public market, under every tab. Facts, identical for everyone.
+
+  The rule that keeps Stores and My Suppliers apart:
+    if two renters would see the same pixel it belongs in Stores; if it differs per
+    renter it belongs in My Suppliers. Company papers are the proof — the only read
+    is GET /marketplace/bids/{bidId}/company-documents, derived from a bid on YOUR
+    request, so Stores cannot show them even in principle.
+
+  Requests : Projects is MANY : ONE. A project is the site and the period; requests
+  are the events inside it. The first request at a new site offers to create the
+  project, pre-filled from its own projectAddressLabel / startDate / endDate.
+
+  On the system (DESIGN.md): navy ramp, six type steps, radii 8/10/14, control
+  heights 30/34/44, the 4px grid, colour-only hover, and no shadows anywhere.
+-->
+
+<style>
+  :root{
+    --navy-deep:#16263f; --navy:#1c3550; --navy-mid:#2a4f72;
+    --muted-dark:#5a6b82; --muted:#6b8fa8; --muted-light:#9aa7b8;
+    --border-strong:#c3d2e0; --border:#d4e0ec;
+    --surface3:#e4edf5; --surface2:#eff4f9; --background:#f5f8fc; --surface:#ffffff;
+
+    --brand:#f79009; --brand-hover:#e58108; --brand-press:#cc7207;
+    --brand-deep:#b45309; --brand-pale:#fde8cc; --brand-soft:#fff4e5;
+
+    --ok:#1daf58; --ok-soft:#e7f7ee; --ok-deep:#15803d;
+    --warn:#d4780a; --warn-soft:#fff3e0; --warn-deep:#8a4f08;
+    --danger:#d9362a; --danger-soft:#fcebea; --danger-deep:#b03636;
+    --info:#1a7ec8; --info-soft:#e6f2fb; --info-deep:#0e4f7e;
+
+    --t-label:11px; --t-meta:12.5px; --t-body:13px; --t-subhead:15px;
+    --t-title:17px; --t-display:22px;
+
+    --r-sm:8px; --r-md:10px; --r-lg:14px; --r-full:999px;
+    --c-sm:30px; --c-md:34px; --c-lg:44px;
+    --t:150ms cubic-bezier(.32,.72,.24,1);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--background);color:var(--navy);
+    font-family:"Nunito",-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:var(--t-body);line-height:1.5;-webkit-font-smoothing:antialiased}
+  [dir="rtl"] body{font-family:"IBM Plex Sans Arabic","Nunito",sans-serif}
+  body.locked{overflow:hidden}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3,h4{margin:0;line-height:1.25;font-weight:800;letter-spacing:-.02em}
+  p{margin:0}
+  table{border-collapse:collapse;width:100%}
+  ::selection{background:var(--brand-pale);color:var(--navy)}
+  .icon{font-family:"Material Symbols Rounded";line-height:1;display:inline-block;direction:ltr;
+    -webkit-font-feature-settings:"liga";user-select:none;font-variation-settings:"opsz" 24,"wght" 400,"FILL" 0}
+  .mono{font-family:"IBM Plex Mono",monospace}
+  .num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+  :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){ *,*::before,*::after{transition:none !important} html{scroll-behavior:auto} }
+
+  .wrap{max-width:1560px;margin:0 auto;padding:0 16px}
+  @media (min-width:640px){ .wrap{padding:0 24px} }
+  @media (min-width:1280px){ .wrap{padding:0 32px} }
+
+  /* ── app bar ────────────────────────────────────────────────────────────── */
+  .appbar{position:sticky;top:0;z-index:40;height:62px;background:var(--navy);color:#fff;
+    border-bottom:1px solid rgba(255,255,255,.12);display:flex;align-items:center;padding:0 24px}
+  .wordmark{display:flex;align-items:center;gap:8px;font-weight:800;font-size:var(--t-title)}
+  .wordmark .m{width:var(--c-sm);height:var(--c-sm);border-radius:var(--r-sm);background:#fff;color:var(--navy);
+    display:grid;place-items:center;font-size:var(--t-title)}
+  .navslot{position:absolute;inset-inline:0;display:none;justify-content:center;pointer-events:none}
+  @media (min-width:1100px){ .navslot{display:flex} }
+  .navslot ul{pointer-events:auto;display:flex;gap:4px;list-style:none;margin:0;padding:0}
+  .navtab{display:inline-flex;align-items:center;height:var(--c-md);border-radius:var(--r-full);padding:0 16px;
+    font-size:var(--t-body);font-weight:600;color:rgba(255,255,255,.72);transition:background var(--t),color var(--t)}
+  .navtab:hover{background:rgba(255,255,255,.1);color:#fff}
+  .navtab[aria-current="page"]{background:#fff;color:var(--navy);font-weight:800}
+  .barright{margin-inline-start:auto;display:flex;align-items:center;gap:14px;z-index:1}
+  .iconbtn{position:relative;width:var(--c-md);height:var(--c-md);border-radius:var(--r-full);display:grid;
+    place-items:center;color:rgba(255,255,255,.8);transition:background var(--t),color var(--t)}
+  .iconbtn:hover{background:rgba(255,255,255,.12);color:#fff}
+  .iconbtn .icon{font-size:var(--t-display)}
+  .dot{position:absolute;top:4px;inset-inline-end:4px;min-width:16px;height:16px;border-radius:var(--r-full);
+    background:var(--brand);color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;padding:0 4px}
+  .avatar{width:var(--c-md);height:var(--c-md);border-radius:var(--r-full);border:1px solid rgba(255,255,255,.4);
+    display:grid;place-items:center;font-size:var(--t-meta);font-weight:800}
+
+  /* ── tab strip ──────────────────────────────────────────────────────────── */
+  .tabbar{background:var(--surface);border-bottom:1px solid var(--border)}
+  .tabbar .row{max-width:1560px;margin:0 auto;padding:0 24px;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+  .tabbar .row::-webkit-scrollbar{display:none}
+  .tab{display:inline-flex;align-items:center;gap:8px;height:46px;padding:0 16px;flex:none;
+    font-size:var(--t-body);font-weight:600;color:var(--muted);border-bottom:2px solid transparent;
+    transition:color var(--t),border-color var(--t),background var(--t)}
+  .tab:hover{color:var(--navy);background:var(--surface2)}
+  .tab .icon{font-size:var(--t-subhead)}
+  .tab .c{min-width:20px;height:18px;border-radius:var(--r-full);background:var(--surface3);color:var(--navy-mid);
+    font-size:var(--t-label);font-weight:800;line-height:18px;text-align:center;padding:0 6px}
+  .tab[aria-selected="true"]{color:var(--navy);font-weight:800;border-bottom-color:var(--brand)}
+  .tab[aria-selected="true"] .c{background:var(--brand-soft);color:var(--brand-deep)}
+  .tab .c.alert{background:var(--brand);color:#fff}
+
+  /* ── page head ──────────────────────────────────────────────────────────── */
+  .phead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 0 12px}
+  .phead h1{font-size:var(--t-display)}
+  .phead .sum{color:var(--muted);font-size:var(--t-meta)}
+  .phead .sum b{color:var(--navy);font-weight:800}
+  .phead .sum .risk{color:var(--danger-deep);font-weight:800}
+  .phead .spacer{flex:1}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--c-md);border-radius:var(--r-md);
+    padding:0 14px;font-size:var(--t-body);font-weight:700;transition:background var(--t),border-color var(--t),color var(--t)}
+  .btn .icon{font-size:var(--t-subhead)}
+  .btn-primary{background:var(--brand);color:#fff}
+  .btn-primary:hover{background:var(--brand-hover)}
+  .btn-primary:active{background:var(--brand-press)}
+  .btn-secondary{border:1px solid var(--border);background:var(--surface);color:var(--navy)}
+  .btn-secondary:hover{background:var(--surface2);border-color:var(--border-strong)}
+  .btn-navy{background:var(--navy);color:#fff}
+  .btn-navy:hover{background:var(--navy-mid)}
+  .btn-sm{height:var(--c-sm);font-size:var(--t-meta);padding:0 10px}
+  .btn-icon{width:var(--c-sm);padding:0}
+
+  /* ── filter row ─────────────────────────────────────────────────────────── */
+  .filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:12px}
+  .search{flex:1 1 280px;min-width:200px;display:flex;align-items:center;gap:8px;height:var(--c-md);
+    border:1px solid var(--border);background:var(--surface);border-radius:var(--r-md);padding:0 12px}
+  .search .icon{font-size:var(--t-subhead);color:var(--muted)}
+  .search input{flex:1;min-width:0;border:0;outline:0;background:none;font:inherit;font-size:var(--t-body)}
+  .search input::placeholder{color:var(--muted-light)}
+  .pill{display:inline-flex;align-items:center;gap:7px;height:var(--c-md);border-radius:var(--r-md);padding:0 12px;
+    border:1px solid var(--border);background:var(--surface);font-size:var(--t-meta);font-weight:700;color:var(--navy-mid);
+    transition:background var(--t),border-color var(--t),color var(--t)}
+  .pill:hover{background:var(--surface2);border-color:var(--border-strong)}
+  .pill .c{font-family:"IBM Plex Mono",monospace;font-size:var(--t-label);color:var(--muted)}
+  .pill .led{width:7px;height:7px;border-radius:var(--r-full)}
+  .pill[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+  .pill[aria-pressed="true"] .c{color:rgba(255,255,255,.7)}
+
+  /* ── table ──────────────────────────────────────────────────────────────── */
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+  .tscroll{overflow-x:auto}
+  thead th{background:var(--surface2);border-bottom:1px solid var(--border);text-align:start;
+    padding:9px 14px;font-size:var(--t-label);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-dark);
+    white-space:nowrap}
+  tbody td{border-bottom:1px solid var(--border);padding:12px 14px;vertical-align:middle}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr{transition:background var(--t)}
+  tbody tr:hover{background:var(--surface2)}
+  .rid{font-family:"IBM Plex Mono",monospace;font-size:var(--t-meta);color:var(--navy-mid);font-weight:500;white-space:nowrap}
+  .rid .proj{display:block;font-family:"Nunito",sans-serif;font-size:var(--t-label);color:var(--muted);
+    font-weight:700;margin-top:3px}
+  .what{display:flex;align-items:center;gap:10px;min-width:260px}
+  .thumb{width:38px;height:38px;border-radius:var(--r-sm);background:var(--surface3);display:grid;place-items:center;
+    color:var(--navy-mid);flex:none;position:relative}
+  .thumb .icon{font-size:var(--t-display)}
+  .thumb .q{position:absolute;bottom:-4px;inset-inline-end:-4px;background:var(--navy);color:#fff;
+    font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;border-radius:var(--r-full);padding:0 4px;
+    border:2px solid var(--surface)}
+  .what .n{font-size:var(--t-body);font-weight:800}
+  .what .n .more{color:var(--muted);font-weight:600}
+  .what .where{display:flex;align-items:center;gap:4px;color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  .what .where .icon{font-size:var(--t-body)}
+  .when{white-space:nowrap;font-size:var(--t-meta)}
+  .when b{display:block;font-size:var(--t-body);font-weight:800}
+  .when span{color:var(--muted)}
+  .bids{white-space:nowrap}
+  .bids .v{font-family:"IBM Plex Mono",monospace;font-size:var(--t-subhead);font-weight:600}
+  .bids .v.zero{color:var(--danger-deep)}
+  .bids .best{display:block;color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  .bids .best b{color:var(--navy);font-weight:800}
+  .new{display:inline-flex;align-items:center;gap:4px;background:var(--brand);color:#fff;border-radius:var(--r-full);
+    padding:1px 7px;font-size:var(--t-label);font-weight:800;margin-inline-start:6px}
+  .badge{display:inline-flex;align-items:center;gap:5px;border-radius:var(--r-full);padding:3px 9px;
+    font-size:var(--t-label);font-weight:800;white-space:nowrap}
+  .badge .led{width:6px;height:6px;border-radius:var(--r-full)}
+  .b-ok{background:var(--ok-soft);color:var(--ok-deep)} .b-ok .led{background:var(--ok)}
+  .b-warn{background:var(--warn-soft);color:var(--warn-deep)} .b-warn .led{background:var(--warn)}
+  .b-danger{background:var(--danger-soft);color:var(--danger-deep)} .b-danger .led{background:var(--danger)}
+  .b-info{background:var(--info-soft);color:var(--info-deep)} .b-info .led{background:var(--info)}
+  .b-mute{background:var(--surface3);color:var(--muted-dark)} .b-mute .led{background:var(--muted)}
+  .sub{display:block;color:var(--muted);font-size:var(--t-meta);margin-top:4px}
+  .acts{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+  .acts .btn{white-space:nowrap}
+  .menu{position:relative}
+  .menu .sheet{position:absolute;inset-inline-end:0;top:calc(100% + 4px);z-index:20;min-width:180px;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:4px;display:none}
+  .menu.open .sheet{display:block}
+  .menu .sheet button{display:flex;align-items:center;gap:8px;width:100%;height:var(--c-md);border-radius:var(--r-sm);
+    padding:0 10px;font-size:var(--t-body);font-weight:600;color:var(--navy);text-align:start;transition:background var(--t)}
+  .menu .sheet button:hover{background:var(--surface2)}
+  .menu .sheet button.danger{color:var(--danger-deep)}
+  .menu .sheet button.danger:hover{background:var(--danger-soft)}
+  .menu .sheet .rule{height:1px;background:var(--border);margin:4px 0}
+  .menu .sheet .icon{font-size:var(--t-subhead);color:var(--muted)}
+
+
+  /* ── new-bid panel — beside the table, not above it ──────────────────────
+     Placed with logical properties, so English puts it on the trailing edge and
+     Arabic mirrors it without a second rule. */
+  .reqlayout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:12px;align-items:start}
+  .reqlayout.tight{grid-template-columns:minmax(0,1fr) 44px}
+  .reqmain{min-width:0}
+
+  .side{position:sticky;top:12px;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--r-lg);overflow:hidden}
+  .sidehead{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--brand-soft);
+    border-bottom:1px solid var(--brand-pale)}
+  .sidehead .icon{font-size:var(--t-subhead);color:var(--brand-deep)}
+  .sidehead h2{font-size:var(--t-body);color:var(--brand-deep)}
+  .sidehead .spacer{flex:1}
+  .sidehead .fold{width:26px;height:26px;border-radius:var(--r-sm);display:grid;place-items:center;
+    color:var(--brand-deep);transition:background var(--t)}
+  .sidehead .fold:hover{background:var(--brand-pale)}
+  .sidehead .fold .icon{font-size:var(--t-subhead)}
+  [dir="rtl"] .sidehead .fold .icon{transform:scaleX(-1)}
+  .sidebody{max-height:520px;overflow:auto;padding:10px}
+  .sidefoot{border-top:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;gap:8px}
+  .sidefoot .spacer{flex:1}
+  .sidefoot button{font-size:var(--t-meta);font-weight:700;color:var(--brand-deep)}
+  .sidefoot button:hover{text-decoration:underline;text-underline-offset:3px}
+
+  .bub{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);
+    padding:10px 12px;margin-bottom:8px;transition:background var(--t),border-color var(--t)}
+  .bub:last-child{margin-bottom:0}
+  .bub:hover{background:var(--surface3);border-color:var(--border-strong)}
+  .bub.fresh{background:var(--brand-soft);border-color:var(--brand-pale);animation:pop 320ms cubic-bezier(.32,.72,.24,1)}
+  @keyframes pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+  .bub .top{display:flex;align-items:center;gap:8px}
+  .bub .who{width:26px;height:26px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--border);
+    display:grid;place-items:center;font-size:var(--t-meta);font-weight:800;color:var(--navy);flex:none}
+  .bub .n{font-size:var(--t-body);font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bub .ago{margin-inline-start:auto;color:var(--muted);font-size:var(--t-label);white-space:nowrap;flex:none}
+  .bub .price{margin-top:6px;display:flex;align-items:baseline;gap:5px}
+  .bub .price .v{font-family:"IBM Plex Mono",monospace;font-size:var(--t-subhead);font-weight:600}
+  .bub .price .u{font-size:var(--t-label);color:var(--muted)}
+  .bub .lead{display:inline-flex;align-items:center;gap:3px;background:var(--ok-soft);color:var(--ok-deep);
+    border-radius:var(--r-full);padding:1px 6px;font-size:var(--t-label);font-weight:800;margin-inline-start:auto}
+  .bub .lead .icon{font-size:12px}
+  .bub .m{color:var(--muted);font-size:var(--t-meta);margin-top:4px}
+  .bub .m b{color:var(--navy-mid);font-weight:700}
+  .bub .go{margin-top:8px;width:100%;height:var(--c-sm);border-radius:var(--r-sm);background:var(--surface);
+    border:1px solid var(--border);font-size:var(--t-meta);font-weight:700;color:var(--navy);transition:background var(--t)}
+  .bub .go:hover{background:var(--surface3);border-color:var(--border-strong)}
+
+  .rail-fold{position:sticky;top:12px;height:190px;width:44px;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--r-lg);display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px 0;
+    transition:background var(--t),border-color var(--t)}
+  .rail-fold:hover{background:var(--surface2);border-color:var(--border-strong)}
+  .rail-fold .c{min-width:22px;height:22px;border-radius:var(--r-full);background:var(--brand);color:#fff;
+    font-size:var(--t-label);font-weight:800;line-height:22px;text-align:center;padding:0 6px}
+  .rail-fold .lbl{writing-mode:vertical-rl;font-size:var(--t-meta);font-weight:700;color:var(--muted-dark);letter-spacing:.04em}
+  .rail-fold .icon{font-size:var(--t-subhead);color:var(--muted)}
+
+  @media (max-width:1180px){
+    .reqlayout,.reqlayout.tight{grid-template-columns:minmax(0,1fr)}
+    .side,.rail-fold{position:static;width:auto;height:auto}
+    .rail-fold{flex-direction:row;justify-content:center}
+    .rail-fold .lbl{writing-mode:horizontal-tb}
+  }
+
+  /* ── projects ───────────────────────────────────────────────────────────── */
+  .plane{display:grid;grid-template-columns:288px minmax(0,1fr);gap:16px;align-items:start}
+  .rail{display:grid;gap:8px;max-height:640px;overflow:auto}
+  .pcard{text-align:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+    padding:12px;border-inline-start:3px solid transparent;transition:background var(--t),border-color var(--t)}
+  .pcard:hover{background:var(--surface2);border-color:var(--border-strong)}
+  .pcard[aria-current="true"]{border-color:var(--navy);background:var(--surface2)}
+  .pcard.alert{border-inline-start-color:var(--danger)}
+  .pcard .n{font-size:var(--t-body);font-weight:800}
+  .pcard .m{color:var(--muted);font-size:var(--t-meta);margin-top:3px;display:flex;align-items:center;gap:6px}
+  .pcard .m .risk{color:var(--danger-deep);font-weight:700}
+
+  .pmeta{display:flex;flex-wrap:wrap;align-items:center;gap:0;border-bottom:1px solid var(--border)}
+  .pmeta .cell{padding:12px 16px;border-inline-end:1px solid var(--border);min-width:132px}
+  .pmeta .k{font-size:var(--t-label);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .pmeta .v{font-size:var(--t-body);font-weight:800;margin-top:3px}
+  .pmeta .spacer{flex:1;border:0}
+  .pmeta .go{padding:10px 16px;display:flex;gap:8px}
+
+  .notice{display:flex;align-items:center;gap:10px;margin:16px;padding:10px 12px;border-radius:var(--r-md);
+    font-size:var(--t-body);font-weight:600}
+  .notice.warn{background:var(--warn-soft);color:var(--warn-deep)}
+  .notice.danger{background:var(--danger-soft);color:var(--danger-deep)}
+  .notice .icon{font-size:var(--t-subhead)}
+
+  .phases{display:flex;align-items:center;gap:8px;padding:0 16px 14px;flex-wrap:wrap}
+  .phase{display:inline-flex;align-items:center;gap:6px;height:26px;border-radius:var(--r-full);padding:0 10px;
+    font-size:var(--t-label);font-weight:800;background:var(--surface2);color:var(--muted-dark)}
+  .phase.done{background:var(--ok-soft);color:var(--ok-deep)}
+  .phase.now{background:var(--navy);color:#fff}
+  .phase.soon{border:1px dashed var(--border-strong);background:transparent;color:var(--muted-light)}
+  .phase .icon{font-size:var(--t-body)}
+  .phasenote{font-size:var(--t-label);color:var(--muted-light);margin-inline-start:4px}
+
+  .gantt{border-top:1px solid var(--border);overflow-x:auto}
+  .gmin{min-width:820px}
+  .grow{display:flex;border-bottom:1px solid var(--border)}
+  .grow:last-child{border-bottom:0}
+  .gcol{width:230px;flex:none;padding:12px 14px;border-inline-end:1px solid var(--border)}
+  .gcol .n{font-size:var(--t-body);font-weight:800}
+  .gcol .m{color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  .gtrack{flex:1;position:relative;min-height:56px}
+  .ghead{background:var(--surface2);font-size:var(--t-label);font-weight:800;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted-dark)}
+  .ghead .gcol{padding:8px 14px}
+  .ghead .gtrack{min-height:32px}
+  .gmonth{position:absolute;top:0;bottom:0;border-inline-start:1px solid var(--border);padding:8px 0 0 8px;white-space:nowrap}
+  [dir="rtl"] .gmonth{padding:8px 8px 0 0}
+  .gline{position:absolute;top:0;bottom:0;width:1px;background:var(--border)}
+  .gtoday{position:absolute;top:0;bottom:0;width:0;border-inline-start:2px dashed var(--brand);z-index:2}
+  .gtoday span{position:absolute;top:-24px;transform:translateX(-50%);background:var(--brand);color:#fff;
+    font-size:10px;font-weight:800;border-radius:var(--r-full);padding:2px 7px;white-space:nowrap}
+  [dir="rtl"] .gtoday span{transform:translateX(50%)}
+  .bar{position:absolute;top:50%;transform:translateY(-50%);height:22px;border-radius:var(--r-sm);
+    display:flex;align-items:center;padding:0 8px;font-size:var(--t-label);font-weight:800;white-space:nowrap;overflow:hidden}
+  .bar.mob{background:var(--info-soft);color:var(--info-deep);border:1px solid var(--info)}
+  .bar.rent{background:var(--ok);color:#fff}
+  .bar.plan{background:var(--surface3);color:var(--muted-dark);border:1px dashed var(--border-strong)}
+  .bar.over{background:var(--danger-soft);color:var(--danger-deep);border:1px solid var(--danger)}
+  .bar .tail{margin-inline-start:auto;opacity:.9}
+
+  /* ── suppliers ──────────────────────────────────────────────────────────── */
+  .sup{display:flex;align-items:center;gap:10px;min-width:220px}
+  .slogo{width:38px;height:38px;border-radius:var(--r-sm);background:var(--surface3);display:grid;place-items:center;
+    font-size:var(--t-subhead);font-weight:800;color:var(--navy);flex:none}
+  .sup .n{font-size:var(--t-body);font-weight:800;display:flex;align-items:center;gap:6px}
+  .sup .m{color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  .rel{white-space:nowrap;font-size:var(--t-meta);color:var(--muted)}
+  .rel b{font-family:"IBM Plex Mono",monospace;color:var(--navy);font-weight:600;font-size:var(--t-body)}
+  .terms{font-size:var(--t-meta);color:var(--muted-dark);max-width:240px}
+  .terms b{color:var(--navy);font-weight:700}
+  .papers{display:flex;gap:4px;flex-wrap:wrap}
+  .paper{display:inline-flex;align-items:center;gap:4px;border-radius:var(--r-sm);padding:2px 7px;
+    font-size:var(--t-label);font-weight:700;background:var(--surface2);color:var(--muted-dark)}
+  .paper.ok{background:var(--ok-soft);color:var(--ok-deep)}
+  .paper.soon{background:var(--warn-soft);color:var(--warn-deep)}
+  .paper.miss{background:var(--danger-soft);color:var(--danger-deep)}
+  .asof{display:block;color:var(--muted-light);font-size:var(--t-label);margin-top:5px}
+
+  /* ── stores strip ───────────────────────────────────────────────────────── */
+  .strip{padding:24px 0 40px}
+  .striphead{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .striphead h2{font-size:var(--t-title)}
+  .striphead .m{color:var(--muted);font-size:var(--t-meta)}
+  .striphead .spacer{flex:1}
+  .link{font-size:var(--t-meta);font-weight:800;color:var(--brand-deep);display:inline-flex;align-items:center;gap:4px}
+  .link:hover{text-decoration:underline;text-underline-offset:3px}
+  .link .icon{font-size:var(--t-subhead)}
+  [dir="rtl"] .link .icon{transform:scaleX(-1)}
+  .scards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+  .scard{text-align:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+    overflow:hidden;transition:background var(--t),border-color var(--t)}
+  .scard:hover{background:var(--surface2);border-color:var(--border-strong)}
+  .sshot{aspect-ratio:2/1;background:var(--surface3);display:grid;place-items:center;position:relative}
+  .sshot .icon{font-size:32px;color:var(--muted-light)}
+  .sshot .v{position:absolute;top:6px;inset-inline-end:6px;width:18px;height:18px;border-radius:var(--r-full);
+    background:var(--ok);color:#fff;display:grid;place-items:center}
+  .sshot .v .icon{font-size:12px;color:#fff}
+  .sbody{padding:10px 12px 12px}
+  .sbody .n,.sbody .m{display:block}
+  .sbody .n{font-size:var(--t-body);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sbody .m{color:var(--muted);font-size:var(--t-meta);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .empty{padding:40px 24px;text-align:center;color:var(--muted);font-size:var(--t-body)}
+  .empty b{display:block;color:var(--navy);font-size:var(--t-subhead);margin-bottom:6px}
+
+  @media (max-width:1280px){ .scards{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  @media (max-width:1024px){ .plane{grid-template-columns:minmax(0,1fr)} .rail{max-height:none;grid-auto-flow:column;
+    grid-auto-columns:240px;overflow-x:auto} }
+  @media (max-width:720px){ .scards{grid-template-columns:repeat(2,minmax(0,1fr))} .appbar,.tabbar .row{padding-inline:16px} }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <a class="wordmark" href="#"><span class="m icon" aria-hidden="true">construction</span>moedatech</a>
+  <nav class="navslot" aria-label="Main"><ul>
+    <li><a class="navtab" href="#" aria-current="page" data-en="Dashboard" data-ar="لوحة التحكم">Dashboard</a></li>
+    <li><a class="navtab" href="#" data-en="Stores" data-ar="المتاجر">Stores</a></li>
+    <li><a class="navtab" href="#" data-en="My Organization" data-ar="منشأتي">My Organization</a></li>
+  </ul></nav>
+  <div class="barright">
+    <button class="iconbtn" aria-label="Inbox"><span class="icon" aria-hidden="true">mail</span><span class="dot">2</span></button>
+    <button class="iconbtn" aria-label="Notifications"><span class="icon" aria-hidden="true">notifications</span><span class="dot">7</span></button>
+    <span class="avatar">YA</span>
+  </div>
+</header>
+
+<div class="tabbar">
+  <div class="row" role="tablist" aria-label="Dashboard sections">
+    <button class="tab" role="tab" aria-selected="true" onclick="pickTab('requests')" id="tab-requests">
+      <span class="icon" aria-hidden="true">assignment</span><span data-en="My Requests" data-ar="طلباتي">My Requests</span><span class="c alert">4</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" onclick="pickTab('projects')" id="tab-projects">
+      <span class="icon" aria-hidden="true">apartment</span><span data-en="My Projects" data-ar="مشاريعي">My Projects</span><span class="c">3</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" onclick="pickTab('suppliers')" id="tab-suppliers">
+      <span class="icon" aria-hidden="true">handshake</span><span data-en="My Suppliers" data-ar="مؤجّروني">My Suppliers</span><span class="c">7</span>
+    </button>
+  </div>
+</div>
+
+<main class="wrap">
+  <div id="panel-requests" role="tabpanel" aria-labelledby="tab-requests"></div>
+  <div id="panel-projects" role="tabpanel" aria-labelledby="tab-projects" hidden></div>
+  <div id="panel-suppliers" role="tabpanel" aria-labelledby="tab-suppliers" hidden></div>
+
+  <!-- Stores — the public market, under every tab -->
+  <section class="strip">
+    <div class="striphead">
+      <h2 data-en="Stores" data-ar="المتاجر">Stores</h2>
+      <span class="m" data-en="the market — what suppliers publish, the same for everyone" data-ar="السوق — ما ينشره المؤجّرون، ذاته للجميع">the market — what suppliers publish, the same for everyone</span>
+      <span class="spacer"></span>
+      <a class="link" href="#"><span data-en="Browse all 214" data-ar="تصفّح الكل ٢١٤">Browse all 214</span><span class="icon" aria-hidden="true">arrow_forward</span></a>
+    </div>
+    <div class="scards" id="stores"></div>
+  </section>
+</main>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Mock data. Field names mirror the real contracts:
+     requests      → groupRef · city · item{name,qty} · bidCount · createdAt · status
+     received-bids → supplierName · currentPrice · unitsOffered · dealRoomStatus
+     projects      → DERIVED today by grouping requests on projectAddressLabel
+   ══════════════════════════════════════════════════════════════════════════ */
+var TODAY = "2026-08-27";
+
+var REQUESTS = [
+  { id:"RFQ-1042", project:"Qiddiya Zone 4", ic:"agriculture", qty:5,
+    nEn:"Excavator 20t", nAr:"حفّار ٢٠ طن", moreEn:"+2 more items", moreAr:"+بندان آخران",
+    cityEn:"Qiddiya — Zone 4", cityAr:"القدية — المنطقة ٤",
+    sentEn:"18 Aug", sentAr:"١٨ أغسطس", agoEn:"9 days ago", agoAr:"قبل ٩ أيام",
+    bids:10, fresh:3, best:8400, tone:"warn", stEn:"Deciding", stAr:"قيد القرار",
+    subEn:"closes in 2 days", subAr:"يغلق خلال يومين", act:"compare" },
+
+  { id:"RFQ-1036", project:"Diriyah Gate", ic:"elevator", qty:4,
+    nEn:"Manlift 16m", nAr:"مناولة أفراد ١٦م", moreEn:"", moreAr:"",
+    cityEn:"Diriyah Gate", cityAr:"بوابة الدرعية",
+    sentEn:"10 Aug", sentAr:"١٠ أغسطس", agoEn:"17 days ago", agoAr:"قبل ١٧ يوماً",
+    bids:6, fresh:0, best:3400, tone:"info", stEn:"Negotiating", stAr:"قيد التفاوض",
+    subEn:"Al-Rajhi · 1 unread", subAr:"الراجحي · رسالة غير مقروءة", act:"room" },
+
+  { id:"RFQ-1039", project:"King Khalid Airport", ic:"precision_manufacturing", qty:1,
+    nEn:"Tower crane 8t", nAr:"رافعة برجية ٨ طن", moreEn:"", moreAr:"",
+    cityEn:"King Khalid Airport — Riyadh", cityAr:"مطار الملك خالد — الرياض",
+    sentEn:"22 Aug", sentAr:"٢٢ أغسطس", agoEn:"5 days ago", agoAr:"قبل ٥ أيام",
+    bids:1, fresh:1, best:46000, tone:"warn", stEn:"One bid only", stAr:"عرض واحد فقط",
+    subEn:"no competition yet", subAr:"لا منافسة بعد", act:"compare" },
+
+  { id:"RFQ-1031", project:"Aramco — Dhahran", ic:"bolt", qty:1,
+    nEn:"Generator 250 kVA", nAr:"مولّد ٢٥٠ ك.ف.أ", moreEn:"", moreAr:"",
+    cityEn:"Aramco — Dhahran", cityAr:"أرامكو — الظهران",
+    sentEn:"20 Aug", sentAr:"٢٠ أغسطس", agoEn:"7 days ago", agoAr:"قبل ٧ أيام",
+    bids:0, fresh:0, best:0, tone:"danger", stEn:"No bids", stAr:"لا عروض",
+    subEn:"the ARAMCO certificate narrows who can answer", subAr:"شهادة أرامكو تضيّق من يستطيع الردّ", act:"widen" }
+];
+
+var PROJECTS = [
+  { id:"p1", nEn:"Qiddiya Zone 4", nAr:"القدية — المنطقة ٤", clientEn:"Qiddiya Investment Co.", clientAr:"شركة القدية",
+    locEn:"Riyadh", locAr:"الرياض", start:"2026-09-01", end:"2026-11-30", onSite:2, alert:false,
+    fromEn:"created from RFQ-1042", fromAr:"أُنشئ من طلب-1042",
+    phase:2,
+    machines:[
+      { nEn:"Excavator 20t · Zahid Tractor", nAr:"حفّار ٢٠ طن · زاهد تراكتور", mEn:"2 units · operator supplied", mAr:"وحدتان · مع مشغّل",
+        mob:["2026-08-28","2026-09-01"], rent:["2026-09-01","2026-11-30"], state:"plan" },
+      { nEn:"Telehandler 4t · Al-Rajhi", nAr:"مناولة ٤ طن · الراجحي", mEn:"1 unit · bare rental", mAr:"وحدة · بدون مشغّل",
+        mob:null, rent:["2026-09-15","2026-11-30"], state:"plan" }
+    ] },
+
+  { id:"p2", nEn:"Diriyah Gate", nAr:"بوابة الدرعية", clientEn:"Diriyah Gate Development", clientAr:"تطوير بوابة الدرعية",
+    locEn:"Riyadh", locAr:"الرياض", start:"2026-07-01", end:"2026-10-31", onSite:5, alert:true,
+    fromEn:"created from RFQ-0994", fromAr:"أُنشئ من طلب-0994",
+    phase:4,
+    noticeEn:"4 manlifts are past their off-hire date and still billing — SAR 453/day",
+    noticeAr:"٤ مناولات تجاوزت موعد إنهاء الإيجار وما زالت تُحتسب — ٤٥٣ ر.س/يوم",
+    machines:[
+      { nEn:"Manlift 16m · Al-Rajhi", nAr:"مناولة ١٦م · الراجحي", mEn:"4 units · off-hire due 31 Aug", mAr:"٤ وحدات · الإنهاء ٣١ أغسطس",
+        mob:["2026-07-01","2026-07-05"], rent:["2026-07-05","2026-08-31"], over:["2026-08-31","2026-09-12"], state:"over" },
+      { nEn:"Water tanker 20k L · Saudi Diesel", nAr:"صهريج ٢٠ ألف لتر · الديزل السعودية", mEn:"1 unit · on rent", mAr:"وحدة · قيد الإيجار",
+        mob:["2026-08-12","2026-08-15"], rent:["2026-08-15","2026-10-15"], state:"rent" }
+    ] },
+
+  { id:"p3", nEn:"Aramco — Dhahran", nAr:"أرامكو — الظهران", clientEn:"Saudi Aramco", clientAr:"أرامكو السعودية",
+    locEn:"Dhahran", locAr:"الظهران", start:"2026-09-10", end:"2026-11-10", onSite:0, alert:false,
+    fromEn:"created from RFQ-1031", fromAr:"أُنشئ من طلب-1031",
+    phase:0,
+    noticeEn:"Nothing awarded yet — the request has no bids",
+    noticeAr:"لا إرساء بعد — الطلب بلا عروض",
+    machines:[] }
+];
+
+var PHASES = [
+  {enEn:"Awarded", enAr:"مُرسَاة", ic:"handshake", real:true},
+  {enEn:"PO issued", enAr:"أمر شراء", ic:"receipt_long", real:false},
+  {enEn:"Mobilising", enAr:"نقل للموقع", ic:"local_shipping", real:false},
+  {enEn:"On rent", enAr:"قيد الإيجار", ic:"schedule", real:false},
+  {enEn:"Off-hire", enAr:"إنهاء الإيجار", ic:"timer_off", real:false},
+  {enEn:"Invoiced", enAr:"مفوترة", ic:"payments", real:false}
+];
+
+var SUPPLIERS = [
+  { n:"Zahid Tractor", nAr:"زاهد تراكتور", city:"Riyadh", cityAr:"الرياض", label:"preferred",
+    invited:6, bids:4, awarded:2, replyEn:"~14h", replyAr:"~١٤س",
+    quoted:9000, settled:8600, lastEn:"12 Aug", lastAr:"١٢ أغسطس",
+    termsEn:"30-day payment · mobilisation included · operator supplied",
+    termsAr:"دفع ٣٠ يوماً · شامل النقل · مع مشغّل",
+    papers:[["CR","ok"],["VAT","ok"],["Insurance","soon"],["SASO","ok"]], asOfEn:"as of their bid, 12 Aug", asOfAr:"حتى عرضهم في ١٢ أغسطس" },
+
+  { n:"Al-Rajhi Equipment", nAr:"الراجحي للمعدات", city:"Riyadh", cityAr:"الرياض", label:"preferred",
+    invited:5, bids:5, awarded:2, replyEn:"~6h", replyAr:"~٦س",
+    quoted:3600, settled:3400, lastEn:"24 Aug", lastAr:"٢٤ أغسطس",
+    termsEn:"60-day payment · mobilisation on us · bare rental",
+    termsAr:"دفع ٦٠ يوماً · النقل علينا · بدون مشغّل",
+    papers:[["CR","ok"],["VAT","ok"],["Insurance","ok"],["SASO","ok"]], asOfEn:"as of their bid, 24 Aug", asOfAr:"حتى عرضهم في ٢٤ أغسطس" },
+
+  { n:"Saudi Diesel", nAr:"الديزل السعودية", city:"Dammam", cityAr:"الدمام", label:"",
+    invited:4, bids:3, awarded:1, replyEn:"~22h", replyAr:"~٢٢س",
+    quoted:5750, settled:5750, lastEn:"2 Aug", lastAr:"٢ أغسطس",
+    termsEn:"45-day payment · mobilisation shared · fuel on renter",
+    termsAr:"دفع ٤٥ يوماً · النقل مشترك · الوقود على المستأجر",
+    papers:[["CR","ok"],["VAT","ok"],["Insurance","ok"],["SASO","miss"]], asOfEn:"as of their bid, 2 Aug", asOfAr:"حتى عرضهم في ٢ أغسطس" },
+
+  { n:"Almajdouie Equipment", nAr:"المجدوعي للمعدات", city:"Jeddah", cityAr:"جدة", label:"",
+    invited:3, bids:1, awarded:0, replyEn:"~3d", replyAr:"~٣ي",
+    quoted:46000, settled:0, lastEn:"24 Aug", lastAr:"٢٤ أغسطس",
+    termsEn:"30-day payment · erection quoted separately",
+    termsAr:"دفع ٣٠ يوماً · التركيب مسعّر منفصلاً",
+    papers:[["CR","ok"],["VAT","soon"],["Insurance","ok"],["SASO","ok"]], asOfEn:"as of their bid, 24 Aug", asOfAr:"حتى عرضهم في ٢٤ أغسطس" },
+
+  { n:"Nesma Rental", nAr:"نسما للتأجير", city:"Jeddah", cityAr:"جدة", label:"",
+    invited:4, bids:0, awarded:0, replyEn:"never", replyAr:"لم يردّوا",
+    quoted:0, settled:0, lastEn:"—", lastAr:"—",
+    termsEn:"no bid on record", termsAr:"لا عرض مسجّل",
+    papers:[], asOfEn:"no bid — no papers to read", asOfAr:"لا عرض — لا أوراق" },
+
+  { n:"United Rentals KSA", nAr:"يونايتد رنتلز", city:"Dammam", cityAr:"الدمام", label:"",
+    invited:2, bids:2, awarded:0, replyEn:"~18h", replyAr:"~١٨س",
+    quoted:3900, settled:0, lastEn:"6 Aug", lastAr:"٦ أغسطس",
+    termsEn:"30-day payment · mobilisation on us",
+    termsAr:"دفع ٣٠ يوماً · النقل علينا",
+    papers:[["CR","ok"],["VAT","ok"],["Insurance","soon"],["SASO","ok"]], asOfEn:"as of their bid, 6 Aug", asOfAr:"حتى عرضهم في ٦ أغسطس" },
+
+  { n:"Gulf Lifting", nAr:"الخليج للرفع", city:"Dammam", cityAr:"الدمام", label:"blocked",
+    invited:2, bids:1, awarded:0, replyEn:"~5d", replyAr:"~٥ي",
+    quoted:36500, settled:0, lastEn:"18 Jul", lastAr:"١٨ يوليو",
+    termsEn:"prepayment required · rigging excluded",
+    termsAr:"دفع مقدّم · التجهيز غير مشمول",
+    papers:[["CR","ok"],["VAT","miss"],["Insurance","miss"],["SASO","miss"]], asOfEn:"as of their bid, 18 Jul", asOfAr:"حتى عرضهم في ١٨ يوليو" }
+];
+
+var STORES = [
+  {n:"Zahid Tractor", nAr:"زاهد تراكتور", city:"Riyadh", cityAr:"الرياض", eq:210, ic:"agriculture", ver:true},
+  {n:"Al-Rajhi Equipment", nAr:"الراجحي للمعدات", city:"Riyadh", cityAr:"الرياض", eq:128, ic:"elevator", ver:true},
+  {n:"Bin Quraya", nAr:"بن قريّة", city:"Dhahran", cityAr:"الظهران", eq:143, ic:"precision_manufacturing", ver:true},
+  {n:"Saudi Diesel", nAr:"الديزل السعودية", city:"Dammam", cityAr:"الدمام", eq:174, ic:"bolt", ver:true},
+  {n:"Nesma Rental", nAr:"نسما للتأجير", city:"Jeddah", cityAr:"جدة", eq:118, ic:"construction", ver:true},
+  {n:"Neom Plant Partners", nAr:"شركاء معدات نيوم", city:"Tabuk", cityAr:"تبوك", eq:134, ic:"local_shipping", ver:true}
+];
+
+
+/* Bid events — the notification feed. Real shape: /api/me/received-bids
+   → supplierName · currentPrice · priceUnit · equipmentName · request.shortCode · createdAt */
+var BID_EVENTS = [
+  { supEn:"Zahid Tractor", supAr:"زاهد تراكتور", eqEn:"Excavator 20t", eqAr:"حفّار ٢٠ طن",
+    req:"RFQ-1042", price:8400, cheapest:true, agoEn:"2 hours ago", agoAr:"قبل ساعتين", ic:"agriculture" },
+  { supEn:"Nesma Rental", supAr:"نسما للتأجير", eqEn:"Excavator 20t", eqAr:"حفّار ٢٠ طن",
+    req:"RFQ-1042", price:8900, cheapest:false, agoEn:"5 hours ago", agoAr:"قبل ٥ ساعات", ic:"agriculture" },
+  { supEn:"Hejaz Earthmovers", supAr:"معدات الحجاز", eqEn:"Telehandler 4t", eqAr:"مناولة ٤ طن",
+    req:"RFQ-1042", price:6100, cheapest:false, agoEn:"yesterday 18:40", agoAr:"أمس ١٨:٤٠", ic:"forklift" },
+  { supEn:"Almajdouie Equipment", supAr:"المجدوعي للمعدات", eqEn:"Tower crane 8t", eqAr:"رافعة برجية ٨ طن",
+    req:"RFQ-1039", price:46000, cheapest:true, agoEn:"yesterday 11:05", agoAr:"أمس ١١:٠٥", ic:"precision_manufacturing" }
+];
+
+var sideOpen = true;
+var lang = "en", tab = "requests", reqFilter = "all", supFilter = "all", proj = "p1", openMenu = null;
+function L(en, ar){ return lang === "ar" ? ar : en; }
+function money(n){ return n.toLocaleString("en-US"); }
+function d(s){ var p = s.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+function days(a, b){ return Math.round((b - a) / 86400000); }
+
+/* ══ tabs ═══════════════════════════════════════════════════════════════════ */
+function pickTab(k){
+  tab = k;
+  ["requests","projects","suppliers"].forEach(function(x){
+    document.getElementById("tab-" + x).setAttribute("aria-selected", String(x === k));
+    document.getElementById("panel-" + x).hidden = x !== k;
+  });
+  render();
+}
+
+/* ══ 1 · requests ═══════════════════════════════════════════════════════════ */
+var REQ_FILTERS = [
+  {k:"all",     enEn:"All",          enAr:"الكل",           tone:""},
+  {k:"new",     enEn:"Has new bids", enAr:"بها عروض جديدة", tone:"var(--brand)"},
+  {k:"nobids",  enEn:"No bids",      enAr:"بلا عروض",       tone:"var(--danger)"},
+  {k:"closing", enEn:"Closing soon", enAr:"يغلق قريباً",    tone:"var(--warn)"}
+];
+function reqMatch(r, f){
+  if (f === "new") return r.fresh > 0;
+  if (f === "nobids") return r.bids === 0;
+  if (f === "closing") return /closes/.test(r.subEn);
+  return true;
+}
+
+
+function renderFeed(){
+  if (!BID_EVENTS.length) return "";
+  if (!sideOpen){
+    return '<button class="rail-fold" type="button" onclick="toggleSide()" aria-label="'
+      + L("Show new bids", "اعرض العروض الجديدة") + '">'
+      + '<span class="c">' + BID_EVENTS.length + '</span>'
+      + '<span class="lbl">' + L("New bids", "عروض جديدة") + '</span>'
+      + '<span class="icon" aria-hidden="true">gavel</span></button>';
+  }
+  var rows = BID_EVENTS.map(function(e, i){
+    return '<article class="bub' + (i === 0 ? " fresh" : "") + '">'
+      + '<div class="top"><span class="who">' + L(e.supEn, e.supAr).charAt(0) + '</span>'
+      +   '<span class="n">' + L(e.supEn, e.supAr) + '</span>'
+      +   '<span class="ago">' + L(e.agoEn, e.agoAr) + '</span></div>'
+      + '<div class="price"><span class="v">' + money(e.price) + '</span>'
+      +   '<span class="u">SAR / ' + L("month", "شهر") + '</span>'
+      +   (e.cheapest ? '<span class="lead"><span class="icon" aria-hidden="true">trending_down</span>'
+            + L("lowest", "الأدنى") + '</span>' : '') + '</div>'
+      + '<div class="m">' + L(e.eqEn, e.eqAr) + ' · <b>' + e.req + '</b></div>'
+      + '<button class="go">' + L("View bid", "اعرض العرض") + '</button>'
+      + '</article>';
+  }).join("");
+  return '<aside class="side">'
+    + '<div class="sidehead"><span class="icon" aria-hidden="true">gavel</span>'
+    +   '<h2>' + BID_EVENTS.length + ' ' + L("new bids", "عروض جديدة") + '</h2>'
+    +   '<span class="spacer"></span>'
+    +   '<button class="fold" onclick="toggleSide()" aria-label="' + L("Collapse", "طيّ") + '">'
+    +     '<span class="icon" aria-hidden="true">chevron_right</span></button></div>'
+    + '<div class="sidebody">' + rows + '</div>'
+    + '<div class="sidefoot"><button>' + L("Mark all as seen", "علّم الكل كمقروء") + '</button>'
+    +   '<span class="spacer"></span>'
+    +   '<button>' + L("All activity", "كل النشاط") + '</button></div>'
+    + '</aside>';
+}
+function toggleSide(){ sideOpen = !sideOpen; renderRequests(); }
+
+function renderRequests(){
+  var fresh = REQUESTS.reduce(function(n, r){ return n + r.fresh; }, 0);
+  var nobids = REQUESTS.filter(function(r){ return r.bids === 0; }).length;
+  var rows = REQUESTS.filter(function(r){ return reqMatch(r, reqFilter); });
+
+  var pills = REQ_FILTERS.map(function(f){
+    var n = REQUESTS.filter(function(r){ return reqMatch(r, f.k); }).length;
+    return '<button class="pill" type="button" aria-pressed="' + (reqFilter === f.k) + '" onclick="setReqFilter(\'' + f.k + '\')">'
+      + (f.tone ? '<span class="led" style="background:' + f.tone + '"></span>' : '')
+      + L(f.enEn, f.enAr) + '<span class="c">' + n + '</span></button>';
+  }).join("");
+
+  var body = rows.map(function(r, i){
+    var act = r.act === "room" ? L("Open room", "افتح الغرفة")
+            : r.act === "widen" ? L("Extend deadline", "مدّد المهلة")
+            : L("Compare bids", "قارن العروض");
+    return '<tr>'
+      + '<td><span class="rid">' + r.id + '<span class="proj">' + r.project + '</span></span></td>'
+      + '<td><div class="what"><span class="thumb"><span class="icon" aria-hidden="true">' + r.ic + '</span>'
+      +   (r.qty > 1 ? '<span class="q">×' + r.qty + '</span>' : '') + '</span>'
+      +   '<span><span class="n">' + L(r.nEn, r.nAr)
+      +     (r.moreEn ? ' <span class="more">' + L(r.moreEn, r.moreAr) + '</span>' : '') + '</span>'
+      +     '<span class="where"><span class="icon" aria-hidden="true">location_on</span>' + L(r.cityEn, r.cityAr) + '</span>'
+      +   '</span></div></td>'
+      + '<td><span class="when"><b>' + L(r.sentEn, r.sentAr) + '</b><span>' + L(r.agoEn, r.agoAr) + '</span></span></td>'
+      + '<td><span class="bids"><span class="v' + (r.bids === 0 ? " zero" : "") + '">' + r.bids + '</span>'
+      +   (r.fresh ? '<span class="new">+' + r.fresh + ' ' + L("new", "جديد") + '</span>' : '')
+      +   (r.best ? '<span class="best">' + L("best", "الأفضل") + ' <b>' + money(r.best) + '</b> SAR/'
+      +     L("mo", "شهر") + '</span>' : '<span class="best">' + L("nothing yet", "لا شيء بعد") + '</span>')
+      + '</span></td>'
+      + '<td><span class="badge b-' + r.tone + '"><span class="led"></span>' + L(r.stEn, r.stAr) + '</span>'
+      +   '<span class="sub">' + L(r.subEn, r.subAr) + '</span></td>'
+      + '<td><div class="acts">'
+      +   '<button class="btn btn-navy btn-sm">' + act + '</button>'
+      +   '<div class="menu' + (openMenu === "r" + i ? " open" : "") + '">'
+      +     '<button class="btn btn-secondary btn-sm btn-icon" aria-label="' + L("More", "المزيد") + '" '
+      +       'onclick="event.stopPropagation();toggleMenu(\'r' + i + '\')"><span class="icon" aria-hidden="true">more_horiz</span></button>'
+      +     '<div class="sheet">'
+      +       '<button><span class="icon" aria-hidden="true">visibility</span>' + L("View request", "اعرض الطلب") + '</button>'
+      +       '<button><span class="icon" aria-hidden="true">edit</span>' + L("Edit request", "عدّل الطلب") + '</button>'
+      +       '<button><span class="icon" aria-hidden="true">share</span>' + L("Share bid link", "شارك رابط العروض") + '</button>'
+      +       '<div class="rule"></div>'
+      +       '<button><span class="icon" aria-hidden="true">check_circle</span>' + L("Close to new bids", "أغلق للعروض الجديدة") + '</button>'
+      +       '<button class="danger"><span class="icon" aria-hidden="true">cancel</span>' + L("Cancel request", "ألغِ الطلب") + '</button>'
+      +     '</div>'
+      +   '</div>'
+      + '</div></td></tr>';
+  }).join("");
+
+  document.getElementById("panel-requests").innerHTML =
+      '<div class="phead"><h1>' + L("My Requests", "طلباتي") + '</h1>'
+    +   '<span class="sum"><b>' + REQUESTS.length + '</b> ' + L("open", "مفتوح") + ' · <b>' + fresh + '</b> '
+    +     L("new bids", "عرضاً جديداً") + (nobids ? ' · <span class="risk">' + nobids + ' ' + L("with no bids", "بلا عروض") + '</span>' : '') + '</span>'
+    +   '<span class="spacer"></span>'
+    +   '<button class="btn btn-secondary"><span class="icon" aria-hidden="true">upload_file</span>' + L("Upload an RFQ", "ارفع طلباً") + '</button>'
+    +   '<button class="btn btn-primary"><span class="icon" aria-hidden="true">add</span>' + L("New request", "طلب جديد") + '</button>'
+    + '</div>'
+    + '<div class="reqlayout' + (sideOpen ? '' : ' tight') + '"><div class="reqmain">'
+    + '<div class="filters"><div class="search"><span class="icon" aria-hidden="true">search</span>'
+    +   '<input placeholder="' + L("Search by request number, equipment or site…", "ابحث برقم الطلب أو المعدّة أو الموقع…") + '" /></div>'
+    +   pills + '</div>'
+    + '<div class="panel"><div class="tscroll"><table>'
+    +   '<thead><tr>'
+    +     '<th>' + L("Request", "الطلب") + '</th>'
+    +     '<th>' + L("What and where", "ماذا وأين") + '</th>'
+    +     '<th>' + L("Sent", "أُرسل") + '</th>'
+    +     '<th>' + L("Bids", "العروض") + '</th>'
+    +     '<th>' + L("Status", "الحالة") + '</th>'
+    +     '<th style="text-align:end">' + L("Actions", "إجراءات") + '</th>'
+    +   '</tr></thead><tbody>' + (body || '<tr><td colspan="6"><div class="empty">'
+    +     L("Nothing matches this filter.", "لا شيء يطابق هذه التصفية.") + '</div></td></tr>') + '</tbody></table></div></div>'
+    + '</div>' + renderFeed() + '</div>';
+}
+function setReqFilter(k){ reqFilter = k; openMenu = null; renderRequests(); }
+function toggleMenu(k){ openMenu = openMenu === k ? null : k; render(); }
+
+/* ══ 2 · projects ═══════════════════════════════════════════════════════════ */
+function ganttSpan(p){
+  var from = d(p.start), to = d(p.end);
+  p.machines.forEach(function(m){
+    [m.mob, m.rent, m.over].forEach(function(seg){
+      if (!seg) return;
+      if (d(seg[0]) < from) from = d(seg[0]);
+      if (d(seg[1]) > to) to = d(seg[1]);
+    });
+  });
+  from = new Date(from.getFullYear(), from.getMonth(), 1);
+  to = new Date(to.getFullYear(), to.getMonth() + 1, 1);
+  return { from:from, to:to, total:days(from, to) };
+}
+function pct(x, s){ return (days(s.from, x) / s.total) * 100; }
+function seg(cls, range, label, s, tail){
+  if (!range) return "";
+  var a = Math.max(0, pct(d(range[0]), s)), b = Math.min(100, pct(d(range[1]), s));
+  if (b <= a) return "";
+  return '<span class="bar ' + cls + '" title="' + label + ' · ' + range[0] + ' → ' + range[1] + '" '
+    + 'style="inset-inline-start:' + a + '%;width:' + (b - a) + '%">'
+    + ((b - a) > 12 ? label : "") + (tail ? '<span class="tail">' + tail + '</span>' : '') + '</span>';
+}
+
+function renderProjects(){
+  var p = PROJECTS.filter(function(x){ return x.id === proj; })[0] || PROJECTS[0];
+  var s = ganttSpan(p);
+
+  var rail = PROJECTS.map(function(x){
+    return '<button class="pcard' + (x.alert ? " alert" : "") + '" type="button" aria-current="' + (x.id === proj)
+      + '" onclick="pickProject(\'' + x.id + '\')">'
+      + '<span class="n">' + L(x.nEn, x.nAr) + '</span>'
+      + '<span class="m">' + (x.onSite
+          ? '<span>' + x.onSite + ' ' + L("on site", "في الموقع") + '</span>'
+          : '<span>' + L("nothing on site yet", "لا شيء في الموقع بعد") + '</span>')
+      + (x.alert ? '<span class="risk">· ' + L("overdue", "متأخّر") + '</span>' : '') + '</span></button>';
+  }).join("");
+
+  var months = "", cur = new Date(s.from.getFullYear(), s.from.getMonth(), 1);
+  var moEn = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var moAr = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+  while (cur < s.to){
+    var next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+    months += '<span class="gmonth" style="inset-inline-start:' + pct(cur, s) + '%;width:'
+      + (pct(next, s) - pct(cur, s)) + '%">' + L(moEn[cur.getMonth()], moAr[cur.getMonth()])
+      + " " + String(cur.getFullYear()).slice(2) + '</span>';
+    cur = next;
+  }
+  var todayP = pct(d(TODAY), s);
+  var todayIn = todayP >= 0 && todayP <= 100;
+
+  var rows = p.machines.map(function(m){
+    return '<div class="grow">'
+      + '<div class="gcol"><div class="n">' + L(m.nEn, m.nAr) + '</div><div class="m">' + L(m.mEn, m.mAr) + '</div></div>'
+      + '<div class="gtrack">'
+      +   (todayIn ? '<span class="gtoday" style="inset-inline-start:' + todayP + '%"></span>' : '')
+      +   seg("mob", m.mob, L("Mobilising", "نقل"), s)
+      +   seg(m.state === "plan" ? "plan" : "rent", m.rent,
+             m.state === "plan" ? L("Planned", "مخطّط") : L("On rent", "قيد الإيجار"), s)
+      +   seg("over", m.over, L("Still billing", "ما زالت تُحتسب"), s)
+      + '</div></div>';
+  }).join("");
+
+  var phases = PHASES.map(function(ph, i){
+    var cls = i < p.phase ? "done" : i === p.phase ? "now" : (ph.real ? "" : "soon");
+    return '<span class="phase ' + cls + '"><span class="icon" aria-hidden="true">' + ph.ic + '</span>'
+      + L(ph.enEn, ph.enAr) + '</span>';
+  }).join("");
+
+  document.getElementById("panel-projects").innerHTML =
+      '<div class="phead"><h1>' + L("My Projects", "مشاريعي") + '</h1>'
+    +   '<span class="sum"><b>' + PROJECTS.length + '</b> ' + L("projects", "مشاريع") + ' · <b>'
+    +     PROJECTS.reduce(function(n, x){ return n + x.onSite; }, 0) + '</b> ' + L("machines on site", "معدّة في الموقع")
+    +     ' · <span class="risk">1 ' + L("overdue", "متأخّر") + '</span></span>'
+    +   '<span class="spacer"></span>'
+    +   '<button class="btn btn-secondary"><span class="icon" aria-hidden="true">add</span>' + L("New project", "مشروع جديد") + '</button>'
+    + '</div>'
+    + '<div class="plane"><div class="rail">' + rail + '</div>'
+    + '<div class="panel">'
+    +   '<div class="pmeta">'
+    +     '<div class="cell"><div class="k">' + L("Project", "المشروع") + '</div><div class="v">' + L(p.nEn, p.nAr) + '</div></div>'
+    +     '<div class="cell"><div class="k">' + L("Client", "العميل") + '</div><div class="v">' + L(p.clientEn, p.clientAr) + '</div></div>'
+    +     '<div class="cell"><div class="k">' + L("Starts", "يبدأ") + '</div><div class="v num">' + p.start + '</div></div>'
+    +     '<div class="cell"><div class="k">' + L("Ends", "ينتهي") + '</div><div class="v num">' + p.end + '</div></div>'
+    +     '<div class="cell"><div class="k">' + L("Location", "الموقع") + '</div><div class="v">' + L(p.locEn, p.locAr) + '</div></div>'
+    +     '<div class="cell spacer"></div>'
+    +     '<div class="go"><button class="btn btn-secondary btn-sm">' + L("New request here", "طلب جديد هنا") + '</button>'
+    +       '<button class="btn btn-navy btn-sm">' + L("Open project", "افتح المشروع") + '</button></div>'
+    +   '</div>'
+    +   (p.noticeEn ? '<div class="notice ' + (p.alert ? "danger" : "warn") + '">'
+    +     '<span class="icon" aria-hidden="true">' + (p.alert ? "error" : "info") + '</span>' + L(p.noticeEn, p.noticeAr) + '</div>' : '')
+    +   '<div class="phases">' + phases + '<span class="phasenote">'
+    + L("PO, on-hire and invoice are not tracked yet — shown for shape",
+        "أمر الشراء وبدء الإيجار والفاتورة غير متتبَّعة بعد — تظهر للشكل") + '</span></div>'
+    +   '<div class="gantt"><div class="gmin">'
+    +     '<div class="grow ghead"><div class="gcol">' + L("Machine", "المعدّة") + '</div>'
+    +       '<div class="gtrack">' + months
+             + (todayIn ? '<span class="gtoday" style="inset-inline-start:' + todayP + '%"><span>'
+    +           + L("today", "اليوم") + '</span></span>' : '') + '</div></div>'
+    +     (rows || '<div class="empty"><b>' + L("No machines on this project yet", "لا معدّات في هذا المشروع بعد") + '</b>'
+             + L("Award a bid and it appears here as a bar.", "أرسِ عرضاً وسيظهر هنا كشريط.") + '</div>')
+    +   '</div></div>'
+    + '</div></div>';
+}
+function pickProject(id){ proj = id; renderProjects(); }
+
+/* ══ 3 · suppliers ══════════════════════════════════════════════════════════ */
+var SUP_FILTERS = [
+  {k:"all",       enEn:"All",             enAr:"الكل"},
+  {k:"preferred", enEn:"Preferred",       enAr:"المفضّلون"},
+  {k:"worked",    enEn:"Worked with",     enAr:"تعاملت معهم"},
+  {k:"papers",    enEn:"Papers expiring",  enAr:"أوراق تنتهي"},
+  {k:"blocked",   enEn:"Avoid",           enAr:"تجنّب"}
+];
+function supMatch(s, f){
+  if (f === "preferred") return s.label === "preferred";
+  if (f === "blocked") return s.label === "blocked";
+  if (f === "worked") return s.bids > 0;
+  if (f === "papers") return s.papers.some(function(p){ return p[1] === "soon" || p[1] === "miss"; });
+  return true;
+}
+
+function renderSuppliers(){
+  var rows = SUPPLIERS.filter(function(s){ return supMatch(s, supFilter); });
+  var pills = SUP_FILTERS.map(function(f){
+    var n = SUPPLIERS.filter(function(s){ return supMatch(s, f.k); }).length;
+    return '<button class="pill" type="button" aria-pressed="' + (supFilter === f.k) + '" onclick="setSupFilter(\'' + f.k + '\')">'
+      + L(f.enEn, f.enAr) + '<span class="c">' + n + '</span></button>';
+  }).join("");
+
+  var body = rows.map(function(s, i){
+    var label = s.label === "preferred" ? '<span class="badge b-ok"><span class="led"></span>' + L("Preferred", "مفضّل") + '</span>'
+              : s.label === "blocked" ? '<span class="badge b-danger"><span class="led"></span>' + L("Avoid", "تجنّب") + '</span>' : '';
+    var papers = s.papers.length
+      ? s.papers.map(function(p){
+          var t = p[1] === "ok" ? "ok" : p[1] === "soon" ? "soon" : "miss";
+          var ic = p[1] === "ok" ? "check" : p[1] === "soon" ? "schedule" : "close";
+          return '<span class="paper ' + t + '"><span class="icon" aria-hidden="true" style="font-size:12px">' + ic + '</span>' + p[0] + '</span>';
+        }).join("")
+      : '<span class="paper">' + L("none on file", "لا أوراق") + '</span>';
+
+    return '<tr>'
+      + '<td><div class="sup"><span class="slogo">' + s.n.charAt(0) + '</span>'
+      +   '<span><span class="n">' + L(s.n, s.nAr) + label + '</span>'
+      +   '<span class="m">' + L(s.city, s.cityAr) + '</span></span></div></td>'
+      + '<td><span class="rel"><b>' + s.bids + '</b>/' + s.invited + ' ' + L("answered", "ردّوا")
+      +   '<span class="sub">' + (s.awarded ? L("you awarded ", "أرسيت ") + s.awarded + L("×", "×")
+            : L("never awarded", "لم تُرسِ عليهم")) + ' · ' + L("replies ", "يردّون ") + L(s.replyEn, s.replyAr) + '</span></span></td>'
+      + '<td><span class="rel">' + (s.quoted ? '<b>' + money(s.quoted) + '</b>' : '—')
+      +   '<span class="sub">' + (s.settled ? L("settled at ", "استقرّ على ") + '<b style="font-size:var(--t-meta)">'
+            + money(s.settled) + '</b>' : L("no deal closed", "لا صفقة")) + ' · ' + L(s.lastEn, s.lastAr) + '</span></span></td>'
+      + '<td><span class="terms">' + L(s.termsEn, s.termsAr) + '</span></td>'
+      + '<td><span class="papers">' + papers + '</span><span class="asof">' + L(s.asOfEn, s.asOfAr) + '</span></td>'
+      + '<td><div class="acts">'
+      +   '<button class="btn btn-navy btn-sm">' + L("Open their store", "افتح متجرهم") + '</button>'
+      +   '<div class="menu' + (openMenu === "s" + i ? " open" : "") + '">'
+      +     '<button class="btn btn-secondary btn-sm btn-icon" aria-label="' + L("More", "المزيد") + '" '
+      +       'onclick="event.stopPropagation();toggleMenu(\'s' + i + '\')"><span class="icon" aria-hidden="true">more_horiz</span></button>'
+      +     '<div class="sheet">'
+            +       '<button><span class="icon" aria-hidden="true">history</span>' + L("Full history with them", "السجل الكامل معهم") + '</button>'
+      +       '<button><span class="icon" aria-hidden="true">description</span>' + L("Their papers", "أوراقهم") + '</button>'
+      +       '<div class="rule"></div>'
+      +       '<button><span class="icon" aria-hidden="true">star</span>' + (s.label === "preferred"
+                ? L("Remove the preferred tag", "أزل وسم المفضّل") : L("Tag as preferred", "ضع وسم المفضّل")) + '</button>'
+      +       '<button class="danger"><span class="icon" aria-hidden="true">flag</span>' + (s.label === "blocked"
+                ? L("Remove the avoid tag", "أزل وسم التجنّب") : L("Tag as avoid", "ضع وسم التجنّب")) + '</button>'
+      +     '</div></div>'
+      + '</div></td></tr>';
+  }).join("");
+
+  document.getElementById("panel-suppliers").innerHTML =
+      '<div class="phead"><h1>' + L("My Suppliers", "مؤجّروني") + '</h1>'
+    +   '<span class="sum">' + L("what they did for you — prices, replies, terms and papers. Stores holds the public facts.",
+                                 "ما فعلوه لك — الأسعار والردود والشروط والأوراق. المتاجر تحمل الحقائق العامة.") + '</span>'
+    + '</div>'
+    + '<div class="filters"><div class="search"><span class="icon" aria-hidden="true">search</span>'
+    +   '<input placeholder="' + L("Search suppliers you have dealt with…", "ابحث في من تعاملت معهم…") + '" /></div>'
+    +   pills + '</div>'
+    + '<div class="panel"><div class="tscroll"><table>'
+    +   '<thead><tr>'
+    +     '<th>' + L("Supplier", "المؤجّر") + '</th>'
+    +     '<th>' + L("Your record", "سجلّك معهم") + '</th>'
+    +     '<th>' + L("Quoted you", "سعّروا لك") + '</th>'
+    +     '<th>' + L("Terms you agreed", "الشروط المتّفقة") + '</th>'
+    +     '<th>' + L("Papers", "الأوراق") + '</th>'
+    +     '<th style="text-align:end">' + L("Actions", "إجراءات") + '</th>'
+    +   '</tr></thead><tbody>' + body + '</tbody></table></div></div>';
+}
+function setSupFilter(k){ supFilter = k; openMenu = null; renderSuppliers(); }
+
+/* ══ stores strip ═══════════════════════════════════════════════════════════ */
+function renderStores(){
+  document.getElementById("stores").innerHTML = STORES.map(function(s){
+    return '<button class="scard" type="button">'
+      + '<span class="sshot"><span class="icon" aria-hidden="true">' + s.ic + '</span>'
+      +   (s.ver ? '<span class="v"><span class="icon" aria-hidden="true">check</span></span>' : '') + '</span>'
+      + '<span class="sbody"><span class="n">' + L(s.n, s.nAr) + '</span>'
+      +   '<span class="m">' + s.eq + ' ' + L("machines", "معدّة") + ' · ' + L(s.city, s.cityAr) + '</span></span></button>';
+  }).join("");
+}
+
+/* ══ render ═════════════════════════════════════════════════════════════════ */
+function render(){
+  if (tab === "requests") renderRequests();
+  if (tab === "projects") renderProjects();
+  if (tab === "suppliers") renderSuppliers();
+  renderStores();
+}
+document.addEventListener("click", function(){ if (openMenu){ openMenu = null; render(); } });
+render();
+</script>
+</body>
+</html>

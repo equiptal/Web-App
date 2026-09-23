@@ -20,6 +20,9 @@ export interface Subcategory {
   /** Canonical taxonomy group inherited from the parent category (see {@link Category.tag}). */
   tag?: string | null;
   measurements: Measurement[];
+  /** A photograph of real equipment for this node, when the admin panel has one.
+   *  Null/absent on most rows — callers fall back to the icon, then to a glyph. */
+  equipmentImageUrl?: string | null;
 }
 
 export interface Category {
@@ -30,12 +33,57 @@ export interface Category {
    *  CATEGORY rows, so a subcategory inherits its parent's. Display/grouping only — no cert rule reads it. */
   tag?: string | null;
   subcategories: Subcategory[];
+  /** A photograph of real equipment for this node, when the admin panel has one.
+   *  Null/absent on most rows — callers fall back to the icon, then to a glyph. */
+  equipmentImageUrl?: string | null;
 }
 
 export type Taxonomy = Category[];
 
+/**
+ * ── The canonical group, in the reader's language (owner, 2026-09-08) ────────────────────────────
+ * *"Category Arabic missing, always shows in English."*
+ *
+ * `GET /equipment/taxonomy` carries `name` and `nameAr` for every node, but `tag` — the canonical
+ * grouping the CATEGORY box shows — is English only: there is no `tagAr` on the wire (checked
+ * against staging). So an Arabic renter picked «رافعة شوكية» for the type and read «Lifting, Cranes
+ * & Aerial» in the box above it.
+ *
+ * The vocabulary is seven values and it is the backend's own, so it is translated here by value.
+ * A tag this map does not know comes back untouched rather than guessed at — a new group added
+ * upstream shows in English until it is added here, which is visibly wrong rather than quietly so.
+ *
+ * ⚠️ **Backend, when someone is in there:** `tagAr` beside `tag` on the taxonomy rows would retire
+ * this map. Until then, any tag added to `equipment_taxonomy.tag` has to be added below too.
+ */
+const TAG_AR: Record<string, string> = {
+  "BMU": "وحدات صيانة المباني",
+  "Demolition, Crushing & Screening": "الهدم والتكسير والغربلة",
+  "Drilling & Foundation": "الحفر والأساسات",
+  "Earthmoving & Excavation": "أعمال الحفر ونقل التربة",
+  "Lifting, Cranes & Aerial": "الرفع والرافعات والمنصات",
+  "Light Construction & Support": "الإنشاءات الخفيفة والمساندة",
+  "Road Construction & Paving": "إنشاء الطرق والرصف",
+};
+
+/** A taxonomy `tag` in the reader's language. Unknown tags pass through as they arrived. */
+export function taxTag(tag: string | null | undefined, locale: string): string {
+  if (!tag) return "";
+  return locale === "ar" ? TAG_AR[tag] ?? tag : tag;
+}
+
 /** Locale-aware display name for a taxonomy node: Arabic when locale is "ar" and a name_ar exists,
  *  else the canonical English name. Keeps the English value as the source of truth. */
+/**
+ * Which catalogue the answer came from: `live` (the agents service) or `fixture` (the built-in
+ * stand-in the route falls back to when that service fails).
+ *
+ * ⚠️ A HEADER, not a field in the body. Every consumer of `/api/taxonomy` reads the tree as a bare
+ * array, and wrapping it to carry one flag would touch each of them for a fact only one screen
+ * cares about.
+ */
+export const SOURCE_HEADER = "x-taxonomy-source";
+
 export function taxName(node: { name: string; nameAr?: string | null } | undefined, locale: string): string {
   if (!node) return "";
   return locale === "ar" && node.nameAr ? node.nameAr : node.name;

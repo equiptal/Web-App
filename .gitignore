@@ -14,7 +14,7 @@
 /coverage
 
 # next.js
-/.next/
+# (`.next/` itself is covered by the `.next*/` rule at the foot of this file.)
 /out/
 
 # production
@@ -40,3 +40,27 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Impeccable (design tooling) — machine-local overrides
+.impeccable/config.local.json
+.impeccable/live/
+.impeccable/*cache*
+
+# Editor/agent backups — never tracked. One was swept in by a `git add -A` on 2026-08-31.
+*.bak
+
+# UI screenshots from `npm run ui:shots` — evidence for a change report, never committed
+.artifacts/
+
+# EVERY Next build directory, whatever it is called — never committed.
+#
+# One rule, not a list of names. This started as `/.next/`, then `.next-preview/` was added for the
+# screenshot lane (it must not contend with `.next`, see next.config.ts), then `.next-probe/` and
+# `.next-probe2/` for ad-hoc `next build` typecheck runs, then `.next-probe*/` on 2026-09-12 when a
+# third one slipped through — and within the day `.next-guestwall/` and `.next-gw2/` were created
+# and matched none of them. Each new name is a full build tree sitting untracked in `git status`
+# waiting for somebody's `git add -A`.
+#
+# The trailing slash matters: it matches DIRECTORIES only, so `next-env.d.ts` (ignored above, no
+# leading dot) and any future `.next-something.json` file are unaffected.
+.next*/

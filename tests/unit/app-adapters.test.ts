@@ -32,6 +32,31 @@ function makeDraft(p?: Partial<{ project: ProjectDetails; items: EquipmentItem[]
   };
 }
 
+describe("draftToCreateRequest — a request started from a store (Epic 008 parity)", () => {
+  it("files it as DIRECT to that supplier alone", () => {
+    const out = draftToCreateRequest(
+      { ...makeDraft(), direct: { supplierId: "412", supplierName: "Zahid Tractor", storeId: "st-1" } },
+      "46",
+    );
+    expect(out.type).toBe("DIRECT");
+    expect(out.supplierId).toBe(412); // an INTEGER user id, which is what the backend validates
+  });
+
+  it("stays a BROADCAST when no store was involved, and sends no supplierId at all", () => {
+    const out = draftToCreateRequest(makeDraft(), "46");
+    expect(out.type).toBe("BROADCAST");
+    expect("supplierId" in out).toBe(false); // a broadcast's payload is byte-identical to before
+  });
+
+  it("refuses to address a request to an unusable id — it broadcasts rather than 400s", () => {
+    for (const supplierId of ["", "abc", "0", "-3", "12.5"]) {
+      const out = draftToCreateRequest({ ...makeDraft(), direct: { supplierId, supplierName: null, storeId: null } }, "46");
+      expect(out.type).toBe("BROADCAST");
+      expect(out.supplierId).toBeUndefined();
+    }
+  });
+});
+
 describe("draftToCreateRequest — ALIGNMENT rules", () => {
   it("rule 2: urgency derived from start date (mobile CR-017 parity)", () => {
     const at = (days: number | null) => {
@@ -223,9 +248,9 @@ describe("draftToCreateRequest — §4.2 fields", () => {
   it("omits the overtime rate rather than writing the '0' sentinel", () => {
     /**
      * The picker is retired and the draft default is "without", which mapped to the string '0'.
-     * '0' is TRUTHY, so it read back as a rate: the quotation printed "Overtime 0" and the deal room
-     * raised a phantom conflict on a term neither side was asked about. The backend now normalises it
-     * away (app `2b095d63`); the web stops creating it.
+     * '0' is TRUTHY, so it read back as a rate: the app's quotation printed "Overtime 0 SAR/hr"
+     * and the deal room raised a phantom conflict on a term neither side was asked about. The
+     * backend now normalises it away; the web stops creating it.
      */
     expect(draftToCreateRequest(makeDraft(), "46").overtimeRate).toBeUndefined();
   });

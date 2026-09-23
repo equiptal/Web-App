@@ -7,6 +7,7 @@ import {
   durationDaysBetween,
   formatSar,
   headlineAmount,
+  headlineShowsRawRate,
   legDisplay,
   rentalDivisor,
   rentalPeriodSubtitle,
@@ -209,15 +210,35 @@ describe("computeRentalTotal — falls back to the bare rate, never 0", () => {
   });
 });
 
-describe("headlineAmount — rate vs prorated total", () => {
+/**
+ * The headline is the quoted RATE, for every price unit (owner, 2026-08-26).
+ *
+ * This assertion is inverted from what it was for daily, and against the app rather than against a
+ * mockup: `rental_pricing.dart:179` is `headlineShowsRawRate(String) => true`, unconditional. The web
+ * answered false for daily and headlined the period total — which is still what prod does — so a daily
+ * bid showed a TOTAL in the same column where weekly and monthly bids show a RATE, and the breakdown
+ * needed two shapes to accommodate it.
+ */
+describe("headlineAmount — always the quoted rate", () => {
   it("weekly and monthly show the RAW quoted rate", () => {
     expect(headlineAmount("PER_WEEK", 4200, 7700)).toBe(4200);
     expect(headlineAmount("PER_MONTH", 26000, 11000)).toBe(26000);
   });
 
-  it("daily shows the prorated total", () => {
-    expect(headlineAmount("PER_DAY", 600, 6600)).toBe(6600);
-    expect(headlineAmount(null, 600, 6600)).toBe(6600);
+  it("daily shows its rate too, not the prorated total", () => {
+    expect(headlineAmount("PER_DAY", 600, 6600)).toBe(600);
+    expect(headlineAmount(null, 600, 6600)).toBe(600);
+  });
+
+  it("per-job and an unrecognized unit are no exception", () => {
+    expect(headlineAmount("PER_JOB", 7700, 477400)).toBe(7700);
+    expect(headlineAmount("PER_FORTNIGHT", 900, 12000)).toBe(900);
+  });
+
+  it("states the rule through the app's own predicate", () => {
+    for (const u of ["PER_DAY", "PER_WEEK", "PER_MONTH", "PER_JOB", null]) {
+      expect(headlineShowsRawRate(u)).toBe(true);
+    }
   });
 });
 
@@ -234,7 +255,29 @@ describe("rentalPeriodSubtitle — the fixed-divisor assumption under the headli
   });
 });
 
-describe("legDisplay — excluded → bundled → not quoted → amount", () => {
+describe("legDisplay — on rentee → excluded → bundled → not quoted → amount", () => {
+  /**
+   * A leg the RENTER kept outranks every other state, including a stored number (owner, 2026-09-05).
+   *
+   * Both figures that reach here in that case are false: an app bid sends no price, because the
+   * backend demands one only when the leg IS the supplier's, so the row read «Not quoted» as though
+   * he had ducked a mandatory answer; an off-platform bid stores 0, because the public form hides
+   * the input and coerces the empty string — and `submitBidForm` would store 0 even for an omitted
+   * field — so the row read «0 SAR», which is free delivery from a supplier who was never asked to
+   * deliver.
+   */
+  it("a leg on the renter beats a price, an exclusion and a gap alike", () => {
+    expect(legDisplay({ onRentee: true, amount: 1500 })).toEqual({ kind: "on_rentee" });
+    expect(legDisplay({ onRentee: true, amount: 0 })).toEqual({ kind: "on_rentee" });
+    expect(legDisplay({ onRentee: true, excluded: true })).toEqual({ kind: "on_rentee" });
+    expect(legDisplay({ onRentee: true })).toEqual({ kind: "on_rentee" });
+  });
+
+  it("and changes nothing when the request never kept the leg", () => {
+    expect(legDisplay({ onRentee: false, amount: 1500 })).toEqual({ kind: "amount", amount: 1500 });
+    expect(legDisplay({ onRentee: null, amount: null })).toEqual({ kind: "not_quoted" });
+  });
+
   it("bundled is unreachable in prod — the app hardcodes it false, so we keep it inert", () => {
     // `my_offers_v3_tab_content.dart:787` is the ONLY construction site and passes a literal false;
     // no bid field or backend column feeds it. Kept wired so a real field is a one-line change.

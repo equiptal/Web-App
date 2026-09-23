@@ -5,6 +5,7 @@
  */
 export const en = {
   common: {
+    endBeforeStart: "The end date is before the start date. Move one of them.",
     next: "Next",
     back: "Back",
     cancel: "Cancel",
@@ -16,6 +17,7 @@ export const en = {
     add: "Add",
     save: "Save",
     done: "Done",
+    open: "Open",
     close: "Close",
     retry: "Retry",
     optional: "optional",
@@ -35,16 +37,48 @@ export const en = {
     preferences: "Preferences",
     preview: "Preview",
   },
+  /* ── The seasonal skin's words ────────────────────────────────────────────────────────────────
+     One string. The chip beside the wordmark reads «96 National Day» / «96 اليوم الوطني», and the
+     ORDINAL is not in here on purpose: it is derived from the year in `season.ts`, so next
+     September reads 97 with nothing to translate.
+
+     ⚠️ Latin digits in BOTH locales — this app's rule since 2026-09-04. The Flutter kit draws «٩٦»;
+     the web does not, and `season.ts` says why beside the derivation. */
+  season: {
+    nationalDay: "National Day",
+  },
   shell: {
     home: "Home",
+    /* The back control's words. It names its DESTINATION, so a renter knows where a press lands
+       before he makes it (owner, 2026-09-03). `back` alone is the fallback for a route the product
+       has no name for — the control still works, it just cannot promise a place. */
+    back: "Back",
+    backTo: "Back to {place}",
+    suppliers: "Suppliers",
     profile: "Profile",
+    /* The tab over `/requests`. ~~«Marketplace» (owner, 2026-09-03).~~ Back to «Requests» (owner,
+       2026-09-04): the row is three words now, one per place, and the renter's own requests are what
+       he goes there to read. */
     requests: "Requests",
+    /* The product's own state, beside the wordmark. Not a page label. The KEY stays `beta` (the
+       mark's slot, and what the `header-beta` pin names); only the words changed, because "Beta"
+       told a renter he was being tested on. */
+    beta: "VIP access",
     compare: "Compare bids",
     dashboard: "Dashboard",
+    browse: "Browse",
     surveys: "Surveys",
     inbox: "Inbox",
     request: "Request",
     account: "Account",
+    // The phone menu button, which opens the nav sheet — the three places the centred row holds
+    // on a wider bar.
+    menu: "Menu",
+    // The language switch names its DESTINATION, not its state — the control is a two-way choice.
+    switchLang: "Switch to Arabic",
+    // The account menu's entry to . The route and its content are unchanged; «Settings» is
+    // what a reader looks for beside Sign out, and it keeps the header to four tabs.
+    settings: "Settings",
     signIn: "Sign in",
     welcome: "Welcome",
     collapseSidebar: "Collapse sidebar",
@@ -52,11 +86,12 @@ export const en = {
     tierGuest: "Guest",
     tierBasic: "Basic rentee",
     tierVerified: "Verified",
+    verifyNudge: "Verify",
     stepsGuest: "1 of 3 steps · complete your profile to unlock requests.",
     stepsBasic: "2 of 3 steps · verify your company to unlock unlimited requests.",
     verifiedNote: "Your company is verified.",
     notifications: "Notifications",
-    company: "My Company",
+    company: "My Organization",
     // Short forms for the mobile bottom bar, which splits its width evenly across the tabs —
     // the full labels truncate to stubs there ("Compare bids" already did before Company existed).
     companyShort: "Company",
@@ -74,21 +109,75 @@ export const en = {
     empty: "You're all caught up.",
     emptyUnread: "No unread notifications.",
     loadError: "Couldn't load notifications.",
+    bubbleMore: "+{n} more",
     justNow: "Just now",
+  },
+  /* The wall a guest meets on a page that is his once he signs in. The kicker is the OS's own
+     («Join Moedatech»); the title and the line under it belong to each page. */
+  guestWall: {
+    join: "Join Moedatech",
+    dashboardTitle: "Your dashboard needs an account",
+    dashboardBody: "Your requests, the bids on them, your sites and your suppliers, all on one page",
+    requestsTitle: "Your requests need an account",
+    requestsBody: "Every request you send, the bids that come back, and the comparison between them",
   },
   home: {
     title: "Home",
-    eyebrow: "Smart Equipment Marketplace",
+    /* The guest dashboard (owner, 2026-09-04). A visitor who presses Dashboard is shown the same
+       prompt every other account-bound page shows him, rather than being bounced to Browse — he
+       asked for this page, so it answers for itself. */
+    signInTitle: "Sign in to see your dashboard",
+    signInBody: "Your requests, the bids on them, your sites and your suppliers all live here once you sign in",
     statSuppliers: "Verified Suppliers",
     statEquipment: "Equipment Listed",
     statCities: "Cities Covered",
-    bannerTitle: "Order your next equipment, faster than ever",
-    bannerSubtitle: "Post your request and get competitive bids from verified suppliers — or upload an RFQ and let your smart assistant build it automatically.",
     createRequest: "Create request",
+    // ── The CTA band (owner's comp, "Moedatech Create Request CTA", 2026-08-29) ─────────────
+    // The headline names the ACT, not the marketplace: the renter is not here to admire a platform,
+    // he is here to get a machine. «AI» is its own token so it can carry the brand's ink — the comp
+    // colours that one word and nothing else on the band.
+    ctaTitleBefore: "Let ",
+    ctaTitleAi: "our AI assistant",
+    ctaTitleAfter: " find your next equipment",
     uploadRfq: "Upload RFQ",
-    suppliersTitle: "Suggested Suppliers",
+    suppliersTitle: "Most popular suppliers",
     viewAll: "View all",
     showLess: "Show less",
+    // ── The dashboard's requests block (owner, 2026-08-29) ──────────────────────────────────────
+    // The column says how long suppliers can still ANSWER, not what the backend calls the row: the
+    // renter is deciding whether to chase, extend or award, and a status word answers none of that.
+    reqSummary: "{n} open · {bids} new bids",
+    reqMoreItems: "+{n} more",
+    reqDaysLeft: "{n} days left",
+    reqOneDayLeft: "1 day left",
+    reqToday: "Closes today",
+    reqExpired: "Expired",
+    // «Closed» is the STATUS speaking, and it outranks both dates: a request the backend has shut
+    // takes no more bids whatever its deadline said, so a countdown beside it would be a lie the
+    // renter acts on. Only when the row is still live do the two deadline sources get a say.
+    reqClosed: "Closed",
+    // The row's own actions, as the prototype carries them — share the bid link, edit the request,
+    // cancel it. Titles only: the icons are the control, and three labelled buttons on a dense row
+    // would be wider than the request they act on.
+    reqShare: "Share for bids",
+    reqEdit: "Edit request",
+    reqCancel: "Cancel request",
+    reqOpenDetails: "Open request details",
+    // The rail shows the newest five; the rest are one scroll away, and the strip says so rather
+    // than letting a cut-off row be the only hint that there are more.
+    moreBidsBelow: "{n} more",
+    /** The toggle back, on both cards once they are open. */
+    showFewer: "Show fewer",
+    // The table's own foot, mirroring the rail's. The header says «20 open» over five rows, and
+    // without this the reader's only reading of that gap is that the list is broken.
+    moreRequests: "{n} more requests",
+    compareBids: "Compare bids",
+    colSite: "Site",
+    colEquipment: "Equipment",
+    colBids: "Bids",
+    colCloses: "Closes",
+    newBidsCount: "{n} new bids",
+    noBidsYet: "No bids yet.",
     nudgeGuestTitle: "Complete your profile",
     nudgeGuestBody: "Add your details to unlock requests and bids.",
     nudgeGuestCta: "Complete profile",
@@ -97,7 +186,10 @@ export const en = {
     nudgeBasicCta: "Get verified",
     verifiedTitle: "You're verified",
     verifiedBody: "Your company is verified.",
-    yourRequests: "Your Requests",
+    yourRequests: "My Requests",
+    /* Behind the dashboard's Requests tab, where `HomeRequests` renders NOTHING at all (2026-09-16).
+       It names the door already on screen above it rather than adding a second one. */
+    noRequestsYet: "No requests yet. Describe what you need above and we will read it for you",
     priceBids: "Price Bids",
     completedDeals: "Completed Deals",
     soon: "Coming soon",
@@ -111,7 +203,7 @@ export const en = {
   browse: {
     title: "Verified Suppliers",
     signInTitle: "Sign in to browse suppliers",
-    signInBody: "Browsing suppliers and their equipment needs an account. Sign in — it only takes a moment.",
+    signInBody: "Browsing suppliers and their equipment needs an account. Sign in. It only takes a moment.",
     search: "Search stores or equipment",
     city: "City",
     category: "Category",
@@ -126,6 +218,14 @@ export const en = {
     pickSubcategoryFirst: "Select a subcategory first",
     newLabel: "New",
     equipmentCount: "equipment",
+    // The pill row's first pill — the shopfront view, before any category narrows the cards.
+    // The leading pill on the category scroller. «All stores», never «All» (owner, 2026-09-16) —
+    // it sits beside real category names and one bare word did not say what it restores.
+    allCategories: "All stores",
+    // The ‹ › pager under the grid. Labels only — the controls draw a chevron each, so these
+    // exist for the screen reader and the tooltip (owner, 2026-09-16: 20 per page, arrows for the rest).
+    prevPage: "Previous page",
+    nextPage: "Next page",
     empty: "No suppliers match your filters.",
     error: "We couldn't load suppliers.",
     retry: "Retry",
@@ -166,30 +266,298 @@ export const en = {
     photos: "Photos",
     docsShort: "Documents",
     close: "Close",
+    suppliedBy: "Supplied by",
+    backToSuppliers: "Back to suppliers",
+    backToResults: "Back to results",
+    backToStore: "Back to the store",
+    about: "About",
+    viewStore: "View store",
+    expandMap: "Open the map",
+    openInGoogleMaps: "Open in Google Maps",
+    prevPhoto: "Previous",
+    nextPhoto: "Next",
+    // The map says what it actually knows: a yard's coordinates, or only the city.
+    approxLocation: "Approximate: city only",
+    noLocation: "No location on this listing",
+    // The recipient ribbon on the create flow, when the request was started from a store.
+    directBanner: "This request goes to {name} only. No other supplier sees it.",
+    directBannerBack: "Back to the store",
+    directSupplierFallback: "this supplier",
   },
   intake: {
+    postShare: {
+      tooLong: "The message is too long to open in Outlook. Copy the link and send it yourself.",
+      fromLine: "From: {name}",
+      fromYou: "you",
+      coach: "Share with your supplier to bid",
+      /* ⚠️ It says what the date DOES, not what it is called (owner, 2026-09-13: *"make the text
+         as «set the deadline of your link so supplier cant bid after it»"*). «Expiry date of your
+         link» named a field; nothing on the screen said that leaving it empty means the link never
+         closes, or that setting it stops a supplier bidding. `expiryName` keeps the short noun for
+         the `aria-label`, because a screen reader wants the field, not the reason. */
+      expiry: "Set your link’s deadline, so nobody can bid after it",
+      expiryName: "Expiry date of your link",
+      title: "Share this request",
+      linkLabel: "Your shareable link",
+      linkMasked: "Generated the moment you post",
+      copy: "Copy link",
+      copyShort: "Copy",
+      previewShort: "Preview",
+      copied: "Copied",
+      loading: "Loading…",
+      recipients: "Send to my suppliers",
+      selected: "{n} selected",
+      noSuppliers: "No suppliers on your list yet.",
+      /* The empty state's own sentence: what the list DOES, so the offer beside it reads as worth
+         taking. The bare «none yet» above is still used where there is no room for a control. */
+      noSuppliersYet: "Add the firms you rent from and you can send this request to them in one press",
+      noEmail: "no e-mail",
+      addEmail: "Add e-mail",
+      addPhone: "Add phone",
+      sendVia: "Send via",
+      email: "E-mail",
+      whatsapp: "WhatsApp",
+      whatsappFirst: "Opens one chat, with {name}. WhatsApp cannot take several at once.",
+      preview: "What they receive",
+      subject: "RFQ for {equipment}",
+      skipping: "{n} of the ones you picked have no e-mail and will be left out.",
+      posting: "Posting…",
+      openIn: "Open in",
+      outlook: "Outlook",
+      gmail: "Gmail",
+      alwaysHint: "Every request goes to Moedatech. You can share it via other channels too.",
+      previewEmpty: "Add equipment to your request to see what suppliers receive.",
+      whichRequest: "Which request",
+      noRequests: "You have no requests to share yet.",
+      searchSuppliers: "Search your suppliers",
+      noMatches: "No supplier of yours matches that.",
+      postMoedatechOnly: "Post to Moedatech",
+      sendMoedatechOnly: "Send to Moedatech",
+      moedatechOnlyHint: "This request goes to Moedatech only. Nothing else is sent.",
+      /* ── The opposite sentence, for a machine the catalogue cannot place ────────────────────
+         Owner, 2026-09-08: *"for requests that have undefined taxonomy we will remove Moedatech
+         from the confirmation, from the icons list in the share and from the confirmation question,
+         and will tell the opposite since we will not have it available and no supplier."*
+
+         Such a request reaches nobody by broadcast, so every surface that announces the marketplace
+         says this instead. It is not a warning about a failure: the request is saved and the link
+         works. It is the one fact that decides what he does next. */
+      offCatalogueLine: "This equipment is not in our catalogue yet, so no supplier on Moedatech can bid on it. Your link is the only way to reach one",
+      offCataloguePost: "Post the request",
+      offCataloguePick: "Pick a way to share",
+      fixedByUs: "Request details",
+      tplTitle: "Subject",
+      tplAbove: "Your words above the request",
+      tplBelow: "Your words below the request",
+      tplGreeting: "Greeting",
+      tplIntro: "Introduction",
+      tplSignoff: "Sign-off",
+      tplReset: "Reset to default",
+      sendToSuppliers: "Send to suppliers",
+      editHint: "Tap any of your own lines to change them. They are saved for your next request.",
+      other: "More",
+      messageCopied: "Message copied. Paste it wherever you like.",
+      postedOnly: "Posted to Moedatech. Suppliers there can bid now.",
+      pickAll: "Select all {n}",
+      pickNone: "Clear selection",
+      shareAgain: "Share again",
+      shareAgainHint: "Pick another channel above and press again. The link stays the same.",
+      nowPasteAddresses: "Your suppliers are on the clipboard. Press Ctrl+V in Outlook’s Bcc field.",
+      nowPasteCard: "The card is on the clipboard. Press Ctrl+V at the end of the message.",
+      /* ── The locked link, answered on the PRESS (owner, 2026-09-12) ────────────────────
+         *"clicking it will open small clear popup saying post the request first so the link is
+         generated and u can share the link"*.
+         ~~`linkHint`, a sentence that sat inside the field at all times.~~ It was a line of prose in
+         a placeholder, so the field had to be wide enough to hold it, and it answered a question
+         before the renter had asked it. */
+      linkLockedTitle: "Post the request first",
+      linkLockedBody: "The link is created the moment you post. After that you can copy it and share it anywhere you like",
+      noPhone: "no phone",
+      vendorShort: "Vendor",
+      skippingPhone: "{n} of the ones you picked have no phone.",
+      previewForm: "Preview form",
+      postedKeepSharing: "Keep sharing",
+      openedEmail: "Your e-mail opened with {n} suppliers. Send it there to finish.",
+      openedWhatsApp: "WhatsApp opened with {name}. Send it there to finish.",
+      openedOther: "Handed to your share sheet. Send it there to finish.",
+      postedTitle: "Your request is posted",
+      /* ── The tick says what happened, in its title (owner, 2026-09-08) ──────────────────────
+         *"The title is «your request is posted into Moedatech and shared from yara@outlook.co»,
+         then below it «sent from ... to 1 supplier, a copy is in your Sent folder in Outlook», then
+         below «you can still...»"*
+
+         The old shape said the post in the title, the post AGAIN in the line under it, the send in
+         a third line and the Sent folder in a fourth. Four lines for two facts. */
+      postedTitleFrom: "Your request is posted to Moedatech and shared from {from}",
+      /* No marketplace to name on an off-catalogue request: nothing there can bid on it. */
+      postedTitleFromOnly: "Your request is shared from {from}",
+      postedLive: "It is live on Moedatech now",
+      postedLiveOne: "It is live on Moedatech now, and shared with 1 supplier",
+      postedLiveMany: "It is live on Moedatech now, and shared with {n} suppliers",
+      postedNext: "You can still share it anytime with more suppliers",
+      /* ── SUP-BE-23: the mail we send ourselves, from his own address ──────────────────────── */
+      mailSent: "Sent from {from} to {n} suppliers",
+      mailSentOne: "Sent from {from} to 1 supplier",
+      /* ── WHO it went to, on the tick (owner, 2026-09-13) ──────────────────────────
+         *"in the success message when a request is posted and sent to email, show to who it was
+         sent, like their emails, if so much addresses then show first 5"*.
+         The count answered «how many» and nothing answered «which» — and a mistyped address in his
+         own supplier list is invisible behind a number. Five, then this. */
+      mailSentTo: "+{n} more",
+      mailSkipped: "{n} of the ones you picked had no e-mail, so they were left out.",
+      mailOpenInstead: "Open your e-mail",
+      /* ── SUP-BE-23, the Graph path: the renter connects his own Outlook once ──────────────── */
+      copyAddresses: "Copy addresses",
+      copyAddressesDone: "Addresses copied",
+      copyAddressesHint: "Outlook drops blind copies from a link, so paste these into its Bcc field",
+      envSubject: "Subject",
+      envFrom: "From",
+      envYourMail: "Your e-mail",
+      envTo: "To",
+      envBcc: "Bcc",
+      envNoRecipients: "Nobody yet, tick a supplier",
+      envSkipped: "{names} has no e-mail on file, so they are left out",
+      /* ── The confirmation names its destinations (owner, 2026-09-10) ──────────────────────
+         *"Allow users to connect Outlook, then ask them if they want to send, clearly. It is a
+         confirmation on Outlook and Moedatech, and if they didn't connect the Outlook the
+         confirmation will be on Moedatech only."*
+
+         Three titles, because the press makes one of three different promises. */
+      confirmBothTitle: "Post this request and e-mail it?",
+      confirmSubBoth: "It reaches both of these places",
+      confirmSubPost: "It reaches one place",
+      confirmDoPost: "Post to Moedatech",
+      /* ── A DIRECT request reaches ONE firm (owner, 2026-09-13) ─────────────────────────────
+         «Every supplier there can bid on it» is the broadcast promise and it is false here. The
+         title is the STORE's own name; these are the fallback and the two sentences. */
+      destDirectFallback: "This supplier",
+      destDirectLine: "They will be the only supplier who can bid",
+      destDirectPosted: "It is already sent to this supplier",
+      /* ── The renter may still send it to the whole market instead (app parity, 2026-09-22) ────
+         The app's `submitConfirmSheet*` strings, word for word, because this is the same question
+         asked at the same moment and the two products must not phrase it differently. */
+      whoReceives: "Who receives it",
+      confirmSubPick: "Pick one option to confirm",
+      /* The act, while WHO it reaches is the question above the button. «Post to Moedatech» over a
+         card reading «nobody else sees it» is the dialog arguing with itself. */
+      confirmDoPostRequest: "Post the request",
+      destBroadcastInstead: "Broadcast instead",
+      destBroadcastLine: "Reach all matching suppliers in your area and compare bids",
+      destMoedatech: "Moedatech",
+      destShared: "Shared",
+      destOutlook: "Outlook",
+      destGmail: "Gmail",
+      destNoMarket: "Not on the marketplace",
+      destOutlookBody: "Sent from {from} to {n} suppliers, each in blind copy",
+      destOutlookBodyOne: "Sent from {from} to 1 supplier, in blind copy",
+      destGmailBody: "Your Gmail opens with the message and your suppliers in blind copy, ready for you to send",
+      destSkipOutlook: "Don't send by Outlook this time",
+      destOutlookSkipped: "Outlook, skipped this time",
+      destOutlookSkippedBody: "Nothing is e-mailed. Your Outlook stays connected for your next request",
+      destSendItAfterAll: "Send it by Outlook after all",
+      destOutlookOff: "Outlook is not connected",
+      destOutlookOffBody: "Nothing is e-mailed. Connect Outlook and your requests go out from your own address, with your suppliers in blind copy",
+      confirmPostTitle: "Post this request and e-mail it?",
+      /* Nothing is e-mailed on this press: Moedatech is the only channel, or Outlook is not
+         connected. The title used to promise a mail that was never going to leave. */
+      confirmPostAloneTitle: "Post this request?",
+      confirmSendTitle: "E-mail this request?",
+      confirmPostLine: "Your request goes live on Moedatech, where every supplier there can bid on it",
+      /* ~~«…, each in blind copy».~~ Dropped from the confirmation (owner, 2026-09-08). It is true and
+         it is plumbing: the renter is being asked to confirm WHO it goes to, and how the addresses
+         ride in the message is a detail he cannot act on at that moment. The Outlook hint below still
+         says it, because there the renter has to paste them into a Bcc field himself. */
+      confirmMailLine: "It is e-mailed from {from} to these suppliers",
+      confirmMailLineAnon: "It is e-mailed from your own account to these suppliers",
+      confirmPostedAlready: "It is already live on Moedatech. This only sends the e-mail",
+      confirmDoBoth: "Post and send",
+      confirmDoSend: "Send",
+      copyTitleBtn: "Copy subject",
+      // Said on the control itself while there is no request yet, now that the press is live.
+    copyBodyPending: "The link is added once you post the request",
+    copyBodyBtn: "Copy body",
+      confirmNo: "Cancel",
+      mailConnect: "Connect Outlook",
+      mailReconnect: "Reconnect Outlook",
+      /* Shown BEFORE any send now (2026-09-10), so it says what connecting buys rather than what
+         has just gone wrong. */
+      mailConnectWhy:
+        "Connect Outlook once and your requests go out from your own address, with your suppliers in blind copy and a copy in your Sent folder",
+      mailConnecting: "Waiting for Outlook",
+      mailConnected: "Sending from {email}",
+      mailDisconnect: "Disconnect",
+      /* «Again» was true only while connecting happened inside Send. It is its own press now. */
+      mailConnectedNow: "Outlook connected. Your requests can go out from it",
+      mailConnectDenied:
+        "Consent was not granted, so nothing is e-mailed. Large organisations often need an administrator to approve it, so ask your IT if you did not refuse it yourself",
+      mailConnectFailed: "Outlook could not be connected, so nothing is e-mailed. Your request still posts to Moedatech",
+      mailInSent: "A copy is in your Sent folder",
+      /* Said out loud, because a send that did not happen used to say NOTHING: the success line was
+         the only outcome this panel reported, and every refusal changed a button label at most. The
+         reason rides in the parentheses untranslated, so a screenshot of this line is diagnostic. */
+      mailNotSent: "The e-mail did not go out. Your request is posted; use «Open your e-mail» below to send it yourself",
+      /* The ONE refusal the renter can clear himself, so it names the remedy instead of the fault.
+         `resolveSender` reads `users.email`, and Moedatech registers people by PHONE — so a great
+         many accounts have none, and a renter whose profile is blank is refused with no idea why. */
+      mailNoSender: "Your profile has no e-mail address, so the message has nowhere to come from. Add one, then send again",
+      mailNoSenderAction: "Open your profile",
+      /* ── The reasons that used to pass in SILENCE (owner, 2026-09-08) ─────────────────────────
+         *"My account is sending to suppliers correctly, but my colleague's Outlook account doesn't
+         send anything."* Every reason below opened his compose window and said nothing about why —
+         so from his seat the press did nothing, while the same press worked for somebody else. Each
+         one names the fact that differs between two accounts. */
+      mailNoRecipients:
+        "We could not find an address for any of the suppliers you picked. They may be on a colleague's list rather than yours, so your e-mail opens instead",
+      mailNotYours:
+        "Sending from your own address is not set up for this account yet. Your e-mail opens instead, which is what it does today",
+      mailDomainWaiting:
+        "Your domain {domain} is registered but not verified yet, so we cannot send as you until your IT adds the records. Your e-mail opens instead",
+    },
+    reading: "Reading",
     heading: "How would you like to create your request?",
-    subheading: "Start from an existing RFQ document, or fill it in manually. You'll review everything before it's sent.",
+    /* 🔴 ~~`subheading`~~ — «Describe your request, or upload an RFQ. A project fills in its own
+       defaults» — DELETED (owner, 2026-09-16, with the side-panel prototype). The placeholder in the
+       box already types a real request through its example, which is the same lesson said once; and
+       the sentence it replaced had been a layout constraint of its own («one line, don't wrap it»,
+       2026-09-13) for a line nobody needed to read twice. */
+
+    /* The rail beside the box: his own past requests, grouped by the project they were filed under.
+       `{n}` machines across `{g}` projects — both numbers, because one without the other says
+       nothing about a list you are about to scroll. */
+    rail: {
+      title: "Previous requests",
+      count: "{n} in {g}",
+      resize: "Resize the panel",
+    },
     optUploadTitle: "Write / Upload RFQ",
-    optUploadDesc: "Write your request or upload a file — your AI assistant fills the form automatically.",
+    optUploadDesc: "Write your request or upload a file. Your AI assistant fills the form automatically.",
     recommended: "Recommended",
-    beta: "Beta",
     optManualTitle: "Fill Manually",
     optManualDesc: "Enter equipment details step by step using a guided form.",
     comingSoon: "Coming soon",
     orUploadBelow: "Or upload a file below",
     attachDivider: "or attach a file",
-    browse: "browse",
-    dropSub: "Add as many files as you like — we'll read them all",
-    chars: "chars",
     tabRfq: "RFQ", // AC-01 tentative
     tabManual: "Manual", // AC-01 tentative
     tabLater: "LATER",
     manualNote: "Manual entry is coming in a later release.",
-    pasteLabel: "Write your RFQ",
-    pastePlaceholder: "Write your request in plain words — e.g. “I need a 30-ton forklift at King Khalid Airport, Riyadh, for 3 weeks starting next Sunday, with an operator and diesel included, delivered to site.”\n\nYou can also paste an email, or an equipment list.",
+    pasteLabel: "Describe your request",
+    // The sentences the placeholder types itself through, in turn. ~~Each one also carried a short
+    // `chip` label for a row of pressable examples under the box~~ — that row is the renter's own
+    // projects now (owner, 2026-08-31), so the labels went with it. Short on purpose: a placeholder
+    // that runs to two lines reads as content rather than as an invitation.
+    examples: [
+      "I want 30 forklifts delivered to Site B by Friday, for 3 weeks",
+      "I need a 20-ton crane rental in Riyadh for 2 weeks",
+      "Looking for 5 concrete mixers with operators included",
+      "3 excavators, diesel included, starting next Sunday",
+    ],
+    uploadRfq: "Upload RFQ",
+    addSomething: "Add a description or a file",
+    continueLabel: "Continue",
+    pastePlaceholder: "Write your request in plain words: e.g. “I need a 30-ton forklift at King Khalid Airport, Riyadh, for 3 weeks starting next Sunday, with an operator and diesel included, delivered to site.”\n\nYou can also paste an email, or an equipment list.",
     uploadLabel: "Attach files too",
-    uploadOptional: "optional — add as many as you like",
+    uploadOptional: "optional: add as many as you like",
     dropTitle: "Drop files here, or",
     uploadHint: "PDF, image, Word or Excel",
     acceptedTypes: "Accepted file types: PDF, image, Word, Excel.", // AC-07 tentative
@@ -198,7 +566,9 @@ export const en = {
     attachedFiles: "Attached files",
     emptyHint: "Paste text or attach at least one file to continue.",
     yourRequest: "Your request",
-    backToReview: "Back to review",
+    /* ~~`backToReview` — the intake's own second Back.~~ Deleted with the button (owner,
+       2026-09-09): the page's Back leaves the flow, the browser's Back and the draft prompt resume the
+       draft, and two controls disagreeing about which way «back» goes is what it cost. */
     reAnalyze: "Re-analyze",
     editReparseNote: "Editing your request re-runs the AI and refreshes your items.",
   },
@@ -210,22 +580,18 @@ export const en = {
     restartTitle: "Start over?",
     restartConfirm: "This clears your current request and starts a new one.",
   },
+  // Three strings for the whole screen (owner, 2026-09-12: *"no need for steps and many complicated
+  // text"*). The stage rail, the activity feed and the counts line are gone, and their eighteen
+  // strings with them - a key nobody reads is the next agent's invitation to draw it again.
   processing: {
-    title: "Reading your RFQ…",
-    note: "Project details and items will appear as they're parsed.",
-    sub: "This usually takes a few seconds — hang tight.",
-    stage1: "Reading your document/text",
-    stage2: "Extracting your project details",
-    stage3: "Matching your equipment to what we provide",
-    stage4: "Preparing your request",
-    // AC-56 e.g. "24 items found · 3 need a quick check · 2 not available"
-    summaryItems: "{count} items found",
-    summaryNeedCheck: "{count} need a quick check",
-    summaryNotAvailable: "{count} not available",
+    reading: "Reading your request",
+    matched: "Matched from our catalogue",
+    // The fallback name for a line the agent placed nowhere and the renter never titled.
+    oneMachine: "Your equipment",
   },
   step1: {
     title: "Project details",
-    subtitle: "We read these from your RFQ — they apply to your whole request, across all items.",
+    subtitle: "We read these from your RFQ. They apply to your whole request, across all items.",
     location: {
       confirmPrompt: "Is this the right site? Please confirm it before you continue.",
       fillPrompt: "Add the project location before you can confirm.", // AC-16: can't confirm an empty location
@@ -238,7 +604,7 @@ export const en = {
       useGps: "Use my current location",
       setManual: "Drop a pin manually",
       extractedFrom: "From your RFQ",
-      conflictTitle: "Two different locations were found — pick one:",
+      conflictTitle: "Two different locations were found. Pick one:",
       fromText: "From text", // AC-47 tentative
       fromFile: "From file", // AC-47 tentative
       multiLocationTitle: "This request covers a single location.", // AC-48
@@ -287,7 +653,7 @@ export const en = {
     fromRfq: "From your RFQ",
     matchedTo: "Matched to",
     settingsForAll: "Settings for all equipment",
-    settingsForAllHint: "Defaults for every item below — open any item to change it for that item only.",
+    settingsForAllHint: "Defaults for every item below. Open any item to change it for that item only.",
     appliesToItems: "Applies to {count} items",
     certificatesTitle: "Required certificates",
     itemSettings: "Operator, fuel & delivery",
@@ -303,8 +669,8 @@ export const en = {
       needsOk: "Needs your OK", // AC-54
       notAvailable: "Not available", // AC-54 / AC-30 tentative
     },
-    confidentReady: "Ready — no action needed.",
-    needsValidationPrompt: "We matched this — approve it or change it.",
+    confidentReady: "Ready. No action needed.",
+    needsValidationPrompt: "We matched this: approve it or change it.",
     nearestSuggested: "Nearest available size: {measurement}.", // AC-19
     pickSizeToApprove: "Pick a size to approve.", // AC-18/19: why Approve is disabled
     unitConversion: "{fromValue}{fromUnit} ≈ {toValue}{toUnit} in our sizes.", // AC-20
@@ -319,18 +685,20 @@ export const en = {
     removeConfirm: "Remove this item from the request?",
     noMatch: {
       provide: "Provide it for me?", // AC-30/31 tentative
-      // Both explainers state the outcome up front: a no-match item never goes out to suppliers
-      // (AC-33), whether or not the renter messages us — so the row shouldn't imply otherwise.
-      explainer: "We couldn't find this in our catalogue — it won't be included in this request.",
+      // ⚠️ These two are the CUSTOM_EQUIPMENT_ENABLED=false wording, and they are true only there: the
+      // item really is dropped from the request. With the flag on the row says the opposite, through
+      // `machineCard.notInCatalogue*` below, because the machine then goes out under the renter's own
+      // name.
+      explainer: "We couldn't find this in our catalogue. It won't be included in this request.",
       // Shown when the equipment IS in the catalogue but the requested SIZE isn't yet (a genuine new size).
-      newSizeExplainer: "We carry this equipment, but not this size yet — message us to add it. It won't be included in this request.",
+      newSizeExplainer: "We carry this equipment, but not this size yet. Message us to add it. It won't be included in this request.",
       // AC-31: prefilled WhatsApp message to Moedatech support requesting the equipment be sourced.
       whatsappMessage: 'Hi Moedatech, I\'m creating an RFQ and need equipment that isn\'t available in the app: "{item}". Please add/source it for me so it is added to my request. Thank you!',
       // New-size variant: equipment exists, the size doesn't — ask support to add the size.
       whatsappMessageSize: 'Hi Moedatech, I\'m creating an RFQ for "{item}" but the size I need isn\'t in the app yet. Please add this size so it can be added to my request. Thank you!',
       // AC-31: shown in place of the action once the renter has been handed off to WhatsApp — the item
       // stays put so returning from WhatsApp doesn't look like it was dropped.
-      requested: "We got your message — we'll add this and contact you on WhatsApp.",
+      requested: "We got your message. We'll add this and contact you on WhatsApp.",
     },
     perItem: {
       quantity: "Quantity",
@@ -342,8 +710,8 @@ export const en = {
       applyToAll: "Apply these settings to all items",
       certificate: "Operator certificate",
       fat: "F.A.T (Food, Accommodation & Transport)",
-      fatFood: "F.A.T — Food",
-      fatTransport: "F.A.T — Accommodation & transport",
+      fatFood: "F.A.T: Food",
+      fatTransport: "F.A.T: Accommodation & transport",
       workType: "Work type",
       workTypePlaceholder: "e.g. lifting steel beams, tower assembly",
       equipmentYear: "Minimum equipment year",
@@ -368,7 +736,7 @@ export const en = {
   },
   step3: {
     title: "Preferences",
-    subtitle: "These apply to the whole request. Filled in from your RFQ — edit anything.",
+    subtitle: "These apply to the whole request. Filled in from your RFQ. Edit anything.",
     coreTerms: "Core terms", // AC-35 tentative
     optionalExtras: "Optional Extras", // AC-35 tentative
     payment: { title: "Payment", terms: "Payment terms", method: "Payment method" },
@@ -388,20 +756,20 @@ export const en = {
   },
   preview: {
     title: "Review and send",
-    subtitle: "Here's your full request. Send it once and every supplier can bid — you'll get one quotation covering all items.",
+    subtitle: "Here's your full request. Send it once and every supplier can bid. You'll get one quotation covering all items.",
     shareTeaserTitle: "Invite suppliers you already know",
-    shareTeaserBody: "Once you send this, you'll get a shareable link to invite suppliers to bid — even ones off Moedatech. Their bids land right here for you to compare.",
+    shareTeaserBody: "Once you send this, you'll get a shareable link to invite suppliers to bid, even ones off Moedatech. Their bids land right here for you to compare.",
     post: "Post request",
     send: "Send request",
     edit: "Edit",
     confirmed: "confirmed",
-    notSent: "{count} not available — left off this request.",
+    notSent: "{count} not available: left off this request.",
     export: "Open in Excel", // AC-52
     itemsTable: "All items",
     projectSummary: "Project",
     equipmentSummary: "Equipment",
     preferencesSummary: "Preferences",
-    whyTitle: "What I assumed — please confirm",
+    whyTitle: "What I assumed: please confirm",
     perItem: "Per item",
     table: {
       equipment: "Equipment",
@@ -426,7 +794,7 @@ export const en = {
     message: "Suppliers can now see it and send bids. You'll get one quotation covering all the items in your request.",
     newRequest: "New request",
     done: "Done",
-    laterNote: "Tracking bids and managing this request on the web is coming soon — for now you'll continue with bids in the Moedatech app as usual.",
+    laterNote: "Tracking bids and managing this request on the web is coming soon: for now you'll continue with bids in the Moedatech app as usual.",
     itemsSummary: "{count} items",
   },
   /**
@@ -437,16 +805,16 @@ export const en = {
   startRequest: {
     title: "Start Your Request",
     trialTitle: "Trial Request",
-    trialBody: "Try the request flow with sample bids — nothing is sent to suppliers.",
+    trialBody: "Try the request flow with sample bids. Nothing is sent to suppliers.",
     realTitle: "Real Request",
     realBody: "Send your request to real suppliers and get live bids.",
     cancel: "CANCEL AND RETURN",
     close: "Close",
     /** Ribbon above the RFQ flow while trial mode is on. */
-    modeBanner: "Trial run — nothing will be sent to suppliers.",
+    modeBanner: "Trial run. Nothing will be sent to suppliers.",
     modeBannerSwitch: "Switch to a real request",
     /** Shown with the sample bids on a trial request. */
-    bidsBanner: "These are sample bids for your trial — no real suppliers were contacted.",
+    bidsBanner: "These are sample bids for your trial. No real suppliers were contacted.",
     trialBadge: "TRIAL",
     disappearsSoon: "TRIAL - DISAPPEARS SOON",
   },
@@ -461,14 +829,21 @@ export const en = {
     details: "Details",
     share: "Share",
     // No company yet → join by code.
+    /* ── ONE card owns the company question, and it asks it once (owner, 2026-09-12) ────────────
+       The page used to put «Add your own company» in a full-width slab at the top and «Join a
+       company» in a card three hundred pixels below it, so a renter with no company met the same
+       errand twice, in two shapes, and the slab's own sentence had to point downwards at the other
+       half. These two are the card's head; `joinTitle` now labels only the invite-code half. */
+    noneTitle: "Your company",
+    noneBody: "You're not part of a company yet. Create your own, or join one with an invite code.",
     joinTitle: "Join a company",
     noCompany: "You're not part of a company yet. Enter an invite code from a company owner to join.",
     enterCode: "Invite code",
     joinButton: "Join",
-    joinRequestSent: "Join request sent — waiting for the owner to approve.",
+    joinRequestSent: "Join request sent: waiting for the owner to approve.",
     invalidCode: "That invite code isn't valid.",
     joinConsent:
-      "Equipment, requests and bids you add — including ones you already have — become this company's and stay with it if you later leave. Continue?",
+      "Equipment, requests and bids you add, including ones you already have, become this company's and stay with it if you later leave. Continue?",
     // Pending membership.
     pendingApproval: "Waiting for the owner to approve you.",
     pendingBadge: "Awaiting approval",
@@ -477,9 +852,14 @@ export const en = {
     // joining anywhere else until an owner happens to reject you.
     cancelJoin: "Withdraw request",
     cancelJoinConfirm:
-      "Withdraw your request to join this company? Nothing has been shared yet, so nothing is lost — and you'll be able to enter a different invite code straight away.",
+      "Withdraw your request to join this company? Nothing has been shared yet, so nothing is lost, and you'll be able to enter a different invite code straight away.",
     cancelJoinDone: "Join request withdrawn.",
     // Owner: invite code + join requests.
+    // The heading over the whole team card — the code, the roster and the way out under one word.
+    team: "Team",
+    // The invite panel names itself INSIDE that card, so it says what the code is rather than
+    // repeating the card it sits in.
+    inviteCode: "Invite code",
     inviteTeam: "Invite your team",
     inviteHint: "Share this code with your team so they can join.",
     inviteCodeCopied: "Invite code copied",
@@ -489,7 +869,7 @@ export const en = {
     // companyCreateOwn* keys). Offered ABOVE the join form, as in the app.
     createOwnTitle: "Add your own company",
     createOwnDesc:
-      "Verify to create your own company and unlock full access — or join an existing company with an invite code below.",
+      "Verify to create your own company and unlock full access, or join an existing company with an invite code below.",
     createOwnCta: "Create your company",
     pendingJoiners: "Pending join requests",
     approve: "Approve",
@@ -508,11 +888,11 @@ export const en = {
     // Exits.
     leave: "Leave company",
     leaveConfirm:
-      "Leave your company? You'll lose your access to the firm's requests, bids and equipment — including ones you created or brought in. This can't be undone without a new invite.",
+      "Leave your company? You'll lose your access to the firm's requests, bids and equipment, including ones you created or brought in. This can't be undone without a new invite.",
     promoteFirst: "You're the owner. Promote another member to owner before you leave.",
     dissolve: "Close company",
     dissolveConfirm:
-      "You're the only member, so leaving closes this company for good.\n\nNothing is lost: your equipment, requests, bids and past deals move back to your personal account and stay yours. But this can't be undone — the invite code stops working and the company's CR and VAT verification is retired, so you'd need to verify a new company to come back.\n\nAny deal rooms still in progress will be closed automatically and the other party notified.",
+      "You're the only member, so leaving closes this company for good.\n\nNothing is lost: your equipment, requests, bids and past deals move back to your personal account and stay yours. But this can't be undone. The invite code stops working and the company's CR and VAT verification is retired, so you'd need to verify a new company to come back.\n\nAny deal rooms still in progress will be closed automatically and the other party notified.",
     // Shared UI.
     cancel: "Cancel",
     retry: "Retry",
@@ -531,7 +911,7 @@ export const en = {
     postGateTitle: "Sign in to post your request",
     // General title for the sign-in/register modal — it serves BOTH new and returning accounts.
     gateTitle: "Sign in to continue",
-    gateSub: "Enter your phone number — we'll text a verification code. New or returning, just enter your number.",
+    gateSub: "Enter your phone number. We'll text a verification code. New or returning, just enter your number.",
     // Guest AI-agent limit reached (per-device run cap). Neutral wording — no free/paid framing.
     trialTitle: "You've reached your limit",
     trialSub: "Sign in to continue.",
@@ -541,17 +921,56 @@ export const en = {
     chooseRentalBasis: "Choose a rental basis to continue.", // AC-12/13
     resolveLocationConflict: "Resolve the location conflict to continue.", // AC-47
     resolveItems: "Resolve the flagged equipment items to continue.", // AC-29
+    // MREQ-AC-09 — the app's required set, named per control so the dot lands on what's empty.
+    noItems: "Add at least one equipment to continue.",
+    categoryMissing: "Choose a category.",
+    subtypeMissing: "Choose a type.",
+    capacityMissing: "Choose a size.",
+    fuelMissing: "Choose a fuel type.",
+    quantityMissing: "Set how many you need.",
+    deliveryMissing: "Say who delivers to site.",
+    returnMissing: "Say who returns it from site.",
+    fuelPartyMissing: "Say who pays for the fuel.",
+    locationMissing: "Set where the equipment goes.",
+    // MREQ-AC-54 — web-only gates, each satisfied by an explicit "nothing" answer.
+    yearMissing: "Choose a minimum year, or Any year.",
+    certMissing: "Choose a certificate, or No certificate.",
+    // Off-catalogue: the name replaces the taxonomy trio as this line's required answer, so a blank
+    // one blocks. A renter who won't name it removes the row.
+    customEquipmentMissing: "Name this equipment, or remove it",
+    confirmChargedDays: "Confirm how many days you'll be charged for.",
   },
   errors: {
     emptyTitle: "We couldn't read a request from that", // AC-09 tentative
     emptyBody: "Try again, or edit what you pasted.",
     networkTitle: "Connection problem", // AC-10 tentative
-    networkBody: "Something went wrong. Your input is saved — try again.",
+    networkBody: "Something went wrong. Your input is saved. Try again.",
     busyTitle: "The AI assistant is busy",
-    busyBody: "It's handling a lot of requests right now. Your input is saved — try again in a moment.",
+    busyBody: "It's handling a lot of requests right now. Your input is saved. Try again in a moment.",
     unavailableTitle: "The AI assistant is unavailable",
-    unavailableBody: "It couldn't process your request right now. Your input is saved — try again shortly.",
+    unavailableBody: "It couldn't process your request right now. Your input is saved. Try again shortly.",
     switchManual: "Switch to Manual",
+    /* ── Said to the RENTER, not to the log (owner, 2026-09-12) ─────────────────────────────
+       *"can we make the error messages clear to the user and user friendly and clearly have the
+       reason, not like this by numbers"*, after meeting «INTERNAL_ERROR · 500».
+
+       One sentence per SIDE the fault is on, because that is what decides his next move. See
+       `contract/submit-error.ts` for why this reads the status rather than the backend's code. */
+    submit: {
+      oursTitle: "Something went wrong on our side",
+      oursBody: "Your request was not sent, and nothing you typed is lost. Try again in a moment",
+      yoursTitle: "Your request could not be accepted",
+      yoursBody: "Something in it was refused. Check the details above and try again",
+      authTitle: "Your account cannot do this yet",
+      authBody: "Sign in again, or complete your profile, then try once more",
+      offlineTitle: "We could not reach Moedatech",
+      offlineBody: "Check your connection. Your request is saved here and nothing was sent",
+      unknownTitle: "That did not go through",
+      unknownBody: "Your request was not sent, and nothing you typed is lost. Try again",
+      /** For support, never the headline. A press, so it cannot take the clipboard by surprise. */
+      copyRef: "Copy error details",
+      copiedRef: "Details copied",
+    },
   },
   options: {
     rentalBasis: { daily: "Daily", weekly: "Weekly", monthly: "Monthly" },
@@ -578,10 +997,10 @@ export const en = {
   auth: {
     brandPill: "Equipment, on demand",
     brandHeadline: "Rent the right equipment, from suppliers you can trust.",
-    brandSubtitle: "Post a request, compare competitive bids from verified suppliers, and book — all in one place.",
+    brandSubtitle: "Post a request, compare competitive bids from verified suppliers, and book: all in one place.",
     feat1Title: "Post a request in minutes",
     feat1Sub: "Tell us what you need, when and where",
-    feat2Title: "Or upload an RFQ — your smart assistant handles it",
+    feat2Title: "Or upload an RFQ. Your smart assistant handles it",
     feat2Sub: "We read your document & build the request",
     feat3Title: "Compare bids & enter the deal room to negotiate",
     feat3Sub: "Competitive offers from verified suppliers",
@@ -596,32 +1015,32 @@ export const en = {
     emailLabel: "Email address",
     emailInvalid: "Enter a valid email address.",
     countryLabel: "Country",
-    smsSaudiOnly: "SMS isn't available outside Saudi Arabia — use Email to get your code.",
+    smsSaudiOnly: "SMS isn't available outside Saudi Arabia. Use Email to get your code.",
     emailChoiceTitle: "Keep your saved email?",
     emailChoiceBody: "This number already uses {stored}. Keep it, or switch to the one you just entered ({new})?",
     emailKeep: "Keep current",
     emailUseNew: "Use new",
     emailSwitching: "Switching…",
-    emailSwitchError: "Couldn't switch your email — keeping the current one.",
+    emailSwitchError: "Couldn't switch your email: keeping the current one.",
     withPhone: "Phone",
     withEmail: "Email",
     entryTitle: "Sign in or create your account",
-    entrySub: "Enter your phone or email — we'll send a verification code. New or returning, this is the only step.",
+    entrySub: "Enter your phone or email. We'll send a verification code. New or returning, this is the only step.",
     addPhoneTitle: "Add your phone number",
-    addPhoneSub: "Your phone is your account identity — we'll text a code to verify it.",
+    addPhoneSub: "Your phone is your account identity. We'll text a code to verify it.",
     verifyCreate: "Verify & create account",
     verifyPhone: "Verify",
     phoneVerified: "Phone verified",
     signInInstead: "Sign in instead",
     emailRequiredTitle: "Add your email",
     emailRequiredSub: "We'll use it for receipts and to help you sign in.",
-    emailSignInUnavailable: "We couldn't sign you in with this email — please use your phone number.",
+    emailSignInUnavailable: "We couldn't sign you in with this email: please use your phone number.",
     finishTitle: "Finish your signup",
-    finishBody: "You're almost there — add your details to finish creating your account.",
+    finishBody: "You're almost there. Add your details to finish creating your account.",
     finishCta: "Finish signup",
     sendCode: "Send code", // AC-01
     sending: "Sending…",
-    signInFoot: "New here? Just enter your number — we'll set you up.",
+    signInFoot: "New here? Just enter your number. We'll set you up.",
     codeTitle: "Enter the 4-digit code", // AC-02
     codeSentTo: "We sent it to {phone}", // AC-02
     verify: "Verify & continue", // AC-03
@@ -632,7 +1051,7 @@ export const en = {
     signOut: "Sign out", // AC-19
     // Restore gate — a verified sign-in on a self-deleted account (app parity: restoreAccount* strings).
     restoreTitle: "Welcome back!",
-    restoreBody: "You deleted this account earlier. Restore it to get your profile, requests and bids back — everything is still here.",
+    restoreBody: "You deleted this account earlier. Restore it to get your profile, requests and bids back: everything is still here.",
     restoreConfirm: "Yes, restore my account",
     restoring: "Restoring…",
     restoreDeny: "No, sign out",
@@ -643,7 +1062,7 @@ export const en = {
       expired: "That code has expired. Request a new one.", // AC-11
       locked: "Too many attempts. Request a new code.", // AC-10
       send_failed: "We couldn't send the code. Please try again.", // AC-15
-      email_ambiguous: "This email is linked to more than one account — use a different email, or sign in with your phone.",
+      email_ambiguous: "This email is linked to more than one account. Use a different email, or sign in with your phone.",
       email_taken: "This email is already in use.",
       phone_taken: "You already have an account with this number.",
       phone_not_verified: "Please verify your phone number first.",
@@ -652,6 +1071,12 @@ export const en = {
     },
   },
   onboarding: {
+    /* ⚠️ **RECONSTRUCTED, 2026-09-13.** The Arabic twin («المغادرة وتسجيل الخروج») and the call
+       site (`OnboardingForm`’s `onAbandon` control) survived; this English string did not, because
+       a `git checkout --` in a SHARED worktree threw away another session’s uncommitted edit to
+       this file. Reworded from the Arabic and the usage, not recovered. Correct it if it is not
+       what was written. */
+    leave: "Leave and sign out",
     step1: "Create account",
     step2: "Verify company",
     later: "later",
@@ -678,12 +1103,13 @@ export const en = {
       lastName: "Last name must be 2–50 characters.", // AC-02/03
       city: "Select your city.", // AC-02
       jobTitle: "Select your job title.", // AC-02
+      companyName: "Enter your company name.", // app parity: required on the complete pass
       email: "Enter a valid email address.",
       emailRequired: "A valid email address is required.",
       whatsapp: "Enter a valid Saudi mobile number.", // AC-04
       phone: "Enter your phone number and verification code.",
       submit: "We couldn't save your details. Please try again.",
-      offline: "You appear to be offline. Your details are kept — try again.", // AC-23
+      offline: "You appear to be offline. Your details are kept. Try again.", // AC-23
     },
   },
   verify: {
@@ -720,7 +1146,7 @@ export const en = {
       // E12004: this account was deleted, so every gated call is refused until it's restored. Retrying
       // the form can never work — send them through sign-in, where the restore prompt is waiting.
       accountDeleted: "This account was deleted. Sign out and sign in again to restore it, then submit.",
-      offline: "You appear to be offline. Your input is kept — try again.", // AC-23
+      offline: "You appear to be offline. Your input is kept. Try again.", // AC-23
     },
     /**
      * The single-pile company-documents flow. Copy is taken verbatim from the mobile app's
@@ -730,7 +1156,7 @@ export const en = {
     pile: {
       title: "Add company documents",
       heroTitle: "Upload your documents in one go",
-      heroSubtitle: "Send us everything you have — our team will review it and confirm your request.",
+      heroSubtitle: "Send us everything you have. Our team will review it and confirm your request.",
       requiredSection: "Required to continue",
       requiredPill: "Required",
       optionalSection: "Additional documents",
@@ -743,7 +1169,7 @@ export const en = {
       optQualifications: "Qualifications",
       optSaso: "SASO certificate",
       dropzoneTitle: "Drag or upload your documents here",
-      dropzoneSubtitle: "Commercial registration, national address, tax, and any extra documents — in one batch",
+      dropzoneSubtitle: "Commercial registration, national address, tax, and any extra documents: in one batch",
       dropzoneHint: "Images or PDF · up to {max} documents",
       limitReached: "Maximum reached ({count} documents)",
       remove: "Remove",
@@ -760,6 +1186,16 @@ export const en = {
       logoChange: "Change",
       logoUpload: "Upload",
       logoRemove: "Remove",
+      // The logo dialog the quotation's «Add a logo» opens (2026-09-23).
+      logoSave: "Save logo",
+      logoSaved: "Logo saved. Open the quotation again to see it on your side",
+      // The mark on the company card, and the way out of it (2026-09-23, app parity with
+      // `company_logo_editor.dart`). Its wording is the app's own, string for string.
+      logoAdd: "Add a logo",
+      logoRemoved: "Logo removed",
+      logoRemoveConfirm:
+        "Your company name will be shown instead, everywhere the logo appears. You can add a new one at any time",
+      logoNeedsProfile: "Add your name, city and job title in your profile first, then you can set a logo",
       continue: "Continue",
       confirmHeadline:
         "Not uploading the required company documents may lead to your registration being rejected",
@@ -798,12 +1234,21 @@ export const en = {
   },
   profile: {
     greeting: "Hi{name}",
+    // The field's own name. It read «First name / Last name» — a form's question standing in for a
+    // fact's label, which is what a two-part name field leaves behind when it stops being a form.
+    name: "Name",
+    // Headings for the page's three groups. «Edit profile» used to title the first one AND its own
+    // button, and «Log out» titled a group holding two acts only one of which is logging out.
+    profileSection: "Profile",
+    accountSection: "Account",
     editProfile: "Edit profile",
     editProfileSub: "Update your name, city, and contact details.",
     account: "Account",
     // Company / verification card
     companyVerifiedTitle: "Company verified",
-    companyVerifiedBody: "Your company is verified — you have a trusted renter badge.",
+    /** The app's own label for both the press and the screen it opens (`companyDetails`). */
+    companyDetails: "Details",
+    companyVerifiedBody: "Your company is verified. You have a trusted renter badge.",
     companyPendingTitle: "Verification in review",
     companyPendingBody: "Your company details are under review. We'll update your status here.",
     companyNoneTitle: "Verify your company",
@@ -812,9 +1257,6 @@ export const en = {
     companyRejectedBody: "Your submission wasn't approved. You can adjust your details and resubmit.",
     companyCta: "Start verification",
     companyResubmit: "Review & resubmit",
-    // Rewards
-    rewards: "Rewards & referrals",
-    comingSoon: "Coming soon",
     // Edit form
     firstName: "First name",
     lastName: "Last name",
@@ -898,7 +1340,7 @@ export const en = {
     signIn: "Sign in",
     // Off-platform offers never open this surface (RM3-AC-25) — they keep their own viewer.
     offPlatformNotHere: "This offer came in through your shared link",
-    offPlatformNotHereWhy: "It carries items, not registered equipment — so there is nothing here to place or verify. Open it from your bids to read the submission and reply.",
+    offPlatformNotHereWhy: "It carries items, not registered equipment. So there is nothing here to place or verify. Open it from your bids to read the submission and reply.",
     // V2 — panel header. Identity only: no contact details, no deals count, no IBAN, CR or VAT.
     //
     // ── Both were SHORTENED because they were eating the supplier's name (owner, 2026-08-19) ──────
@@ -913,10 +1355,15 @@ export const en = {
     // papers live behind «Details ›» on each card and are never reached from here. The full phrases
     // survive where there is room for them: the company panel's own heading still reads «Company
     // documents», and the chip carries «Verified company on the platform» on its title.
+    //
+    // 🔴 Reversed for the documents entry (owner, 2026-09-22: *"i want the company document to be
+    // clearly company documents"*). The width it needed came back the same day: the verified chip on
+    // the map header is the tick alone now, its word on the tick's name and title, so «Company
+    // documents» fits beside the name without squeezing it.
     verifiedCompany: "Verified",
     /** The chip's full sentence, on its `title` — the prototype puts it there too. */
     verifiedCompanyWhy: "Verified company on the platform",
-    companyDocuments: "Documents",
+    companyDocuments: "Company documents",
     // V3 — the count pills. `type` is the REQUEST's own equipment type, and it agrees with the count.
     // "With the supplier" means machines that FIT this request, never his whole yard.
     // «registered», not the prototype's «لدى المورد» / "with the supplier" (owner, 2026-08-10). The
@@ -951,7 +1398,7 @@ export const en = {
     // failure — "try again" is precisely what the rule exists to stop, and the question is already
     // with the supplier.
     askPendingWhy: "You've already asked this, and the supplier hasn't answered yet.",
-    requestAlreadyPending: "You've already asked this. It's with the supplier — you'll see his answer in the chat.",
+    requestAlreadyPending: "You've already asked this. It's with the supplier. You'll see his answer in the chat.",
     // Map canvas
     // The prototype's copy verbatim: «مشروعك». "Your site" names a place on a map; the pin names the
     // PROJECT, which is the thing every distance on this surface is measured from.
@@ -970,7 +1417,7 @@ export const en = {
     pickSupplier: "Pick a supplier from the list to see their equipment",
     sortPrice: "Lowest price",
     sortNearest: "Nearest",
-    sortNearestOff: "Nearest — needs a project location",
+    sortNearestOff: "Nearest: needs a project location",
     rate: "Offer price",
     ratePer: "SAR / {unit}",
     perDay: "day",
@@ -983,19 +1430,19 @@ export const en = {
     offPlatform: "Off-platform",
     justArrived: "Just arrived",
     unitsOfferedLine: "{n} offered",
-    unitsIdentifiedLine: "{n} identified — serial, documents and location",
-    unitsUnidentifiedLine: "{n} unidentified — readiness can't be checked",
+    unitsIdentifiedLine: "{n} identified: serial, documents and location",
+    unitsUnidentifiedLine: "{n} unidentified: readiness can't be checked",
     refresh: "Refresh",
     refreshing: "Refreshing…",
     freshnessNote: "Offers update when you open this page, come back to it, or press refresh.",
     // T15 — the colour key, hosted inside the panel
     keyToggle: "What do the colours mean?",
     keyHeading: "Every pin on the map is one piece of equipment",
-    keyConfirmed: "Confirmed — the supplier confirmed its yard in the offer readiness",
-    keyUnconfirmed: "Not confirmed — he hasn't confirmed it yet",
+    keyConfirmed: "Confirmed. The supplier confirmed its yard in the offer readiness",
+    keyUnconfirmed: "Not confirmed. He hasn't confirmed it yet",
     keyNotUnavailable:
-      "“Not confirmed” does not mean unavailable — it means the supplier hasn't named its yard in the offer readiness yet. Ask him to confirm from the equipment panel.",
-    keyCountOnly: "Units added as a count only don't appear on the map — no equipment is registered for them.",
+      "“Not confirmed” does not mean unavailable. It means the supplier hasn't named its yard in the offer readiness yet. Ask him to confirm from the equipment panel.",
+    keyCountOnly: "Units added as a count only don't appear on the map. No equipment is registered for them.",
     // V10 — the machine marker's availability label (§6.8). One scale, two labels, and "not confirmed"
     // reads as UNANSWERED — never refused, never unavailable (RM3-AC-20). The "you can request it"
     // variant is gone with the hollow marker; a machine he did not offer is now an ORDINARY red pin
@@ -1016,19 +1463,17 @@ export const en = {
     // availability and nothing else (RM3-AC-30 — no reason, no cause).
     //
     // «· in this offer» was dropped from the confirmed chip (owner, 2026-08-19). Offer membership is
-    // carried by the orange `pinInOffer` badge sitting beside this chip on the same row, so the chip was
-    // stating the same fact twice on one line.
+    // carried by the orange `pinInOffer` badge, so the chip was stating the same fact twice.
+    //
+    // **The MAP PIN is the only reader left** (owner, 2026-08-28). The card's own availability chip
+    // went with the redesign that made the distance the card's whole subject — the colour of the
+    // distance says what the chip said, on the object the renter is actually comparing. The pin's
+    // hover box still needs the words, so the keys stay.
     eqChipConfirmed: "Availability confirmed",
     eqChipUnconfirmed: "Not confirmed yet",
-    // Blue, never navy (RM3-AC-33) — beside a red chip, navy reads as disabled.
-    // A mark on the title: the platform CHECKED this equipment's papers (`verificationStatus ===
-    // "VERIFIED"`). A fact about the platform's verdict, not about whether it is available.
-    // ~~"Documented machine".~~ Two changes, one ruling (owner, 2026-08-11 — "make sure it is read
-    // the equipment status is it verified really or not"): the mark used to fire on "the request
-    // named a certificate", and "documented" was the honest word for that weaker claim. Now that it
-    // states verification, the copy has to as well — a renter reading "documented" beside a tick
-    // cannot tell whether anyone checked. ("equipment", never "machine", in English copy.)
-    eqVerifiedMachine: "Verified equipment",
+    // `eqVerifiedMachine` and `eqNoPhoto` deleted the same day, with the title's ✓ and the photo cell
+    // they labelled. `isEquipmentVerified` is untouched and still the one definition of the word; no
+    // surface draws its verdict today.
     // Qualifies the offer, not the number: the yard sits outside the request city's own radius, so
     // delivery is a mobilisation worth asking about.
     eqOutOfCity: "· Outside the city",
@@ -1044,7 +1489,49 @@ export const en = {
     // for), and "No certificates requested" explained an absence nobody had asked about. No readers
     // are left, so the key went with them.
     eqDistanceUnit: "km from your project",
-    eqNoDistance: "Distance not known",
+    /* ~~«Distance not known».~~ The condition is stricter than that and always was: `km` is null
+       only when the machine has NO resolvable location, so the distance is not the thing missing -
+       the place is (owner, 2026-09-12: *"if no yard then show no equipment in map and show
+       unspecified location"*). Saying «distance» invited the reading that the yard is known and the
+       arithmetic failed. */
+    eqNoDistance: "Location not specified",
+    // ── The distance chip, and the tutorial behind it (owner, 2026-08-28) ──────────────────
+    // The card's dominant fact is now the distance, painted with the availability it is only as good
+    // as. A red distance is not a bad distance — it is a distance nobody has promised — and that is
+    // exactly the sentence a renter could not get from a chip, so the first press explains it before
+    // it asks anything.
+    eqYardExplainTitle: "How this distance works",
+    // Three steps, in the order they happen. It replaced two paragraphs that said the same true
+    // things in prose (owner, 2026-08-31) — prose is where a renter looking at a red number stops
+    // reading, and what he wants to know is where he is in a flow and what the end of it gets him.
+    /** ── TWO lines, and the first one is the whole point (owner, 2026-09-08) ──────────────────
+     *  ~~Three lines: what the number is, why it is red, what the press does.~~ The first of them
+     *  described a distance nobody had asked about, and the owner cut it: *"remove the model year box
+     *  at top, just keep the red to green and below it one sentence clear"*. What is left is the fact
+     *  (the yard is not set, so the machine may not be available), the act (ask him to confirm it for
+     *  this offer), and what his answer does to the colour above. */
+    eqYardLine1: "The supplier has not set the yard this equipment would move from for your offer, so it might not be available. Ask him to confirm it is available for your offer",
+    eqYardLine2: "When he confirms availability by setting its yard, this turns green as confirmed",
+    // «Other bids», sentence case (owner, 2026-09-22: *"call it other bids and dont capitalize it
+    // all"*). The strip's CSS used to uppercase it; that rule is gone too.
+    otherBids: "Other bids",
+    eqYardExplainCta: "Ask the supplier",
+    eqYardExplainLater: "Not now",
+    // The same surface, in the state where the question is already out. It shows what was asked and
+    // says it is waiting — never a second «Ask», which would put a duplicate card in the room.
+    eqYardAskedTitle: "You already asked about this machine",
+    eqYardAskedBody: "Your request is in the conversation with the supplier and has not been answered yet.",
+    eqYardAskedWhat: "What you asked",
+    // The chips' own explanations, on hover and to a screen reader.
+    eqYardConfirmedWhy: "The supplier named the yard this machine moves from, so this distance is confirmed for your offer.",
+    eqYardUnconfirmedWhy: "Not confirmed for this offer: press to see what that means and to ask.",
+    // The dots beside the file icon: the machine's papers, scored the way the app scores them.
+    eqReadinessOnFile: "{done} of {total} documents on file",
+    eqOpenFile: "Open this machine's file",
+    // The card's corner control, as WORDS (owner, 2026-09-22: *"the icon of the equipment card to be
+    // equipment documents not icon"*). It sits one row under «Company documents», so the two name
+    // whose papers each one opens.
+    eqDocuments: "Equipment documents",
     eqNoPhoto: "No photo",
     eqSelect: "Show this equipment on the map",
     // RM3-AC-26 — a price and a count were given, and nothing else. No empty card furniture.
@@ -1060,7 +1547,7 @@ export const en = {
     // The filtered empty state — deliberately unlike RM3-AC-26's. That one is a statement about the
     // supplier; this one is a statement about the chips the renter pressed.
     eqFilterEmpty: "No equipment matches what you chose",
-    eqFilterEmptyWhy: "Active filters: {filters}. This offer has {total} — clear the filters to see them all.",
+    eqFilterEmptyWhy: "Active filters: {filters}. This offer has {total}: clear the filters to see them all.",
     // The company panel's own back control, and the detail's.
     // The list-foot ask (§6.4). The prototype says «المورد»; this surface says «المؤجّر» / supplier.
     eqAskAnother: "Ask the supplier to add another {type}",
@@ -1071,7 +1558,6 @@ export const en = {
     eqShowOfferOnly: "Show only what he offered",
     // The divider where the offer ends. It says these are the supplier's, not this offer's — without
     // it the extra cards read as offered machines that were hiding.
-    eqBeyondOffer: "Also in his fleet — not in this offer",
     backToEquipment: "Back to the equipment",
     // What the map is NOT showing, in words. Silence would read as "this supplier has no machines".
     //
@@ -1084,7 +1570,7 @@ export const en = {
     noLocatable: "None of this supplier's equipment can be placed",
     // The resize grip's accessible name. Says what dragging does and what returns it, because the
     // control is invisible until hovered and a screen reader never sees the cursor change.
-    resizePanel: "Drag to widen the panel — double-click, or Home, to restore",
+    resizePanel: "Drag to widen the panel: double-click, or Home, to restore",
     noLocatableWhy:
       "He hasn't shared a yard for any equipment that fits this request, so nothing can be drawn. Ask him to confirm a yard.",
     offPlatformNoPins: "An off-platform offer has no pin",
@@ -1187,7 +1673,7 @@ export const en = {
     // have had to work out that they are the same thing.
     confirmPrice: "Accept",
     // The one place the offered and the agreed count are reconciled (RM3-AC-66).
-    unitsDiffer: "Priced on {agreed} agreed units — the offer was made of {offered}.",
+    unitsDiffer: "Priced on {agreed} agreed units. The offer was made of {offered}.",
     rental: "Rental",
     // The basis, restated under the label the way the BID CARD restates it: the raw quoted rate over its
     // own period, the days it is actually charged across, then how many units — so the rental total is
@@ -1222,6 +1708,374 @@ export const en = {
     total: "Total",
     noDuration: "This request has no duration, so the figures cover one full period.",
   },
+  /* ── The requests workspace (docs/implementation-plans/requests-workspace/plan.md) ──
+     One page for every request, its items and its bids. Phase 1 is the shell: the rail, the strip
+     that names what is selected, and the two tabs. */
+  /**
+   * ── The manual (owner, 2026-09-06) ────────────────────────────────────────────────────────────
+   * Nine sections, in the order a renter meets them. Three lines each at most: what the feature is,
+   * and the one thing that trips people on it. Anything longer belongs on the screen itself.
+   */
+  help: {
+    title: "How Moedatech works",
+    subtitle: "Seven short answers, in the order you will need them",
+    contact: "Reach us",
+    whatsapp: "Message us on WhatsApp",
+    call: "Call",
+    follow: "Follow Moedatech",
+    sections: {
+      post: {
+        t: "Post a request with the assistant",
+        b: "Describe the machine you need in your own words and the assistant fills the form. Then pick the project defaults from one of your earlier requests: the dates, the site, the hours and the terms come across, so the whole request takes minutes instead of a form filled from scratch.",
+      },
+      share: {
+        t: "Share the request with your suppliers",
+        b: "Send the request to your own suppliers on email, WhatsApp or any channel you already use. It goes as one template carrying the request details, and the supplier prices it and sends it back without needing an account.",
+      },
+      bids: {
+        t: "View your bids, and compare them",
+        b: "Every offer you receive lands in Requests. Read them one at a time in the cards view, or open Compare: a table that builds itself from the offers on the table and puts their cost and their terms side by side.",
+      },
+      suppliers: {
+        t: "Build your suppliers list",
+        b: "Add the suppliers you already deal with, your registered vendors, or pick them from the Moedatech suppliers. Group them, and a request goes to the group you choose instead of the whole market.",
+      },
+      map: {
+        t: "The equipment map",
+        b: "See the equipment registered on a supplier, and check its availability from the yards it would move from. A red distance means he has not confirmed which yard; ask him from the card, and his answer turns it green.",
+      },
+      counter: {
+        t: "Counter the price",
+        b: "Counter the price a supplier offered to bring it down. You name the price and the terms you want and send them as one offer; he answers with his own, and the round shows on his card until one of you accepts.",
+      },
+      accept: {
+        t: "Accept a deal",
+        b: "Accept a supplier's deal from the deal room, where the price and terms you both settled on are held. Everything agreed there is what the two of you are bound to.",
+      },
+    },
+  },
+  workspace: {
+    /* ── the bid card's BAND (app parity, `RenteeBandState`) ───────────────────────────────
+       One caption per card, and the card's only news channel. ⚠️ `band.counterPrice` deliberately
+       repeats `priceFooter.counterPrice`: the band and the map's own footer are two surfaces saying
+       one act, and the app keeps the same word on both. */
+    band: {
+      counterPrice: "Counter this price",
+      /* A room exists and nobody has priced yet. The owner asked for the second wording explicitly:
+         there is an OFFER on the table to answer, not just a price to undercut. */
+      counterOffer: "Counter this offer",
+      awaitingSupplier: "Awaiting supplier response",
+      newCounterOffer: "New counter offer",
+      newMessage: "New message from supplier",
+      /* ⚠️ ONE caption for every ask and every resolution (app parity): the renter does not remember
+         which question he asked, and the room shows him when he opens it. It is also what makes a
+         PARTIAL answer safe to report, since the wording claims nothing about what is on file. */
+      supplierAnswered: "Supplier answered your request",
+      offerUpdated: "Supplier updated the offer",
+      awaitingConfirmation: "Awaiting supplier confirmation",
+      dealClosed: "Deal closed",
+      accepted: "Accepted",
+      withdrawn: "Withdrawn",
+      expired: "Expired",
+    },
+    title: "My Requests",
+    // The rail's first tile. It is an action, not a request, so it says what it makes.
+    newRequest: "New",
+    closed: "Closed",
+    // The units a request asked for, on the rail tile. Rendered only when it is more than one.
+    unitsBadge: "×{n}",
+    // The rail's two counts, as words, on the tile's tooltip — the badges themselves are too small to
+    // carry the distinction and a renter should not have to infer it from a glyph.
+    itemsBadge: "{n} different machines",
+    unitsTitle: "×{n} of one machine",
+    railScrollNext: "More requests",
+    railScrollPrev: "Earlier requests",
+    // The dark strip, left half — the request itself.
+    bidsCount: "{n} bids",
+    oneBid: "1 bid",
+    openRequest: "Open the request",
+    // The bid count on the navy, said as three parts so the number can carry its own weight.
+    bidsWord: "bids",
+    bidWord: "bid",
+    // The primary control acts on the picked bid, so it says why it is inert.
+    selectBidFirst: "Select a bid first",
+    fullDetails: "Full details",
+    share: "Share",
+    quotation: "Quotation",
+    quotationNeedsRoom: "The quotation is issued in the deal room. Open the conversation with this supplier first.",
+    // The dark strip, right half — the item, and what the selected supplier offers against it.
+    offers: "{supplier} offers",
+    noBidSelected: "No bid selected",
+    noBidsYet: "No bids on this item yet",
+    itemsInRequest: "Items",
+    hideRequest: "Hide this request",
+    equipmentAndDocs: "Equipment & docs",
+    reviewEquipment: "Review equipment",
+    viewDocuments: "View documents",
+    docsShort: "Documents",
+    // The picked machine, as the reference shows it: a ribbon on the thumbnail and a chip beside
+    // the model. «Not checked» is the honest state — nobody has confirmed a yard for it yet.
+    ribbonConfirmed: "Confirmed",
+    ribbonUnconfirmed: "Unconfirmed",
+    availabilityConfirmed: "Availability confirmed",
+    availabilityNotChecked: "Availability not checked",
+    // The request's own terms, as chips on the strip beside the item they qualify. They were
+    // drawer-only, which made the renter open a panel to recall what he had asked for while reading
+    // what he was being offered.
+    chipStarts: "Starts {date}",
+    chipDuration: "{n} days",
+    chipMore: "+{n} more",
+    // Read off the bid's copy of the request terms, not derived from the rental type.
+    chipOperator: "With operator",
+    // The two tabs and the export beside them.
+    tabCards: "Cards",
+    tabCompare: "Compare",
+    download: "Download",
+    // The one download beside the tabs, named for what the tab it stands over exports.
+    downloadQuotation: "Download quotation",
+    exportComparison: "Export comparison",
+    /** Under the printed comparison. The sheet may be read in black and white, so the two colours
+     *  are named rather than left to speak for themselves. */
+    exportLegend: "Green meets what you asked for, red goes against it, and ✗ marks a requirement the supplier would not meet",
+    // Puts every benched bid back on the comparison — and therefore back in the export, which covers
+    // what the comparison covers. Named with its count so the renter knows what he is bringing back.
+    selectAll: "Select all ({n} off)",
+    // The source filter. "Via app" is a bid placed through Moedatech; "Offline" is one that arrived
+    // through the share link or was typed in by the renter.
+    source: "Source",
+    sourceAll: "All",
+    sourceApp: "Via app",
+    /* The FILTER's word, and it stays «Offline» (owner, 2026-09-06: *"for filter keep as before"*).
+       The tab sits under «Source» beside «Via app», where the pair is read as one question about
+       where bids came from — and the renter has been reading it for weeks. Only the BID CARD's own
+       line changed; see `sourceOfflineLong`. */
+    sourceOffline: "Offline",
+    /* ── Larger-size bids (owner, 2026-09-08) ────────────────────────────────────────────────────
+       A bid offering a machine BIGGER than the one asked for is dropped by the backend unless the
+       list asks for it (`sizeMatch=exact_or_larger`), so the renter can be notified of a bid and
+       then find nothing here. The filter panel says how many are being held and lets him see them;
+       the empty state says the same thing where it matters most. */
+    filters: "Filters",
+    sizeLargerToggle: "Show bids with larger size",
+    sizeLargerHeldOne: "{n} bid offers a larger size",
+    sizeLargerHeldMany: "{n} bids offer a larger size",
+    sizeLargerNoneHeld: "Every bid here offers the size you asked for",
+    showLargerCtaOne: "Show it",
+    showLargerCtaMany: "Show them",
+    // Empty states.
+    emptyTitle: "No requests yet",
+    emptyBody: "Create your first request to start getting supplier bids. You'll set up your account when you submit.",
+    emptyCta: "Create request",
+    signedOutTitle: "Sign in to see your requests",
+    signedOutBody: "Your requests, the bids on them, and every comparison live here once you're signed in.",
+    signedOutCta: "Sign in",
+    loading: "Loading your requests…",
+    loadFailed: "Your requests could not be loaded. Check your connection and try again.",
+    retry: "Try again",
+    // Phase 1 ships the shell; the two panes arrive with phases 2 and 3.
+    tabPending: "This view is still being built.",
+    // ── The bid card ──
+    // The card's source line, said in full. The header chip above is the short form.
+    sourceAppLong: "Via Moedatech app",
+    /* ── The card says how the bid REACHED him (owner, 2026-09-06) ────────────────────────────
+       *"Offline / added by you is not clear."* On the card there is room for a sentence and a
+       reason to be exact: this bid came back through the link he sent. «Offline» here also collided
+       with this app's own word for a lost connection ("You appear to be offline", four places), and
+       a bid is not a network state. The filter tab keeps the old word on his instruction. */
+    /* «Offline» is back in front of it (owner, 2026-09-06, same day): *"On the bid card header I want
+       it «offline - via your link»."* Both facts, in the order he reads them — what KIND of bid this
+       is, then how it reached him. The word's collision with a lost connection stands as a note, not
+       as a reason to drop it: nothing else on a bid card talks about the network. */
+    sourceOfflineLong: "Offline · via your link",
+    openChat: "Open the conversation",
+    // "{period}" is the rental period the bid quoted in — Monthly rental, Weekly rental, and so on.
+    // The price block mirrors the app's bid card (`v3_bid_card.dart`, `price_expanded_breakdown.dart`,
+    // checked 2026-08-12). The headline names the rental type; on a weekly or monthly bid it carries
+    // the RATE, so suppliers compare on what they quoted, and the prorated total moves into the rows.
+    rentalDaily: "Daily rental",
+    rentalWeekly: "Weekly rental",
+    rentalMonthly: "Monthly rental",
+    rentalJob: "Job price",
+    perUnitLabel: "{label} per unit",
+    // The rental row explains the headline: the rate spread across the days actually billed.
+    rentalRowDays: "Rental · {n} days",
+    rentalRowNoDuration: "Rental",
+    rentalRowCustom: "Rental for the specified period",
+    deliveryToSite: "Delivery to site",
+    returnFromSite: "Return from site",
+    onSupplier: "On supplier",
+    onRentee: "On rentee",
+    notQuoted: "Not quoted",
+    grandTotal: "Grand total",
+    grandTotalInclVat: "Grand total · incl. VAT",
+    // Multi-unit only, in the same box: the true all-units figure, which is not the per-unit total
+    // times the count — each transport leg carries its own unit count.
+    overallTotal: "Overall total",
+    // What the figure was multiplied by, INLINE with the label (owner, 2026-08-29) — a bare «· 4»
+    // read as a line number, and the app's stacked «Units: 4» caption spent a row of the totals box on
+    // four characters. Parenthesised, it is part of the phrase it qualifies.
+    unitsCountLabel: "({n} units)",
+    // ── The offered-units badge (app parity: `bidOffersUnits` / `bidAcceptedUnits`) ─────────────
+    // Drawn only where the REQUEST asked for more than one unit, which is the app's own gate: on a
+    // single-unit request every bid covers the whole of it and the chip states nothing.
+    offersUnits: "{n} units",
+    acceptedUnits: "{accepted} of {offered} units accepted",
+    // ── Off-platform pair ────────────────────────────────────────────────────────────────────────
+    // The invite reaches the supplier through the renter's OWN WhatsApp, the way «Provide it for me?»
+    // reaches support (owner, 2026-08-25) — so the message is written in the renter's voice and says
+    // what the supplier gets, not what Moedatech wants. It names the firm so a supplier holding
+    // several conversations knows which renter is asking.
+    inviteToApp: "Invite to Moedatech",
+    inviteSent: "Invite opened",
+    inviteNoContact: "This bid carries no number to reach the supplier on.",
+    inviteMessage:
+      "Hello {supplier}: I received your bid through Moedatech. If you install the Moedatech app you'll see my requests directly and can bid on more of them. {url}",
+    // The off-platform card's second control. What it opens is read-only by construction — the
+    // supplier's own submission through the shared link, in the bid form's own shape. ~~`editQuote`,
+    // "the renter typed this quote in himself, so it is his to correct".~~ Deleted with the label
+    // (owner, 2026-08-31): the renter did not type it, the supplier did, and the viewer edits
+    // nothing. One key for one button.
+    viewQuote: "View quote",
+    // The next move on an off-platform row: get that supplier onto the app.
+    /* The supplier line under a name in the comparison — that bid's standing with the renter, not
+       a second supplier. Kept as it was (owner, 2026-09-06: *"offline invite keep it"*). */
+    offlineInvite: "Offline · invite ↗",
+    notBuiltYet: "Not available yet.",
+    // ── When a bid's PRICED and OFFERED counts disagree (`unit-count-notes`) ─────────────────────
+    // Said only where they genuinely diverge: `priced` is what the money was built on, `offered` is
+    // what the bid claims. ~~A third line named how many machines were actually behind it.~~ Removed
+    // from the bid card on 2026-09-10 (owner) — it fired on the ordinary shape of an off-platform
+    // bid. `unitCountNotes` still computes that count for the equipment map.
+    countPricedAbove: "Priced on {priced} units, though the offer lists {offered}.",
+    countPricedBelow: "Priced on {priced} of the {offered} units offered.",
+    // ── The comparison matrix ──
+    // "Pick one" focuses the row — it drives the strip above. It never awards; that is the deal room.
+    supplierPickOne: "Supplier · pick one",
+    // The same header, in the two halves the 180px column has room for.
+    supplier: "Supplier",
+    pickOne: "· pick one",
+    removeColumn: "Take off the comparison",
+    recommended: "Recommended",
+    awaitingReply: "Awaiting reply",
+    inNegotiation: "In negotiation",
+    perCycle: "Per cycle",
+    colRate: "Rental",
+    // The three totals. The third is named after the request's own duration.
+    deliveredCost: "Delivered cost",
+    deliveredCostOneCycle: "rental + mobilization + demobilization · one cycle",
+    runningRate: "Running rate",
+    runningRateSub: "rental value only, per cycle",
+    firstCycle: "First cycle",
+    everyCycleAfter: "Every cycle after",
+    overDays: "{n} days",
+    // Their popovers. Each lists the lines the figure was added from, in that order.
+    howFirstCycle: "How the delivered cost is built",
+    howEveryCycle: "How the running rate is built",
+    howDuration: "How the delivered cost over {n} days is built",
+    // The duration column charges billable days, so its popover names them rather than claiming a
+    // count of whole months. Ruled 2026-08-12: the shared pricing module governs this figure, and it
+    // prorates at rate ÷ divisor a day with Fridays excluded — the same equation the deal room and
+    // the quotation use, so one rental cannot cost two different amounts across the app.
+    //
+    // `{d}` is that divisor, and it used to be the literal 26 (owner, 2026-08-26). A weekly bid was
+    // therefore told «Rental ÷ 26 × 11 billable days» over a figure built on ÷ 6 — the money was
+    // right and the sentence explaining it was not, and a reader who checked it would have got 1,777
+    // where the column said 8,855.
+    rentalOverDays: "Rental ÷ {d} × {n} billable days",
+    // Daily has a divisor of 1 and a per-job price has none at all, so neither has a division to
+    // explain and both would read as noise («÷ 1», «÷ 0») if forced through the sentence above.
+    rentalOverDaysFlat: "Rental × {n} billable days",
+    fridaysNote: "{days} days minus its Fridays = {billable} billable days.",
+    transportOnce: "Delivery + return",
+    paidOnce: "paid once, cycle 1",
+    vatNote: "All figures in SAR. VAT applied at 15% on the taxable lines above.",
+    // The terms split: what the request asked for, against what suppliers volunteered.
+    noVolunteeredTerms: "This request set no terms, and no supplier added one",
+    termOperator: "Operator",
+    termFuel: "Fuel",
+    termPayment: "Payment",
+    termSla: "Maintenance SLA",
+    termOvertime: "Overtime",
+    termNationality: "Nationality",
+    // A term the supplier never answered. Said out loud, because a blank cell reads as "nothing to pay".
+    didntSay: "Didn't say",
+    /** He never answered the term in words, but the paper that proves it is on the bid. */
+    docAttached: "Sent the document",
+    rankWithAi: "Rank with AI",
+    aiRanked: "AI ranked",
+    // Under the three grand totals, so a figure is never read as a pre-tax one.
+    withVat: "with VAT",
+    // On a term the RENTER set: what he asked for, beside the column's name.
+    youAsked: "you asked",
+    // A term every supplier answered the same way. The column says it once, then says nobody differs.
+    sameFromAll: "same from all {n}",
+    // The two closed column groups, standing on their edge.
+    groupCost: "Cost",
+    groupTerms: "Terms",
+    // The rails say what pressing them does; the rail itself carries one word.
+    openCost: "Show the cost columns",
+    openTerms: "Show the terms columns",
+    // The fold controls. A rail says what pressing it brings back.
+    openTotals: "Show the grand totals",
+    hideGroup: "Fold this group away",
+    hideColumn: "Fold this column away",
+    showColumn: "Show this column",
+    // The supplier line under a name in the comparison, where the column is 185px wide.
+    sourceOfflineShort: "Offline · added by you",
+    // A yes/no term, said as a word rather than the wire's own YES / NO.
+    termYes: "Yes",
+    termNo: "No",
+    // The equipment rail is a door, not a group: availability is a machine-by-machine question and
+    // the map already answers it in full, so pressing it opens the picked bid's machines there.
+    mapAllOffers: "Open the equipment map, with every offer on it",
+    checkAvailability: "Check availability",
+    // ── The suggestion bar under the comparison ──
+    rankPresets: { best: "Best overall", lowest: "Lowest cost", newest: "Newest machine", trusted: "Most trusted" },
+    rankThinking: "Reading the offers…",
+    rankAsk: "Ask the assistant",
+    rankAskHint: "Ask about these offers in your own words",
+    rankAskShort: "Cheapest with an operator…",
+    rankAskPlaceholder: "Ask about these offers: cheapest with an operator, who can start soonest…",
+    rankFailed: "The assistant could not answer that. Try again, or read the table as it stands",
+    aiSuggestion: "AI suggestion",
+    aiWhatIdDo: "What I'd do",
+    aiBrand: "MOEDATECH AI",
+    aiRankPrompt: "Rank these bids for me",
+    aiRanking: "Reading the bids…",
+    // The equipment group. Its cell states how many of the bid's machines the supplier has named a
+    // yard for, in the MAP's words — one vocabulary for availability across the product.
+    groupEquipment: "Equipment",
+    colAvailability: "Availability",
+    exportPopupBlocked: "Allow pop-ups to print the comparison.",
+    docsEquipment: "This machine",
+    docsCompany: "The company",
+    docsNone: "No documents on this bid yet.",
+    docsFailed: "Those documents could not be loaded.",
+    docOpen: "Open",
+    docNoLink: "No link",
+    // ── The request drawer ──
+    shareRequest: "Share request",
+    editRequest: "Edit request",
+    cancelRequest: "Cancel this request",
+    unitsCount: "{n} units",
+    factStarts: "Starts",
+    factPeriod: "Period",
+    factUrgency: "Urgency",
+    factDuration: "Duration",
+    factSite: "Site",
+    factRequested: "Requested",
+    factBidsIn: "Bids in",
+    daysValue: "{n} days",
+    // "4 · 2 via the app, 2 added offline" — the total alone hides that half were typed in by hand.
+    bidsSplit: "{app} via the app, {offline} added offline",
+    certsRequired: "Certificates required",
+    // The one-time post-bid edit, in the app's own words (`app_en.arb`, editOnceConfirm*). The web
+    // used to hide Edit entirely once a bid arrived; the app has allowed exactly one since 2026-08-05.
+    editOnceTitle: "One-time edit",
+    editOnceBody: "You can edit this request only once after a bid has been placed. Continue to the edit form?",
+    editOnceContinue: "Continue editing",
+    editCapUsed: "You've already used your one edit for this request",
+  },
   survey: {
     navTitle: "Surveys",
     badgeAria: "You have a survey waiting",
@@ -1231,7 +2085,7 @@ export const en = {
     q1Title: "How did your request go?",
     q1Question: "You requested {equipment}. Who did you end up renting from, and for how much?",
     someoneElse: "Someone else (not listed)",
-    noOne: "No one — I didn't rent",
+    noOne: "No one: I didn't rent",
     priceLabel: "How much did you pay {unit}?",
     reasonNoOne: "If you don't mind, what happened?",
     reasonSomeoneElse: "Tell us more (optional)",
@@ -1239,9 +2093,1110 @@ export const en = {
     skip: "Skip for now",
     // Q2 — still need this? (no bids)
     q2Title: "Your request hasn't received any bids yet",
-    q2Body: "Try loosening your requirements so more suppliers can take part — otherwise we'll close this request for you.",
+    q2Body: "Try loosening your requirements so more suppliers can take part: otherwise we'll close this request for you.",
     edit: "Edit my requirements",
     close: "Close the request",
+  },
+
+  /**
+   * The request canvas (MREQ). Replaces the four-step wizard's own key groups; `step1`–`step3` stay
+   * for now because other surfaces still read a handful of their labels.
+   */
+  projects: {
+    home: {
+      viewAll: "All {n}",
+      onSite: "{n} units on site",
+    },
+    offer: {
+      filedTitle: "Filed under {site}",
+      filedSub: "This request is now part of your project. Everything about the request is unchanged.",
+      fieldName: "Project",
+      viewAction: "View the project",
+      alreadyTitle: "You already have a project at {site}",
+      alreadySub: "Add this request to it, or say it is a different site: two projects for one place split the site's picture in two.",
+      addTo: "Add it to {site}",
+      addToSub: "Nothing on the request changes. It just appears on that site's chart.",
+      different: "It's a different site",
+      differentSub: "Same address, different job. We make a second project and file this under it.",
+      createTitle: "Make a project from this request?",
+      createSub: "State the site once and your next request for it is one line of typing.",
+      savedHeading: "Saved as the project",
+      fieldSite: "Site",
+      fieldDates: "Dates",
+      fieldBasis: "Rental basis",
+      fieldExtendable: "Extendable",
+      fieldPayment: "Payment terms",
+      createAction: "Make the project",
+      notNow: "Not now",
+    },
+    docs: {
+      title: "Papers for this award",
+      none: "Nothing attached yet.",
+      kind: "What is it",
+      kinds: {
+        po: "Purchase order",
+        contract: "Contract",
+        quotation: "Supplier's quotation",
+        other: "Other",
+      },
+      /* The same four, short enough for a pill beside a machine name. The chart has one line per
+         row and a filename eats all of it, so the row names the KIND and the filename rides the
+         hover — «PO» is what a renter is looking for when they scan a chart for one. */
+      kindShort: {
+        po: "PO",
+        contract: "Contract",
+        quotation: "Quotation",
+        other: "Doc",
+      },
+      attach: "Attach a file",
+      removeNamed: "Remove {name}",
+      oursIsGenerated: "Our quotation for this request is generated, not uploaded: download it from the row menu. The one here is the quotation the SUPPLIER sent you.",
+      siteLevelNote: "Nobody is awarded this machine yet, so this paper is filed against the site. Not against a supplier.",
+      openHint: "Open this paper",
+      openFailed: "Could not open that paper. Try again.",
+      tooBig: "That file is over {max}. Attach a smaller one.",
+      badType: "PDF, JPG, PNG or WEBP. Convert it first, or take a photo of the page.",
+      readFailed: "That file could not be read. Try another.",
+    },
+    file: {
+      title: "Add an existing request",
+      sub: "Put a request you have already posted onto {site}.",
+      none: "Every request you have is already on a site.",
+      noMatch: "Nothing matches that.",
+      elsewhere: "Different location: cannot be part of this project.",
+      askTitle: "This request is for {there}, not {here}.",
+      askBody: "A project is one place, so a request posted for somewhere else cannot be filed on it. Change the request’s location to {here}, or pick another request.",
+      askEdit: "Change the request’s location",
+      askNotEditable: "its location can no longer be changed",
+      orExisting: "or one you already posted",
+      search: "Search your requests",
+      note: "Filing changes nothing about the request. Not its status, not its dates, not its terms. Only its location has to match.",
+      failed: "That did not file. Try again.",
+    },
+    rename: {
+      title: "Rename this row",
+      label: "Name",
+      placeholder: "A name you will recognise",
+      hint: "The reference {ref} does not change â it is what a supplier quotes back at you.",
+      clear: "Remove the name",
+      failed: "That did not rename. Try again.",
+    },
+    periodConflict: {
+      title: "{n} things here keep different dates",
+      sub: "This site will say {period}.",
+      keep: "Keep their dates",
+      apply: "Change {n} too",
+      lockedNote: "{n} of these cannot change â they will keep the dates they have.",
+      locked: {
+        edit_used: "edit already used",
+        closed: "closed",
+        costs_the_edit: "has bids",
+        free: "",
+        work_order: "",
+      },
+    },
+    conflict: {
+      openTheForm: "Open the work order and change its dates there \u2014 that form owns the check that keeps a group\u2019s rows in step.",
+      title: "This runs to different dates",
+      intro: "Both are kept. Keeping the difference is usually right. A machine that stays longer than the site's own dates is a fact, not a mistake.",
+      keepDifferent: "Keep it different",
+      matchProject: "Match the project",
+      costsTheEdit: "This request has bids, so matching the project uses its one remaining edit.",
+      editUsed: "This request has already used its one post-bid edit, so it cannot be changed. The difference stays, and the chart keeps showing it.",
+      closed: "This request is closed, so nothing can change it now.",
+    },
+    move: {
+      fileTitle: "File this in a project",
+      moveTitle: "Move this to another project",
+      changesNothing: "Filing changes nothing on the request. Not one value moves, even where the new site says something different. That is why it works after bids and costs you no edit.",
+      movingDropsAwards: "Moving it to another site removes the awards recorded here, with their marks and documents. The request itself is untouched.",
+      movingCarries: "Its awards and papers move with it. Nothing is lost.",
+      movingDropsAwardsWorkOrder: "Moving this order leaves its awards behind. They belong to the site they were agreed on.",
+      deleteWorkOrder: "Delete this work order",
+      atThisAddress: "At {site}",
+      noneHere: "No project at {site} yet.",
+      orAnother: "Or another project",
+      chooseOne: "Choose a project",
+      file: "File",
+      move: "Move",
+      removeFromProject: "Remove from this project",
+    },
+    workOrder: {
+      operatorNeeded: "This equipment needs an operator",
+      nationality: "Operator nationality",
+      natAny: "Any",
+      natRestricted: "Restricted",
+      natCustom: "Which nationalities?",
+      natCustomPlaceholder: "e.g. Saudi, Egyptian, Filipino",
+      opCerts: "Operator certificates",
+      opCertOther: "Other operator certificate",
+      opCertOtherPlaceholder: "Name the certificate",
+      fatFood: "Food for the operator",
+      fatAT: "Accommodation & transport",
+      safetyOther: "Other certificate",
+      safetyOtherPlaceholder: "Name the certificate",
+      overrideBadge: "{n} different",
+      termsTitle: "Terms for this order",
+      termsUnreadable: "Could not read this order’s terms. Try again: opening it without them would overwrite what you entered.",
+      sameAsFirst: "same as the first machine",
+      orderTitle: "Name this order",
+      orderTitleHint: "What you will call it on the chart.",
+      orderTitlePlaceholder: "e.g. Own fleet: Qiddiya",
+      operator: "Operator",
+      delivery: "Delivery by",
+      ret: "Return by",
+      fuelResp: "Fuel paid by",
+      fuelType: "Fuel",
+      year: "Model year",
+      yearPlaceholder: "Any",
+      safety: "Certificates",
+      night: "Night shift",
+      ratePer: "Rate / {basis}",
+      mobAmount: "Mobilization",
+      demobAmount: "Demobilization",
+      assigned: "{n} of {q} assigned",
+      tooMany: "{n} too many",
+      machineTotal: "Total {amount}",
+      equipment: "What is on site",
+      orderSection: "The order",
+      machineCount: "{n} machines",
+      supplierColumn: "Supplier, or your own fleet",
+      machine: "Machine",
+      category: "Category",
+      subtype: "Type",
+      size: "Size",
+      search: "Search…",
+      notInCatalogue: "Not in our catalogue: I will type the name",
+      rawLabelPlaceholder: "What it is, e.g. Welding machine",
+      rawSizePlaceholder: "Size, e.g. 400A",
+      quantity: "Units",
+      notes: "Notes",
+      addMachine: "Add another machine",
+      differentTerms: "Different terms for this machine",
+      termsComing: "Operator, delivery, fuel and certificates for this machine. Arriving with the terms editor.",
+      period: "How long it is here",
+      periodHint: "Leave these empty and the work order runs to the site's own dates.",
+      differs: "This runs to different dates from the site ({start} → {end}). That is allowed: both are kept, and the chart shows the difference.",
+      supplier: "Who provides it",
+      supplierHint: "A work order is awarded the moment it exists, because the machine is already here. Leave a supplier blank for your own fleet.",
+      supplierPlaceholder: "Supplier, or your own fleet",
+      unnamedMachine: "This machine",
+      nameMachineFirst: "Say what the machine is first. Pick its type, or tick «not in our catalogue» and type its name.",
+      fixUnitsFirst: "A machine has more units promised to suppliers than it asks for. Fix the counts to save.",
+    },
+    menu: {
+      label: "Row actions",
+      award: "Award",
+      reviewBids: "Review the bids",
+      changeAward: "Change the award",
+      attachDocument: "Attach a document",
+      markMobilized: "Mark mobilized",
+      undoMobilized: "Undo mobilized",
+      markDemobilized: "Mark demobilized",
+      undoDemobilized: "Undo demobilized",
+      openRequest: "Open the request",
+      ourQuotation: "Our quotation",
+      openDealRoom: "Open the deal room",
+      editWorkOrder: "Edit the work order",
+      deleteWorkOrder: "Delete the work order",
+      removeFromProject: "Remove from the project",
+      fileInProject: "File in a project",
+    },
+    award: {
+      title: "Who is supplying this?",
+      privateNote: "Your own record. This is not the marketplace accept. It reads nothing from the deal room and writes nothing to it.",
+      supplier: "Supplier",
+      supplierPlaceholder: "Type the supplier's name",
+      notRegistered: "not vendor-registered",
+      addSupplier: "Add a supplier",
+      addName: "Company name",
+      addReach: "E-mail or phone",
+      addSave: "Add and select",
+    addFailed: "That did not save. Nothing was added.",
+      noSuppliers: "Your supplier list is empty. Add the firm supplying this line and it joins the list.",
+      pickSupplier: "Choose a supplier before saving the award.",
+      units: "Units",
+      rate: "Rate",
+      ratePlaceholder: "SAR, optional",
+      mobAmount: "Mobilization",
+      demobAmount: "Demobilization",
+      lineTotal: "Total {amount}",
+      perDaily: "per day",
+      perWeekly: "per week",
+      perMonthly: "per month",
+      moneyOptional: "Rate, mobilization and demobilization are optional: record what you agreed.",
+      basis: "Per",
+      daily: "day",
+      weekly: "week",
+      monthly: "month",
+      split: "Split across another supplier",
+      counter: "{used} of {qty} assigned",
+      overBy: "{n} too many",
+      save: "Award",
+      unawardTitle: "Un-award this?",
+      unawardBody: "{n} units from {supplier} stop being recorded on this site. These go with it:",
+      marksGoToo: "The mobilized and demobilized marks",
+      unawardAction: "Un-award",
+    },
+    board: {
+      railCounts: "{r} requests · {w} work orders",
+      unassigned: "Unassigned",
+      unassignedSub: "Posted before you had a site for them. Filing one takes a click and changes nothing about the request.",
+      loading: "Opening…",
+      namedByUs: "named by us",
+      project: "Project",
+      location: "Location",
+      start: "Start",
+      end: "End",
+      filedHere: "Filed here",
+      siteSays: "site says {date}",
+      filedCount: "{r} req · {w} WO",
+      addWorkOrder: "Add work order",
+      newRequest: "New request",
+      addRequest: "Add request",
+      whatIsHere: "What is on this site",
+      today: "Today",
+      ownPeriod: "own dates",
+      nothingYet: "Nothing on this site yet. Add a work order for a machine already here, or post a request.",
+    },
+    chart: {
+      /* A machine whose name nothing could supply: no taxonomy pair on the request and no free text
+         either. Said rather than drawn blank (owner, 2026-09-08) — an empty name reads as a broken
+         row, and the renter cannot tell it from a machine we simply failed to load. */
+      unnamedItem: "Equipment (not named)",
+      of: "of",
+      pending: "pending",
+      ownFleet: "Own fleet",
+      markFailed: "Could not record that. Try again.",
+      withOperator: "with operator",
+      noOperator: "no operator",
+      year: "year",
+      openEnded: "open-ended",
+      from: "from",
+      noPeriod: "no dates yet",
+      mobilized: "Mobilized",
+      demobilized: "Demobilized",
+    },
+    del: {
+      confirmTitle: "Delete this project?",
+      confirmBody: "“{name}” has nothing filed under it, so nothing is lost. This cannot be undone.",
+      createdBy: "Created by {name}",
+      confirmAction: "Delete project",
+      busyTitle: "This project is in use",
+      busyBody: "“{name}” cannot be deleted while these are filed under it:",
+      countRequests: "{n} requests",
+      countWorkOrders: "{n} work orders",
+      countUnits: "{n} units awarded, with their marks and documents",
+      finishedLead: "If the job is finished,",
+      finished: "you need do nothing. A site reads as ended on its own once its last date passes.",
+      wrongPlaceLead: "If one row is in the wrong place,",
+      wrongPlace: "use Remove from the project on that row. It keeps everything and simply stops being filed here.",
+      mistakeLead: "If the project was made by mistake,",
+      mistake: "remove what is filed under it and the delete appears.",
+    },
+    created: {
+      title: "“{name}” is ready",
+      sub: "What is on this site?",
+      workOrder: "Add a work order",
+      workOrderSub: "A machine already on site. Your own, or a vendor you use. Private: no supplier ever sees it.",
+      request: "Post a new request",
+      requestSub: "Ask our suppliers. The site's terms are filled in already. You type the machine.",
+      later: "Not now",
+    },
+    surface: {
+      summary: "{n} sites",
+        heading: "My projects",
+        sub: "A site you state once. Every request for it starts filled in.",
+        newProject: "New project",
+        editTitle: "Project settings",
+        empty: "No projects yet. Make one and your next request for that site is one line of typing.",
+        counts: "{requests} requests · {workOrders} work orders · {units} units awarded",
+        stale: "Someone else changed this project while you had it open. Close and reopen it to see their change first.",
+        saveFailed: "That did not save. Try again.",
+      },
+    form: {
+        addressRequired: "Add the location first. Drop a pin, or type it.",
+        whereTitle: "Where",
+        address: "Location",
+        addressPlaceholder: "Drop a pin above, or type the location",
+        title: "Title of this project",
+        titlePlaceholder: "Optional",
+        unsetFlag: "not set",
+        titleHint: "Leave it blank and we call it “{fallback}”.",
+        whenTitle: "When & terms",
+        extendableLabel: "Extendable",
+        basis: "Rental basis",
+        hours: "Hours per day",
+        start: "Start date",
+        end: "End date",
+        paymentTerms: "Payment terms",
+        applyTitle: "What is already on this site",
+        applyNote: "Nothing here changes unless you tick it. A request with bids has one edit left, and ticking it spends that edit.",
+        stateFree: "no bids: free to edit",
+        stateCosts: "has bids: uses its one edit",
+        stateUsed: "edit already used",
+        stateClosed: "closed",
+        stateWorkOrder: "work order: always editable",
+        saveProjectOnly: "Project only",
+        saveAndApply: "Save and apply to {n}",
+      },
+    /* 🔴 ~~`pick` / `all` / `fewer`~~ went with `ProjectChips` (owner, 2026-09-16): the site
+       strip left the intake floor for the requests rail beside the box, and those three strings
+       named its parts. `label` and `ended` stay - the projects board and the move dialog read them. */
+    chips: {
+      label: "Project",
+      ended: "ended",
+    },
+    pills: {
+      startFrom: "start from",
+      templateApplied: "terms copied",
+      kindWorkOrder: "Work order",
+      kindRequest: "Request",
+      site: "site",
+      basis: "basis",
+      start: "start",
+      end: "end",
+      paymentTerms: "payment",
+      extendable: "extendable",
+      delivery: "Delivery",
+      ret: "Return",
+      fuelResp: "Fuel",
+      operator: "Operator",
+      certs: "equipment cert",
+      year: "year",
+      fuel: "fuel",
+      food: "food",
+      accom: "stay",
+      night: "nights",
+      nationality: "nationality",
+      opCerts: "operator cert",
+      conflict: "You wrote {spoken}, which is not this project's site.",
+      keepMine: "Keep what I wrote",
+      useProject: "Use the project's site",
+    },
+  },
+  create: {
+    youWrote: "YOU WROTE",
+    needsYou: "{n} things need you",
+    needsYouOne: "1 thing needs you",
+    startOver: "Start over",
+    machine: "The equipment",
+    /* ── The request's equipment, as tabs (owner, 2026-09-09) ──────────────────────────────────
+       A label for the strip and nothing else: each tab is DATA (the equipment's own type and size),
+       and the + carries `addAnother`, which this block already had. */
+    equipmentTabs: { label: "Equipment in this request" },
+    /* The way out of the lock on the site and the schedule (owner, 2026-09-09). It names the SCOPE,
+       because that is the whole reason those two panels lock: one address and one schedule for every
+       equipment on the request. */
+    changeForRequest: "Change for the request",
+    /* ── Taking one equipment off the request (owner, 2026-09-09) ──────────────────────────────
+       *"In the equipment tabs must have x button to remove it, also the x is always visible."*
+       `label` is the ✕'s accessible name and its tooltip, so a screen reader hears WHICH equipment
+       the press removes; the dialog is the one-line question, because the answers on that card go
+       with it and nothing brings them back. */
+    removeEquipment: {
+      label: "Remove {name}",
+      title: "Remove this equipment from the request?",
+      remove: "Remove",
+      keep: "Keep it",
+    },
+    /* A DIRECT request's ✕ swaps the machine rather than removing it: it goes back to the supplier's
+       store, because that listing is where the equipment came from. «Remove» would be a lie about
+       both what it does and what comes back. */
+    changeEquipment: "Change {name}, at the store",
+    operator: "The operator",
+    operatorRail: "OPERATOR",
+    where: "Where it goes",
+    when: "When it runs",
+    nextPanel: "Next: {panel}",
+    requiredMark: "* Required",
+    /** The same demand for a field whose LABEL already carries the star: the word alone, so the
+     *  marker costs the label as little width as possible (owner, 2026-09-12). */
+    requiredWord: "Required",
+    /* Said in a panel the SITE filled and the renter has never opened, so the panel that opens on
+       «Review & send» states why it opened. See `prefilledNote` in `Canvas`. */
+    checkFromProject: "Filled in from your project. Have a look, then press Review & send again.",
+    nextOnly: "Next",
+    missingTitle: "Before this can be sent",
+    lockedForRequest: "locked for the whole request",
+    collapse: "collapse",
+    change: "change",
+    nextEquipment: "Next equipment",
+    previousEquipment: "Previous equipment",
+    addAnother: "Add another equipment",
+    reviewAndSend: "Review & send",
+    itemOfCount: "Equipment #{n} of {total}",
+    provenance: {
+      agent: "AI selected",
+      default: "AI selected",
+      // PROJ - deliberately NOT "AI selected". The renter chose this themselves, once, for the whole
+      // site; calling it the agent's would misattribute their own decision back to them.
+      project: "From your project",
+      renter: "changed by you",
+    },
+    machineCard: {
+      category: "CATEGORY",
+      type: "TYPE",
+      size: "SIZE",
+      /* ⚠️ The two read as a PAIR (owner, 2026-09-13: *"for the placeholder of the type dropdown
+         make it «select type», same as «select size»"*). They sit side by side in the same row and
+         said different kinds of thing - one a four-word instruction naming the catalogue, the other
+         two words. «from our list» is also the escape row's job now, one cell along.
+         ⚠️ The comment that stood here was CORRUPTED - `26a0Fe0f` and a run of raw code points where
+         the ⚠️ and the Arabic should have been, the same class of scripting accident the 2026-09-12
+         `RED` note records. Repaired rather than left: an unreadable comment is worse than none. */
+      typePlaceholder: "Select type",
+      sizePlaceholder: "Select size",
+      searchTypes: "Search types…",
+      /* ── The way out of a TYPE search that found nothing (owner, 2026-09-09) ────────────────────
+         *"Maybe if he searched in the type and didnt find it we show for him something here that will
+         open the field of custom type and the alert."*, then *"make it general, add custom equipment
+         type but show something that is not on moedatech etc"*.
+         ~~«Add «{q}» as equipment we do not carry yet».~~ Quoting the search text read as a promise
+         about that text, and a search FRAGMENT is not a machine's name. So: the act on the first
+         line, what it means on the second, and the name is asked for in the box this opens. */
+      /* One line, and only this one (owner, 2026-09-09: *"add a custom equipment type only"*). The
+         second line said what the state means, which the orange note on the card says once the box
+         is open. */
+      /* ── The way out of a match that is not his machine (owner, 2026-09-12, settled 09-13) ────
+         Five wordings. The first four died of the SLOT, not of the words:
+         ~~«Doesn't match what I want? Use my own name of equipment»~~ — three lines, and «what I
+         want» asked about his PREFERENCE, so a renter who merely liked his own wording had every
+         reason to press it and lose every supplier we would have reached.
+         ~~«My machine is not listed»~~ — a statement: when to press, never what pressing does.
+         ~~«Name it myself»~~ — an act with no object, on a card whose name box is already filled.
+         ~~«Send it with the name above»~~ — points at the box at last, and still reads as a shrug:
+         *"must be clear"*.
+         🔴 The column was choosing the words. ~160px of text cannot hold a sentence that both names
+         the CONDITION and the ACT, so every candidate dropped one of the two. The control moved to
+         its own full-width row instead, and the string below is the owner's own sentence, whole
+         (*"doesnt match what you want? send it with your custom equipment name above"*).
+         ⚠️ «custom equipment name» is deliberately the FIELD's own vocabulary rather than plain
+         English: it names the box the press points at, which is the whole of what the sentence has
+         to do now that the pulse draws the eye there. */
+      /* ⚠️ SHORT, because it moved (owner, 2026-09-13: *"i want this note inlined with the size-type
+         row ... make sure use shorter sentences to fit"*). It sits in a ~200px grid column under the
+         two lists now, not on a full-width row of its own, so the sentence that named both the
+         CONDITION and the ACT no longer has the room for either at length. Five words: what is wrong,
+         and what to press. Keep any replacement this short and LOOK at it in the card. */
+      useMyOwnName: "Not in our list? Use your custom name",
+      /* The same row, on a line that has already gone off-catalogue (owner, 2026-09-13): *"if it is
+         clicked then in its place, with no taxonomy selected, we will write «select from our list»"*.
+         His words. It OPENS the type list, rather than just naming it — the lists are still on screen
+         above this row, so a line that only points at them would be a caption, not a control. */
+      selectFromList: "Select from our list",
+      addCustomType: "Add a custom equipment type",
+      /* ── The escape, and the one panel behind it (owner, 2026-09-13/14) ──────────────────────
+         Planned against his supervisor's prototype and cut down from it: *"despite we see them as 4
+         cases, user see them in 2"*, *"the cta instead of describe so he dont feel he is writing
+         again"*, *"many extra text everywhere no need"*.
+         ⚠️ ONE sentence per state on the row, and it must never wrap — the control is sized to the
+         sentence, not the sentence to the column.
+         🔴 Their LENGTH is a layout constraint, not a free choice (owner, 2026-09-20, on a shot of
+         the row reading «Can't find the equipment you ...»): the row clips rather than wrapping, so
+         a sentence that outgrows its column does not get smaller — it disappears. ~~«Can't find the
+         equipment you want?»~~ is cut to the shorter question it was already asking, and both now
+         fit the cell at its narrowest. */
+      hatchMatched: "Not the equipment you want?",
+      hatchNoMatch: "Can't find your equipment?",
+      /* A label, not a question: the row he just pressed asked the question, and asking again a
+         centimetre below it is the extra text this pass exists to remove. */
+      panelChange: "How do you want to change it?",
+      panelWiden: "Widen the search",
+      doorSearch: "Search our catalogue",
+      doorOwn: "Keep my own words",
+      browseHeading: "{family} types in our catalogue",
+      /* ⚠️ This is the search box's PLACEHOLDER now, not a link to a second view (owner,
+         2026-09-15: *"dont keep the search as another path"*). It still says «all», because the box
+         searches the whole catalogue even while the list below it shows one family.
+         ~~`searchAny`, «Name or nickname — try “digger”, “roto”, “FLT”».~~ It belonged to the widened
+         view, which no longer exists as a place you go. */
+      searchAll: "Search all equipment",
+      searchHeading: "Search the Moedatech catalogue",
+      /* The foot of a one-family list: the rest of the catalogue is one small press away, in place,
+         rather than behind a door (owner, 2026-09-15: *"small show all in the end of the shown
+         catelogie of the same type that will show all taxonamy too"*). */
+      showAllTypes: "Show all equipment",
+      /* 🔴 The list is SHORT because the catalogue did not load, not because we do not carry the
+         machine. Without this the two are the same picture, and the renter concludes the wrong one. */
+      catalogueShort: "Our catalogue did not load, so this list is short — try again in a moment",
+      noneFound: "Nothing in the catalogue matches that",
+      useThis: "Use this",
+      currentPick: "Current",
+      whichSize: "WHICH SIZE?",
+      backStep: "← Back",
+      /* He described the machine at the intake. This is a CONFIRMATION, never a second form:
+         *"i dont want the user to write anything more here as he already described it in his input
+         before"*. */
+      willSay: "THE REQUEST WILL SAY",
+      /* Short, because it is a BUTTON (owner, 2026-09-14: *"the button must be smaller with
+         «keep my name» only, in button style"*). The sentence it used to carry is the label above the
+         field it saves. */
+      keepOwn: "Keep my name",
+      /* 🔴 ~~`savedOwn`, «Saved as your own equipment — {name}».~~ Removed by the owner on
+         2026-09-15: *"no need for saved as your own equipemtn etc just remove it and keep the
+         equipment name field look green"*. The green NAME FIELD says it, where his words are. */
+      pillInCatalogue: "In our catalogue",
+      pillNotMatched: "Not matched",
+      /* 🔴 ~~`ownType` / `ownSize`, the two flat green statements that replaced the lists.~~ Removed
+         2026-09-15: *"the type - size will stay be dropdown in case user want to select but still
+         shown green"*. The lists stay live and wear the green instead, so a renter on his own words
+         can still reach into the catalogue without opening the panel. */
+      searchSizes: "Search sizes…",
+      fuel: "FUEL",
+      /* ── An ask, not a heading (owner, 2026-09-08) ───────────────────────────────
+         *"If not set at all then show them orange with pick certificate and pick min year, in
+         warning orange and not capitalised."*
+
+         ~~«MINIMUM YEAR» / «CERTIFICATE».~~ Shouted, and a NOUN — which reads as a label for a value
+         that is already there, on a control whose whole point at that moment is that nothing is.
+         The words say what to do now, in the case the rest of the card is written in. */
+      minYear: "Pick min year",
+      anyYear: "Any year",
+      cert: "Pick certificate",
+      /** The field's NAME, for a screen reader and for the sheet's own heading. */
+      certName: "Certificate",
+      minYearName: "Minimum year",
+      noCert: "No certificate",
+      certOther: "Name the certificate",
+      quantity: "QUANTITY",
+      logistics: "LOGISTICS",
+      delivery: "DELIVERY TO SITE",
+      returnFromSite: "RETURN FROM SITE",
+      /* ── «FUEL PAID BY», because «FUEL RESPONSIBILITY» did not fit (owner, 2026-09-12) ─────────
+         Measured, not guessed: the fuel box gives its label 119px and «FUEL RESPONSIBILITY *» needs
+         133px on one line, so it wrapped to two at FULL desktop width while the two haulage legs
+         beside it stayed on one. It is the longest of the three strings in the narrowest of the
+         three slots — the row is `2fr_1fr`, and fuel also pays a whole box's 28px padding alone
+         where the two legs share one box's between them.
+         Shortened rather than re-gridded: `RETURN FROM SITE` has only 4px of its own to spare, so
+         taking room from that column would move the wrap rather than remove it.
+         ⚠️ NOT plain «FUEL»: the same card already labels the fuel TYPE control «FUEL», over the
+         photo. Two different questions under one word on one card is worse than a wrap. */
+      fuelResponsibility: "FUEL PAID BY",
+      attachment: "ATTACHMENT",
+      workType: "WORK TYPE",
+      workTypePlaceholder: "What will it lift?",
+      notes: "NOTES",
+      notesOptional: "(optional)",
+      notesPlaceholder: "Anything else the supplier should know…",
+      unavailableTitle: "{equipment} isn't available from suppliers right now.",
+      /* ── Off-catalogue (CUSTOM_EQUIPMENT_ENABLED) ───────────────────────────────────────────
+         ~~«This equipment type is not available, but you can still post and share the link with your
+         suppliers».~~ Owner, 2026-09-12: *"it is not the case always that this equipment is not
+         available, like what the note says"* — and the note has to be *"clear"* that the request
+         will not reach our suppliers.
+         🔴 The sentence made a claim about OUR CATALOGUE, and since the renter can now take a line
+         off-catalogue himself, that claim is false half the time: the type he rejected is sitting in
+         the list above the note. And the half he actually needed — nobody is sent this — was left to
+         be inferred from «you can still share the link», which reads as an extra, not as the only
+         route there is.
+         So the note states the CONSEQUENCE, which is true however the line got here.
+         ~~«No Moedatech supplier is matched to a machine you name yourself, so we will not send this
+         equipment to anyone…».~~ Right facts, unreadable: 180 characters whose first clause described
+         our MATCHING rather than his outcome. ~~«Moedatech suppliers will not see this equipment.
+         Only the suppliers you send the link to can price it».~~ Shorter, and still ours rather than
+         his. The wording below is the OWNER'S OWN, taken as given.
+         ⚠️ «This one», never «this request». One line of a five-line request can be off-catalogue
+         while the other four go out to everybody who stocks them.
+         ⚠️ «offline» carries a SECOND meaning in this dictionary — «you appear to be offline», the
+         lost connection, four strings of it. It is deliberate here: it is also the word the source
+         filter and the comparison have shown him for weeks («Offline · invite»), so it is the
+         product's own name for a supplier reached outside Moedatech. */
+      /* ⚠️ ONE LINE, and therefore short (owner, 2026-09-13). It is `sm:truncate` in a two-column
+         cell now, so a longer sentence does not wrap - it disappears. Both facts survive: it reaches
+         no Moedatech supplier, and the link is still his to send. */
+      notInCatalogueNote: "This one won't reach Moedatech suppliers. Share the link yourself",
+      // The renter names the machine himself and the request goes out carrying his words. Prefilled
+      // from what he wrote in the RFQ, so the ordinary case is a glance.
+      /* The prototype's own wording, and his (2026-09-14): the box says WHOSE words it holds,
+         which is the whole reason it is read-only until he asks for it. */
+      customEquipment: "EQUIPMENT NAME IN MY OWN WORDS",
+      customEquipmentPlaceholder: "Name the equipment you need",
+      // Small and quiet: it is the way to get the machine into the catalogue, not the way out of the
+      // request. Named for what it does, not for the app it opens (owner, 2026-09-06).
+      unavailableWhatsapp: "Message us",
+      unavailableChoose: "Choose another type",
+      sourcingRequested: "We're looking for this one. We'll be in touch.",
+    },
+    operatorCard: {
+      /**
+       * Short forms for the certificate CHIPS only. `options.safetyCert` spells
+       * "SASO technical inspection", which is right in a table cell and wraps this row onto two
+       * lines. The stored value is untouched — this is a label, not a vocabulary.
+       */
+      certShort: {
+        "tuv": "TÜV",
+        "spsp": "SPSP",
+        "saso-technical": "SASO",
+        "aramco": "Aramco",
+        "other": "Other",
+      } as Record<string, string>,
+      food: "FOOD",
+      accommodation: "ACCOM. & TRANSPORT",
+      certificates: "OPERATOR CERTIFICATES",
+      moreDetails: "MORE DETAILS",
+      nationality: "NATIONALITY",
+      nationalityAny: "Any",
+      nationalityRestricted: "Restricted",
+      nationalityCustom: "Which nationalities work for you?",
+      nightShift: "NIGHT SHIFT",
+      nightIncluded: "Included",
+      nightDayOnly: "Day only",
+      noOperator: "No operator needed. We drive it ourselves",
+      needOperator: "Do you want an operator with this equipment?",
+      operatorIncluded: "Include an operator",
+      operatorNotIncluded: "No operator",
+      withOperator: "with an operator",
+    },
+    wherePanel: {
+      unfiledShort: "different location: not in the project",
+      /* ── It no longer ends nowhere (owner, 2026-09-08) ─────────────────────────────────────
+         ~~"...so this request will not be part of it. Move the pin back to file it there."~~ That
+         second sentence read as «otherwise it is filed under nothing», which was true until the
+         post began filing a moved request under a project of its own. Saying the outcome is the
+         point: he is not losing a project, he is starting a second one. */
+      unfiledNote: "This is a different place from {project}, so it gets a project of its own. Move the pin back to keep it in {project}",
+      searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
+      dragHint: "Drag the map, or drop a pin where the equipment goes",
+      confirm: "This is the right spot",
+      useMyLocation: "Use my location",
+    },
+    whenPanel: {
+      dates: "START & END DATE",
+      startDate: "START DATE",
+      endDate: "END DATE",
+      duration: "Duration",
+      durationDays: "{n} days",
+      billing: "HOW YOU'RE BILLED",
+      extendable: "Extendable",
+      quoteRate: "Suppliers quote you a {basis} rate.",
+      moreDetails: "MORE DETAILS",
+      moreDetailsHint: "hours a day",
+      hours: "HOURS A DAY",
+      hoursStandard: "KSA STANDARD",
+      overtime: "OVERTIME RATE",
+      // MREQ-AC-33/34 — the charged-day disclosure, in TWO LINES (owner, 2026-08-25): the count and
+      // its arithmetic on one, the acknowledgement on the next. The uppercase title above it is gone
+      // — the sentence names the number, so a heading only made the block taller.
+      // `chargedLine` follows the count, which is rendered beside it at 20px.
+      chargedLine: "billable days: {total} calendar days less {fridays} Fridays, at {hours} hours a day",
+      chargedLineBasis: "billable days: {total} calendar days less {fridays} Fridays, at {hours} hours a day, billed {basis}",
+      chargedNoDates: "Add a start and end date and we'll show exactly how many days you'll be charged for. Fridays are never charged.",
+      confirmCharged: "I understand suppliers will quote against {charged} billable days",
+      confirmChargedNoDates: "I understand suppliers will price without a fixed end date.",
+      // Shown in place of the count when the window runs backwards, which used to read as «1 day».
+      datesReversed: "The end date is before the start date. Fix the dates to see billable days.",
+      tooShortMonthly: "Your dates cover {days} days. Monthly billing usually needs 30 days or more.",
+      tooShortWeekly: "Your dates cover {days} days. Weekly billing usually needs 7 days or more.",
+      // ── The condition was inverted, and the Arabic proved it (owner, 2026-08-26) ─────────────────
+      // These read «Suppliers quote LOWER when they don't know your dates» — an argument for leaving
+      // the dates blank, on the one notice whose whole job is to get them filled in. The Arabic beside
+      // it had said the opposite all along («better prices when they DO know»), so the two languages
+      // were handing a renter opposite advice out of the same box.
+      //
+      // The owner's wording, and DURATION is the word that carries it: a supplier who knows how long
+      // the machine is committed for prices that period, and one who does not pads for the longest
+      // plausible answer. Dates are what he is being asked for; duration is what he does with them.
+      //
+      // One first sentence across all three, because the reason does not change — only the ask does.
+      // A renter who has filled the start in should not be told again that his dates are missing; he
+      // should be told which one is.
+      nudgeBoth: "Suppliers price lower when they know your duration. Add a start and end date to get better bids.",
+      nudgeEnd: "Suppliers price lower when they know your duration. Add an end date to get better bids.",
+      nudgeStart: "Suppliers price lower when they know your duration. Add a start date to get better bids.",
+    },
+    /* ~~`carry` — the carry-forward modal's four strings («Equipment #{n}», what is locked, what is
+       copied, and its two buttons).~~ Deleted with the modal (owner, 2026-09-09). What they said is
+       on the screen now: the locked strip states the site and the schedule, and the copied details
+       are the card the renter lands on. */
+    /* ── The last stop before review (owner, 2026-09-01) ───────────────────────────────
+       The canvas had a standing «+ Add another machine» beside «Review & send», which asked the
+       question on every screen of the flow and made two calls to action out of one moment. It asks
+       once now, and at the moment it is actually a question: the machine in front of the renter is
+       finished and the whole request is answered, so the only thing left to decide is whether there
+       IS another one.
+
+       The body says what carrying on costs him — nothing, the site and schedule already apply —
+       because the reason people re-post a second request instead of adding an item is that they
+       assume a second machine means starting again. */
+    /* ── Back, out of the drafted request (owner, 2026-09-09) ────────────────────────────────
+       *"Show short simple confirm modal asking do you want to leave this request? … just very simple
+       one line question."* So the TITLE is the question and there is no body: the two buttons say the
+       rest. «Leave» is the primary because it is what he pressed Back for; «Stay» is the way out of
+       having pressed it by accident. */
+    leaveRequest: {
+      title: "Leave this request and go back?",
+      leave: "Leave",
+      stay: "Stay",
+    },
+    addMore: {
+      title: "Anything else on this request?",
+      body: "Your request is ready to review. If the request needs another equipment, add it now. It uses the same site and schedule, so there is nothing to fill in twice.",
+    },
+    ready: {
+      /* ⚠️ ONE WORD (owner, 2026-09-14: *"make the button details only so it is smaller"*). It
+         shares a row with four facts that must not be pushed onto a second line, so its width is a
+         layout constraint - «View all details» is 3.4x this. The pen beside it says «edit»; this one
+         only has to say what it opens. */
+      viewAll: "Details",
+      detailsTitle: "The full request",
+      stripDays: "days",
+      stripOperator: "with operator",
+      stripVerified: "Verified only",
+      /* Singular, and it is both the control's name and its empty state (owner, 2026-09-02:
+         *"call it payment term"*). ~~`stripNoPayment`, a second string for the same control saying
+         the same thing.~~ One term is being chosen, so one word names it. */
+      paymentTerm: "Payment details",
+      /* The TITLE over the strip's payment control (owner, 2026-09-03: *"this in the ready to send
+         must have payment terms as the title of the field"*). The pill showed «Net 30» and nothing
+         else once a term was chosen, so the one thing on that strip a renter can still change did
+         not say what it was; unset it read «Payment details», which is a placeholder and vanishes
+         the moment he answers. A title stays. */
+      paymentTermTitle: "Payment terms",
+      title: "Ready to send",
+      subtitle: "This is exactly what suppliers will see. Terms and payment come after the bids arrive. Nothing else to fill in here.",
+      where: "Where it goes",
+      when: "When it runs",
+      machineAndOperator: "The equipment & operator",
+      preferences: "Preferences",
+      equipment: "Equipment",
+      billingDuration: "BILLING & DURATION",
+      hours: "HOURS",
+      hoursOvertime: "HOURS & OVERTIME", // unused while the overtime picker is hidden
+      chargedDays: "DAYS CHARGED",
+      equipmentTile: "EQUIPMENT",
+      logistics: "LOGISTICS",
+      operatorTile: "OPERATOR",
+      foodStay: "FOOD & STAY",
+      paymentTerms: "PAYMENT DETAILS",
+      maintenance: "MAINTENANCE",
+      maintenanceSla: "RESPONSE TIME",
+      budget: "BUDGET CEILING · SAR",
+      bidWindow: "OFFER / BID WINDOW",
+      supplierFilters: "SUPPLIER FILTERS",
+      verifiedOnly: "Verified suppliers only",
+      sublettingAllowed: "Allow subletting / crosshire",
+      additionalNotes: "ADDITIONAL NOTES",
+      notesPlaceholder: "Anything else…",
+      optional: "(optional)",
+      inviteTitle: "Invite suppliers you already know",
+      inviteBody:
+        "Once you send this, you'll get a shareable link to invite suppliers to bid, even ones off Moedatech. Their bids land right here for you to compare.",
+      backToEditing: "Back to editing",
+      send: "Send to suppliers",
+      notSet: "not set",
+    },
+  },
+  /**
+   * My Suppliers — the renter's own list (SUP-T13).
+   *
+   * Wording rule: this screen never speaks about the supplier's standing on the platform except as a
+   * fact ("On Moedatech"). "Registered vendor" is the RENTER's own label, and the copy says so where
+   * it could be mistaken for something the supplier earned.
+   */
+  suppliers: {
+    title: "My suppliers list",
+    summaryOne: "{n} supplier",
+    summaryMany: "{n} suppliers",
+    vendors: "{n} registered vendors",
+    search: "Search name, contact, email or phone",
+    all: "All",
+    registeredVendors: "Registered vendors",
+    colSupplier: "Supplier",
+    colVendor: "Vendor registration",
+    colPhone: "Phone",
+    colEmail: "E-mail",
+    colContact: "Contact",
+    colGroups: "Groups",
+    colBids: "Bids",
+    onMoedatech: "On Moedatech",
+    noContactName: "no contact name",
+    /* ── The BADGE says «Vendor»; the ACT still says «vendor registered» ─────────────────────
+       Owner, 2026-09-03: *"keep it mark as vendor registered, mark them all as vendor registered,
+       but I mean the badge only, to have it Vendor instead of Registered."*
+
+       The chip sits on a row that is already about a supplier, so «Vendor» is the whole of what it
+       has to say, where «Registered» stated a state without saying registered as WHAT. The controls
+       that SET the flag name the act instead, and «mark as vendor registered» is the product's
+       phrase for that act. The share panel's own chip already read «Vendor», so the badges now
+       agree wherever they are drawn. */
+    registered: "Vendor",
+    mark: "Mark",
+    markTitle: "Mark as vendor registered. Your own label, the supplier is never told",
+    unmarkTitle: "Vendor registered: click to unset",
+    notSet: "not set",
+    add: "add",
+    noGroup: "no group",
+    bidOne: "{n} bid",
+    bidMany: "{n} bids",
+    noBids: "No bids yet",
+    sharedNoAnswer: "{n} shared · no answer",
+    onApp: "{n} on Moedatech",
+    viaLink: "{n} via link",
+    awarded: "{n} awarded",
+    last: "last {when}",
+    couldNotRead: "We could not read that",
+    couldNotReadField: "{field} was not usable: “{value}”",
+    couldNotReadBody: "Your sheet said this, and it is not a phone number or an address, so it is kept as a note, and cannot be used to reach them or to match them to a Moedatech account. Edit the row to correct it.",
+    emptyTitle: "Your list is empty",
+    emptyBody: "Moedatech has hundreds of suppliers. None of them are here until you add them.",
+    noMatchTitle: "No supplier matches",
+    noMatchBody: "Change the search or the filters.",
+    loading: "Loading your suppliers…",
+    vendorOn: "{name} is a registered vendor",
+    vendorOff: "{name} is no longer a registered vendor",
+    vendorNeedsContact: "{name} has no e-mail and no phone yet. Add one on the row, then the flag will save.",
+    vendorFailed: "That did not save. Nothing changed.",
+    addTitle: "Add suppliers",
+    /* What the dialog is for, in the renter's own terms (owner, 2026-09-03). ~~«Type them in,
+       upload a list, or pick a firm that is already on Moedatech.»~~ That named three doors, one of
+       which is a different dialog, and said nothing about WHY a contact matters. A supplier with no
+       e-mail and no phone is a name on a list he can never send a request to, and that is the fact
+       worth stating at the top. */
+    addSubtitle: "Type them in, or upload a list with their contact details, so you can share your requests with them.",
+    addAnother: "Add another",
+    addOne: "Add 1 supplier",
+    addMany: "Add {n} suppliers",
+    addNone: "Add suppliers",
+    addedOne: "1 supplier added",
+    addedMany: "{n} suppliers added",
+    addedMixed: "{n} added · {merged} already on your list, updated · {rejected} refused",
+    addFailed: "That did not save. Your rows are still here. Try again.",
+    fName: "Company name",
+    fContact: "Contact name",
+    fEmail: "Email",
+    fPhone: "Phone",
+    fCr: "CR number",
+    removeRow: "Remove this row",
+    markAll: "Mark them all as vendor registered",
+    /* Off by default now (owner, 2026-09-08), so the hint names the press that ⚠️S rather than
+       the press that undoes it. */
+    markAllHint: "Tick this to mark every row above as a vendor you have registered",
+    /* «My» is the whole distinction from the button beside it (owner, 2026-09-03). Both add
+       suppliers; one picks a firm off Moedatech, this one takes the renter's own contacts. */
+    addSupplier: "Add my suppliers",
+    added: "Added to your list",
+    createGroup: "Create group",
+    newGroup: "New group",
+    allGroups: "All groups",
+    rename: "Rename",
+    renameGroup: "Rename the group",
+    deleteGroup: "Delete the group",
+    deleteGroupBody: "The {n} suppliers in it stay in your list. They simply end up with no group.",
+    deleteGroupBodyOne: "The supplier in it stays in your list. They simply end up with no group.",
+    nameGroup: "Name the group",
+    groupName: "Group name",
+    groupPlaceholder: "Earthmoving, Riyadh, Preferred…",
+    nSelected: "{n} suppliers selected",
+    pickMembers: "Tick the suppliers that belong in the new group",
+    nSelectedFor: "{n} selected for the new group",
+    groupCreated: "{name} created with {n}",
+    groupRenamed: "Renamed to {name}",
+    groupDeleted: "Group deleted. The suppliers stay",
+    groupFailed: "That did not save. Nothing changed.",
+    close: "Close",
+    filtersTitle: "Filters",
+    filtersSubtitle: "Narrow the list.",
+    filterWhere: "Where they are",
+    filterBidding: "Bidding",
+    filterBidApp: "Bid on Moedatech",
+    filterBidLink: "Bid through my link",
+    clearAll: "Clear all",
+    filters: "Filters",
+    offPlatform: "Off platform",
+    hasStore: "Has a store",
+    verifiedByMoedatech: "Verified by Moedatech",
+    registeredVendor: "Vendor",
+    openBids: "Open bids",
+    insideApp: "Inside the app",
+    noAccountBody: "They have no Moedatech account, so there is no deal room and no award: every bid reached you through your shared form.",
+    kOnApp: "bids on Moedatech",
+    kViaLink: "offline bids",
+    kRooms: "deal rooms",
+    kAwards: "awards",
+    noPhone: "No phone",
+    docMissing: "Not provided",
+    docOpen: "Open the document",
+    sharedWith: "Requests you shared with them",
+    sharedNothing: "You have not shared a request with them yet",
+    openRequest: "Open the request",
+    roomsNoLink: "Open them from your inbox",
+    papers: "Company documents",
+    papersNeedBid: "A supplier's papers reach you through a bid. They have not bid yet, so there is nothing to show.",
+    papersNoAccess: "Their papers came through a bid you can no longer reach.",
+    docCr: "CR",
+    docVat: "VAT certificate",
+    docAddress: "National address",
+    docLocalContent: "Local content",
+    docSaso: "SASO",
+    docNotProvided: "not provided",
+    docRenews: "reissued every year",
+    docValidUntil: "valid until {date}",
+    docNoExpiry: "no expiry recorded",
+    awardedToThem: "Awarded to them",
+    noAwards: "You have not awarded them anything yet.",
+    whatYouSent: "What you sent them",
+    nothingSent: "Nothing sent yet.",
+    requestShared: "Request shared",
+    invitationSent: "Invitation to join Moedatech",
+    theyOpened: "they opened the link",
+    notOpened: "not opened yet",
+    theyJoined: "they joined",
+    notJoined: "not joined yet",
+    noEmailCannotShare: "No email. The request's share sheet will skip them",
+    fromYourSheet: "From your sheet",
+    profileFailed: "We could not load this supplier.",
+    tier_new: "New",
+    tier_bidding: "Bidding",
+    tier_working: "Working",
+    tier_core: "Core",
+    quiet: "quiet",
+    whyNew: "no bid yet",
+    whyBidding: "they bid, you have not awarded them",
+    whyWorking: "you awarded them once",
+    whyCore: "you awarded them {n} times",
+    bidsFrom: "Bids from {name}",
+    bidsFromSub: "Open any of them in its request to compare, negotiate or award.",
+    noBidsYet: "They have not bid on any of your requests yet.",
+    openInRequest: "Open in the request",
+    supplierProfile: "Supplier profile",
+    viaLinkShort: "via link",
+    editTitle: "Edit supplier",
+    editPlatformSub: "Name and store come from their Moedatech account. You can only edit what is yours.",
+    nameIsTheirs: "Read from their Moedatech account.",
+    /* ── One note under the phone AND the e-mail (owner, 2026-09-06) ────────────────────────────
+       ~~«Without it, the request's share sheet skips them.»~~ It hung off the e-mail alone and said
+       what the renter LOSES; the pair is what he is filling in, either one is enough to reach the
+       firm, and the sentence should say what he GAINS. */
+    contactHint: "Add them so you can share your request to their e-mail or WhatsApp",
+    addToGroup: "Add to a group",
+    removeFromGroup: "Remove from this group",
+    groupsHint: "Removing a group here only unlabels this supplier. The group itself stays.",
+    saved: "Saved",
+    saveFailed: "That did not save. Nothing changed.",
+    edit: "Edit",
+    remove: "Remove",
+    removeAction: "Remove",
+    pickToRemove: "Tick the suppliers to remove from your list",
+    nSelectedToRemove: "{n} selected to remove",
+    removeConfirmOne: "Remove 1 supplier",
+    removeConfirmMany: "Remove {n} suppliers",
+    removedOne: "1 supplier removed from your list",
+    removedMany: "{n} suppliers removed from your list",
+    removedSome: "{n} removed, {failed} could not be",
+    removeTitle: "Remove from my suppliers",
+    removeBody: "This removes your link, your vendor flag and your groups. Their Moedatech account, their store and the bids they already sent you are untouched.",
+    removed: "{name} removed",
+    inviteToApp: "Invite to Moedatech",
+    unseenBid: "A bid you have not opened yet",
+    newBadge: "New",
+    newBidsTitle: "{n} arrived in the last 24 hours",
+    inviteTitle: "Invite {name} to Moedatech",
+    inviteSubtitle: "Your message, in your words. Send it however you already talk to them.",
+    inviteMessageCold: "Hello {supplier}, I use Moedatech to send out my equipment requests. If you install the app you'll see them directly and can bid on them. {url}",
+    inviteWhy: "Same message on every channel: only the e-mail subject is extra.",
+    inviteSubject: "An invitation to bid on my equipment requests",
+    inviteChannelWhatsApp: "WhatsApp",
+    inviteChannelEmail: "E-mail",
+    inviteChannelSms: "SMS",
+    inviteChannelCopy: "Copy",
+    inviteCopied: "Message copied",
+    inviteNoPhone: "No phone on this supplier. Add one to reach them here.",
+    inviteNoEmail: "No e-mail on this supplier. Add one to reach them here.",
+    inviteRecorded: "Copy pastes the full card, with the app links, into Gmail or Outlook. However you send it, it lands on their history.",
+    inviteNotRecorded: "Sending is not recorded yet.",
+    addFromApp: "Add from Moedatech",
+    /* Named for what it saves (owner, 2026-09-03: *"make the title save Moedatech supplier to your
+       list"*). «Save suppliers to your list» is also what the OTHER dialog does, from typed rows and
+       from a sheet, so the title said nothing about which of the three doors he had opened. */
+    dirTitle: "Save Moedatech suppliers to your list",
+    dirSubtitle: "They stay in your list so you can send them your requests directly, and mark the ones you have registered as vendors.",
+    dirEveryone: "Everyone with a Moedatech account, whether or not they have a store.",
+    dirAdd: "Add selected",
+    dirAddN: "Add {n} selected",
+    uploadInstead: "Upload a sheet instead",
+    modeApp: "From Moedatech",
+    appSearch: "Search by name",
+    dirCount: "Showing {shown} of {total}",
+    dirShowAll: "Show all",
+    appEveryone: "Everyone with a Moedatech account. A firm without one goes under {tab}.",
+    appOnlyStores: "Only suppliers with a store are listed here. Add anyone else under {tab}.",
+    appNoSupplierId: "cannot be linked: this store does not name its company",
+    appRegisteredRule: "Everyone added here is marked a registered vendor, which is what lets you see their contact details.",
+    appSearchFirst: "Type a name to search.",
+    appNoResults: "No supplier with a store matches that.",
+    appAddN: "Add {n} suppliers",
+    appAddOne: "Add supplier",
+    appAddNone: "Add",
+    appAdded: "{n} added to your suppliers",
+    appAddedSome: "{n} added · {skipped} already in your list",
+    appAllLinked: "already in your list",
+    appFailed: "That did not save. Nothing was added.",
+    modeType: "Type them in",
+    modeFile: "Upload a list",
+    importHint: "Excel (.xlsx) or CSV, with a header row: company, contact, e-mail, phone.",
+    previewImport: "Check the file first",
+    planning: "Checking…",
+    planLine: "{created} will be added · {merged} will merge into a supplier you already have · {rejected} refused",
+    mergeFillsBlanks: "A merge fills what is empty and never overwrites. A phone you corrected in the app stays as it is, and a correction in this sheet will not replace it. Edit those in the app.",
+    planRejected: "Row {row} refused: {reason}",
+    planWarning: "Row {row}, {field}: {reason}",
+    rMissingContact: "no e-mail and no phone",
+    rMissingName: "no company name",
+    rInvalidPhone: "that is not a phone number, so the row was added without one",
+    rInvalidEmail: "that is not an e-mail address, so the row was added without one",
+    rTruncated: "too long, so it was cut",
+    rTooLong: "too long for the field",
+    rSameName: "same name as a supplier you have, but a different phone and e-mail, so it was added as a separate row. If it is the same firm, delete one.",
+    rDuplicateOf: "the same supplier as row {row} of this file",
+    importTitle: "Import a supplier list",
+    importSubtitle: "Paste the rows from your spreadsheet, or choose a CSV.",
+    pasteLabel: "Paste from your spreadsheet",
+    pastePlaceholder: "Company\tContact\tE-mail\tMobile\nZahid Tractor\tFaisal\tt@z.sa\t0551234567",
+    pasteHint: "Select the rows in Excel, including the header row, and paste them here.",
+    or: "or",
+    chooseCsv: "Choose a file",
+    importUnreadable: "We could not read that. It needs a header row and at least one row under it.",
+    importTooBig: "That file is over 2 MB. Split it and import the parts.",
+    pastedRows: "Pasted rows",
+    rowsColumns: "{rows} rows · {cols} columns",
+    cappedAt: "first 500 only",
+    chooseAnother: "Choose another file",
+    importRule: "A supplier needs a company name, and an e-mail or a phone.",
+    mappingIsPerColumn: "One choice per column, applied to every row.",
+    yourColumn: "Your column",
+    exampleFromRow1: "Example from row 1",
+    mapsTo: "Becomes",
+    fixHere: "Correct them in the table above, or import without them.",
+    matchColumns: "Match your columns to ours",
+    keepAsExtra: "Keep as extra field",
+    ignoreColumn: "Ignore this column",
+    columnN: "Column {n}",
+    preview: "Preview",
+    skippedRows: "{n} rows will be skipped. They have no company name, or no email and no phone.",
+    markAllPreviewHint: "Tick this to mark every row in the preview as a vendor you have registered",
+    startOver: "Start over",
+    importN: "Import {n} suppliers",
+    importNone: "Import",
+    importCount: "{n} will be imported",
+    importCountSkipped: "{n} will be imported · {skipped} skipped",
+    imported: "{n} suppliers imported",
+    importedMixed: "{n} imported · {merged} already in your list · {rejected} refused",
+    importFailed: "That did not import. Nothing was added.",
+    importSuppliers: "Import a list",
+    suggestedTitle: "They bid on your requests but are not in your list",
+    suggestedViaLink: "via your link",
+    suggestedOnApp: "on Moedatech",
+    addToMySuppliers: "Add to my suppliers",
+    dismiss: "Dismiss",
+    xlsxNotRead: "That format isn't read. Open it and save as .xlsx or CSV, then choose that file",
+    xlsxUnreadable: "That file couldn't be read as an Excel workbook. It may be renamed, or saved in another format",
+    phonesNormalized: "Phone numbers are shown as they will be saved (+966…)",
+    phoneTruncated: "One or more phone numbers were shortened by Excel when this file was saved as CSV (9.66503E+11 is 966,503,000,000, so the last digits are gone from the file). Type the number into the table below, or upload the .xlsx instead, where it is still complete",
+    rPhoneTruncated: "the phone was shortened by Excel",
+    rowShort: "Not added yet — {reason}",
+    rPhoneUnreadable: "the phone couldn't be read",
   },
 };
 

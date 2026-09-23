@@ -2,9 +2,12 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useT, useLocale } from "@/lib/i18n";
+import { Dropdown } from "@/components/Dropdown";
 import { Icon } from "@/components/ui";
-import { updateProfile } from "@/lib/api/profile-client";
+import { completeProfile, updateProfile } from "@/lib/api/profile-client";
+import { useSession } from "@/lib/session";
 import type { RenterProfile } from "@/lib/contract/onboarding";
+import { pin } from "@/lib/uiPins";
 
 interface Opt {
   value: string;
@@ -51,6 +54,30 @@ export function EditProfileForm({
   const p = t.profile;
   const { locale } = useLocale();
   const ar = locale === "ar";
+  const { tier, refresh } = useSession();
+  /**
+   * Is this the renter's FIRST save — the guest→basic transition — or an edit?
+   *
+   * 🔴 **The tier is not the answer, and keying on it stranded a real renter** (owner, 2026-09-13,
+   * on `+966566493886` — the same account as the 2026-09-10 fix, blocked again by the other half of
+   * the same trap). The backend has TWO facts here and they can disagree:
+   *  · `getUserTier` answers `basic` off `firstName && lastName && city && jobTitle`, and never
+   *    reads the flag below;
+   *  · `createRequest` refuses with `GUEST_CANNOT_POST_REQUESTS` on `hasCompletedOnboarding`, and
+   *    never reads the tier.
+   * Only `completeProfile` (`PUT /users/me/profile`) sets that flag. `updateProfile`
+   * (`PUT /profile/me`) does not — so a renter whose four fields were filled some other way reads as
+   * basic, is therefore sent to the EDIT endpoint by this form, and can never clear the flag that is
+   * blocking him. Basic enough to be denied the fix, not onboarded enough to post.
+   *
+   * So the form asks the flag the GATE asks. A guest still lands here too: he cannot have completed
+   * onboarding, so both readings agree for him and the 2026-09-10 fix is untouched.
+   *
+   * ⚠️ `=== false`, never falsy. `undefined` means an older backend did not send it, and the
+   * ordinary account is complete — guessing the other way would push a healthy renter through the
+   * first-save endpoint for nothing.
+   */
+  const isFirstSave = tier === "guest" || profile.hasCompletedOnboarding === false;
 
   const [firstName, setFirstName] = useState(profile.firstName ?? "");
   const [lastName, setLastName] = useState(profile.lastName ?? "");
@@ -94,6 +121,11 @@ export function EditProfileForm({
     if (lastName.trim().length < 2 || lastName.trim().length > 50) next_fe.lastName = t.onboarding.errors.lastName;
     if (!city.trim()) next_fe.city = t.onboarding.errors.city;
     if (!jobTitle.trim()) next_fe.jobTitle = t.onboarding.errors.jobTitle;
+    /* 🔴 **Required on a FIRST save, optional on an edit** — the app's own split
+       (`profile_form_page._companyNameIsValid`: `!_isComplete || length >= 2`). A renter who came
+       here to change his phone must not be blocked by a field that was optional the day he signed
+       up; a renter completing his profile is being named by it on every surface. */
+    if (isFirstSave && companyName.trim().length < 2) next_fe.companyName = t.onboarding.errors.companyName;
     if (email.trim() && !EMAIL_RE.test(email.trim())) next_fe.email = t.onboarding.errors.email;
     if (whatsapp.trim() && !WA_RE.test(whatsapp.replace(/\s/g, ""))) next_fe.whatsapp = t.onboarding.errors.whatsapp;
     // Optionals can be ADDED here but not removed: updateProfileSchema has no partial-clear, so the BFF
@@ -109,7 +141,13 @@ export function EditProfileForm({
     setFe({});
     setErr(null);
     setBusy(true);
-    const r = await updateProfile({
+    // ⚠️ A first save goes to `completeProfile`, NOT `updateProfile`. Two reasons, and they are
+    // different faults: `PUT /profile/me` is gated on `requireTier(basic)`, so a GUEST sent there is
+    // 403'd with "complete your profile" — the thing he was doing; and it never writes
+    // `hasCompletedOnboarding`, so a renter already reading as basic stays blocked from posting
+    // however many times he saves. Same fields either way; only the endpoint differs.
+    const save = isFirstSave ? completeProfile : updateProfile;
+    const r = await save({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       city: city.trim(),
@@ -118,6 +156,16 @@ export function EditProfileForm({
       whatsapp: whatsapp.trim() || undefined,
       companyName: companyName.trim() || undefined,
     });
+    if (r.ok && isFirstSave) {
+      // guest→basic. The BFF already re-stamped the mt_user cookie; without this the page keeps the
+      // stale tier, so the badge still reads «Guest» and every basic-only action stays blocked over a
+      // profile that is now complete. Same step OnboardingForm takes after its own submit.
+      //
+      // ⚠️ It also matters for the renter who was ALREADY basic: nothing visible changes for him
+      // here (the badge was never wrong), but the save has just set `hasCompletedOnboarding` and the
+      // request gate reads it on the next submit.
+      await refresh();
+    }
     setBusy(false);
     if (!r.ok) {
       setErr(r.code === "offline" ? p.offline : ar && r.messageAr ? r.messageAr : p.saveError);
@@ -137,7 +185,7 @@ export function EditProfileForm({
 
   // "optional" describes an EMPTY field only — once a value is stored it can't be cleared here (above).
   const optionalTag = (stored: string | null | undefined) =>
-    stored ? null : <span className="text-[11px] font-medium text-muted">— {p.optional}</span>;
+    stored ? null : <span className="text-label font-semibold text-muted">— {p.optional}</span>;
 
   // Optionals show `cantClear` as soon as a stored value is blanked — not only on submit — so the field
   // is never left looking emptied when the save can't empty it. Submit-time errors still take priority.
@@ -148,86 +196,89 @@ export function EditProfileForm({
   const companyNote = noteFor("companyName", profile.companyName, companyName);
 
   const inputCls =
-    "h-[46px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[14px] text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]";
-  const labelCls = "mb-[6px] block text-[12.5px] font-bold text-navy-mid";
+    "h-[46px] w-full rounded-sm border border-border bg-surface px-4 text-body text-navy outline-0 focus:border-brand";
+  const labelCls = "mb-2 block text-meta font-semibold text-navy-mid";
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-[14px]">
-      <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+    <form {...pin("edit-profile-form")} onSubmit={submit} noValidate className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>{p.firstName}</label>
           <input className={inputCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} maxLength={30} />
-          {fe.firstName && <p className="mt-1 text-[12px] text-danger">{fe.firstName}</p>}
+          {fe.firstName && <p className="mt-1 text-meta text-danger">{fe.firstName}</p>}
         </div>
         <div>
           <label className={labelCls}>{p.lastName}</label>
           <input className={inputCls} value={lastName} onChange={(e) => setLastName(e.target.value)} maxLength={50} />
-          {fe.lastName && <p className="mt-1 text-[12px] text-danger">{fe.lastName}</p>}
+          {fe.lastName && <p className="mt-1 text-meta text-danger">{fe.lastName}</p>}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>{p.city}</label>
-          <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
-            <option value="">{p.selectCity}</option>
-            {withCurrent(cities, city).map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
-          {fe.city && <p className="mt-1 text-[12px] text-danger">{fe.city}</p>}
+          <Dropdown
+            label={p.city}
+            placeholder={p.selectCity}
+            value={city || null}
+            onChange={setCity}
+            options={withCurrent(cities, city).map((c) => ({ value: c.value, label: c.label }))}
+          />
+          {fe.city && <p className="mt-1 text-meta text-danger">{fe.city}</p>}
         </div>
         <div>
           <label className={labelCls}>{p.jobTitle}</label>
-          <select className={inputCls} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)}>
-            <option value="">{p.selectJobTitle}</option>
-            {withCurrent(jobs, jobTitle).map((j) => (
-              <option key={j.value} value={j.value}>{j.label}</option>
-            ))}
-          </select>
-          {fe.jobTitle && <p className="mt-1 text-[12px] text-danger">{fe.jobTitle}</p>}
+          <Dropdown
+            label={p.jobTitle}
+            placeholder={p.selectJobTitle}
+            value={jobTitle || null}
+            onChange={setJobTitle}
+            options={withCurrent(jobs, jobTitle).map((j) => ({ value: j.value, label: j.label }))}
+          />
+          {fe.jobTitle && <p className="mt-1 text-meta text-danger">{fe.jobTitle}</p>}
         </div>
       </div>
 
       <div>
         <label className={labelCls}>
-          {p.companyName} {optionalTag(profile.companyName)}
+          {p.companyName}{" "}
+          {isFirstSave ? <span className="text-danger">*</span> : optionalTag(profile.companyName)}
         </label>
         <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} maxLength={200} placeholder={p.companyNamePlaceholder} />
-        {companyNote && <p className="mt-1 text-[12px] text-danger">{companyNote}</p>}
+        {companyNote && <p className="mt-1 text-meta text-danger">{companyNote}</p>}
       </div>
 
-      <div className="grid grid-cols-1 gap-[12px] sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className={labelCls}>
             {p.email} {optionalTag(profile.email)}
           </label>
           <input className={inputCls} type="email" value={email} onChange={(e) => setEmail(e.target.value)} dir="ltr" />
-          {emailNote && <p className="mt-1 text-[12px] text-danger">{emailNote}</p>}
+          {emailNote && <p className="mt-1 text-meta text-danger">{emailNote}</p>}
         </div>
         <div>
           <label className={labelCls}>
             {p.whatsapp} {optionalTag(profile.whatsapp)}
           </label>
           <input className={inputCls} inputMode="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="+9665XXXXXXXX" dir="ltr" />
-          {whatsappNote && <p className="mt-1 text-[12px] text-danger">{whatsappNote}</p>}
+          {whatsappNote && <p className="mt-1 text-meta text-danger">{whatsappNote}</p>}
         </div>
       </div>
 
-      {err && <p className="text-[13px] font-semibold text-danger">{err}</p>}
+      {err && <p className="text-body font-semibold text-danger">{err}</p>}
 
       <div className="flex gap-2 pt-1">
         <button
           type="button"
           onClick={onCancel}
-          className="h-11 flex-1 rounded-[10px] border border-border bg-surface text-[13.5px] font-bold text-navy-mid hover:bg-surface2"
+          className="h-11 flex-1 rounded-md border border-border bg-surface text-body font-semibold text-navy-mid hover:bg-surface2"
         >
           {p.cancel}
         </button>
         <button
           type="submit"
           disabled={busy}
-          className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-brand text-[13.5px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:opacity-50"
+          className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-sm bg-brand text-body font-semibold text-brand-fg transition disabled:bg-disabled-bg disabled:text-disabled-fg"
         >
           {!busy && <Icon name="save" size={16} />}
           {busy ? p.saving : p.save}

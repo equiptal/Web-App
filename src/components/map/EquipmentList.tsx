@@ -71,15 +71,17 @@
  * a surface, not a decision.
  */
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Fragment, useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
 // Two numeral formatters, and the split is deliberate: `arabicIndicDigits` truncates, which is what a
 // COUNT wants, and `distanceDigits` keeps one decimal, which is what a measured distance wants.
-import { arabicIndicDigits, distanceDigits, isInOffer } from "@/lib/contract/bid-map";
+import { arabicIndicDigits, distanceDigits } from "@/lib/contract/bid-map";
 import { listEmptyState, type EquipmentListView } from "@/lib/contract/equipment-list";
 import type { FleetMachine } from "@/lib/contract/fleet";
-import { equipmentCardModel } from "@/components/map/equipment-card-model";
+import { equipmentCardModel, type EquipmentCardReadiness } from "@/components/map/equipment-card-model";
 import type { MatchRequest } from "@/components/map/panel/machine-panel-model";
 import { fmt, useLocale, useT } from "@/lib/i18n";
+import { Photo } from "@/components/Photo";
+import { pin } from "@/lib/uiPins";
 
 export interface EquipmentListProps {
   /**
@@ -115,9 +117,15 @@ export interface EquipmentListProps {
   onOpenDetail: (equipmentId: string) => void;
   /** Fly the map to this machine without opening its panel (app parity, 2026-08-15). */
   onFocusMachine: (equipmentId: string) => void;
-  /** «اطلب التأكيد» — V11 owns the composer and the send; this only says which machine was asked
-   *  about. Absent → the control renders disabled rather than claiming an ask was sent. */
-  onAskAvailability?: (machine: FleetMachine) => void;
+  /**
+   * **The distance was pressed on an unconfirmed machine.** The WORKSPACE decides what happens next —
+   * an explanation the first time, the ask itself after that, and on an already-asked machine the
+   * question he already put — because that layer is a modal over the whole surface and the detail
+   * panel (which replaces this list) has to be able to open the same one (owner, 2026-09-08).
+   *
+   * `asked` says whether his question is already with the supplier.
+   */
+  onYardPress: (machine: FleetMachine, asked: boolean) => void;
   /**
    * Whether this machine's availability ask is already with the lessor and unanswered — the owner's
    * "one ask, one card" rule (2026-08-10), asked of the workspace because only it can see the
@@ -136,6 +144,64 @@ export interface EquipmentListProps {
    *  container's `scrollTop` rather than `scrollIntoView`, which scrolls every ancestor and moves the
    *  whole page. */
   scrollRef?: RefObject<HTMLElement | null>;
+  /** Whether the filter panel is open. The WORKSPACE owns it (owner, 2026-09-22), because the button
+   *  that opens it sits in the count pills' row, which the workspace draws. */
+  filtersOpen: boolean;
+  onCloseFilters: () => void;
+  /** The request item's catalogue picture, for a machine with no photo of its own: the same
+   *  fallback its map circle takes, so a card and its circle never show two pictures (2026-09-23). */
+  itemImageUrl?: string | null;
+}
+
+/**
+ * The filter's one control, drawn by the workspace at the END of the count pills' row (owner,
+ * 2026-09-22: *"put the filter on the same row as units pills"*). Absent when the model offers no
+ * group, as before. The clear link rides beside it while a chip is on, so a narrowed list still has
+ * its way out without opening the panel.
+ */
+export function EquipmentFilterButton({
+  view,
+  open,
+  onToggle,
+  onClear,
+}: {
+  view: EquipmentListView;
+  open: boolean;
+  onToggle: () => void;
+  onClear: () => void;
+}) {
+  const t = useT();
+  const { locale } = useLocale();
+  const num = (n: number) => (locale === "ar" ? arabicIndicDigits(n) : String(n));
+  if (view.groups.length === 0 && view.active.length === 0) return null;
+  return (
+    <div {...pin("equipment-filter")} className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel}>
+      {view.active.length > 0 && (
+        <button type="button" className="bm-eqf-clear" onClick={onClear}>
+          {t.bidMap.eqFilterClear}
+        </button>
+      )}
+      {/* The groups live BEHIND this control (owner, 2026-08-11). One icon states that filtering
+          exists and how much of it is on; the panel states the rest, when asked. */}
+      {view.groups.length > 0 && (
+        <button
+          type="button"
+          className={`bm-eqf-btn${open ? " on" : ""}`}
+          /* `aria-haspopup`, not `aria-expanded`: this opens a panel over the column, not a region
+             below itself. */
+          aria-haspopup="dialog"
+          aria-label={t.bidMap.eqFilterLabel}
+          title={t.bidMap.eqFilterLabel}
+          onClick={onToggle}
+        >
+          <span className="material-icons-outlined">tune</span>
+          {/* The count of ACTIVE filters, not of groups — the number that tells the renter the list
+              in front of them is not the whole offer. */}
+          {view.active.length > 0 && <span className="bm-eqf-btn-n" dir="ltr">{num(view.active.length)}</span>}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function EquipmentList({
@@ -148,10 +214,13 @@ export function EquipmentList({
   cueId,
   onOpenDetail,
   onFocusMachine,
-  onAskAvailability,
+  onYardPress,
   askPending,
   onToggleShowAll,
   scrollRef,
+  filtersOpen,
+  onCloseFilters,
+  itemImageUrl = null,
 }: EquipmentListProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -160,17 +229,14 @@ export function EquipmentList({
   const machines = view.machines;
   const num = (n: number) => (ar ? arabicIndicDigits(n) : String(n));
 
-  /** The filter groups are behind a control now, so the bar is one line until asked. Escape closes
-   *  it — a panel that only its own button can dismiss is a panel the renter has to aim at twice.
-   *  (The `filterRef` that used to sit here was written and never read: a ref nothing measures is a
-   *  handle for a behaviour that does not exist.) */
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  /** Escape closes the filter panel — a panel that only its own button can dismiss is a panel the
+   *  renter has to aim at twice. The open flag itself is the workspace's (2026-09-22). */
   useEffect(() => {
     if (!filtersOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFiltersOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCloseFilters(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [filtersOpen]);
+  }, [filtersOpen, onCloseFilters]);
 
   // Bring the selected card into view when it is off-screen — which is the case when the selection was
   // made on the MAP (AC-15). Already-visible cards are left exactly where they are: scrolling a card
@@ -225,45 +291,12 @@ export function EquipmentList({
   return (
     <>
       {/* ── V17 · the filter bar ─────────────────────────────────────────────────────────────────
-          Absent entirely when the model offers no group — an empty control row is worse than none.
-          The count renders whether or not anything is filtered, because «8 من 8» is the sentence that
-          makes «3 من 8» readable later. */}
-      {(view.groups.length > 0 || view.active.length > 0) && (
-        <div className="bm-eqf" role="group" aria-label={t.bidMap.eqFilterLabel}>
-          <div className="bm-eqf-top">
-            <span className="bm-eqf-count">{countLine()}</span>
-            {view.active.length > 0 && (
-              <button type="button" className="bm-eqf-clear" onClick={onClearFilters}>
-                {t.bidMap.eqFilterClear}
-              </button>
-            )}
-            {/* The groups live BEHIND this control (owner, 2026-08-11). Laid out flat, they were two
-                labelled rows of chips above every list — furniture the renter reads past on the way
-                to the machines, on a panel whose whole width is 392px. One icon states that filtering
-                exists and how much of it is on; the panel states the rest, when asked. */}
-            {view.groups.length > 0 && (
-              <button
-                type="button"
-                className={`bm-eqf-btn${filtersOpen ? " on" : ""}`}
-                /* `aria-haspopup`, not `aria-expanded`: this no longer grows a region below itself,
-                   it opens a panel over the column. A reader told the control is "expanded" would go
-                   looking underneath it for content that is somewhere else entirely. */
-                aria-haspopup="dialog"
-                aria-label={t.bidMap.eqFilterLabel}
-                title={t.bidMap.eqFilterLabel}
-                onClick={() => setFiltersOpen((v) => !v)}
-              >
-                <span className="material-icons-outlined">tune</span>
-                {/* The count of ACTIVE filters, not of groups — the number that tells the renter the
-                    list in front of them is not the whole offer. */}
-                {view.active.length > 0 && (
-                  <span className="bm-eqf-btn-n" dir="ltr">{num(view.active.length)}</span>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+          ~~A row of its own above the list: «1 of 2», the clear link and the tune button.~~ Moved
+          (owner, 2026-09-22: *"remove this 1 of 2 and put the filter on the same row as units
+          pills"*). The button is `EquipmentFilterButton` below, drawn by the workspace in the count
+          pills' row; the panel it opens is still this file's. The count is still stated where it
+          earns its place: in the panel's foot, while chips are being pressed, and in the filtered
+          empty state. */}
 
       {/* ── The filter's OWN panel, over the existing one (owner, 2026-08-11) ─────────────────────
           `.mp-over`'s idiom, and deliberately so: the company documents already open this way, and a
@@ -281,7 +314,7 @@ export function EquipmentList({
           company panel makes no ARIA claim at all; this one names itself because, unlike that panel,
           it has no heading of its own in the reading order above it. */}
       {filtersOpen && view.groups.length > 0 && (
-        <div className="bm-eqfp" role="dialog" aria-label={t.bidMap.eqFilterLabel}>
+        <div {...pin("equipment-filter-panel")} className="bm-eqfp" role="dialog" aria-label={t.bidMap.eqFilterLabel}>
           <div className="bm-eqfp-head">
             <span className="bm-eqfp-t">{t.bidMap.eqFilterLabel}</span>
             {/* An X, not a back chevron. The company panel goes BACK to what it covered; this one is
@@ -291,7 +324,7 @@ export function EquipmentList({
               className="bm-eqfp-x"
               aria-label={t.common.close}
               title={t.common.close}
-              onClick={() => setFiltersOpen(false)}
+              onClick={onCloseFilters}
             >
               <span className="material-icons-outlined">close</span>
             </button>
@@ -337,7 +370,7 @@ export function EquipmentList({
           </div>
 
           {/* The foot carries rule 3 a second time, and that is the point of covering the list: with
-              the cards hidden, «3 من 8» is the only thing telling the renter what a chip just cost
+              the cards hidden, «٣ من ٨» is the only thing telling the renter what a chip just cost
               him — and it still names the WHOLE offer as the denominator. «امسح التصفية» is here as
               well as in the bar because the bar is behind this panel: a renter three chips deep with
               no way out would have to close the panel to find the control that undoes it. */}
@@ -373,15 +406,15 @@ export function EquipmentList({
         <ul className="bm-eqlist" ref={listRef}>
           {machines.map((m, i) => (
             <Fragment key={m.equipmentId}>
-              {/* Where the offer ends. Drawn once, before the first machine that is not in it, so the
-                  renter knows why the cards below appeared rather than finding them mixed in. The
-                  model orders the array offer-first, which is what makes "the first one that isn't"
-                  a real boundary rather than a guess. */}
-              {!isInOffer(m) && (i === 0 || isInOffer(machines[i - 1])) && (
-                <li className="bm-eqsplit" aria-hidden="true">
-                  <span>{t.bidMap.eqBeyondOffer}</span>
-                </li>
-              )}
+              {/* ~~«Also in his fleet — not in this offer», drawn once before the first machine that
+                  is not in the offer.~~ Removed by the owner (2026-08-31). It restated on the LIST a
+                  distinction the renter had already told us he does not act on — the same reasoning
+                  that took the «in this offer» badge off the card on 2026-08-19: what he is choosing
+                  between is machines that can be confirmed for him, and the sentence sorted them by
+                  a fact about paperwork instead.
+
+                  The ORDER is untouched — `listedMachines` still puts the offer first — and the map
+                  still tags membership on the pin, so nothing became unknowable. */}
             <EquipmentCard
               machine={m}
               index={i}
@@ -394,10 +427,12 @@ export function EquipmentList({
               cue={cueId === m.equipmentId}
               ar={ar}
               t={t}
+              num={num}
               onOpenDetail={onOpenDetail}
               onFocusMachine={onFocusMachine}
-              onAskAvailability={onAskAvailability}
+              onYardPress={onYardPress}
               askPending={askPending}
+              itemImageUrl={itemImageUrl}
             />
             </Fragment>
           ))}
@@ -439,101 +474,114 @@ function EquipmentCard({
   cue,
   ar,
   t,
+  num,
   onOpenDetail,
   onFocusMachine,
-  onAskAvailability,
+  onYardPress,
   askPending,
   request,
+  itemImageUrl,
 }: {
+  itemImageUrl: string | null;
   machine: FleetMachine;
   index: number;
   selected: boolean;
   cue: boolean;
   ar: boolean;
   t: ReturnType<typeof useT>;
-  /** No `onSelect`: the card OPENS now, and opening selects on its way in. A select-only handler
-   *  here would be a second way to change the same state that nothing calls. */
+  /** The list's own numeral formatter — threaded rather than re-derived, so the dots' fraction is
+   *  written in the same digits as the count above the list. */
+  num: (n: number) => string;
+  /** No `onSelect`: the card FINDS on the map, and the file icon opens the detail. A select-only
+   *  handler here would be a second way to change the same state that nothing calls. */
   onOpenDetail: (id: string) => void;
   onFocusMachine: (id: string) => void;
-  onAskAvailability?: (machine: FleetMachine) => void;
+  /**
+   * The distance chip was pressed on an unconfirmed machine — `asked` says whether his question is
+   * already with the supplier. The LIST decides what happens next, because what happens next is a
+   * layer over the whole column: an explanation the first time, the ask itself after that, and on an
+   * asked machine the question he already put.
+   */
+  onYardPress: (machine: FleetMachine, asked: boolean) => void;
   askPending?: (machine: FleetMachine) => boolean;
-  /** The request this machine is read against — the source of WHICH certificates the card names
-   *  (owner, 2026-08-11). Absent → no certificate chips, which reads as "nothing was asked for"
-   *  rather than as an inventory of what the machine happens to carry. */
+  /** The request this machine is read against — the source of WHICH certificates the readiness
+   *  fraction scores (owner, 2026-08-11). Absent → the photos and the ownership paper alone, which
+   *  is a real reading rather than a fallback. */
   request?: MatchRequest;
 }) {
   // Everything this card states — and everything it is allowed to know — is one model call. The chip
   // is `availabilityView`'s, which is the SAME call `machineMarkers` makes for this machine's pin
-  // (AC-19), and the model carries no serial, no capacity and no second band for the card to reach
-  // for even by accident (AC-12, AC-32).
+  // (AC-19), and the model carries no serial and no capacity for the card to reach for even by
+  // accident (AC-12).
   const card = useMemo(() => equipmentCardModel(machine, request), [machine, request]);
-  const { chip, certs, photo, askAvailability, verified } = card;
-  /* ~~`const confirmed = chip.availability === "confirmed"`~~ — a boolean cannot carry three states,
-     and every reader of it had to be revisited when the third arrived (owner, 2026-08-13). The chip's
-     own value is read directly now, so a fourth state would be a type error here rather than a silent
-     fall-through into "not confirmed". */
+  const { chip, readiness } = card;
+  // Its own photo, else the request's catalogue picture, as its map circle does (2026-09-23).
+  const photo = card.photo ?? itemImageUrl;
   /** Asked, and not yet answered. The workspace decides it — only it can see the conversation — and
-   *  the card paints the answer, the same division the chip above already follows. */
+   *  the card paints the answer. */
   const pending = askPending?.(machine) ?? false;
-  const colour = chip.colour;
+  const confirmed = chip.availability === "confirmed";
   const title = ar ? card.title.ar : card.title.en;
   const km = card.km;
+  /* The chip's own state as ONE word rather than two booleans read in four places: a fourth state
+     would be a type error here instead of a silent fall-through into "not confirmed". */
+  const yard: "ok" | "asked" | "no" = confirmed ? "ok" : pending ? "asked" : "no";
 
   return (
     <li
+      {...pin("equipment-card")}
       className={`bm-eq${selected ? " on" : ""}${cue ? " cue" : ""}`}
       data-eq={machine.equipmentId}
       // The staggered arrival is the prototype's `0.05 + index·0.07s` — the list reads as being
       // assembled in distance order rather than dumped. Inline because it is per-card data.
       style={{ animationDelay: `${(0.05 + index * 0.07).toFixed(2)}s` }}
     >
-      {/* Selection is achromatic slate, not blue: on a card whose only other colour is its availability
-          chip, a saturated accent read as a third state. Selection is UI, so it stays neutral. */}
+      {/* The selected card's own edge — see `.bm-eq.on` for why the navy border alone did not read
+          as chosen. */}
       {selected && <span className="bm-eq-acc" aria-hidden="true" />}
 
-      {/* The WHOLE CARD opens the machine (owner, 2026-08-11), not just the «Details» control beside
-          it. A card that only highlighted a pin made the one obvious target on it do the least, and
-          left the renter hunting a 10px pill for the thing they had already asked for by clicking.
-          `onOpenDetail` focuses the machine on its way in — `nextSelection(…, "open")`, which never
-          toggles the selection off — so opening still leaves the map where the card points.
-          Not `aria-pressed`: this no longer toggles a state, it navigates. */}
+      {/* The WHOLE CARD finds the machine on the map; the file icon opens its detail (app parity,
+          owner 2026-08-15). A stretched button UNDER the content rather than one wrapping it — a
+          button inside a button is invalid, and the two real controls above it have to stay
+          reachable. Never a toggle: pressing the same card again flies again, which is what
+          comparing two machines actually looks like. */}
       <button
         type="button"
         className="bm-eq-select"
         aria-label={`${t.bidMap.eqFind} — ${title}`}
-        /* `aria-current`, not `aria-pressed`. AC-15 still needs the selected id to reach the card as
-           a state a reader can perceive, but this control no longer TOGGLES anything — it navigates,
-           and `aria-pressed` on a non-toggle announces a button that can be un-pressed. "The current
-           machine in this list" is what the accent means and what this now says. */
+        /* `aria-current`, not `aria-pressed`: this navigates, it does not toggle, and "the current
+           machine in this list" is what the accent means. */
         aria-current={selected || undefined}
-        /* ── The card body FINDS the machine; it no longer opens the panel (app parity, owner
-           2026-08-15) ──────────────────────────────────────────────────────────────────────────
-           *"when user clicks on equipment card on the fleet it now opens its details, but I want
-           instead to take him zoomed in to the equipment on the map with an animation so he sees
-           which one he clicked."*
-
-           The map is the surface, and a list beside a map answers "which of these is where?" —
-           pressing a card to have the map fly to that machine is the question the pairing exists to
-           answer, where opening a panel covered the very thing being asked about.
-
-           Never a toggle: pressing the same card again flies again, which is what a renter comparing
-           two machines actually wants. The panel is still one press away — the «التفاصيل ›» pill and
-           the photo both open it, so nothing became unreachable. */
         onClick={() => onFocusMachine(machine.equipmentId)}
       />
 
       <div className="bm-eq-in">
-        {/* The cell shimmers while a photo decodes. `is-empty` stops it for a machine that has none:
-            nothing is arriving, and a placeholder travelling forever says otherwise. */}
-        {/* The photo OPENS, above the stretched focus layer (owner, 2026-08-18). The app leaves the
-            «التفاصيل ›» pill as the only way in; this keeps a second, which costs nothing here — the
-            picture is the one part of the card that is already about looking at the machine closely,
-            so pressing it to see it closely is not a rule the renter has to learn. */}
+        {/* ── The machine's own picture, back where it was (owner, 2026-08-29) ─────────────────────
+            *"I want the images of the front image of equipment back."* It was cut on 08-28 as
+            furniture and it is not: a column of machines is a fleet, and a renter comparing three
+            excavators recognises them by sight before he reads a word of either title.
+
+            ~~Brought back as a banner across the card's top.~~ Withdrawn the same day, on seeing it:
+            *"make the photo back in same place and design of previous card ui which was on the
+            side."* A full-width banner gave a 104px cell's worth of subject a 366px stage, so a
+            machine with no photo was a third of the card saying «No photo» — the exact "empty card
+            furniture" the surface's own empty state was written to avoid.
+
+            So: the 104px side cell, stretched to the card's height, exactly as it was. The corner
+            controls go back inside the text column with it.
+
+            The cell shimmers while a photo decodes; `is-empty` stops it for a machine that has none,
+            because nothing is arriving and a placeholder travelling forever says otherwise.
+
+            It OPENS the detail, above the stretched find-on-map layer (owner, 2026-08-18): the
+            picture is the part of the card already about looking at the machine closely, so pressing
+            it to see it closely is not a rule the renter has to learn. */}
         <span
+          {...pin("equipment-card-photo")}
           role="button"
           tabIndex={0}
-          aria-label={`${t.bidMap.eqDetails} — ${title}`}
-          className={`bm-eq-photo is-open${photo ? "" : " is-empty"}`}
+          aria-label={`${t.bidMap.eqOpenFile} — ${title}`}
+          className={`bm-eq-photo${photo ? "" : " is-empty"}`}
           onClick={() => onOpenDetail(machine.equipmentId)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -542,210 +590,153 @@ function EquipmentCard({
             }
           }}
         >
-          {photo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photo} alt="" className="bm-eq-art" />
-          ) : (
-            <span className="bm-eq-nophoto">{t.bidMap.eqNoPhoto}</span>
-          )}
-          {/* A 3px hairline of the machine's own state down the photo's inner edge — the card's
-              quietest signal, and the same derivation as the chip and the pin. */}
-          <span className="bm-eq-hair" style={{ background: colour }} aria-hidden="true" />
-
-          {/* ── «في هذا العرض», ON THE PHOTO (owner, 2026-08-19) ──────────────────────────────────
-              Membership is still a badge and still never the chip's colour (app parity, 2026-08-17):
-              the chip answers "has he named the yard", this answers "is it on the offer", and folding
-              them made one of the two lie. What moved is only where it sits.
-
-              It sat beside the chip on row 2, and that row does not fit. At 392px the text column is
-              262px and the chip, this badge and «اطلب التأكيد» together need about 278 — so on an
-              unconfirmed machine that IS in the offer, the one thing the renter scans for was
-              truncated to «لم يؤكد تو…» to make room for the one thing the count pills already say.
-
-              The photo is the right ground for it: it is the only part of the card with unused
-              surface, the badge is a fact about the whole card rather than about the state line, and
-              a corner tag is how a picture has always carried a label. Row 2 gets its width back and
-              the chip reads whole again. */}
-          {card.inOffer && (
-            <span className="bm-eq-inoffer">{t.bidMap.pinInOffer}</span>
-          )}
+          {/* The app's one placeholder, not a sentence (owner, 2026-09-02). «No photo» set in 9.5px was
+              a paragraph standing where a picture goes, and it read as an error rather than as an
+              absence. `Photo` also covers the case the old branch could not see: a machine that NAMES
+              a photograph the bucket does not hold, which drew the browser's broken glyph. */}
+          <Photo src={photo} alt="" className="bm-eq-art" />
         </span>
 
         <div className="bm-eq-tx">
-          {/* 1 · title — model · year, with the verified mark against the end of the NAME rather than
-              the far edge of the row. No serial, no capacity (AC-12).
+          {/* ── The corner: how complete the file is, and the way into it (owner, 2026-08-28) ─────
+              Both are facts about the machine's PAPERS, which is a different subject from the
+              distance below and from the supplier's promise that colours it. They sit together,
+              small, in the corner the reader's eye leaves the card by.
 
-              **«التفاصيل» is back on this row** (owner, 2026-08-19, against the v3 prototype's own
-              card — `app-decoded.js:4009`). ~~It moved to row 3's cluster on 2026-08-11 because a white
-              pill on a white card had no ground under it and read as floating.~~ Withdrawn: the ground
-              was the fix, not the row. The pill keeps the `#F2F6FA` tint it gained there, so it is no
-              longer white-on-white — and it returns to the trailing edge of the title, which is where
-              the prototype puts it and where the reader's eye already is after the machine's name.
-
-              Row 3 keeps the distance alone, which is what it was clipping the distance to avoid. */}
-          <div className="bm-eq-r1">
-            <span className="bm-eq-name">
-              <span className="bm-eq-title" title={title}>{title}</span>
-              {/* The PLATFORM verified this machine — a fact about its papers, not about whether it
-                  is available, which is why it is a mark on the title and not a third colour in the
-                  state row.
-
-                  ~~`certs.length > 0`.~~ Withdrawn (owner, 2026-08-11: *"for equipment verification
-                  ticked make sure it is read the equipment status is it verified really or not"*).
-                  `certs` holds one entry per certificate the REQUEST named, held or not — so that
-                  condition was a fact about the request, the same for every card in the list, and it
-                  ticked machines an admin had rejected while leaving genuinely verified ones bare.
-                  `card.verified` is `verificationStatus === "VERIFIED"` and nothing else; the model's
-                  field comment carries the full ruling and the staging numbers.
-
-                  Row 4's chips are NOT the same source and never were — they answer the request, this
-                  answers the platform's file. */}
-              {verified && (
-                <span className="bm-eq-vd" title={t.bidMap.eqVerifiedMachine} aria-label={t.bidMap.eqVerifiedMachine}>
-                  ✓
-                </span>
-              )}
-            </span>
-
-            <span className="bm-eq-acts">
-              <button type="button" className="bm-eq-details" onClick={() => onOpenDetail(machine.equipmentId)}>
-                {t.bidMap.eqDetails}
-                {/* The prototype hard-codes «‹», which is correct in Arabic and backwards in English —
-                    it is an RTL-forward chevron in an RTL-only file. Kept locale-flipped by decision
-                    (owner, 2026-08-09; `design-v3.md` §9 records it): the chevron points the way the
-                    reader travels, and a control reading "Details ‹" in English points back at the text
-                    it is meant to lead away from. */}
-                <span aria-hidden="true">{ar ? "‹" : "›"}</span>
-              </button>
-            </span>
+              «Details ›» is gone as a word. The icon is the file under a magnifier, which is what the
+              control has always done — look inside this machine's file. */}
+          <div {...pin("equipment-card-head")} className="bm-eq-hd">
+            {/* How complete the file is, on the LEADING edge (owner, 2026-08-31) — the first thing
+                read on the card's first line, and it sits beside the control that opens the papers
+                it counts. */}
+            <ReadinessBar
+              readiness={readiness}
+              label={`${num(readiness.done)}/${num(readiness.total)}`}
+              title={fmt(t.bidMap.eqReadinessOnFile, { done: num(readiness.done), total: num(readiness.total) })}
+            />
+            <button
+              type="button"
+              className="bm-eq-open"
+              aria-label={`${t.bidMap.eqDocuments} — ${title}`}
+              onClick={() => onOpenDetail(machine.equipmentId)}
+            >
+              {/* ~~The owner's own glyph (2026-08-31), a document under a magnifier.~~ WORDS now
+                  (owner, 2026-09-22: *"the icon of the equipment card to be equipment documents not
+                  icon"*). The header one row up reads «Company documents»; this names the other
+                  file, so the two controls say whose papers each one opens. */}
+              {t.bidMap.eqDocuments}
+              {/* 🔴 **The same control, twice on one surface** (owner, 2026-09-22: *"make the
+                  equipment documents the same style as company documents (same corner rounding, and
+                  with >)"*). The header one band up opens the FIRM's papers and this opens the
+                  MACHINE's, and until now they were a rounded pill with a chevron and a square tile
+                  without one — two shapes for one act, a row apart.
+                  ⚠️ It flips with the LOCALE rather than being mirrored by a transform, which
+                  would mirror its weight with it. `.bm-docsentry-chev`'s own note says the same. */}
+              <span className="bm-eq-open-chev" aria-hidden="true">{ar ? "‹" : "›"}</span>
+            </button>
           </div>
 
-          {/* 2 · state — ONE chip (AC-32), the in-offer badge and the out-of-city qualifier. The row
-              holds its height whether or not either qualifier is there. The ask sits here, beside the
-              chip it answers, and «التفاصيل» is back on row 1 (owner, 2026-08-19). */}
-          <div className="bm-eq-r2">
-            <span className={`bm-eq-chip${chip.availability === "confirmed" ? " ok" : " no"}`}>
-              {/* TWO states, and the shape carries the meaning, not the colour alone: the confirmed
-                  chip is a small squared label with a ✓; the other is a capsule with a dot that
-                  breathes, because it is a live question. Anyone reading this list with a red-green
-                  deficiency has the ✓ and the words. */}
-              {chip.availability === "confirmed" ? (
-                <span aria-hidden="true">✓</span>
-              ) : (
-                <span className="bm-eq-dot" aria-hidden="true" />
-              )}
-              {/* The label is its own element so it can ELLIPSISE. `text-overflow` acts on a block's
-                  inline content, and the chip is a flex container — so the rule sat on `.bm-eq-chip`
-                  doing nothing while the row's overflow cut the words mid-glyph («لم يؤكد تو»). At
-                  392px, on a card carrying both the in-offer badge and the ask, this row genuinely
-                  runs out of width; what this fixes is that it now degrades to «لم يؤكد توفرها…»
-                  instead of to a severed word. */}
-              <span className="bm-eq-chip-l">
-                {chip.availability === "confirmed" ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed}
+          {/* ── The distance, and it IS the card (owner, 2026-08-28) ────────────────────────────────
+              The dominant object, painted with the one thing that qualifies it: whether the supplier
+              has promised this machine for this offer.
+
+              A red distance is not a bad distance. It is a distance nobody has promised — the machine
+              stands there today, and the supplier has not said it would come from there, or that it is
+              free at all. That sentence is what a renter could not get from a chip reading «Not
+              confirmed» beside a black number, and it is why pressing this opens an explanation before
+              it opens an ask: the first press teaches, every press after it asks.
+
+              Green with a tick is the settled case, and it is not a control — there is nothing left to
+              ask. Red with a «?» is the question. Red with a clock is the question already put: it
+              still opens, and shows him what he asked rather than offering to ask again.
+
+              AC-13 holds and is now stronger: an unconfirmed machine is askable without opening the
+              detail, and the ask is the largest object on the card rather than a 10px link beside a
+              chip. AC-33 too — the ask's ink is still `askAvailability.colour`, carried on the rule
+              under the prompt below. */}
+          {yard === "ok" ? (
+            <span {...pin("equipment-card-yard")} className="bm-eq-yard ok" title={t.bidMap.eqYardConfirmedWhy}>
+              <span className="material-icons-outlined" aria-hidden="true">check_circle</span>
+              <Distance km={km} ar={ar} t={t} />
+            </span>
+          ) : (
+            <button
+              {...pin("equipment-card-yard")}
+              type="button"
+              className={`bm-eq-yard ${yard}`}
+              title={yard === "asked" ? t.bidMap.askPendingWhy : t.bidMap.eqYardUnconfirmedWhy}
+              /* No inline ink. `askAvailability.colour` is the ASK's colour — `var(--info)`, blue —
+                 and it was right while it painted a separate «Ask him to confirm» prompt. With that
+                 prompt gone it would have painted the FIGURE blue, and the figure is availability's
+                 (owner, 2026-08-31: *"keep the font of distance red"*). RM3-AC-33 is satisfied on
+                 the surfaces that still render an ask CONTROL of their own; this one renders a
+                 distance whose colour is the availability, and one fact may only have one ink. */
+              onClick={() => onYardPress(machine, yard === "asked")}
+            >
+              {/* The mark sits AFTER the distance (owner, 2026-09-04). Leading, it was the first thing
+                  the eye met on a row whose whole point is the number — a question mark introducing a
+                  figure reads as doubt about the row, not as a control. Trailing, the number leads and
+                  the mark is what it is: the way to ask about it. */}
+              <Distance km={km} ar={ar} t={t} />
+              <span className="material-icons-outlined" aria-hidden="true">
+                {yard === "asked" ? "schedule" : "help_outline"}
               </span>
-            </span>
-            {/* The yard is outside the request city's own radius — the fact that turns a delivery into
-                a mobilisation. It qualifies the offer, so it sits with the state and not with the
-                number it is derived from. */}
-            {card.outOfCity && <span className="bm-eq-far">{t.bidMap.eqOutOfCity}</span>}
+            </button>
+          )}
 
-            {/* ── The ask sits BESIDE the state, not with the controls (owner, 2026-08-11) ─────────
-                ~~Both controls clustered on row 3's trailing edge.~~ Withdrawn by the owner on
-                seeing it: *"for the asked make it beside not confirmed"*, and *"the details button
-                make it as before"*.
+          {/* The machine itself — model and year, under the number they belong to. It is the caption on
+              the distance, not the headline: the renter is choosing between machines by where they are
+              and how sure that is, and the name is what he confirms once he has chosen.
 
-                It was not only a preference. Row 3 is `nowrap`, so on a card that had been asked the
-                ask and «التفاصيل» together took enough of the row to clip the distance — the screenshot
-                shows «7.5 km from your |», the label cut mid-word. The distance is the reason this
-                list is sorted the way it is; a control must not eat it.
+              No serial and no capacity (AC-12): the serial identifies the machine to the system, not to
+              a renter, and the size is already stated once in the count pills above the list. */}
+          <div className="bm-eq-model" title={title}>{title}</div>
 
-                And it reads better here on its merits: «تم الطلب» is the ANSWER to «لم يؤكد توفرها
-                بعد» — the chip states the question, the pill states that it has been put. Two facts
-                about the same thing, on one line. «التفاصيل» goes back to being alone at row 3's
-                trailing edge, which is where it sits on a confirmed card, so every card in the column
-                now has its Details in the same place whether or not an ask is out.
-
-                AC-13 is untouched: the ask is still a real button on the card, above the stretched
-                open layer, so an unconfirmed machine is still askable without opening the detail.
-                AC-33 too — it is still `askAvailability.colour`. Only the row moved. */}
-            {askAvailability && (
-              <button
-                type="button"
-                className="bm-eq-ask"
-                style={{ color: askAvailability.colour }}
-                // ── One ask, one card (owner, 2026-08-10) ──────────────────────────────────────
-                // The control STAYS on the card once the ask is out, disabled and relabelled. It is
-                // not removed: a control that vanished would read as «there is nothing to ask»,
-                // when the truth is that the question was asked and is waiting — and it is not left
-                // live either, because a second press would flood the lessor's conversation with a
-                // duplicate card (or, since the backend's own guard landed, meet a 409 the renter
-                // can do nothing with).
-                title={pending ? t.bidMap.askPendingWhy : t.bidMap.eqAskConfirmWhy}
-                onClick={() => onAskAvailability?.(machine)}
-                disabled={!onAskAvailability || pending}
-              >
-                {/* «تم الطلب» / «Asked» — the list-foot ask's own sent label, borrowed rather than
-                    duplicated (owner, 2026-08-11: *"use shorter wordings, even on the equipment
-                    card"*). The earlier draft read «Asked — awaiting reply», a sentence inside a
-                    22px control beside a second control; the same fact fits in one word, and the
-                    REASON the button is inert is already on its `title` in full. */}
-                {pending ? t.bidMap.eqAskAnotherSent : t.bidMap.eqAskConfirm}
-              </button>
-            )}
-          </div>
-
-          {/* 3 · distance from the project, and NOTHING else (owner, 2026-08-19; the v3 prototype's
-              own card, `app-decoded.js:4029`). Numerals are `dir="ltr"` — an Arabic-Indic figure
-              inside an RTL run still reads left to right.
-
-              Both controls have now left this row: the ask went up beside the availability chip it
-              answers (2026-08-11), and «التفاصيل» went back to row 1's trailing edge. The row is
-              `nowrap`, and a control on it clipped the distance mid-word on any card that carried
-              one — which is why nothing shares it now. The distance is the fact this list is sorted
-              on, so it gets the line to itself.
-
-              Every card is still exactly four rows tall (AC-32's second half). */}
-          <div className="bm-eq-r3">
-            <span className="bm-eq-dist">
-              {km != null ? (
-                <>
-                  {/* `distanceDigits`, never `arabicIndicDigits` — that one truncates, which is right
-                      for a count and would silently turn 7.5 km into «7». One decimal always, trailing
-                      `.0` and all, so a column of distances is one shape to scan down. */}
-                  <span className="bm-eq-km" dir="ltr">{distanceDigits(km, ar)}</span>
-                  <span className="bm-eq-kmu">{t.bidMap.eqDistanceUnit}</span>
-                </>
-              ) : (
-                <span className="bm-eq-kmu">{t.bidMap.eqNoDistance}</span>
-              )}
-            </span>
-          </div>
-
-          {/* 4 · the REQUESTED certificates, held or not (owner, 2026-08-11). A certificate the
-              machine holds but nobody asked for is not here — it is on the documents tab, where the
-              renter goes to see everything the machine carries.
-
-              **Empty renders NOTHING** (owner, 2026-08-19). The row used to carry a sentence when no
-              certificate was asked for, and neither wording survived reading: the prototype's «لا
-              شهادات على المعدّة» claims the MACHINE has none, which this row cannot know — it lists
-              what the REQUEST named — and «لم تُطلب شهادات» was a line explaining an absence nobody
-              had asked about. An empty row states the same fact and states it quietly.
-
-              **The row still occupies its line**, empty or not: `min-height` on `.bm-eq-r4` holds it,
-              so a machine with no certificates is a shorter LINE and not a shorter CARD (AC-32). */}
-          <div className="bm-eq-r4">
-            {/* The mark is not decoration. At this size the two fills are close enough that colour
-                would be the only carrier, and a renter who cannot separate them reads a missing
-                certificate as a present one — the exact misreading this line exists to prevent. */}
-            {certs.map((c) => (
-              <span key={c.code} className={`bm-eq-cert ${c.held ? "held" : "missing"}`}>
-                <span aria-hidden="true">{c.held ? "✓" : "!"}</span>
-                {ar ? c.label.ar : c.label.en}
-              </span>
-            ))}
-          </div>
+          {/* The yard is outside the request city's own radius — the fact that turns a delivery into a
+              mobilisation. It qualifies the distance, so it follows it. */}
+          {card.outOfCity && <div className="bm-eq-far">{t.bidMap.eqOutOfCity}</div>}
         </div>
       </div>
     </li>
+  );
+}
+
+/** The distance itself, in both states of knowing it. `distanceDigits`, never `arabicIndicDigits` —
+ *  that one truncates, which is right for a count and would silently turn 7.5 km into «٧». */
+function Distance({ km, ar, t }: { km: number | null; ar: boolean; t: ReturnType<typeof useT> }) {
+  if (km == null) return <span className="bm-eq-kmu">{t.bidMap.eqNoDistance}</span>;
+  return (
+    <span className="bm-eq-dist">
+      <span className="bm-eq-km" dir="ltr">{distanceDigits(km, ar)}</span>
+      <span className="bm-eq-kmu">{t.bidMap.eqDistanceUnit}</span>
+    </span>
+  );
+}
+
+/**
+ * **How complete this machine's file is** — a bar and its fraction (owner, 2026-08-31: the dots were
+ * *"clearer than dots"* territory). The figures are the app's: `computeUnitReadiness`'s
+ * `done`/`total` with ownership scored, which is exactly what the app's own map panel reads
+ * (`bid_map.dart:470-473`).
+ *
+ * ~~One dot per scored requirement.~~ Withdrawn. Dots kept the denominator honest — «75%» hides both
+ * how many requirements there are and how close three is — but they made the reader COUNT, twice,
+ * to learn a fraction. The bar shows how far along at a glance and «3/4» keeps the two numbers, so
+ * nothing the dots protected is lost and the counting is gone.
+ *
+ * The colour is the readiness band's and never the availability colour: the papers are a fact about
+ * the FILE, the distance is a promise from the SUPPLIER, and reading one off the other is the whole
+ * mistake this card is arranged to prevent.
+ */
+function ReadinessBar({ readiness, label, title }: { readiness: EquipmentCardReadiness; label: string; title: string }) {
+  const { done, total, band } = readiness;
+  if (total <= 0) return null;
+  return (
+    <span className={`bm-eq-rd ${band}`} title={title} aria-label={title} role="img">
+      <span className="bm-eq-rdbar">
+        <span className="bm-eq-rdfill" style={{ width: `${Math.round((done / total) * 100)}%` }} />
+      </span>
+      <span className="bm-eq-rdn" dir="ltr">{label}</span>
+    </span>
   );
 }

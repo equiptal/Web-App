@@ -1,8 +1,12 @@
 "use client";
 
+import { uploadCompanyLogo } from "@/lib/company-logo";
 import { useState } from "react";
 import { useT, useLocale } from "@/lib/i18n";
+import { Dropdown } from "@/components/Dropdown";
 import { Icon } from "@/components/ui";
+import { Dialog, DialogButton } from "@/components/Dialog";
+import { btn } from "@/lib/ds";
 
 export type AuthorityRole = "owner" | "manager" | "employee";
 
@@ -54,7 +58,6 @@ export function CompanyIdentityModal({
   const t = useT();
   const p = t.verify.pile;
   const { locale } = useLocale();
-  const L = (e: string, a: string) => (locale === "ar" ? a : e);
 
   const [role, setRole] = useState<AuthorityRole | null>(prefill?.role ?? null);
   const [nationalId, setNationalId] = useState(prefill?.nationalId ?? "");
@@ -74,63 +77,22 @@ export function CompanyIdentityModal({
   ];
 
   /**
-   * Downscale to 220px, re-encode as PNG, upload on pick, keep the KEY. Same size and format as the
-   * app (`downscaleCompanyLogo`) so one firm's logo looks identical wherever it is drawn: an unscaled
-   * photo would be embedded at full resolution in the quotation and the bid form, and PNG keeps
-   * transparency against those documents' light backgrounds.
-   *
-   * A logo is branding, never a blocker — a failure here notifies and leaves the pile sendable.
+   * Upload on pick, keep the KEY. The downscale and the upload are `uploadCompanyLogo`, shared with
+   * the quotation's logo dialog so the two cannot drift. A logo is branding, never a blocker: a
+   * failure here notifies and leaves the pile sendable.
    */
-  const onPickLogo = (file: File) => {
+  const onPickLogo = async (file: File) => {
     setLogoErr(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const max = 220;
-        let { width, height } = img;
-        if (width >= height && width > max) {
-          height = Math.round((height * max) / width);
-          width = max;
-        } else if (height > width && height > max) {
-          width = Math.round((width * max) / height);
-          height = max;
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, width, height);
-        canvas.toBlob(async (blob) => {
-          if (!blob) return;
-          setLogoBusy(true);
-          try {
-            const r = await fetch("/api/profile/doc-upload-url", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ filename: "company-logo.png", contentType: "image/png" }),
-            });
-            if (!r.ok) throw new Error("upload");
-            const { url, key } = (await r.json()) as { url: string; key: string };
-            const put = await fetch(url, {
-              method: "PUT",
-              body: blob,
-              headers: { "Content-Type": "image/png" },
-            });
-            if (!put.ok) throw new Error("upload");
-            setLogoKey(key);
-            setLogoPreview(canvas.toDataURL("image/png"));
-          } catch {
-            setLogoErr(t.verify.errors.submit);
-          } finally {
-            setLogoBusy(false);
-          }
-        }, "image/png");
-      };
-      img.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
+    setLogoBusy(true);
+    try {
+      const { key, preview } = await uploadCompanyLogo(file);
+      setLogoKey(key);
+      setLogoPreview(preview);
+    } catch {
+      setLogoErr(t.verify.errors.submit);
+    } finally {
+      setLogoBusy(false);
+    }
   };
 
   const submit = () => {
@@ -143,36 +105,25 @@ export function CompanyIdentityModal({
     });
   };
 
-  const labelCls = "mb-[6px] block text-[12.5px] font-bold text-navy-mid";
+  const labelCls = "mb-2 block text-meta font-semibold text-navy-mid";
   const inputCls =
-    "h-[46px] w-full rounded-[10px] border border-border bg-surface px-[14px] text-[14px] outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]";
+    "h-[46px] w-full rounded-md border border-border bg-surface px-4 text-body outline-0 focus:border-brand";
 
   return (
-    <div
-      dir={locale === "ar" ? "rtl" : "ltr"}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/45 p-4 sm:items-center"
-      onClick={onCancel}
-      role="dialog"
-      aria-modal="true"
-      aria-label={p.identityTitle}
+    <Dialog
+      open
+      onClose={onCancel}
+      size="md"
+      title={p.identityTitle}
+      footer={
+        <>
+          <DialogButton full onClick={onCancel}>{t.verify.back}</DialogButton>
+          <DialogButton full tone="primary" disabled={!role} onClick={submit}>{p.continue}</DialogButton>
+        </>
+      }
     >
-      <div
-        className="w-full max-w-md overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-xl sm:p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start gap-3">
-          <h2 className="flex-1 text-[18px] font-extrabold tracking-tight text-navy">{p.identityTitle}</h2>
-          <button
-            type="button"
-            onClick={onCancel}
-            aria-label={L("Close", "إغلاق")}
-            className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface2"
-          >
-            <Icon name="close" size={18} />
-          </button>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-[14px]">
+      <div dir={locale === "ar" ? "rtl" : "ltr"}>
+        <div className="flex flex-col gap-4">
           {/* Role — three equal chips, the only required answer. */}
           <div>
             <label className={labelCls}>
@@ -185,7 +136,7 @@ export function CompanyIdentityModal({
                   key={r.value}
                   onClick={() => setRole(r.value)}
                   aria-pressed={role === r.value}
-                  className={`min-h-[52px] rounded-[10px] border-[1.5px] px-2 py-2 text-[12.5px] font-bold leading-tight transition ${
+                  className={`min-h-[52px] rounded-sm border-[1.5px] px-2 py-2 text-meta font-semibold leading-tight transition ${
                     role === r.value
                       ? "border-brand bg-brand-soft text-brand"
                       : "border-border bg-surface text-muted hover:border-brand/60"
@@ -200,7 +151,7 @@ export function CompanyIdentityModal({
           <div>
             <label className={labelCls}>
               {p.nationalIdLabel}{" "}
-              <span className="text-[11px] font-medium text-muted">— {t.verify.optional}</span>
+              <span className="text-label font-semibold text-muted">— {t.verify.optional}</span>
             </label>
             <input
               className={inputCls}
@@ -214,24 +165,23 @@ export function CompanyIdentityModal({
 
           <div>
             <label className={labelCls}>
-              {p.cityLabel} <span className="text-[11px] font-medium text-muted">— {t.verify.optional}</span>
+              {p.cityLabel} <span className="text-label font-semibold text-muted">— {t.verify.optional}</span>
             </label>
-            <select className={inputCls} value={city} onChange={(e) => setCity(e.target.value)}>
-              <option value="">{t.verify.cityPlaceholder}</option>
-              {cities.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {locale === "ar" ? c.ar : c.en}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              label={t.verify.cityPlaceholder}
+              placeholder={t.verify.cityPlaceholder}
+              value={city || null}
+              onChange={setCity}
+              options={cities.map((c) => ({ value: c.value, label: locale === "ar" ? c.ar : c.en }))}
+            />
           </div>
 
           <div>
             <label className={labelCls}>
-              {p.logoLabel} <span className="text-[11px] font-medium text-muted">— {t.verify.optional}</span>
+              {p.logoLabel} <span className="text-label font-semibold text-muted">— {t.verify.optional}</span>
             </label>
-            <div className="flex items-center gap-3 rounded-[10px] border border-border bg-surface px-[14px] py-3">
-              <span className="grid h-12 w-12 flex-none place-items-center overflow-hidden rounded-[10px] border border-border bg-surface2">
+            <div className="flex items-center gap-3 rounded-sm border border-border bg-surface px-4 py-3">
+              <span className="grid h-12 w-12 flex-none place-items-center overflow-hidden rounded-sm border border-border bg-surface2">
                 {logoBusy ? (
                   <Icon name="hourglass_empty" size={20} className="text-muted" />
                 ) : logoPreview ? (
@@ -241,8 +191,8 @@ export function CompanyIdentityModal({
                   <Icon name="image" size={20} className="text-muted" />
                 )}
               </span>
-              <span className="flex-1 text-[12px] text-muted">{p.logoNote}</span>
-              <label className="flex-none cursor-pointer rounded-lg border border-brand bg-surface px-3 py-1.5 text-[12.5px] font-bold text-brand">
+              <span className="flex-1 text-meta text-muted">{p.logoNote}</span>
+              <label className="flex-none cursor-pointer rounded-sm border border-brand bg-surface px-3 py-1.5 text-meta font-semibold text-brand">
                 {logoBusy ? t.verify.uploading : logoKey || logoPreview ? p.logoChange : p.logoUpload}
                 <input
                   type="file"
@@ -251,7 +201,7 @@ export function CompanyIdentityModal({
                   disabled={logoBusy}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) onPickLogo(f);
+                    if (f) void onPickLogo(f);
                     e.target.value = "";
                   }}
                 />
@@ -263,34 +213,17 @@ export function CompanyIdentityModal({
                     setLogoKey(null);
                     setLogoPreview(null);
                   }}
-                  className="flex-none rounded-lg border border-border px-3 py-1.5 text-[12.5px] font-bold text-danger"
+                  className={btn("secondary", "sm", { className: "flex-none" })}
                 >
                   {p.logoRemove}
                 </button>
               )}
             </div>
-            {logoErr && <p className="mt-1 text-[12px] text-danger">{logoErr}</p>}
+            {logoErr && <p className="mt-1 text-meta text-danger">{logoErr}</p>}
           </div>
         </div>
 
-        <div className="mt-5 flex gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="flex-1 rounded-[10px] border border-border bg-surface px-4 py-3 text-[14px] font-bold text-navy-mid"
-          >
-            {t.verify.back}
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!role}
-            className="flex-1 rounded-[10px] border border-brand bg-brand px-4 py-3 text-[14px] font-bold text-brand-fg transition hover:brightness-[1.04] disabled:cursor-not-allowed disabled:border-border disabled:bg-surface2 disabled:text-muted"
-          >
-            {p.continue}
-          </button>
-        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

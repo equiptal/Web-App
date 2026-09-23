@@ -1,0 +1,2058 @@
+<title>Open Request Surface</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap"
+  rel="stylesheet"
+/>
+
+<style>
+  /* ══════════════════════════════════════════════════════════════════
+     Moedatech — request surface, redesign prototype
+     Palette and families follow the app's existing system:
+     navy #1c3550 · action #f79009 · surface #eff4f9 · Inter / IBM Plex Mono
+     ══════════════════════════════════════════════════════════════════ */
+  :root {
+    color-scheme: light;
+
+    --navy: #1c3550;
+    --navy-deep: #12263a;
+    --navy-mid: #2a4f72;
+    --muted: #6b8fa8;
+    --faint: #9bb3c8;
+
+    --action: #f79009;
+    --action-deep: #d4780a;
+    --action-dim: #fff4e5;
+    --action-line: #f7c98b;
+
+    --good: #12a150;
+    --good-dim: #e7f7ee;
+
+    --surface: #eff4f9;
+    --card: #ffffff;
+    --sunk: #f5f9fc;
+    --border: #d9e4ee;
+    --line: #e7eef5;
+
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 18px;
+    --r-xl: 24px;
+    --r-pill: 100px;
+
+    --shadow-sm: 0 1px 2px rgba(18, 38, 58, 0.06);
+    --shadow-md: 0 6px 20px -8px rgba(18, 38, 58, 0.18);
+    --shadow-lg: 0 24px 60px -24px rgba(18, 38, 58, 0.35);
+
+    --ease: cubic-bezier(0.32, 0.72, 0.24, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--surface);
+    color: var(--navy);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  .icon {
+    font-family: "Material Symbols Outlined";
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  .mono {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--action);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* ── prototype chrome (not part of the app) ───────────────────── */
+  .protobar {
+    max-width: 1460px;
+    margin: 0 auto;
+    padding: 18px 20px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .protobar .brand { color: var(--navy-mid); font-weight: 600; }
+  .protobar .brand em { font-style: normal; color: var(--action); }
+  .protobar .spacer { flex: 1; }
+  .protobar .note {
+    letter-spacing: 0.02em;
+    text-transform: none;
+    font-family: "Inter", sans-serif;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .protobar .vp {
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: var(--r-pill);
+    padding: 5px 11px;
+    letter-spacing: 0.04em;
+    color: var(--navy-mid);
+  }
+
+  /* ── app frame ────────────────────────────────────────────────── */
+  .app {
+    max-width: 1460px;
+    margin: 0 auto;
+    padding: 0 20px 140px;
+  }
+
+  .appbar {
+    background: var(--card);
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    padding: 14px 20px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+  }
+  .appbar h1 {
+    margin: 0;
+    font-size: 15.5px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    text-align: center;
+  }
+  .langtog {
+    display: inline-flex;
+    background: var(--sunk);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 2px;
+    width: max-content;
+  }
+  .langtog button {
+    border: 0;
+    background: transparent;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .langtog button.on { background: var(--card); color: var(--navy); box-shadow: var(--shadow-sm); }
+
+  .acct {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: right;
+  }
+  .acct .who { font-size: 12.5px; font-weight: 700; line-height: 1.3; }
+  .acct .who small { display: block; font-weight: 500; font-size: 11.5px; color: var(--muted); }
+  .acct .av {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1.5px solid var(--navy);
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 700;
+  }
+
+  /* ── the words strip ──────────────────────────────────────────── */
+  .words {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: 1px solid var(--line);
+    border-radius: 0 0 var(--r-xl) var(--r-xl);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    box-shadow: var(--shadow-sm);
+  }
+  .words .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+    flex: none;
+  }
+  .words .quote {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px;
+    color: var(--navy-mid);
+    flex: 1 1 340px;
+    min-width: 0;
+  }
+  .words .linkbtn {
+    border: 0; background: none; padding: 4px 2px;
+    font-size: 12.5px; font-weight: 700; color: var(--action-deep);
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+
+  .needsbtn {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--action-line);
+    background: var(--action-dim);
+    color: var(--action-deep);
+    border-radius: var(--r-pill);
+    padding: 8px 14px;
+    font-size: 12.5px; font-weight: 700;
+    transition: transform 0.18s var(--ease), background 0.18s, border-color 0.18s;
+  }
+  .needsbtn:hover { transform: translateY(-1px); }
+  .needsbtn .dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--action);
+    box-shadow: 0 0 0 0 rgba(247, 144, 9, 0.5);
+    animation: pulse 2.4s var(--ease) infinite;
+  }
+  .needsbtn.clear {
+    border-color: rgba(18, 161, 80, 0.28);
+    background: var(--good-dim);
+    color: #0e7c3e;
+  }
+  .needsbtn.clear .dot { background: var(--good); animation: none; }
+
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(247, 144, 9, 0.5); }
+    70% { box-shadow: 0 0 0 7px rgba(247, 144, 9, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(247, 144, 9, 0); }
+  }
+
+  .sendbtn {
+    border: 0;
+    background: var(--action);
+    color: #fff;
+    border-radius: var(--r-md);
+    padding: 11px 20px;
+    font-size: 13.5px; font-weight: 800;
+    display: inline-flex; align-items: center; gap: 8px;
+    box-shadow: 0 8px 18px -10px rgba(247, 144, 9, 0.9);
+    transition: transform 0.18s var(--ease), filter 0.18s;
+  }
+  .sendbtn:hover { transform: translateY(-1px); filter: brightness(1.04); }
+  .sendbtn .icon { font-size: 18px; }
+
+  /* ── needs popover ────────────────────────────────────────────── */
+  .needswrap { position: relative; }
+  .needslist {
+    position: absolute;
+    top: calc(100% + 10px);
+    inset-inline-end: 0;
+    width: 320px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 8px;
+    z-index: 60;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    pointer-events: none;
+    transition: opacity 0.18s var(--ease), transform 0.18s var(--ease);
+  }
+  .needslist.open { opacity: 1; transform: none; pointer-events: auto; }
+  .needslist h4 {
+    margin: 6px 8px 8px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--faint); font-weight: 500;
+  }
+  .needslist button.row {
+    width: 100%;
+    display: flex; align-items: center; gap: 10px;
+    border: 0; background: none; text-align: start;
+    padding: 9px 8px; border-radius: var(--r-sm);
+    font-size: 13px; font-weight: 600;
+    transition: background 0.14s;
+  }
+  .needslist button.row:hover { background: var(--sunk); }
+  .needslist button.row .bullet {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--action); flex: none;
+  }
+  .needslist button.row small {
+    display: block; font-weight: 500; font-size: 11.5px; color: var(--muted);
+  }
+  .needslist button.row.done { color: var(--faint); }
+  .needslist button.row.done .bullet { background: var(--good); }
+  .needslist button.row.done .lbl { text-decoration: line-through; }
+  .needslist .allclear {
+    padding: 16px 10px; text-align: center; font-size: 13px; color: var(--muted);
+  }
+  .needslist .allclear .icon { display: block; font-size: 26px; color: var(--good); margin-bottom: 6px; }
+
+  /* ── section shell ────────────────────────────────────────────── */
+  .sections { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+
+  .sec {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.24s var(--ease), border-color 0.24s var(--ease);
+  }
+  .sec.open { box-shadow: var(--shadow-md); border-color: var(--action-line); }
+  .sec.flash, .flash { animation: flash 1.1s var(--ease); }
+  @keyframes flash {
+    0% { box-shadow: 0 0 0 0 rgba(18, 161, 80, 0.35); }
+    100% { box-shadow: 0 0 0 12px rgba(18, 161, 80, 0); }
+  }
+
+  .sechead {
+    width: 100%;
+    border: 0; background: none;
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px;
+    text-align: start;
+  }
+  .sechead .sdot {
+    width: 9px; height: 9px; border-radius: 50%; flex: none;
+    background: var(--action);
+    transition: background 0.3s var(--ease);
+  }
+  .sec.done .sechead .sdot { background: var(--good); }
+  .sechead .name { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; flex: none; }
+  .sechead .sum {
+    font-size: 13px; color: var(--navy-mid); flex: 1 1 auto;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .sechead .sum b { font-weight: 600; }
+  .sechead .sum .gap { color: var(--action-deep); font-weight: 700; }
+  .sechead .chev {
+    font-size: 20px; color: var(--faint); flex: none;
+    transition: transform 0.28s var(--ease);
+  }
+  .sec.open .sechead .chev { transform: rotate(180deg); }
+  .sec.open .sechead .sum { opacity: 0; }
+
+  .secbody {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.34s var(--ease);
+  }
+  .sec.open .secbody { grid-template-rows: 1fr; }
+  .secbody > .inner { overflow: hidden; }
+  .secbody > .inner > .pad { padding: 0 20px 20px; }
+
+  /* ── controls: chip groups ────────────────────────────────────── */
+  .field { display: grid; grid-template-columns: 110px 1fr; gap: 12px; align-items: start; padding: 9px 0; }
+  .field > .flabel {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--faint); padding-top: 9px;
+  }
+  .field.want > .flabel { color: var(--action-deep); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: var(--r-sm);
+    padding: 8px 14px;
+    font-size: 13px; font-weight: 600;
+    transition: transform 0.14s var(--ease), background 0.16s, border-color 0.16s, color 0.16s;
+  }
+  .chip:hover { border-color: var(--navy-mid); transform: translateY(-1px); }
+  .chip.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .chip.on.accent { background: var(--action); border-color: var(--action); }
+  .chips.want .chip { border-color: var(--action-line); background: #fffdf8; }
+  .chips.want .chip:hover { border-color: var(--action); }
+
+  .chip .fromwords {
+    display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--action); margin-inline-start: 7px; vertical-align: 1.5px;
+  }
+  .chip.on .fromwords { background: rgba(255, 255, 255, 0.85); }
+
+  .seg {
+    display: inline-flex; background: var(--sunk);
+    border: 1px solid var(--border); border-radius: var(--r-sm); padding: 3px; gap: 3px;
+  }
+  .seg button {
+    border: 0; background: transparent; border-radius: 6px;
+    padding: 7px 14px; font-size: 12.5px; font-weight: 700; color: var(--muted);
+    transition: background 0.16s, color 0.16s;
+  }
+  .seg button.on { background: var(--navy); color: #fff; }
+
+  .box {
+    border: 1px solid var(--line);
+    background: var(--sunk);
+    border-radius: var(--r-md);
+    padding: 12px 14px;
+  }
+  .box.want { border-color: var(--action-line); background: #fffdf8; }
+  .box > .btitle {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--faint); margin-bottom: 10px;
+  }
+  .box.want > .btitle { color: var(--action-deep); }
+  .box .sub { font-size: 12px; color: var(--muted); margin: 2px 0 6px; }
+
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .hint.warm { color: var(--action-deep); }
+
+  .stamp {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    background: var(--good-dim); color: #0e7c3e;
+    border-radius: 4px; padding: 3px 6px; margin-inline-start: 8px; vertical-align: 1px;
+  }
+  .stamp.warm { background: var(--action-dim); color: var(--action-deep); }
+  .stamp.cool { background: var(--sunk); color: var(--muted); }
+
+  /* ── machine card ─────────────────────────────────────────────── */
+  .machine {
+    display: grid;
+    grid-template-columns: minmax(240px, 0.8fr) minmax(370px, 1.3fr) 330px;
+    gap: 12px;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 12px;
+    background: linear-gradient(180deg, #fbfdff 0%, #f4f8fc 100%);
+  }
+  .machine + .machine { margin-top: 14px; }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+    display: flex; flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .panel > .phead {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 11px 13px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #fdfeff, #f7fafd);
+  }
+  .panel > .phead .pt {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 800; letter-spacing: -0.01em;
+  }
+  .panel > .phead .pt .sdot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: none; }
+  .panel > .phead .pt .sdot.want { background: var(--action); }
+  .panel > .phead .pk {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase; color: var(--faint);
+  }
+  .panel > .pbody {
+    padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 1;
+  }
+
+  /* the picture panel */
+  .panel.visual {
+    position: relative;
+    min-height: 330px;
+    background: linear-gradient(180deg, #dbe8f2 0%, #cfe0ee 52%, #bcd0e0 52.1%, #a9c2d5 100%);
+    border-color: #c2d5e4;
+  }
+  .panel.visual > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .ovl {
+    position: absolute;
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 0; border-radius: var(--r-sm);
+    background: rgba(18, 38, 58, 0.88);
+    color: #fff;
+    backdrop-filter: blur(6px);
+    padding: 7px 11px;
+    font-size: 12px; font-weight: 700;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.16s var(--ease), background 0.16s;
+  }
+  .ovl:hover { transform: translateY(-1px); background: var(--navy-deep); }
+  .ovl .icon { font-size: 15px; opacity: 0.7; }
+  .ovl .k {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
+    opacity: 0.6; margin-inline-end: 2px;
+  }
+  .ovl.want { background: var(--action); box-shadow: 0 6px 16px -8px rgba(247, 144, 9, 0.9); }
+  .ovl.want:hover { background: var(--action-deep); }
+  .ovl.tl { top: 12px; inset-inline-start: 12px; }
+  .ovl.br { bottom: 12px; inset-inline-end: 12px; }
+  .ovl.bl { bottom: 12px; inset-inline-start: 12px; }
+
+  .qty {
+    position: absolute; top: 12px; inset-inline-end: 12px;
+    display: inline-flex; align-items: center; gap: 2px;
+    background: rgba(18, 38, 58, 0.88); backdrop-filter: blur(6px);
+    border-radius: var(--r-sm); padding: 4px;
+  }
+  .qty button {
+    border: 0; background: transparent; color: #fff;
+    width: 26px; height: 26px; border-radius: 6px;
+    display: grid; place-items: center; font-size: 15px; font-weight: 700;
+    transition: background 0.14s;
+  }
+  .qty button:hover { background: rgba(255, 255, 255, 0.18); }
+  .qty .n { color: #fff; font-size: 13px; font-weight: 800; min-width: 26px; text-align: center; }
+
+  /* rows of fields inside a panel */
+  .prow { display: grid; gap: 10px; }
+  .prow.two { grid-template-columns: 1fr 1fr; }
+  .prow.three { grid-template-columns: 0.85fr 1.3fr 0.85fr; }
+  .prow.grow { flex: 1; align-items: stretch; }
+
+  .cell {
+    border: 1px solid var(--line);
+    background: var(--sunk);
+    border-radius: var(--r-md);
+    padding: 9px 10px 10px;
+    display: flex; flex-direction: column; gap: 7px;
+    min-width: 0;
+  }
+  .cell.want { border-color: var(--action-line); background: #fffdf7; }
+  .cell.plain { background: var(--card); }
+  .cell > .ck {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint);
+  }
+  .cell.want > .ck { color: var(--action-deep); }
+  .cell > .cv { display: flex; flex-direction: column; gap: 7px; flex: 1; }
+  .cell .note { font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+  .cell .note.warm { color: var(--action-deep); }
+
+  /* a control that opens the shared menu */
+  .selbtn {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    width: 100%;
+    border: 1px solid var(--border); background: var(--card);
+    border-radius: var(--r-sm); padding: 9px 10px;
+    font-size: 13px; font-weight: 700; text-align: start;
+    transition: border-color 0.16s, background 0.16s, transform 0.14s var(--ease);
+  }
+  .selbtn:hover { border-color: var(--navy-mid); transform: translateY(-1px); }
+  .selbtn .icon { font-size: 18px; color: var(--faint); flex: none; }
+  .selbtn .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .selbtn.empty { border-color: var(--action-line); background: #fffdf7; color: var(--action-deep); }
+  .selbtn.empty .icon { color: var(--action); }
+
+  .seg.full { display: flex; width: 100%; }
+  .seg.full button { flex: 1; padding: 7px 8px; }
+  .seg.tiny button { padding: 5px 10px; font-size: 11.5px; }
+
+  .costline {
+    display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+    font-size: 11.5px; font-weight: 600; color: var(--muted);
+    padding: 1px 2px 0;
+  }
+
+  .notes {
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    background: var(--card); color: var(--navy);
+    padding: 8px 10px; font: inherit; font-size: 12.5px;
+    width: 100%; flex: 1; min-height: 52px; resize: none; outline: 0;
+  }
+  .notes:focus { border-color: var(--navy-mid); }
+  .notes::placeholder { color: var(--faint); }
+
+  /* ── operator panel ───────────────────────────────────────────── */
+  .panel.op > .phead { background: linear-gradient(180deg, #fbfdff, #f2f7fc); }
+  .panel.op > .pbody { justify-content: space-between; }
+  .switch {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 11.5px; font-weight: 700; color: var(--muted);
+    border: 0; background: none; padding: 0;
+  }
+  .switch .track {
+    width: 38px; height: 21px; border-radius: var(--r-pill);
+    background: var(--good); position: relative;
+    transition: background 0.22s var(--ease);
+  }
+  .switch .knob {
+    position: absolute; top: 3px; inset-inline-start: 3px;
+    width: 15px; height: 15px; border-radius: 50%; background: #fff;
+    transition: transform 0.22s var(--ease);
+    box-shadow: var(--shadow-sm);
+  }
+  .switch.on .knob { transform: translateX(17px); }
+  .switch.off .track { background: #c6d5e2; }
+
+  .opempty {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; text-align: center;
+    border: 1.5px dashed var(--border);
+    border-radius: var(--r-md);
+    background: var(--sunk);
+    padding: 22px 18px;
+    transition: border-color 0.18s, background 0.18s, transform 0.18s var(--ease);
+    width: 100%;
+  }
+  .opempty:hover, .opempty:focus-visible {
+    border-color: var(--action); background: #fffdf7; transform: translateY(-1px);
+  }
+  .opempty .ring {
+    width: 54px; height: 54px; border-radius: 50%;
+    background: var(--card); border: 1px solid var(--border);
+    display: grid; place-items: center; color: var(--navy-mid);
+  }
+  .opempty:hover .ring { border-color: var(--action-line); color: var(--action-deep); }
+  .opempty .ring .icon { font-size: 27px; }
+  .opempty .h { font-size: 14px; font-weight: 800; }
+  .opempty .p { display: block; margin: 0; font-size: 12.5px; color: var(--muted); max-width: 27ch; line-height: 1.5; }
+  .opempty .cta {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--navy); color: #fff;
+    border-radius: var(--r-sm); padding: 9px 15px;
+    font-size: 12.5px; font-weight: 800;
+    transition: background 0.18s;
+  }
+  .opempty:hover .cta { background: var(--action); }
+
+  .nightrow {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    border-top: 1px dashed var(--border); padding-top: 9px;
+  }
+  .nightrow .lbl { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; }
+  .nightrow .lbl .icon { font-size: 17px; color: var(--muted); }
+  .nightrow .lbl small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); }
+  .addmachine {
+    margin-top: 14px;
+    width: 100%;
+    border: 1px dashed var(--border);
+    background: var(--sunk);
+    border-radius: var(--r-md);
+    padding: 13px;
+    font-size: 13px; font-weight: 700; color: var(--navy-mid);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: border-color 0.16s, background 0.16s, color 0.16s;
+  }
+  .addmachine:hover { border-color: var(--action); color: var(--action-deep); background: #fffdf8; }
+
+  /* ── map ──────────────────────────────────────────────────────── */
+  .placegrid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+  .searchrow { display: flex; gap: 8px; margin-bottom: 10px; }
+  .searchrow .inp {
+    flex: 1; display: flex; align-items: center; gap: 8px;
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: 0 12px; background: var(--card);
+  }
+  .searchrow .inp .icon { font-size: 18px; color: var(--faint); }
+  .searchrow input {
+    flex: 1; border: 0; outline: 0; padding: 11px 0;
+    font: inherit; font-size: 13px; background: transparent; color: var(--navy);
+  }
+  .searchrow input::placeholder { color: var(--faint); }
+  .searchrow .gps {
+    border: 1px solid var(--border); background: var(--card);
+    border-radius: var(--r-sm); width: 42px; display: grid; place-items: center;
+  }
+  .searchrow .gps:hover { border-color: var(--navy-mid); }
+
+  .map {
+    position: relative;
+    height: 340px;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    background: #eae7dc;
+    cursor: grab;
+    touch-action: none;
+  }
+  .map:active { cursor: grabbing; }
+  .map .plate { position: absolute; background: #f2efe6; }
+  .map .park { position: absolute; background: #dcecd4; }
+  .map .road { position: absolute; background: #f7e6b8; }
+  .map .roadthin { position: absolute; background: #fbf6e6; }
+
+  .pin {
+    position: absolute;
+    width: 26px; height: 26px;
+    transform: translate(-50%, -100%);
+    transition: filter 0.2s;
+    pointer-events: none;
+  }
+  .pin svg { width: 100%; height: 100%; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.25)); }
+  .map.confirmed .pin svg path.body { fill: var(--good); }
+
+  .maptip {
+    position: absolute; bottom: 12px; inset-inline-start: 12px;
+    background: rgba(18, 38, 58, 0.86); color: #fff;
+    border-radius: var(--r-sm); padding: 7px 11px;
+    font-size: 12px; font-weight: 600;
+    backdrop-filter: blur(6px);
+    pointer-events: none;
+  }
+  .mapzoom {
+    position: absolute; bottom: 12px; inset-inline-end: 12px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .mapzoom button {
+    width: 30px; height: 30px; border-radius: var(--r-sm);
+    border: 1px solid var(--border); background: rgba(255,255,255,0.94);
+    display: grid; place-items: center; font-size: 17px; font-weight: 700; color: var(--navy-mid);
+  }
+
+  .placeside { display: flex; flex-direction: column; }
+  .addr { display: flex; gap: 9px; }
+  .addr .icon { color: var(--action); font-size: 19px; }
+  .addr .txt { font-size: 13px; font-weight: 700; line-height: 1.5; }
+  .addr .coords {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px; color: var(--muted); margin-top: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .placeside .spacer { flex: 1; min-height: 14px; }
+
+  .confirmbtn {
+    width: 100%;
+    border: 0; background: var(--navy);
+    color: #fff; border-radius: var(--r-md);
+    padding: 13px; font-size: 13.5px; font-weight: 800;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    transition: transform 0.16s var(--ease), background 0.2s;
+  }
+  .confirmbtn:hover { transform: translateY(-1px); }
+  .confirmbtn.done { background: var(--good); }
+
+  /* ── schedule ─────────────────────────────────────────────────── */
+  .schedgrid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; }
+  .dates { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .datebox {
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: 8px 14px; min-width: 128px; background: var(--card);
+  }
+  .datebox .k {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint);
+  }
+  .datebox .v { font-size: 14px; font-weight: 800; margin-top: 2px; }
+  .datebox.calc { background: var(--sunk); }
+
+  .dayrow { display: flex; gap: 5px; flex-wrap: wrap; }
+  .dayrow .day {
+    width: 42px; text-align: center;
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: 8px 0; font-size: 12px; font-weight: 700; color: var(--faint);
+    background: var(--sunk); cursor: not-allowed;
+  }
+  .dayrow .day.on { background: var(--navy); border-color: var(--navy); color: #fff; cursor: default; }
+
+  .bigno {
+    font-size: 28px; font-weight: 900; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .ack {
+    display: flex; align-items: flex-start; gap: 9px;
+    margin-top: 11px; font-size: 12.5px; font-weight: 600; text-align: start;
+    border: 0; background: none; padding: 0; width: 100%;
+  }
+  .ack .cbx {
+    width: 18px; height: 18px; border-radius: 5px; flex: none;
+    border: 1.5px solid var(--border); background: var(--card);
+    display: grid; place-items: center; color: transparent; font-size: 14px;
+    transition: background 0.16s, border-color 0.16s, color 0.16s;
+  }
+  .ack.on .cbx { background: var(--good); border-color: var(--good); color: #fff; }
+
+  /* ── dropdown menu ────────────────────────────────────────────── */
+  .menu {
+    position: fixed;
+    z-index: 80;
+    min-width: 190px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-lg);
+    padding: 6px;
+    opacity: 0; transform: translateY(-6px) scale(0.98); pointer-events: none;
+    transition: opacity 0.16s var(--ease), transform 0.16s var(--ease);
+  }
+  .menu.open { opacity: 1; transform: none; pointer-events: auto; }
+  .menu .mtitle {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--faint); padding: 6px 9px 8px;
+  }
+  .menu button {
+    width: 100%; border: 0; background: none; text-align: start;
+    padding: 9px 10px; border-radius: var(--r-sm);
+    font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .menu button:hover { background: var(--sunk); }
+  .menu button .icon { font-size: 17px; color: var(--good); opacity: 0; }
+  .menu button.on .icon { opacity: 1; }
+  .menu button small { display: block; font-weight: 500; font-size: 11.5px; color: var(--muted); }
+
+  /* ── review drawer ────────────────────────────────────────────── */
+  .scrim {
+    position: fixed; inset: 0; z-index: 90;
+    background: rgba(18, 38, 58, 0.42);
+    backdrop-filter: blur(2px);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.26s var(--ease);
+  }
+  .scrim.open { opacity: 1; pointer-events: auto; }
+
+  .drawer {
+    position: fixed; z-index: 95;
+    top: 0; bottom: 0; inset-inline-end: 0;
+    width: min(480px, 100%);
+    background: var(--card);
+    border-inline-start: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    display: flex; flex-direction: column;
+    transform: translateX(102%);
+    transition: transform 0.34s var(--ease);
+  }
+  .drawer.open { transform: none; }
+  .drawer header {
+    padding: 20px 22px 14px;
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .drawer header h2 { margin: 0; font-size: 17px; font-weight: 900; letter-spacing: -0.02em; }
+  .drawer header .x {
+    border: 0; background: var(--sunk); border-radius: 50%;
+    width: 32px; height: 32px; display: grid; place-items: center; color: var(--muted);
+  }
+  .drawer .scroll { overflow: auto; padding: 16px 22px 22px; flex: 1; }
+  .drawer footer {
+    padding: 14px 22px 18px;
+    border-top: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .drawer footer .sendbtn { width: 100%; justify-content: center; padding: 14px; font-size: 14.5px; }
+  .drawer footer .sendbtn[disabled] {
+    background: var(--sunk); color: var(--faint); box-shadow: none; cursor: not-allowed;
+  }
+  .drawer footer .foot { font-size: 12px; color: var(--muted); text-align: center; }
+
+  .rev { border-top: 1px solid var(--line); padding: 13px 0; }
+  .rev:first-child { border-top: 0; padding-top: 0; }
+  .rev .rk {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--faint); margin-bottom: 7px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .rev .rk button {
+    border: 0; background: none; font-family: "Inter", sans-serif;
+    font-size: 12px; font-weight: 700; letter-spacing: 0; text-transform: none;
+    color: var(--action-deep); text-decoration: underline; text-underline-offset: 3px;
+  }
+  .rev .rv { font-size: 13.5px; line-height: 1.6; }
+  .rev .rv .miss { color: var(--action-deep); font-weight: 700; }
+  .rev ul { margin: 0; padding-inline-start: 18px; }
+  .rev li + li { margin-top: 5px; }
+
+  /* ── confirmation ─────────────────────────────────────────────── */
+  .done-screen {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-md);
+    padding: 34px;
+    margin-top: 12px;
+    text-align: center;
+    display: none;
+  }
+  .done-screen.show { display: block; animation: rise 0.42s var(--ease); }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .done-screen .tick {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--good-dim); color: var(--good);
+    display: grid; place-items: center; margin: 0 auto 14px;
+  }
+  .done-screen .tick .icon { font-size: 30px; }
+  .done-screen h2 { margin: 0 0 6px; font-size: 22px; font-weight: 900; letter-spacing: -0.02em; }
+  .done-screen p { margin: 0 auto; max-width: 52ch; color: var(--muted); font-size: 13.5px; }
+  .code {
+    display: inline-block; margin: 16px 0 6px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 15px; font-weight: 600; letter-spacing: 0.06em;
+    background: var(--sunk); border: 1px solid var(--border);
+    border-radius: var(--r-sm); padding: 9px 15px;
+  }
+  .sharerow {
+    display: flex; gap: 8px; max-width: 520px; margin: 18px auto 0;
+  }
+  .sharerow .link {
+    flex: 1; border: 1px solid var(--border); border-radius: var(--r-sm);
+    padding: 11px 13px; background: var(--sunk);
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--navy-mid);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start;
+  }
+  .nextsteps {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    max-width: 640px; margin: 22px auto 0; text-align: start;
+  }
+  .nextsteps .st {
+    border: 1px solid var(--line); background: var(--sunk);
+    border-radius: var(--r-md); padding: 12px;
+  }
+  .nextsteps .st .n {
+    font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    letter-spacing: 0.12em; color: var(--faint);
+  }
+  .nextsteps .st .h { font-size: 13px; font-weight: 800; margin: 5px 0 3px; }
+  .nextsteps .st p { font-size: 12px; color: var(--muted); margin: 0; }
+
+  /* ── bottom bar ───────────────────────────────────────────────── */
+  .tabbar {
+    position: fixed; z-index: 40;
+    bottom: 18px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 4px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    padding: 8px 10px;
+    box-shadow: var(--shadow-lg);
+  }
+  .tabbar button {
+    border: 0; background: none; border-radius: var(--r-pill);
+    padding: 9px 16px; display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; font-weight: 700; color: var(--muted);
+    transition: background 0.16s, color 0.16s;
+  }
+  .tabbar button .icon { font-size: 19px; }
+  .tabbar button.on { background: var(--action-dim); color: var(--action-deep); }
+  .tabbar button:hover { color: var(--navy); }
+  .tabbar .fab {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--navy); color: #fff;
+    display: grid; place-items: center; margin: 0 4px;
+    box-shadow: 0 10px 22px -10px rgba(18, 38, 58, 0.9);
+  }
+  .tabbar .fab .icon { font-size: 24px; }
+  .tabbar .badge {
+    background: var(--action); color: #fff; border-radius: var(--r-pill);
+    font-size: 10.5px; font-weight: 800; padding: 1px 6px; margin-inline-start: -3px;
+  }
+
+  /* ── toast ────────────────────────────────────────────────────── */
+  .toast {
+    position: fixed; z-index: 100;
+    bottom: 92px; left: 50%;
+    transform: translate(-50%, 14px);
+    background: var(--navy-deep); color: #fff;
+    border-radius: var(--r-pill); padding: 10px 18px;
+    font-size: 12.5px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 8px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.22s var(--ease), transform 0.22s var(--ease);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .toast .icon { font-size: 17px; color: #7fe0a6; }
+
+  @media (max-width: 1320px) {
+    .machine { grid-template-columns: minmax(220px, 0.8fr) minmax(340px, 1.25fr) 300px; }
+    .prow.three { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 1120px) {
+    .machine { grid-template-columns: minmax(240px, 1fr) minmax(320px, 1.25fr); }
+    .panel.op { grid-column: 1 / -1; }
+    .panel.op > .pbody { justify-content: flex-start; }
+    .opempty { padding: 26px 18px; }
+  }
+  @media (max-width: 900px) {
+    .machine { grid-template-columns: 1fr; }
+    .prow.two, .prow.three { grid-template-columns: 1fr; }
+    .placegrid, .schedgrid { grid-template-columns: 1fr; }
+    .field { grid-template-columns: 1fr; }
+    .field > .flabel { padding-top: 0; }
+    .nextsteps { grid-template-columns: 1fr; }
+    .words { position: static; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+
+<div class="protobar">
+  <span class="brand">MOEDATECH · CREATE · <em>OPEN SURFACE</em></span>
+  <span class="vp">1440 × 900 — 13" laptop</span>
+  <span class="spacer"></span>
+  <span class="note">No steps, no order — open whatever you like. Amber dots are the only things we actually need.</span>
+</div>
+
+<div class="app">
+  <div class="appbar">
+    <div class="langtog">
+      <button class="on" type="button">EN</button>
+      <button type="button">ع</button>
+    </div>
+    <h1>My Requests</h1>
+    <div class="acct">
+      <div class="who">خالد<small>Al Rajhi Contracting</small></div>
+      <div class="av">خا</div>
+    </div>
+  </div>
+
+  <div class="words">
+    <span class="tag">You wrote</span>
+    <span class="quote" id="quote">“1 × 30 ton digger with operator, King Khalid Airport, 6 months from 12 August”</span>
+    <button class="linkbtn" type="button" id="editWords">Edit</button>
+    <div class="needswrap">
+      <button class="needsbtn" type="button" id="needsBtn" aria-expanded="false">
+        <span class="dot"></span><span id="needsLabel">5 things need you</span>
+      </button>
+      <div class="needslist" id="needsList" role="dialog" aria-label="Things that need you"></div>
+    </div>
+    <button class="sendbtn" type="button" id="openReview">Review &amp; send <span class="icon">arrow_forward</span></button>
+  </div>
+
+  <div class="sections" id="sections">
+    <!-- ══ THE MACHINE ══════════════════════════════════════════ -->
+    <section class="sec open" data-sec="machine" id="sec-machine">
+      <button class="sechead" type="button" data-toggle="machine">
+        <span class="sdot"></span>
+        <span class="name">The machine</span>
+        <span class="sum" data-sum="machine"></span>
+        <span class="icon chev">expand_more</span>
+      </button>
+      <div class="secbody"><div class="inner"><div class="pad">
+        <div id="machineList"></div>
+        <button class="addmachine" type="button" id="addMachine">
+          <span class="icon">add</span> Add another machine to this request
+        </button>
+      </div></div></div>
+    </section>
+
+    <!-- ══ WHERE IT GOES ════════════════════════════════════════ -->
+    <section class="sec" data-sec="place" id="sec-place">
+      <button class="sechead" type="button" data-toggle="place">
+        <span class="sdot"></span>
+        <span class="name">Where it goes</span>
+        <span class="sum" data-sum="place"></span>
+        <span class="icon chev">expand_more</span>
+      </button>
+      <div class="secbody"><div class="inner"><div class="pad">
+        <div class="placegrid">
+          <div>
+            <div class="searchrow">
+              <label class="inp">
+                <span class="icon">search</span>
+                <input type="text" placeholder="Search a place, or paste a Maps link / coordinates" />
+              </label>
+              <button class="gps" type="button" title="Use my location"><span class="icon">my_location</span></button>
+            </div>
+            <div class="map" id="map">
+              <div class="plate" style="left:2%;top:4%;width:20%;height:22%"></div>
+              <div class="plate" style="left:26%;top:2%;width:28%;height:26%"></div>
+              <div class="plate" style="left:58%;top:6%;width:24%;height:18%"></div>
+              <div class="park" style="left:56%;top:36%;width:26%;height:20%"></div>
+              <div class="plate" style="left:4%;top:38%;width:16%;height:18%"></div>
+              <div class="plate" style="left:24%;top:34%;width:24%;height:24%"></div>
+              <div class="road" style="left:0;top:62%;width:100%;height:5%"></div>
+              <div class="roadthin" style="left:52%;top:0;width:3%;height:100%"></div>
+              <div class="plate" style="left:6%;top:74%;width:34%;height:18%"></div>
+              <div class="plate" style="left:60%;top:72%;width:30%;height:20%"></div>
+              <div class="pin" id="pin" style="left:50%;top:44%">
+                <svg viewBox="0 0 24 32" aria-hidden="true">
+                  <path class="body" fill="#e33d2f" d="M12 0C5.9 0 1 4.9 1 11c0 8 11 21 11 21s11-13 11-21C23 4.9 18.1 0 12 0z" />
+                  <circle cx="12" cy="11" r="4" fill="#fff" opacity=".85" />
+                </svg>
+              </div>
+              <div class="maptip" id="mapTip">Drag the map, or drop a pin where the machine goes</div>
+              <div class="mapzoom">
+                <button type="button" aria-label="Zoom in">+</button>
+                <button type="button" aria-label="Zoom out">−</button>
+              </div>
+            </div>
+          </div>
+          <div class="placeside">
+            <div class="addr">
+              <span class="icon">location_on</span>
+              <div>
+                <div class="txt" id="addrText">King Khalid International Airport<br />Riyadh 12443, Saudi Arabia</div>
+                <div class="coords" id="coords">24.733451, 46.708540</div>
+              </div>
+            </div>
+            <div class="hint" id="placeHint">
+              Your words named the airport. The pin is our best guess — nudge it onto the gate the machine drives to,
+              then confirm. Suppliers price the trip from this exact point.
+            </div>
+            <div class="spacer"></div>
+            <button class="confirmbtn" type="button" id="confirmPlace">This is the right spot</button>
+          </div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- ══ WHEN IT RUNS ═════════════════════════════════════════ -->
+    <section class="sec" data-sec="time" id="sec-time">
+      <button class="sechead" type="button" data-toggle="time">
+        <span class="sdot"></span>
+        <span class="name">When it runs</span>
+        <span class="sum" data-sum="time"></span>
+        <span class="icon chev">expand_more</span>
+      </button>
+      <div class="secbody"><div class="inner"><div class="pad">
+        <div class="schedgrid">
+          <div>
+            <div class="box">
+              <div class="btitle">How you're billed <span class="stamp warm">from “6 months”</span></div>
+              <div class="chips" data-field="basis">
+                <button class="chip" type="button" data-value="Daily">Daily</button>
+                <button class="chip" type="button" data-value="Weekly">Weekly</button>
+                <button class="chip on" type="button" data-value="Monthly">Monthly</button>
+              </div>
+              <div class="chips" style="margin-top:8px">
+                <button class="chip on accent" type="button" data-toggleflag="extendable">✓ Extendable</button>
+              </div>
+              <div class="hint">Suppliers quote you a monthly rate. It can still run past the end date.</div>
+            </div>
+
+            <div class="box" style="margin-top:10px">
+              <div class="btitle">How long <span class="stamp warm">start from your words</span> <span class="stamp cool">end calculated</span></div>
+              <div class="dates">
+                <div class="datebox"><div class="k">Starts</div><div class="v">12 Aug 2026</div></div>
+                <span class="icon" style="color:var(--faint)">arrow_forward</span>
+                <div class="datebox calc"><div class="k">Ends</div><div class="v" id="endDate">8 Feb 2027</div></div>
+                <div class="chips" data-field="length">
+                  <button class="chip" type="button" data-value="6 days">6 days</button>
+                  <button class="chip" type="button" data-value="3 weeks">3 weeks</button>
+                  <button class="chip on" type="button" data-value="6 months">6 months</button>
+                </div>
+              </div>
+              <div class="hint">180 days · 6 months · 26 Fridays in it</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="box">
+              <div class="btitle">Hours a day <span class="stamp cool">KSA standard</span></div>
+              <div class="chips" data-field="hours">
+                <button class="chip" type="button" data-value="8">8</button>
+                <button class="chip on" type="button" data-value="10">10</button>
+                <button class="chip" type="button" data-value="12">12</button>
+              </div>
+            </div>
+
+            <div class="box" style="margin-top:10px">
+              <div class="btitle">Days off <span class="stamp cool">locked for now</span></div>
+              <div class="dayrow">
+                <span class="day">Sun</span><span class="day">Mon</span><span class="day">Tue</span>
+                <span class="day">Wed</span><span class="day">Thu</span><span class="day on">Fri</span><span class="day">Sat</span>
+              </div>
+              <div class="hint">One day off, Friday. Several days off comes later.</div>
+            </div>
+
+            <div class="box want" id="billableBox" style="margin-top:10px">
+              <div class="btitle">Billable days <span class="stamp cool">worked out from the above</span></div>
+              <div style="display:flex;align-items:baseline;gap:10px">
+                <span class="bigno" id="billableNo">154</span>
+                <span style="font-size:12.5px;color:var(--navy-mid)">
+                  billable days — 180 calendar days less 26 Fridays, at <b id="hoursEcho">10</b> hours a day, billed monthly
+                </span>
+              </div>
+              <button class="ack" type="button" id="ackBillable">
+                <span class="cbx icon">check</span>
+                <span>I understand suppliers quote against <b id="billableEcho">154</b> billable days</span>
+              </button>
+            </div>
+
+            <div class="box want" id="otBox" style="margin-top:10px">
+              <div class="btitle">Overtime rate <span class="stamp warm">nothing in your words</span></div>
+              <div class="chips want" data-field="overtime">
+                <button class="chip" type="button" data-value="No overtime">No overtime</button>
+                <button class="chip" type="button" data-value="1.5×">1.5×</button>
+                <button class="chip" type="button" data-value="2×">2×</button>
+              </div>
+              <div class="hint warm">The one thing here nobody tells you. It decides what an extra hour costs you.</div>
+            </div>
+          </div>
+        </div>
+      </div></div></div>
+    </section>
+
+    <!-- ══ HOW YOU'D DEAL ═══════════════════════════════════════ -->
+    <section class="sec done" data-sec="terms" id="sec-terms">
+      <button class="sechead" type="button" data-toggle="terms">
+        <span class="sdot"></span>
+        <span class="name">How you'd deal</span>
+        <span class="sum" data-sum="terms"></span>
+        <span class="icon chev">expand_more</span>
+      </button>
+      <div class="secbody"><div class="inner"><div class="pad">
+        <div class="schedgrid">
+          <div>
+            <div class="box">
+              <div class="btitle">Payment</div>
+              <div class="field"><span class="flabel">Terms</span>
+                <div class="chips" data-field="payterms">
+                  <button class="chip" type="button" data-value="On delivery">On delivery</button>
+                  <button class="chip on" type="button" data-value="Net 30">Net 30</button>
+                  <button class="chip" type="button" data-value="Net 60">Net 60</button>
+                </div>
+              </div>
+              <div class="field"><span class="flabel">Method</span>
+                <div class="chips" data-field="paymethod">
+                  <button class="chip on" type="button" data-value="Bank transfer">Bank transfer</button>
+                  <button class="chip" type="button" data-value="Cheque">Cheque</button>
+                </div>
+              </div>
+            </div>
+            <div class="box" style="margin-top:10px">
+              <div class="btitle">Maintenance</div>
+              <div class="chips" data-field="maint">
+                <button class="chip on" type="button" data-value="Supplier">Supplier</button>
+                <button class="chip" type="button" data-value="We do it">We do it</button>
+              </div>
+              <div class="hint">Breakdown cover and servicing sit with the supplier unless you say otherwise.</div>
+            </div>
+          </div>
+          <div>
+            <div class="box">
+              <div class="btitle">Who may bid</div>
+              <div class="chips" data-field="whobids">
+                <button class="chip on" type="button" data-value="Everyone">Everyone</button>
+                <button class="chip" type="button" data-value="Verified only">Verified suppliers only</button>
+              </div>
+            </div>
+            <div class="box" style="margin-top:10px">
+              <div class="btitle">Bids close in</div>
+              <div class="chips" data-field="window">
+                <button class="chip" type="button" data-value="24 hours">24 hours</button>
+                <button class="chip on" type="button" data-value="3 days">3 days</button>
+                <button class="chip" type="button" data-value="1 week">1 week</button>
+              </div>
+              <div class="hint">Nothing here is required — we already have sensible answers. Change what matters to you.</div>
+            </div>
+          </div>
+        </div>
+      </div></div></div>
+    </section>
+  </div>
+
+  <!-- ══ CONFIRMATION ═══════════════════════════════════════════ -->
+  <div class="done-screen" id="doneScreen">
+    <div class="tick"><span class="icon">check</span></div>
+    <h2>It's out to suppliers</h2>
+    <p>Riyadh suppliers with a matching 30 ton crawler are being notified now. Bids land in your inbox as they come in — you compare them side by side, no calls needed.</p>
+    <div class="code" id="doneCode">RFQ-8F3K2A</div>
+    <div class="sharerow">
+      <div class="link" id="shareLink">moedatech.net/bid/al-rajhi-8f3k2a</div>
+      <button class="sendbtn" type="button" id="copyLink"><span class="icon">content_copy</span> Copy link</button>
+    </div>
+    <div class="nextsteps">
+      <div class="st"><div class="n">NOW</div><div class="h">Suppliers get it</div><p>Everyone with the right machine near Riyadh sees your request.</p></div>
+      <div class="st"><div class="n">3 DAYS</div><div class="h">Bids close</div><p>You can close early the moment you have enough to choose from.</p></div>
+      <div class="st"><div class="n">THEN</div><div class="h">You compare</div><p>All-in rates, side by side, with the cheapest real cost flagged.</p></div>
+    </div>
+    <div style="margin-top:22px"><button class="linkbtn" type="button" id="backToEdit">← Back to the request</button></div>
+  </div>
+</div>
+
+<!-- ══ dropdown menu (shared) ═══════════════════════════════════ -->
+<div class="menu" id="menu" role="menu"></div>
+
+<!-- ══ review drawer ════════════════════════════════════════════ -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Review and send">
+  <header>
+    <h2>Before it goes out</h2>
+    <button class="x" type="button" id="closeDrawer" aria-label="Close"><span class="icon">close</span></button>
+  </header>
+  <div class="scroll" id="reviewBody"></div>
+  <footer>
+    <button class="sendbtn" type="button" id="sendBtn">Send to suppliers <span class="icon">send</span></button>
+    <div class="foot" id="sendFoot">Nothing is sent until you press this.</div>
+  </footer>
+</aside>
+
+<div class="toast" id="toast"><span class="icon">check_circle</span><span id="toastText">Saved</span></div>
+
+<div class="tabbar">
+  <button type="button"><span class="icon">grid_view</span> Dashboard</button>
+  <button type="button" class="on"><span class="icon">description</span> Requests</button>
+  <button class="fab" type="button" aria-label="New request"><span class="icon">warehouse</span></button>
+  <button type="button"><span class="icon">mail</span> Inbox <span class="badge">4</span></button>
+  <button type="button"><span class="icon">person</span> Profile</button>
+</div>
+
+<script>
+  /* ══════════════════════════════════════════════════════════════
+     State. One machine to start — the request from the renter's words.
+     ══════════════════════════════════════════════════════════════ */
+  var machineSeq = 0;
+
+  function newMachine(seed) {
+    machineSeq += 1;
+    var base = {
+      id: 'm' + machineSeq,
+      qty: 1,
+      spec: 'Earthmoving',
+      type: null,
+      size: null,
+      attachment: null,
+      fuel: null,
+      cert: null,
+      year: null,
+      notes: '',
+      toSite: 'Supplier',
+      fromSite: 'Supplier',
+      mobPay: 'Supplier',
+      fuelPay: 'We pay',
+      operator: false,
+      opFood: 'Supplier',
+      opAccom: 'Supplier',
+      nationality: 'Any',
+      nightShift: false,
+      opLicence: null,
+      fromWords: {}
+    };
+    if (seed) { for (var k in seed) { base[k] = seed[k]; } }
+    return base;
+  }
+
+  var state = {
+    machines: [
+      newMachine({
+        type: 'Crawler excavator',
+        size: '30 ton',
+        attachment: 'Standard bucket',
+        fuel: 'Diesel',
+        operator: true,
+        fromWords: { type: true, size: true, operator: true }
+      })
+    ],
+    placeConfirmed: false,
+    lat: 24.733451,
+    lng: 46.708540,
+    basis: 'Monthly',
+    extendable: true,
+    length: '6 months',
+    hours: '10',
+    overtime: null,
+    billableAck: false,
+    payterms: 'Net 30',
+    paymethod: 'Bank transfer',
+    maint: 'Supplier',
+    whobids: 'Everyone',
+    window: '3 days'
+  };
+
+  var FAMILIES = ['Earthmoving', 'Lifting', 'Concrete', 'Haulage'];
+  var TYPES = ['Crawler excavator', 'Backhoe loader', 'Wheel loader'];
+  var SIZES = ['25 ton', '30 ton', '40 ton'];
+  var ATTACHMENTS = ['Standard bucket', 'Rock breaker', 'Grapple'];
+  var FUELS = ['Diesel', 'Electric', 'Hybrid'];
+  var CERTS = [
+    { v: 'Aramco', d: 'Aramco third-party inspection' },
+    { v: 'SASO', d: 'Saudi standards certificate' },
+    { v: 'TÜV', d: 'TÜV inspection certificate' },
+    { v: 'None needed', d: 'No certificate required' }
+  ];
+  var YEARS = ['2015 or newer', '2018 or newer', '2021 or newer', 'Any year'];
+  var LICENCES = ['SPSP', 'TÜV', 'SASO', 'Any'];
+
+  /* ══ what still needs the renter ══════════════════════════════ */
+  function needs() {
+    var out = [];
+    state.machines.forEach(function (m, i) {
+      var who = state.machines.length > 1 ? 'Machine ' + (i + 1) + ' — ' : '';
+      if (!m.cert) out.push({ id: m.id + '-cert', sec: 'machine', label: who + 'Safety certificate', why: 'Sites turn machines away without one', el: 'cert-' + m.id });
+      if (!m.year) out.push({ id: m.id + '-year', sec: 'machine', label: who + 'Oldest machine you accept', why: 'Stops a 2006 unit turning up', el: 'year-' + m.id });
+      if (m.operator && !m.opLicence) out.push({ id: m.id + '-lic', sec: 'machine', label: who + 'Operator certificate', why: 'Which ticket the driver must hold', el: 'lic-' + m.id });
+    });
+    if (!state.placeConfirmed) out.push({ id: 'pin', sec: 'place', label: 'Confirm the exact spot', why: 'Suppliers price the trip from this point', el: 'confirmPlace' });
+    if (!state.overtime) out.push({ id: 'ot', sec: 'time', label: 'Overtime rate', why: 'What an extra hour costs you', el: 'otBox' });
+    if (!state.billableAck) out.push({ id: 'ack', sec: 'time', label: 'Confirm 154 billable days', why: 'What every bid is priced against', el: 'billableBox' });
+    return out;
+  }
+
+  function secNeeds(sec) {
+    return needs().filter(function (n) { return n.sec === sec; });
+  }
+
+  /* ══ machine card ═════════════════════════════════════════════ */
+  var EXCAVATOR_SVG =
+    '<svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' +
+    '<g opacity=".35" fill="#8fb0c8">' +
+    '<rect x="0" y="150" width="400" height="6" rx="3"/>' +
+    '</g>' +
+    '<g fill="#c9dae7" opacity=".7">' +
+    '<rect x="18" y="96" width="46" height="56" rx="3"/><rect x="72" y="112" width="34" height="40" rx="3"/>' +
+    '<rect x="300" y="104" width="52" height="48" rx="3"/>' +
+    '</g>' +
+    '<g fill="#9db98f" opacity=".55">' +
+    '<circle cx="140" cy="140" r="16"/><circle cx="160" cy="146" r="11"/><circle cx="272" cy="142" r="14"/>' +
+    '</g>' +
+    /* tracks */
+    '<g>' +
+    '<rect x="96" y="212" width="176" height="40" rx="20" fill="#1c3550"/>' +
+    '<rect x="106" y="222" width="156" height="20" rx="10" fill="#2a4f72"/>' +
+    '<g fill="#12263a">' +
+    '<rect x="116" y="212" width="6" height="40"/><rect x="136" y="212" width="6" height="40"/>' +
+    '<rect x="156" y="212" width="6" height="40"/><rect x="176" y="212" width="6" height="40"/>' +
+    '<rect x="196" y="212" width="6" height="40"/><rect x="216" y="212" width="6" height="40"/>' +
+    '<rect x="236" y="212" width="6" height="40"/>' +
+    '</g></g>' +
+    /* house */
+    '<rect x="120" y="196" width="140" height="16" rx="5" fill="#12263a"/>' +
+    '<rect x="150" y="152" width="112" height="46" rx="8" fill="#f79009"/>' +
+    '<rect x="150" y="152" width="112" height="12" rx="6" fill="#ffa733"/>' +
+    '<rect x="236" y="160" width="20" height="30" rx="4" fill="#12263a" opacity=".35"/>' +
+    /* cab */
+    '<rect x="106" y="140" width="52" height="58" rx="8" fill="#f79009"/>' +
+    '<rect x="112" y="148" width="40" height="30" rx="5" fill="#cfe3f2"/>' +
+    '<rect x="112" y="148" width="40" height="30" rx="5" fill="#1c3550" opacity=".18"/>' +
+    /* boom */
+    '<path d="M164 164 L232 96 L252 112 L188 182 Z" fill="#f79009"/>' +
+    '<path d="M232 96 L252 112 L246 118 L226 102 Z" fill="#d4780a"/>' +
+    '<path d="M240 104 L302 150 L288 168 L226 122 Z" fill="#f79009"/>' +
+    '<circle cx="240" cy="104" r="8" fill="#12263a"/>' +
+    '<circle cx="166" cy="166" r="9" fill="#12263a"/>' +
+    /* arm cylinder */
+    '<rect x="186" y="112" width="56" height="9" rx="4.5" transform="rotate(18 186 112)" fill="#2a4f72"/>' +
+    /* bucket */
+    '<path d="M288 162 q28 4 30 30 q-30 12 -52 -6 z" fill="#12263a"/>' +
+    '<path d="M300 194 l6 10 M312 190 l5 11 M288 196 l4 10" stroke="#12263a" stroke-width="4" stroke-linecap="round"/>' +
+    /* dust */
+    '<g fill="#fff" opacity=".22"><ellipse cx="300" cy="240" rx="46" ry="10"/><ellipse cx="120" cy="248" rx="34" ry="8"/></g>' +
+    '</svg>';
+
+  function chipRow(field, mid, values, current, wordsFlag) {
+    var html = '<div class="chips" data-field="' + field + '" data-mid="' + mid + '">';
+    values.forEach(function (v) {
+      html += '<button class="chip' + (current === v ? ' on' : '') + '" type="button" data-value="' + v + '">' +
+        v + (wordsFlag && current === v ? '<span class="fromwords" title="read from your words"></span>' : '') +
+        '</button>';
+    });
+    return html + '</div>';
+  }
+
+  function segRow(field, mid, a, b, current) {
+    return '<div class="seg full" data-field="' + field + '" data-mid="' + mid + '">' +
+      '<button type="button" class="' + (current === a ? 'on' : '') + '" data-value="' + a + '">' + a + '</button>' +
+      '<button type="button" class="' + (current === b ? 'on' : '') + '" data-value="' + b + '">' + b + '</button>' +
+      '</div>';
+  }
+
+  function selBtn(kind, mid, value, placeholder) {
+    return '<button class="selbtn' + (value ? '' : ' empty') + '" type="button" data-menu="' + kind + '" data-mid="' + mid + '" id="' + kind + '-' + mid + '">' +
+      '<span class="val">' + (value || placeholder) + '</span><span class="icon">expand_more</span></button>';
+  }
+
+  function machineCard(m, idx) {
+    var certLabel = m.cert ? m.cert : 'Select certificate';
+    var yearLabel = m.year ? m.year : 'Select min. year';
+    var html = '<div class="machine" data-mid="' + m.id + '">';
+
+    /* ── panel 1 · the picture, with the two site rules on it ──── */
+    html += '<div class="panel visual">' + EXCAVATOR_SVG +
+      '<button class="ovl tl' + (m.cert ? '' : ' want') + '" type="button" data-menu="cert" data-mid="' + m.id + '" id="cert-' + m.id + '">' +
+        '<span class="k">Cert</span>' + certLabel + '<span class="icon">expand_more</span></button>' +
+      '<div class="qty" data-mid="' + m.id + '">' +
+        '<button type="button" data-step="-1" aria-label="One fewer">−</button>' +
+        '<span class="n">×' + m.qty + '</span>' +
+        '<button type="button" data-step="1" aria-label="One more">+</button>' +
+      '</div>' +
+      '<button class="ovl br' + (m.year ? '' : ' want') + '" type="button" data-menu="year" data-mid="' + m.id + '" id="year-' + m.id + '">' +
+        '<span class="k">Year</span>' + yearLabel + '<span class="icon">expand_more</span></button>' +
+      '</div>';
+
+    /* ── panel 2 · the machine itself ──────────────────────────── */
+    var mdot = (m.cert && m.year) ? '' : ' want';
+    html += '<div class="panel">' +
+      '<div class="phead">' +
+        '<span class="pt"><span class="sdot' + mdot + '"></span>The machine</span>' +
+        '<span class="pk">what you\'re renting</span>' +
+      '</div>' +
+      '<div class="pbody">' +
+
+      /* family · type · size — one row */
+      '<div class="prow three">' +
+        '<div class="cell"><span class="ck">Family</span>' + selBtn('family', m.id, m.spec, 'Pick a family') + '</div>' +
+        '<div class="cell"><span class="ck">Type' + (m.fromWords.type ? '<span class="fromwords" title="read from your words"></span>' : '') + '</span>' +
+          selBtn('type', m.id, m.type, 'Pick a type') + '</div>' +
+        '<div class="cell"><span class="ck">Size' + (m.fromWords.size ? '<span class="fromwords" title="read from your words"></span>' : '') + '</span>' +
+          selBtn('size', m.id, m.size, 'Pick a size') + '</div>' +
+      '</div>' +
+
+      /* attachment */
+      '<div class="cell"><span class="ck">Attachment</span>' + chipRow('attachment', m.id, ATTACHMENTS, m.attachment, false) + '</div>' +
+
+      /* delivery · return — one row */
+      '<div class="prow two">' +
+        '<div class="cell"><span class="ck">Delivery to site</span>' + segRow('toSite', m.id, 'Supplier', 'We collect', m.toSite) + '</div>' +
+        '<div class="cell"><span class="ck">Return from site</span>' + segRow('fromSite', m.id, 'Supplier', 'We return', m.fromSite) + '</div>' +
+      '</div>' +
+      '<div class="costline"><span>Mob &amp; demob cost paid by</span>' +
+        '<div class="seg tiny" data-field="mobPay" data-mid="' + m.id + '">' +
+          '<button type="button" class="' + (m.mobPay === 'Supplier' ? 'on' : '') + '" data-value="Supplier">Supplier</button>' +
+          '<button type="button" class="' + (m.mobPay === 'We pay' ? 'on' : '') + '" data-value="We pay">We pay</button>' +
+        '</div></div>' +
+
+      /* fuel · notes — one row */
+      '<div class="prow two grow">' +
+        '<div class="cell"><span class="ck">Fuel</span><div class="cv">' +
+          selBtn('fuel', m.id, m.fuel, 'Pick a fuel') +
+          segRow('fuelPay', m.id, 'Supplier pays', 'We pay', m.fuelPay) +
+        '</div></div>' +
+        '<div class="cell"><span class="ck">Notes to suppliers</span><div class="cv">' +
+          '<textarea class="notes" data-notes="' + m.id + '" placeholder="Anything a supplier should know — access, ground, permits…">' + (m.notes || '') + '</textarea>' +
+        '</div></div>' +
+      '</div>' +
+
+      '</div></div>';
+
+    /* ── panel 3 · the operator ────────────────────────────────── */
+    var opdot = (!m.operator || m.opLicence) ? '' : ' want';
+    html += '<div class="panel op">' +
+      '<div class="phead">' +
+        '<span class="pt"><span class="sdot' + opdot + '"></span>The operator</span>' +
+        '<button class="switch ' + (m.operator ? 'on' : 'off') + '" type="button" data-op="' + m.id + '" ' +
+          'aria-pressed="' + (m.operator ? 'true' : 'false') + '" aria-label="Include an operator">' +
+          '<span>' + (m.operator ? 'included' : 'not included') + '</span>' +
+          '<span class="track"><span class="knob"></span></span>' +
+        '</button>' +
+      '</div>' +
+      '<div class="pbody">';
+
+    if (!m.operator) {
+      html += '<button class="opempty" type="button" data-addop="' + m.id + '" id="op-' + m.id + '">' +
+        '<span class="ring"><span class="icon">engineering</span></span>' +
+        '<span class="h">No operator asked for</span>' +
+        '<span class="p">Your words never mentioned a driver, so this machine goes out bare. Add one and you set his food, nationality and licence.</span>' +
+        '<span class="cta"><span class="icon">add</span> Add an operator</span>' +
+        '</button>';
+    } else {
+      html += '<div class="prow two">' +
+          '<div class="cell"><span class="ck">Food</span>' + segRow('opFood', m.id, 'We pay', 'Supplier', m.opFood) + '</div>' +
+          '<div class="cell"><span class="ck">Housing &amp; transport</span>' + segRow('opAccom', m.id, 'We pay', 'Supplier', m.opAccom) + '</div>' +
+        '</div>' +
+
+        '<div class="cell"><span class="ck">Nationality</span>' +
+          segRow('nationality', m.id, 'Any', 'Restricted', m.nationality) +
+          '<div class="nightrow">' +
+            '<span class="lbl"><span class="icon">dark_mode</span><span>Night shift<small>a second crew after sunset</small></span></span>' +
+            '<button class="switch ' + (m.nightShift ? 'on' : 'off') + '" type="button" data-night="' + m.id + '" ' +
+              'aria-pressed="' + (m.nightShift ? 'true' : 'false') + '" aria-label="Include night shift">' +
+              '<span class="track"><span class="knob"></span></span></button>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="cell' + (m.opLicence ? '' : ' want') + '" id="lic-' + m.id + '"><span class="ck">Certificate</span>' +
+          chipRow('opLicence', m.id, LICENCES, m.opLicence, false) +
+          (m.opLicence ? '' : '<span class="note warm">Pick “Any” if the ticket does not matter — that still counts as an answer.</span>') +
+        '</div>';
+    }
+
+    html += '</div></div>';
+
+    if (state.machines.length > 1) {
+      html += '<div style="grid-column:1/-1;display:flex;justify-content:flex-end">' +
+        '<button class="linkbtn" type="button" data-remove="' + m.id + '">Remove machine ' + (idx + 1) + '</button></div>';
+    }
+
+    return html + '</div>';
+  }
+
+  function renderMachines() {
+    var html = '';
+    state.machines.forEach(function (m, i) { html += machineCard(m, i); });
+    document.getElementById('machineList').innerHTML = html;
+  }
+
+  /* ══ summaries on collapsed headers ═══════════════════════════ */
+  function gapText(n) { return '<span class="gap">' + n + (n === 1 ? ' answer missing' : ' answers missing') + '</span>'; }
+
+  function machineSummary() {
+    var parts = state.machines.map(function (m) {
+      var bits = [m.type || m.spec || 'machine', m.size, m.year, m.attachment, m.fuel, '×' + m.qty].filter(Boolean);
+      var line = bits.join(' · ');
+      if (m.operator) {
+        line += ' — with an operator' + (m.opLicence ? ' (' + m.opLicence + ')' : '') + (m.nightShift ? ', nights too' : '');
+      } else {
+        line += ' — bare, no operator';
+      }
+      return line;
+    });
+    var n = secNeeds('machine').length;
+    return '<b>' + parts.join('  |  ') + '</b>' + (n ? ' · ' + gapText(n) : '');
+  }
+
+  function placeSummary() {
+    var head = '<b>King Khalid International Airport — Riyadh</b> · ' + state.lat.toFixed(6) + ', ' + state.lng.toFixed(6);
+    return head + (state.placeConfirmed ? '' : ' · <span class="gap">pin not confirmed</span>');
+  }
+
+  function timeSummary() {
+    var bits = [
+      state.basis + (state.extendable ? ' (extendable)' : ''),
+      '12 Aug → 8 Feb 2027',
+      state.hours + ' h/day',
+      'Fri off',
+      state.overtime ? 'overtime ' + state.overtime : null
+    ].filter(Boolean);
+    var n = secNeeds('time').length;
+    return '<b>' + bits.join(' · ') + '</b>' + (n ? ' · ' + gapText(n) : '');
+  }
+
+  function termsSummary() {
+    return '<b>' + [state.payterms, state.paymethod, state.maint + ' maintains', state.whobids, 'bids close in ' + state.window].join(' · ') + '</b>';
+  }
+
+  var SUMMARY = { machine: machineSummary, place: placeSummary, time: timeSummary, terms: termsSummary };
+
+  /* ══ render everything derived ════════════════════════════════ */
+  function render() {
+    renderMachines();
+    paint();
+  }
+
+  function paint() {
+    Object.keys(SUMMARY).forEach(function (sec) {
+      var el = document.querySelector('[data-sum="' + sec + '"]');
+      if (el) el.innerHTML = SUMMARY[sec]();
+      var s = document.getElementById('sec-' + sec);
+      if (s) s.classList.toggle('done', secNeeds(sec).length === 0);
+    });
+
+    var list = needs();
+    var btn = document.getElementById('needsBtn');
+    var label = document.getElementById('needsLabel');
+    if (list.length === 0) {
+      btn.classList.add('clear');
+      label.textContent = 'Everything answered';
+    } else {
+      btn.classList.remove('clear');
+      label.textContent = list.length + (list.length === 1 ? ' thing needs you' : ' things need you');
+    }
+
+    document.getElementById('hoursEcho').textContent = state.hours;
+    var billable = 154; /* 180 calendar days less 26 Fridays; hours a day do not change the count */
+    document.getElementById('billableNo').textContent = billable;
+    document.getElementById('billableEcho').textContent = billable;
+    document.getElementById('ackBillable').classList.toggle('on', state.billableAck);
+    document.getElementById('billableBox').classList.toggle('want', !state.billableAck);
+    document.getElementById('otBox').classList.toggle('want', !state.overtime);
+
+    document.getElementById('coords').textContent = state.lat.toFixed(6) + ', ' + state.lng.toFixed(6);
+    document.getElementById('map').classList.toggle('confirmed', state.placeConfirmed);
+    var cb = document.getElementById('confirmPlace');
+    cb.classList.toggle('done', state.placeConfirmed);
+    cb.innerHTML = state.placeConfirmed
+      ? '<span class="icon">check</span> Spot confirmed — move the pin to change it'
+      : 'This is the right spot';
+    document.getElementById('mapTip').textContent = state.placeConfirmed
+      ? 'Confirmed. Drag the pin again if the gate moves.'
+      : 'Drag the map, or drop a pin where the machine goes';
+
+    renderNeedsList();
+  }
+
+  function renderNeedsList() {
+    var list = needs();
+    var box = document.getElementById('needsList');
+    if (list.length === 0) {
+      box.innerHTML = '<div class="allclear"><span class="icon">task_alt</span>Nothing left. Send it whenever you like.</div>';
+      return;
+    }
+    var html = '<h4>' + list.length + ' answers left · tap one to jump</h4>';
+    list.forEach(function (n) {
+      html += '<button class="row" type="button" data-jump="' + n.sec + '" data-el="' + n.el + '">' +
+        '<span class="bullet"></span><span><span class="lbl">' + n.label + '</span><small>' + n.why + '</small></span></button>';
+    });
+    box.innerHTML = html;
+  }
+
+  /* ══ sections ═════════════════════════════════════════════════ */
+  function openSection(sec, scroll) {
+    document.querySelectorAll('.sec').forEach(function (s) {
+      s.classList.toggle('open', s.dataset.sec === sec);
+    });
+    if (scroll) {
+      var el = document.getElementById('sec-' + sec);
+      if (el) window.scrollTo({ top: el.offsetTop - 92, behavior: 'smooth' });
+    }
+  }
+
+  document.getElementById('sections').addEventListener('click', function (e) {
+    var head = e.target.closest('[data-toggle]');
+    if (head) {
+      var sec = head.dataset.toggle;
+      var s = document.getElementById('sec-' + sec);
+      if (s.classList.contains('open')) s.classList.remove('open');
+      else openSection(sec, false);
+      return;
+    }
+
+    var flag = e.target.closest('[data-toggleflag]');
+    if (flag) {
+      state.extendable = !state.extendable;
+      flag.classList.toggle('on', state.extendable);
+      flag.classList.toggle('accent', state.extendable);
+      paint();
+      return;
+    }
+
+    var chip = e.target.closest('.chips .chip, .seg button');
+    if (chip) {
+      var group = chip.closest('[data-field]');
+      if (!group) return;
+      var field = group.dataset.field;
+      var mid = group.dataset.mid;
+      var value = chip.dataset.value;
+      if (mid) {
+        var m = findMachine(mid);
+        m[field] = value;
+        if (field === 'type') { m.fromWords.type = false; }
+        if (field === 'size') { m.fromWords.size = false; }
+        render();
+        openSection('machine', false);
+      } else {
+        state[field] = value;
+        group.querySelectorAll('.chip, button').forEach(function (b) { b.classList.remove('on'); });
+        chip.classList.add('on');
+        paint();
+      }
+      return;
+    }
+
+    var step = e.target.closest('.qty button');
+    if (step) {
+      var qm = findMachine(step.closest('.qty').dataset.mid);
+      qm.qty = Math.max(1, qm.qty + parseInt(step.dataset.step, 10));
+      render();
+      return;
+    }
+
+    var addop = e.target.closest('[data-addop]');
+    if (addop) {
+      findMachine(addop.dataset.addop).operator = true;
+      render();
+      toast('Operator added — set his licence to clear the last dot');
+      return;
+    }
+
+    var night = e.target.closest('[data-night]');
+    if (night) {
+      var nm = findMachine(night.dataset.night);
+      nm.nightShift = !nm.nightShift;
+      render();
+      return;
+    }
+
+    var opsw = e.target.closest('[data-op]');
+    if (opsw) {
+      var om = findMachine(opsw.dataset.op);
+      om.operator = !om.operator;
+      render();
+      toast(om.operator ? 'Operator included' : 'Bare machine — you supply the driver');
+      return;
+    }
+
+    var rm = e.target.closest('[data-remove]');
+    if (rm) {
+      state.machines = state.machines.filter(function (x) { return x.id !== rm.dataset.remove; });
+      render();
+      toast('Machine removed');
+      return;
+    }
+
+    var menuBtn = e.target.closest('[data-menu]');
+    if (menuBtn) { openMenu(menuBtn); return; }
+  });
+
+  document.getElementById('machineList').addEventListener('input', function (e) {
+    var ta = e.target.closest('[data-notes]');
+    if (!ta) return;
+    findMachine(ta.dataset.notes).notes = ta.value;
+  });
+
+  function findMachine(id) {
+    for (var i = 0; i < state.machines.length; i++) if (state.machines[i].id === id) return state.machines[i];
+    return null;
+  }
+
+  /* ══ overtime / billable ══════════════════════════════════════ */
+  document.getElementById('ackBillable').addEventListener('click', function () {
+    state.billableAck = !state.billableAck;
+    paint();
+  });
+
+  /* ══ shared dropdown menu ═════════════════════════════════════ */
+  var menu = document.getElementById('menu');
+  var menuCtx = null;
+
+  function openMenu(btn) {
+    var kind = btn.dataset.menu;
+    var m = findMachine(btn.dataset.mid);
+    menuCtx = { kind: kind, mid: m.id };
+
+    function plain(list) { return list.map(function (v) { return { v: v, d: '' }; }); }
+
+    var items, title, current;
+    if (kind === 'cert') { items = CERTS; title = 'Safety certificate'; current = m.cert; }
+    else if (kind === 'year') { items = plain(YEARS); title = 'Oldest you accept'; current = m.year; }
+    else if (kind === 'family') { items = plain(FAMILIES); title = 'Equipment family'; current = m.spec; }
+    else if (kind === 'type') { items = plain(TYPES); title = 'Machine type'; current = m.type; }
+    else if (kind === 'size') { items = plain(SIZES); title = 'Size class'; current = m.size; }
+    else { items = plain(FUELS); title = 'Fuel'; current = m.fuel; }
+
+    var html = '<div class="mtitle">' + title + '</div>';
+    items.forEach(function (it) {
+      html += '<button type="button" class="' + (current === it.v ? 'on' : '') + '" data-pick="' + it.v + '">' +
+        '<span>' + it.v + (it.d ? '<small>' + it.d + '</small>' : '') + '</span><span class="icon">check</span></button>';
+    });
+    menu.innerHTML = html;
+
+    var r = btn.getBoundingClientRect();
+    menu.classList.add('open');
+    var mw = menu.offsetWidth, mh = menu.offsetHeight;
+    var top = r.bottom + 8;
+    if (top + mh > window.innerHeight - 12) top = Math.max(12, r.top - mh - 8);
+    var left = Math.min(Math.max(12, r.left), window.innerWidth - mw - 12);
+    menu.style.top = top + 'px';
+    menu.style.left = left + 'px';
+  }
+
+  menu.addEventListener('click', function (e) {
+    var pick = e.target.closest('[data-pick]');
+    if (!pick || !menuCtx) return;
+    var m = findMachine(menuCtx.mid);
+    var picked = pick.dataset.pick;
+    if (menuCtx.kind === 'cert') m.cert = picked;
+    if (menuCtx.kind === 'year') m.year = picked;
+    if (menuCtx.kind === 'fuel') m.fuel = picked;
+    if (menuCtx.kind === 'size') { m.size = picked; m.fromWords.size = false; }
+    if (menuCtx.kind === 'type') { m.type = picked; m.fromWords.type = false; }
+    if (menuCtx.kind === 'family') {
+      if (m.spec !== picked) { m.type = null; m.size = null; m.attachment = null; m.fromWords = {}; }
+      m.spec = picked;
+    }
+    menu.classList.remove('open');
+    menuCtx = null;
+    render();
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.menu') && !e.target.closest('[data-menu]')) menu.classList.remove('open');
+    if (!e.target.closest('.needswrap')) closeNeeds();
+  });
+
+  /* ══ needs popover ════════════════════════════════════════════ */
+  var needsList = document.getElementById('needsList');
+  function closeNeeds() {
+    needsList.classList.remove('open');
+    document.getElementById('needsBtn').setAttribute('aria-expanded', 'false');
+  }
+  document.getElementById('needsBtn').addEventListener('click', function () {
+    var open = needsList.classList.toggle('open');
+    this.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  needsList.addEventListener('click', function (e) {
+    var row = e.target.closest('[data-jump]');
+    if (!row) return;
+    closeNeeds();
+    openSection(row.dataset.jump, true);
+    var target = document.getElementById(row.dataset.el);
+    if (target) {
+      window.setTimeout(function () {
+        target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        target.classList.add('flash');
+        window.setTimeout(function () { target.classList.remove('flash'); }, 1200);
+        if (target.tagName === 'BUTTON') target.focus();
+      }, 340);
+    }
+  });
+
+  /* ══ map ══════════════════════════════════════════════════════ */
+  var map = document.getElementById('map');
+  var pin = document.getElementById('pin');
+  var dragging = false;
+
+  function movePin(clientX, clientY) {
+    var r = map.getBoundingClientRect();
+    var x = Math.min(Math.max(clientX - r.left, 8), r.width - 8);
+    var y = Math.min(Math.max(clientY - r.top, 16), r.height - 4);
+    pin.style.left = (x / r.width) * 100 + '%';
+    pin.style.top = (y / r.height) * 100 + '%';
+    state.lat = 24.7455 - (y / r.height) * 0.028;
+    state.lng = 46.6955 + (x / r.width) * 0.028;
+    if (state.placeConfirmed) {
+      state.placeConfirmed = false;
+      toast('Pin moved — confirm the new spot');
+    }
+    paint();
+  }
+
+  map.addEventListener('pointerdown', function (e) {
+    dragging = true;
+    map.setPointerCapture(e.pointerId);
+    movePin(e.clientX, e.clientY);
+  });
+  map.addEventListener('pointermove', function (e) { if (dragging) movePin(e.clientX, e.clientY); });
+  map.addEventListener('pointerup', function () { dragging = false; });
+  map.addEventListener('pointercancel', function () { dragging = false; });
+
+  document.getElementById('confirmPlace').addEventListener('click', function () {
+    if (state.placeConfirmed) return;
+    state.placeConfirmed = true;
+    paint();
+    var sec = document.getElementById('sec-place');
+    sec.classList.add('flash');
+    window.setTimeout(function () { sec.classList.remove('flash'); }, 1100);
+    toast('Spot confirmed');
+    window.setTimeout(function () {
+      sec.classList.remove('open');
+      var nxt = needs()[0];
+      if (nxt) openSection(nxt.sec, true);
+    }, 620);
+  });
+
+  /* ══ add machine ══════════════════════════════════════════════ */
+  document.getElementById('addMachine').addEventListener('click', function () {
+    state.machines.push(newMachine({ spec: 'Pick a family' }));
+    render();
+    toast('Second machine added — it rides on the same request');
+    window.setTimeout(function () {
+      var cards = document.querySelectorAll('.machine');
+      cards[cards.length - 1].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 60);
+  });
+
+  /* ══ review drawer ════════════════════════════════════════════ */
+  var drawer = document.getElementById('drawer');
+  var scrim = document.getElementById('scrim');
+
+  function reviewRow(k, v, sec) {
+    return '<div class="rev"><div class="rk"><span>' + k + '</span>' +
+      (sec ? '<button type="button" data-goto="' + sec + '">Change</button>' : '') +
+      '</div><div class="rv">' + v + '</div></div>';
+  }
+
+  function buildReview() {
+    var list = needs();
+    var html = '';
+
+    if (list.length) {
+      html += '<div class="rev"><div class="rk"><span>Still open</span></div><div class="rv"><ul>';
+      list.forEach(function (n) {
+        html += '<li><span class="miss">' + n.label + '</span> — ' + n.why + '</li>';
+      });
+      html += '</ul></div></div>';
+    }
+
+    var mhtml = '<ul>';
+    state.machines.forEach(function (m) {
+      var bits = ['×' + m.qty, m.type || '(no type)', m.size, m.attachment, m.fuel, m.cert, m.year].filter(Boolean).join(' · ');
+      mhtml += '<li>' + bits + '<br /><span style="color:var(--muted)">' +
+        (m.operator ? 'With operator · ' + (m.opLicence || '(certificate not set)') + ' · ' + (m.nightShift ? 'day + nights' : 'day shift') + ' · food ' + m.opFood.toLowerCase() + ', housing ' + m.opAccom.toLowerCase() + ' · ' + m.nationality.toLowerCase() + ' nationality' : 'Bare machine, no operator') +
+        ' · to site: ' + m.toSite.toLowerCase() + ' · fuel: ' + m.fuelPay.toLowerCase() + (m.notes ? '<br />Note: ' + m.notes : '') + '</span></li>';
+    });
+    mhtml += '</ul>';
+
+    html += reviewRow('The machine' + (state.machines.length > 1 ? 's' : ''), mhtml, 'machine');
+    html += reviewRow('Where it goes',
+      'King Khalid International Airport, Riyadh<br /><span class="mono" style="font-size:12px;color:var(--muted)">' +
+      state.lat.toFixed(6) + ', ' + state.lng.toFixed(6) + '</span>' +
+      (state.placeConfirmed ? '' : '<br /><span class="miss">Pin not confirmed</span>'), 'place');
+    html += reviewRow('When it runs',
+      '12 Aug 2026 → 8 Feb 2027 · ' + state.basis.toLowerCase() + (state.extendable ? ', extendable' : '') +
+      '<br />' + state.hours + ' hours a day, Friday off — <b>154 billable days</b>' +
+      '<br />Overtime: ' + (state.overtime ? state.overtime : '<span class="miss">not set</span>'), 'time');
+    html += reviewRow('How you\'d deal',
+      state.payterms + ' · ' + state.paymethod + ' · ' + state.maint.toLowerCase() + ' maintains<br />' +
+      state.whobids + ' may bid · closes in ' + state.window, 'terms');
+    html += reviewRow('Suppliers will see', 'Your spec, dates, and site. Never your budget, never your company name until you award.');
+
+    document.getElementById('reviewBody').innerHTML = html;
+
+    var send = document.getElementById('sendBtn');
+    send.disabled = false;
+    document.getElementById('sendFoot').textContent = list.length
+      ? list.length + ' answers still open — send anyway and suppliers will ask.'
+      : 'Everything answered. Nothing is sent until you press this.';
+  }
+
+  function openDrawer() {
+    buildReview();
+    drawer.classList.add('open');
+    scrim.classList.add('open');
+  }
+  function closeDrawer() {
+    drawer.classList.remove('open');
+    scrim.classList.remove('open');
+  }
+
+  document.getElementById('openReview').addEventListener('click', openDrawer);
+  document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
+  scrim.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeDrawer(); menu.classList.remove('open'); closeNeeds(); }
+  });
+
+  document.getElementById('reviewBody').addEventListener('click', function (e) {
+    var go = e.target.closest('[data-goto]');
+    if (!go) return;
+    closeDrawer();
+    openSection(go.dataset.goto, true);
+  });
+
+  document.getElementById('sendBtn').addEventListener('click', function () {
+    closeDrawer();
+    document.getElementById('sections').style.display = 'none';
+    document.getElementById('doneScreen').classList.add('show');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  document.getElementById('backToEdit').addEventListener('click', function () {
+    document.getElementById('doneScreen').classList.remove('show');
+    document.getElementById('sections').style.display = '';
+  });
+
+  document.getElementById('copyLink').addEventListener('click', function () {
+    toast('Bid link copied');
+  });
+
+  document.getElementById('editWords').addEventListener('click', function () {
+    toast('Your words stay — editing re-reads them without losing your answers');
+  });
+
+  /* ══ toast ════════════════════════════════════════════════════ */
+  var toastEl = document.getElementById('toast');
+  var toastTimer = null;
+  function toast(msg) {
+    document.getElementById('toastText').textContent = msg;
+    toastEl.classList.add('show');
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(function () { toastEl.classList.remove('show'); }, 2400);
+  }
+
+  render();
+</script>

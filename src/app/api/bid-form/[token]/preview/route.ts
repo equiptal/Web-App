@@ -12,12 +12,18 @@ import { serverEnv } from "@/lib/config/env";
  * Used by the share sheet's Copy button to build the rich-text card that Gmail renders on paste.
  * Unwraps the `{ data }` envelope, like its sibling.
  */
-export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   if (!serverEnv.agentsApiUrl) return NextResponse.json({ error: "not_configured" }, { status: 503 });
+  /**
+   * ⚠️ **Forwarded, because the upstream defaults to `ar` and the IMAGE it names defaults to `en`.**
+   * Dropping the parameter here put an Arabic card picture on an English message — the two defaults
+   * are opposite, so there is no neutral answer to fall back to.
+   */
+  const lang = new URL(req.url).searchParams.get("lang") === "ar" ? "ar" : "en";
   try {
     const res = await fetch(
-      `${serverEnv.agentsApiUrl}/public/bid-form/${encodeURIComponent(token)}/preview`,
+      `${serverEnv.agentsApiUrl}/public/bid-form/${encodeURIComponent(token)}/preview?lang=${lang}`,
       // Matches the endpoint's own Cache-Control: a newly set deadline shows up quickly, and
       // repeatedly opening the sheet doesn't hit the database each time.
       { next: { revalidate: 300 } },

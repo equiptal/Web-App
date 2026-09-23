@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
 import type { Locale } from "@/lib/i18n/config";
 import { Icon } from "@/components/ui";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Shared chrome for the onboarding + verification screens (web-app/003), matching the prototype:
@@ -17,7 +18,7 @@ export function OnboardingShell({ step, children }: { step: 1 | 2; children: Rea
 
   const Dot = ({ n, done, active }: { n: number; done?: boolean; active?: boolean }) => (
     <span
-      className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${
+      className={`grid h-7 w-7 place-items-center rounded-full text-label font-semibold ${
         done ? "bg-ok text-white" : active ? "bg-navy text-white" : "bg-surface2 text-muted"
       }`}
     >
@@ -26,28 +27,28 @@ export function OnboardingShell({ step, children }: { step: 1 | 2; children: Rea
   );
 
   return (
-    <div dir={locale === "ar" ? "rtl" : "ltr"} className="min-h-screen bg-surface2">
+    <div {...pin("onboarding-shell")} dir={locale === "ar" ? "rtl" : "ltr"} className="min-h-screen bg-surface2">
       <div className="flex h-[60px] items-center justify-between border-b border-border bg-surface px-6">
         {/* Logo links home — the onboarding/verify screens have no sidebar, so this (and the explicit
             "Back to home" button) are the only in-app way out. Without them a submitted renter is
             stuck on the pending screen with only the browser back button. */}
-        <Link href="/" className="flex items-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-navy/40" aria-label={t.shell.home}>
+        <Link href="/" className="flex items-center rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-navy/40" aria-label={t.shell.home}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/moedatech-logo.png" alt="Moedatech" className="h-7 w-auto" />
         </Link>
         <div className="flex items-center gap-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-[12.5px] font-bold text-navy-mid transition hover:bg-surface2"
+            className="inline-flex items-center gap-1.5 rounded-sm border border-border px-3 py-1.5 text-meta font-semibold text-navy-mid transition hover:bg-surface2"
           >
             <Icon name="home" size={16} /> {t.onboarding.backToHome}
           </Link>
-          <span className="inline-flex overflow-hidden rounded-md border border-border">
+          <span className="inline-flex overflow-hidden rounded-sm border border-border">
             {(["en", "ar"] as Locale[]).map((l) => (
               <button
                 key={l}
                 onClick={() => setLocale(l)}
-                className={`px-2.5 py-1 text-xs font-bold ${locale === l ? "bg-navy text-white" : "bg-surface text-muted"}`}
+                className={`px-2.5 py-1 text-label font-semibold ${locale === l ? "bg-navy text-white" : "bg-surface text-muted"}`}
               >
                 {l === "en" ? "EN" : "ع"}
               </button>
@@ -60,7 +61,7 @@ export function OnboardingShell({ step, children }: { step: 1 | 2; children: Rea
         {/* Stepline only on the verify step — on account creation the "Verify company (later)"
             preview read as overwhelming, so the account form stands on its own. */}
         {step === 2 && (
-          <div className="flex items-center gap-2 text-[13px] font-semibold text-navy-mid">
+          <div className="flex items-center gap-2 text-body font-semibold text-navy-mid">
             <Dot n={1} done active={false} />
             {t.onboarding.step1}
             <span className="mx-1 h-px flex-1 bg-border" />
@@ -69,7 +70,7 @@ export function OnboardingShell({ step, children }: { step: 1 | 2; children: Rea
           </div>
         )}
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">{children}</div>
+        <div className="mt-5 overflow-hidden rounded-lg border border-border bg-surface">{children}</div>
       </div>
     </div>
   );

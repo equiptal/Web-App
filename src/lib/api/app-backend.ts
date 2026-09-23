@@ -59,6 +59,15 @@ export class AuthError extends Error {
   }
 }
 
+/**
+ * Which client this is, for the backend's session-origin tracking (`login_events` +
+ * `users.last_login_platform`): the mobile app sends `mobile-ios` / `mobile-android` and
+ * Supplier OS sends `supplier-os` on the same header. Attribution only — the backend never
+ * authorizes on it. One constant, spread into every backend fetch here and in
+ * `app-backend-authed.ts`, so the value the backend records cannot drift.
+ */
+export const CLIENT_PLATFORM_HEADER = { "X-Client-Platform": "web-rentee" } as const;
+
 interface BackendEnvelope<T> {
   success?: boolean;
   data?: T;
@@ -77,6 +86,7 @@ async function authFetch<T>(path: string, init: RequestInit, locale?: string): P
       headers: {
         "Content-Type": "application/json",
         "X-Tenant-Id": serverEnv.tenantId,
+        ...CLIENT_PLATFORM_HEADER,
         ...(locale ? { "Accept-Language": locale } : {}),
         ...init.headers,
       },

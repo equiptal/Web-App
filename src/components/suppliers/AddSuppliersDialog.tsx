@@ -1,0 +1,399 @@
+"use client";
+
+import { useState } from "react";
+import { Dialog } from "@/components/Dialog";
+import { Icon } from "@/components/ui";
+import { btn, cx } from "@/lib/ds";
+import { fmt, useLocale, useT } from "@/lib/i18n";
+import type { Dictionary } from "@/lib/i18n/en";
+import { contactable } from "@/lib/contract/sheet-paste";
+import { normalizePhone, phoneE164 } from "@/lib/contract/phone-normalize";
+import { VendorMark } from "@/components/VendorMark";
+import { addRenterSuppliersBulk, ApiError, type NewRenterSupplier } from "@/lib/api/client";
+import { SupplierImportPanel } from "./SupplierImportPanel";
+
+/**
+ * SUP-T15 — adding the suppliers a renter already works with.
+ *
+ * ── Typing, or a sheet instead — as the prototype has it ────────────────────────────────────────
+ *
+ * `prototypes/renter-suppliers-v1.html` (`addRowsPanel`) ends the rows with an *or* rule and one
+ * secondary button, **Upload a sheet instead**. Not a tab strip: tabs say "these are two equal
+ * things, choose", and they are not — typing is what the dialog opens on because most renters add
+ * two or three suppliers, and the sheet is the escape hatch for the one who has forty.
+ *
+ * *Add from Moedatech* is NOT in here. It has its own button in the header, also from the prototype,
+ * because it makes a different kind of row — one linked to an account rather than the renter's own.
+ *
+ * ── Rows, not a form ────────────────────────────────────────────────────────────────────────────
+ *
+ * A form would make a renter do four fields, press Save, and start again — and the second time he
+ * did that he would go and find a spreadsheet instead. So it is a table, and *Add another* is one
+ * click away when he has more.
+ *
+ * **It opens on ONE row** (owner, 2026-09-01). Three empty rows look like three things that must be
+ * filled in, and a renter adding a single supplier reads two of them as work he is being asked to
+ * do. One row is the honest floor; the second appears when he asks for it.
+ *
+ * ── A row counts when it can be used ────────────────────────────────────────────────────────────
+ *
+ * A name and some way to reach them. A row with only a name is not a supplier, it is a note; a row
+ * with neither is the blank one at the bottom that everybody leaves behind. Both are ignored
+ * silently, and the button counts what will actually be created so nobody presses Save wondering.
+ *
+ * ── No CR number (owner, 2026-09-01) ────────────────────────────────────────────────────────────
+ *
+ * It was a column here and it should not have been. A renter does not hold his suppliers' commercial
+ * registrations, so the field was either left empty — teaching him this screen asks for things he
+ * cannot answer — or filled from memory, which is worse: the CR is the strongest key we have for
+ * matching an off-platform firm to an account, and a wrong one matches the wrong company. It comes
+ * from the supplier, on his own bid, or it does not come at all.
+ *
+ * ── Registered by default, per row ──────────────────────────────────────────────────────────────
+ *
+ * Someone typing suppliers in is typing the firms he works with, so the flag is on. But a batch
+ * always has an exception — the one being tried out, the one inherited from a previous site — so
+ * every row carries its own tick and the one at the bottom only sets them all at once.
+ */
+type Row = { name: string; contactName: string; email: string; phone: string; vendor: boolean };
+
+/**
+ * 🔴 **Vendor starts OFF** (owner, 2026-09-08: *"any add supplier, whether by hand or Excel,
+ * doesn't default to vendor registered, but he will mark it"*).
+ *
+ * ~~`vendor: true`.~~ «Registered vendor» is a claim about a relationship the renter has with that
+ * firm — a contract, an approval, a procurement record — and adding a contact is not the moment it
+ * becomes true. Ticked for him, every row he typed in a hurry carried a claim he never made, and
+ * the flag stopped meaning anything the moment it was on everybody.
+ */
+const blank = (): Row => ({ name: "", contactName: "", email: "", phone: "", vendor: false });
+
+/**
+ * A row is real once it names a firm AND carries a way to reach it — `contactable`, the same rule
+ * the import uses (owner, 2026-09-08: *"why doesn't it import a missing company or e-mail or phone,
+ * while adding them manually allows it? No sense"*).
+ *
+ * The phone has to be one we can READ, not merely one that was typed. `9.66503E+11` pasted out of a
+ * spreadsheet and «call the office» both used to pass here and then be refused by the backend after
+ * the press, which is the same refusal arriving later and with less to show for it.
+ */
+const usable = (r: Row) => contactable(r, (v) => phoneE164(v) != null);
+
+/** Which half of the rule a row breaks, in the renter's words — the import's sentences, reused. */
+function whyNot(r: Row, c: Dictionary["suppliers"]): string | null {
+  if (usable(r)) return null;
+  // A row nobody has typed in yet is not a mistake; it is the next empty line.
+  if (!r.name.trim() && !r.contactName.trim() && !r.email.trim() && !r.phone.trim()) return null;
+  if (!r.name.trim()) return c.rMissingName;
+  if (!r.email.trim() && !r.phone.trim()) return c.rMissingContact;
+  const trouble = normalizePhone(r.phone);
+  if (trouble && "problem" in trouble) {
+    return trouble.problem === "truncated" ? c.rPhoneTruncated : c.rPhoneUnreadable;
+  }
+  return c.rMissingContact;
+}
+
+/** Four columns and the flag — the grid is declared once so the header and the rows cannot drift. */
+/**
+ * The row, and the header over it, in ONE template.
+ *
+ * ⚠️ The vendor column was `auto`, and `auto` is measured from the CONTENT — the header cell held
+ * the words «Vendor registration», the row cell held a pill, and the two came out different widths.
+ * Every column after them then landed somewhere else, so each label sat a few pixels off the box it
+ * named and the whole table looked hand-placed (owner, 2026-09-02: *"the labels must be above the
+ * box exactly at its start"*). A FIXED column cannot disagree with itself.
+ *
+ * `items-end` rather than `items-center`, so a header and a 34px field share a baseline.
+ */
+const GRID =
+  "grid grid-cols-[1.4fr_1fr_1.5fr_1.1fr_10rem_28px] items-end gap-x-2.5 gap-y-1.5";
+
+export function AddSuppliersDialog({ open, onClose, onAdded }: { open: boolean; onClose: () => void; onAdded: (msg?: string) => void }) {
+  const t = useT();
+  const { locale } = useLocale();
+  const c = t.suppliers;
+  /** One way, and back. `file` is reached from the rows and returns to them on cancel. */
+  const [mode, setMode] = useState<"type" | "file">("type");
+  const [rows, setRows] = useState<Row[]>([blank()]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ready = rows.filter(usable);
+  const patch = (i: number, next: Partial<Row>) => setRows((r) => r.map((row, n) => (n === i ? { ...row, ...next } : row)));
+
+  const close = () => {
+    setRows([blank()]);
+    setMode("type");
+    setError(null);
+    onClose();
+  };
+
+  const save = async () => {
+    if (!ready.length || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const payload: NewRenterSupplier[] = ready.map((r) => ({
+        name: r.name.trim(),
+        contactName: r.contactName.trim() || null,
+        email: r.email.trim() || null,
+        // E.164, exactly as the import sends it: one supplier typed twice in two places must produce
+        // one key, or the backend's dedupe sees two counterparties.
+        phone: phoneE164(r.phone) ?? (r.phone.trim() || null),
+        vendorRegistered: r.vendor,
+      }));
+      /**
+       * ⚠️ The result used to be thrown away.
+       *
+       * `bulk` answers `created`, `merged` and `rejected`, and this called it, ignored all three, and
+       * said "added". So a row that MERGED into a supplier already on the list, and a row the backend
+       * refused, both looked identical to a row that landed — and the renter, seeing no new line
+       * appear, concluded the feature was broken (owner, found in UAT 2026-09-02).
+       *
+       * Now it says which of the three happened. A merge is a success and reads as one, but it is a
+       * different success, and the renter has to be told which he got.
+       */
+      const result = await addRenterSuppliersBulk(payload);
+      const created = result?.created?.length ?? 0;
+      const merged = result?.merged?.length ?? 0;
+      const rejected = result?.rejected?.length ?? 0;
+
+      // Refusals stay on screen rather than passing in a toast: they are the rows the renter still
+      // has to do something about, and each one names which row and why.
+      if (rejected > 0 && created + merged === 0) {
+        setError(refusalLine(result?.rejected ?? [], c));
+        setSaving(false);
+        return;
+      }
+      onAdded(
+        merged || rejected
+          ? fmt(c.addedMixed, { n: created, merged, rejected })
+          : created === 1
+            ? fmt(c.addedOne, { n: 1 })
+            : fmt(c.addedMany, { n: created }),
+      );
+      close();
+    } catch (e) {
+      /**
+       * ── SAY WHAT THE SERVER SAID (owner, 2026-09-12) ────────────────────────────────────────
+       *
+       * ~~`catch {}` → `c.addFailed`.~~ A renter on beta hit this and the screenshot could not tell
+       * us which of five different failures it was: the relay's 401 (no session), the handler's 404
+       * («المستخدم غير موجود» — his user row is not in the tenant that Lambda reads), a 422 from the
+       * schema, a 500 from the unguarded `createMany`, or a dropped connection. Every one of them
+       * printed «لم يُحفظ… حاول مرة أخرى», and the one screen that had been TOLD the answer threw it
+       * away. A day was spent guessing at it from source.
+       *
+       * The backend answers `message` + `messageAr` on every refusal and `projectFetch` now carries
+       * both. The `code · HTTP n` suffix is deliberate and is NOT prose: it is the part that makes a
+       * screenshot of this dialog diagnostic, which is how the report arrives next time.
+       */
+      const err = e instanceof ApiError ? e : null;
+      const said = (locale === "ar" ? err?.messageAr : err?.detail) ?? err?.detail ?? err?.messageAr;
+      const tag = [err?.backendCode, err?.status ? `HTTP ${err.status}` : null].filter(Boolean).join(" · ");
+      // Never close on failure: the renter's typing is the only copy of it.
+      setError([said || c.addFailed, tag ? `(${tag})` : null].filter(Boolean).join(" "));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={close}
+      size="xxl"
+      icon={<Icon name="person_add" size={18} />}
+      title={c.addTitle}
+      subtitle={c.addSubtitle}
+      /* The import panel carries its own actions — its primary button says how many rows will be
+         written, which a fixed dialog footer cannot. */
+      footer={
+        mode === "file" ? undefined : (
+          <div className="flex w-full items-center justify-end gap-2">
+            {error && <span className="me-auto text-meta font-extrabold text-danger-deep">{error}</span>}
+            <button type="button" onClick={close} className={btn("ghost", "md")}>
+              {t.common.cancel}
+            </button>
+            <button type="button" onClick={save} disabled={!ready.length || saving} className={btn("primary", "md")}>
+              {ready.length === 1 ? c.addOne : ready.length ? fmt(c.addMany, { n: ready.length }) : c.addNone}
+            </button>
+          </div>
+        )
+      }
+    >
+      <div className="grid gap-3">
+        {mode === "file" ? (
+          <SupplierImportPanel
+            onDone={(msg) => {
+              onAdded(msg);
+              close();
+            }}
+            onCancel={() => setMode("type")}
+          />
+        ) : (
+          <div className="grid gap-1.5">
+            {/* One header row for the whole table, not a label per row: five labels repeated down
+                six rows is a wall of shouting, and the columns do not change meaning as you go. */}
+            <div className={GRID}>
+              {[c.fName, c.fContact, c.fEmail, c.fPhone, c.colVendor].map((h, i) => (
+                <span key={h} className="truncate text-label font-extrabold uppercase tracking-wide text-muted">
+                  {h}
+                  {i === 0 && <span className="text-danger"> *</span>}
+                </span>
+              ))}
+              <span />
+            </div>
+
+            {rows.map((r, i) => {
+              const short = whyNot(r, c);
+              return (
+              <div key={i} className="grid gap-1">
+              <div className={GRID}>
+                <Field value={r.name} onChange={(v) => patch(i, { name: v })} placeholder={c.fName} />
+                <Field value={r.contactName} onChange={(v) => patch(i, { contactName: v })} placeholder={c.fContact} />
+                <Field value={r.email} onChange={(v) => patch(i, { email: v })} placeholder="name@company.com" type="email" />
+                <Field value={r.phone} onChange={(v) => patch(i, { phone: v })} placeholder="+966 5X XXX XXXX" />
+                <label
+                  className={cx(
+                    "inline-flex h-[34px] cursor-pointer items-center justify-center gap-1.5 rounded-md border px-2.5 text-label font-extrabold",
+                    r.vendor ? "border-ok bg-ok-soft text-ok-deep" : "border-dashed border-border-strong bg-surface text-muted",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={r.vendor}
+                    onChange={(e) => patch(i, { vendor: e.target.checked })}
+                    className="h-3 w-3 accent-ok"
+                  />
+                  <VendorMark size={13} />
+                  {c.registered}
+                </label>
+                <button
+                  type="button"
+                  disabled={rows.length === 1}
+                  onClick={() => setRows((list) => list.filter((_, n) => n !== i))}
+                  title={c.removeRow}
+                  className="grid h-[34px] w-[28px] place-items-center rounded-sm text-muted transition hover:bg-danger-soft hover:text-danger disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+                >
+                  <Icon name="close" size={13} />
+                </button>
+              </div>
+              {/* ── Say it here, not after the press (owner, 2026-09-08) ─────────────────────
+                  A row short of the rule used to be dropped in SILENCE: the button counted the rows
+                  that qualified and the others simply did not go, which is why the typed form looked
+                  as though it allowed what the import refuses. Same sentences as the import, under
+                  the row they are about. */}
+              {short && (
+                <span className="flex items-center gap-1.5 ps-0.5 text-meta text-danger-deep">
+                  <Icon name="error_outline" size={13} className="flex-none" />
+                  {fmt(c.rowShort, { reason: short })}
+                </span>
+              )}
+              </div>
+              );
+            })}
+
+            {/* ── One row: add another on the left, mark-them-all on the right (owner, 2026-09-03) ──
+                *"This needs no long box, make it a box on the right at the same row as the Add
+                another button, and remove the description."*
+
+                It was a full-width green band with a heading and a sentence under it, sitting between
+                the table and the upload — three lines of chrome for one checkbox that most renters
+                leave exactly as it arrives. Beside «Add another» it is what it actually is: a control
+                over the rows above, at the end of them.
+
+                ~~«Each supplier needs a company name, and an email or a phone…»~~ Gone with it. The
+                table's own header stars the required column, the refusal names the row that is short
+                of a contact, and the dialog's subtitle now says what a list is for. Explaining all of
+                that a fourth time, before he has typed anything, is a paragraph in the way. */}
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setRows((list) => [...list, blank()])}
+                className="inline-flex h-[30px] w-fit items-center gap-1.5 rounded-md border border-dashed border-border-strong px-3 text-meta font-extrabold text-muted-dark transition hover:border-navy-mid hover:bg-surface2 hover:text-navy"
+              >
+                <Icon name="add" size={15} />
+                {c.addAnother}
+              </button>
+
+              {/* The flag is per row above; this only sets them all at once. */}
+              {/* ⚠️ Green only when it is ON. With the flag off by default (2026-09-08) a
+                  permanently green band over an unticked box reads as a state nobody set. */}
+              <label
+                className={cx(
+                  "inline-flex h-[30px] cursor-pointer items-center gap-2 rounded-md border px-3 text-meta font-extrabold",
+                  rows.every((r) => r.vendor)
+                    ? "border-ok/40 bg-ok-soft text-ok-deep"
+                    : "border-border-strong bg-surface text-muted",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={rows.every((r) => r.vendor)}
+                  onChange={(e) => setRows((list) => list.map((r) => ({ ...r, vendor: e.target.checked })))}
+                  className="h-3.5 w-3.5 flex-none accent-ok"
+                />
+                {c.markAll}
+              </label>
+            </div>
+
+            {/* The prototype's `or` rule and one secondary button — not a tab. Tabs say "two equal
+                things, choose"; these are not equal. Typing is what the dialog opens on because most
+                renters add two or three, and the sheet is the escape hatch for the one with forty. */}
+            <div className="my-1 flex items-center gap-3 text-label font-extrabold uppercase tracking-wide text-muted-light">
+              <span className="h-px flex-1 bg-border" />
+              {c.or}
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            {/* Centred under its own rule (owner, 2026-09-03). Left-aligned it read as one more
+                control in the column of fields; on the centre line it reads as the alternative the
+                rule above it announces. */}
+            <div className="flex justify-center">
+              <button type="button" onClick={() => setMode("file")} className={cx(btn("secondary", "md"), "w-fit")}>
+                <Icon name="upload_file" size={15} />
+                {c.uploadInstead}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Dialog>
+  );
+}
+
+/**
+ * The refusals, as one line a renter can act on.
+ *
+ * Named by ROW, because the dialog he is looking at is a table of rows — "row 3 has no e-mail and no
+ * phone" points at something on his screen, where "MISSING_CONTACT" points at our vocabulary.
+ */
+function refusalLine(
+  rejected: { row: number; reason: string }[],
+  c: ReturnType<typeof useT>["suppliers"],
+): string {
+  const reason = (code: string) =>
+    code === "MISSING_CONTACT" ? c.rMissingContact : code === "MISSING_NAME" ? c.rMissingName : code;
+  return rejected.map((r) => fmt(c.planRejected, { row: r.row + 1, reason: reason(r.reason) })).join(" · ");
+}
+
+function Field({
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  type?: string;
+}) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="h-[30px] w-full rounded-md border border-border-strong bg-surface px-2.5 text-meta text-navy outline-none focus:border-brand"
+    />
+  );
+}

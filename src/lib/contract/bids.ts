@@ -7,6 +7,9 @@
 
 
 import { mapBidLiveStatus, type BidLiveStatus } from "@/lib/contract/bid-live-status";
+import { companyBrandName, companyNamePartsOf, counterpartyDisplayName } from "@/lib/contract/counterparty-name";
+import { mediaUrl } from "@/lib/contract/stores";
+import { isHiddenTermKey } from "@/lib/contract/term-visibility";
 
 export type BidStatus =
   | "PENDING"
@@ -36,6 +39,11 @@ function toCert(raw: string): CertCode | null {
   if (/TUV|TÜV/.test(u)) return "TUV";
   if (/SPSP/.test(u)) return "SPSP";
   return null;
+}
+/** Normalise whatever the backend calls a certificate into the enum, dropping what it can't name.
+ *  The request drawer needs this to render a request's required certificates as chips. */
+export function toCertCodes(v: unknown): CertCode[] {
+  return certList(v);
 }
 function certList(v: unknown): CertCode[] {
   const out: CertCode[] = [];
@@ -91,6 +99,28 @@ export type UnitLocationSource = "unit_yard" | "bid_pin" | "bid_yard" | "listing
 export interface OfferedUnitDoc { type: string; key: string; url: string | null; verifyStatus: string | null; expiryDate: string | null; }
 /** A photo on an offered unit — `slot` ∈ {front, serial, hours, …}. `url` is presigned. */
 export interface OfferedUnitPhoto { slot: string; key: string; url: string | null; }
+
+/**
+ * The supplier's own photograph of what he is offering — his FRONT shot, first for preference.
+ *
+ * Taxonomy artwork answers "what kind of machine is this"; a renter looking at a bid is asking "what
+ * am I being sent", and a stock drawing of an excavator cannot answer that. Every offered unit
+ * carries the supplier's uploads, so the picture exists — it was simply never read on the surfaces
+ * that show one machine.
+ *
+ * The front slot is the one a machine is recognised by, which is why the equipment detail's own
+ * `heroPhotoUrl` prefers it too. Any other photograph beats none, so a unit with only a serial
+ * plate still shows something real. Null when the supplier uploaded nothing, and the caller then
+ * falls back — the equipment record's primary photo, then the taxonomy drawing, then an icon. Never
+ * a broken image.
+ *
+ * Slots are matched loosely (`/front/i`) because the backend has spelled it `front`,
+ * `FRONT_VIEW` and `front_photo` at different times, and `bid-readiness` already reads it that way.
+ */
+export function offeredFrontPhotoUrl(units: { photoKeys: OfferedUnitPhoto[] }[] | null | undefined): string | null {
+  const all = (units ?? []).flatMap((u) => u.photoKeys ?? []).filter((p) => p.url);
+  return all.find((p) => /front/i.test(p.slot))?.url ?? all[0]?.url ?? null;
+}
 /** One equipment unit a supplier offered on a NATIVE app bid (bid-readiness — `offeredUnitsDetail`).
  *  Ownership docs are stripped server-side for the renter. Absent on off-platform shared-link bids. */
 export interface OfferedUnitDetail {
@@ -260,6 +290,20 @@ export interface BidCard {
    */
   supplierCompanyId: string | null;
   supplierName: string;
+  /**
+   * The supplier's STORE mark, for the quotation's party box and its navy footer.
+   *
+   * 🔴 THE STORE's logo, never the supplier profile's `companyLogoKey`: that key lives under the
+   * private-documents prefix, so a public URL built from it answers 403 — and an `<img>` absorbs that
+   * as «this firm has no logo», which is a failure nobody can see. The app states the same rule where
+   * it fills this field.
+   *
+   * ⚠️ Read TOLERANTLY across the spellings the two services might land on, and through `mediaUrl`,
+   * which passes a signed http URL through and builds the public one for a bare key — the app's
+   * `S3Url.from`. Null until a projection actually carries one, and then both slots simply draw
+   * nothing, which is the app's own behaviour for a supplier with no mark.
+   */
+  supplierLogoUrl: string | null;
   verified: boolean;
   rating: number | null;
   distanceKm: number | null;
@@ -333,9 +377,24 @@ export interface BidCard {
    *  email is null until the bid-list projection adds it (backend), then the Email row lights up. */
   supplierPhone?: string | null;
   supplierEmail?: string | null;
+  /**
+   * The supplier's own city, from the bid-list `supplierProfile` (owner, 2026-08-25).
+   *
+   * It was already on the wire and already being READ — one of the parts `supplierNationalAddress`
+   * composes a Saudi address from when no single address field is present. Surfacing it needs no
+   * projection change; the earlier note that this required backend work was wrong.
+   *
+   * What it is NOT is an offered unit's `yardCity`. That is where a machine sits, which is a
+   * different fact and wrong for any supplier shipping from outside his own city.
+   */
+  supplierCity?: string | null;
   matchCount: number;
   conflictCount: number;
   dealRoomId: string | null;
+  /** The room's own phase (`OPEN` / `CLOSED` / `CANCELLED` / `ABANDONED`). On the wire since the app
+   *  shipped its footer band, and read by nothing here — so the bid card could not tell a live
+   *  negotiation from a closed one. `RenteeBandState` splits three ways on it. */
+  dealRoomStatus: string | null;
   expired: boolean;
   /** Free-text note the supplier attached to this bid (app: BidModel.note). */
   note: string | null;
@@ -414,9 +473,20 @@ export interface BidCard {
   };
   /** Normalized keys of terms AGREED/locked in the deal room — drives the quotation's "Agreed" badge. */
   agreedTermKeys?: string[];
+  /** The latest COUNTER's proposed value per term (getBidList `counters`).
+   *
+   *  ⚠️ The mapper has always built these to decide a term row's matched/conflict state; they are
+   *  exposed because the QUOTATION resolves every clause down the app's own ladder (locked → counter
+   *  → declared → the request's side) and a counter is the middle rung. */
+  counters?: { key: string; value: unknown; side?: string | null; at?: string | null }[];
+  /** The supplier's RAW T3 declaration map, keys as the backend sends them.
+   *
+   *  ⚠️ `declaredTerms` above is the five the card reads by name; this is all of them, because the
+   *  quotation must print every term the room holds and cannot know their names in advance. */
+  t3Declarations?: Record<string, unknown>;
   /** 014 lifecycle, server-enriched in getBidList (same source the mobile bid card reads). Drives the
    *  live deal-terms strip + overlays locked terms onto the Terms modal / quotation. */
-  lockedTerms: { key: string; value: unknown }[]; // agreed terms + their negotiated value
+  lockedTerms: { key: string; value: unknown; at?: string | null }[]; // agreed terms + their negotiated value
   unreadTerms: string[]; // term keys with a counter the renter hasn't seen
   progress: { agreed: number; total: number }; // agreed-terms meter
   lastEventAr: string | null; // last-event copy (e.g. "منذ 3 دقائق")
@@ -469,6 +539,13 @@ export interface TermRow {
    *  pending counter (counter.newValue) matches the renter's ask (→ matched) or differs (→ conflict),
    *  matching the app's `contractState` (dealRoomValue vs rentee value). Only populated on counted terms. */
   renteeValue?: string | null;
+  /** Who wrote the counter the standing value came from, and when the value last moved in the room.
+   *  App parity: `TermAttribution.counterSide` / `.updatedAt`, which the Terms panel prints under the
+   *  label as «Updated by the supplier · 12 Sep» or «Agreed in deal room · 12 Sep». `updatedAt` is a
+   *  lock's `lockedAt` on an agreed row and that counter's `occurredAt` otherwise; both are null on a
+   *  row the deal room has never touched. */
+  counterSide?: "rentee" | "supplier" | null;
+  updatedAt?: string | null;
 }
 
 const n = (v: unknown): number | null => {
@@ -509,7 +586,13 @@ const normKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
  * therefore not removable — it is the only thing that reads a request submitted by an old build — but
  * it must never be read ALONE.
  *
- * It was, until 2026-08-10: `mapBid` set `reqMinYear` from the alias only, so every live bid carried
+ * It happened AGAIN on the request detail (owner, 2026-09-01: *"the year term of the equipment does
+ * not appear even when I edited the request and set it"*). `itemDetailRows` read `maxEquipmentAge`
+ * alone — the field the web POSTS under, and the one the backend never sends back — so a renter who
+ * had just set 2020 saw the row missing entirely. That is the third reader, and it goes through here
+ * now: this function is exported for it.
+ *
+ * It was first, until 2026-08-10: `mapBid` set `reqMinYear` from the alias only, so every live bid carried
  * `reqMinYear: null` while the Terms modal 400 lines up read the real field and disagreed. A renter who
  * asked for 2020 got «لم تطلب سنة» in the match grid and no السنة filter at all (RM3-AC-28a/28c/37).
  * Both callers now go through here, so the next rename lands in one place.
@@ -517,7 +600,7 @@ const normKey = (k: string) => k.toLowerCase().replace(/[^a-z0-9]/g, "");
  * The value is returned RAW — a min year (2020) or, on legacy data, an age. Deciding which it reads as
  * is `computeUnitReadiness`'s job and stays there; this only reads the wire.
  */
-function requestedMinYear(item: Record<string, unknown>): number | null {
+export function requestedMinYear(item: Record<string, unknown>): number | null {
   return n(item.minimumEquipmentYear) ?? n(item.maxEquipmentAge);
 }
 
@@ -534,8 +617,15 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const reqItem = reqItems[0] ?? {};
   const eq = (raw.equipment ?? {}) as Record<string, unknown>;
   const unverified = !eqVerified; // listing unverified → measurement/year/fuel forced grey
+  /* 🔴 **A HIDDEN term's deviation dies here, once.** Three readings below ask this set whether
+     the lumped operator row conflicts and what its detail line says; filtering at each reader would
+     have been three edits and a fourth one missed, and a retired term would go on painting a row red
+     over a question nobody was asked. Mirrors the app, which filters the same deviations at its own
+     parse (`marketplace_models.dart`). */
   const deviationKeys = new Set(
-    (Array.isArray(raw.deviations) ? (raw.deviations as Record<string, unknown>[]) : []).map((d) => String(d.key ?? "")),
+    (Array.isArray(raw.deviations) ? (raw.deviations as Record<string, unknown>[]) : [])
+      .map((d) => String(d.key ?? ""))
+      .filter((k) => !isHiddenTermKey(k)),
   );
 
   const reqCap = s(reqItem.capacityId);
@@ -565,13 +655,9 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   // Operator (spec 128). operator_included is CONFLICT_ELIGIBLE / Negotiable — the app moved it
   // Acknowledge → Negotiable (deal-room.service CONFLICT_ELIGIBLE_KEYS): it conflicts when the RFQ needs
   // an operator the bid omits OR on a backend-flagged deviation, and is countered in the deal room.
-  // operator_nationality is its own CONFLICT_ELIGIBLE term.
   const reqOperator = s(reqItem.operatorIncluded)?.toUpperCase() === "YES";
   const bidOperator = s(raw.operatorIncluded)?.toUpperCase() === "YES";
   const operatorIncluded: TermState = !reqOperator ? "grey" : (!bidOperator || deviationKeys.has("operator_included")) ? "conflict" : "matched";
-  const opNat = reqOperator
-    ? (s(reqItem.operatorNationality) === "restricted" ? (s(reqItem.operatorNationalityCustom) ?? "restricted") : s(reqItem.operatorNationality))
-    : null;
 
   // FAT split + fuel responsibility — request prefs map to supplier/rentee (term-matching.ts parity).
   // fat_food / fat_accommodation_transport AND fuel_responsibility are all CONFLICT_ELIGIBLE / Negotiable
@@ -587,9 +673,11 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const maintenance: TermState = !reqMaint ? "grey" : "matched";
 
   // Single "operator" row for the BID CARD's equipment bucket (mobile app parity): conflict on a
-  // nationality deviation or when the RFQ needs an operator the bid omits; matched when included.
-  // App parity (terms_modal.dart): the single operator term also conflicts on a missing operator cert.
-  const operator: TermState = !reqOperator ? "grey" : deviationKeys.has("operator_nationality") || deviationKeys.has("operator_certification") || !bidOperator ? "conflict" : "matched";
+  // an operator-certification deviation, or when the RFQ needs an operator the bid omits.
+  /* ~~`deviationKeys.has("operator_nationality")`.~~ Hidden term: the parse above can no longer
+     hand this set that key, and a dead clause that reads as live is how a retired term comes back
+     by accident. */
+  const operator: TermState = !reqOperator ? "grey" : deviationKeys.has("operator_certification") || !bidOperator ? "conflict" : "matched";
 
   // operator_certification & safety_certifications — CONFLICT_ELIGIBLE / Negotiable in the app
   // (term-matching.ts: "Moved Acknowledge → Negotiable"). They live in the comparison's negotiable
@@ -599,11 +687,25 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const safetyCertState: TermState = requiredCerts.length === 0 ? "grey" : deviationKeys.has("safety_certifications") ? "conflict" : certs;
 
   // Project rows reused by both the bid-card "Project" bucket and the comparison's negotiable set.
-  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms"), renteeValue: s(req.paymentTerms) };
-  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla"), renteeValue: s(req.breakdownResponseSla) };
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- built, not rendered; see below
+  const t3raw = (raw.t3Declarations ?? {}) as Record<string, unknown>;
+  const rPayment: TermRow = { key: "payment_terms", labelEn: "Payment terms", labelAr: "شروط الدفع", state: negContractState("payment_terms"), renteeValue: s(req.paymentTerms), value: s(t3raw.payment_terms) };
+  const rSla: TermRow = { key: "breakdown_response_sla", labelEn: "Breakdown response", labelAr: "زمن الاستجابة للأعطال", state: negContractState("breakdown_response_sla"), renteeValue: s(req.breakdownResponseSla), value: s(t3raw.breakdown_response_sla) };
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- built, not rendered; see `contract` below
   const rOvertime: TermRow = { key: "overtime_rate", labelEn: "Overtime", labelAr: "العمل الإضافي", state: negContractState("overtime_rate"), renteeValue: s(req.overtimeRate) };
-  const rMaint: TermRow = { key: "maintenance_responsibility", labelEn: "Maintenance", labelAr: "الصيانة", state: maintenance };
+  /* ⚠️ `renteeValue` was missing here, and it is the whole content of the row (owner, 2026-09-07:
+     *"why does maintenance appear? Is it set by the request?"*). The STATE said matched — the request
+     had set a side, so the supplier accepts it by bidding — while the row carried no value at all,
+     so the comparison drew a «Maintenance» column in which every cell read «Didn't say» about a term
+     the renter had answered. Its two neighbours, payment and breakdown response, have always carried
+     the request's own value; this one was built without it. */
+  const rMaint: TermRow = {
+    key: "maintenance_responsibility",
+    labelEn: "Maintenance",
+    labelAr: "الصيانة",
+    state: maintenance,
+    renteeValue: s(req.maintenanceResponsibility),
+    value: s(t3raw.maintenance_responsibility),
+  };
 
   // Conflict detail (Renter: X · Supplier: Y) — app parity with link bids, so an in-app conflict in
   // the Terms modal names BOTH sides, not just the term. Cert terms carry the exact codes.
@@ -623,17 +725,39 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     : undefined;
   // The lumped `operator` bid-card row shows only "Conflict" with no values today. Give it the same
   // Renter/Supplier detail as the specific rows (app parity) — pick the reason that drove the conflict:
-  // a missing operator, an operator-certification deviation, or an operator-nationality deviation.
-  const opNatDeclared = s(t3.operator_nationality) ?? s(t3.operatorNationality);
+  // a missing operator, or an operator-certification deviation. (~~or a nationality deviation~~: that
+  // term is hidden product-wide and its deviation is dropped at the parse.)
+  /* ~~`opNatDeclared`, what the SUPPLIER answered.~~ Swept with `opNat` above. */
+  /**
+   * ── What the SUPPLIER declared, so no term can read «Didn't say» when he answered it ────────────
+   * Owner, 2026-09-09: *"how can someone not say? It must say yes or no in the form, even in a bid
+   * he must choose"*. He is right, and the blank was OURS: the bid form makes every T3 term a
+   * required choice and the answers arrive in `t3Declarations` — `payment_terms: "net_60"`,
+   * `breakdown_response_sla: "FORTY_EIGHT_HR"`, `maintenance_responsibility: "supplier"` — but these
+   * rows carried a STATE and the renter's own `renteeValue` and no supplier value at all. The
+   * comparison prints the supplier's answer, falling back to «Didn't say», so a fully answered bid
+   * reported silence on half the terms it had declared.
+   *
+   * ⚠️ The STATE is untouched: an un-negotiated declaration is still `grey` («pending review», app
+   * parity with `terms_modal.dart`), and only a backend-flagged deviation is a conflict. This adds
+   * the VALUE the state was always about.
+   *
+   * ⚠️ **`''` means absent, not an answer.** `submitBid` fills any required key the client omitted
+   * with the empty string (`bid.service.ts`), so a bid from an older build carries the key with
+   * nothing in it — and `s()` already returns null for a blank, which is what keeps «Didn't say»
+   * honest for those.
+   */
+  const declared = (...keys: string[]): string | null => {
+    for (const k of keys) { const v = s(t3[k]); if (v) return v; }
+    return null;
+  };
   const operatorDetail: { en: string; ar: string } | undefined = !reqOperator
     ? undefined
     : !bidOperator
       ? { en: "Renter: operator required · Supplier: not included", ar: "المستأجر: مطلوب مشغّل · المؤجّر: غير مشمول" }
       : deviationKeys.has("operator_certification") && opCertDetail
         ? opCertDetail
-        : deviationKeys.has("operator_nationality")
-          ? { en: `Renter: ${opNat ?? dash} · Supplier: ${opNatDeclared ?? dash}`, ar: `المستأجر: ${opNat ?? dash} · المؤجّر: ${opNatDeclared ?? dash}` }
-          : undefined;
+        : undefined;
 
   return {
     // BID-CARD buckets — mirror the mobile app's bid card exactly: Equipment 6 · Project 4. Operator is
@@ -647,20 +771,21 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
       { key: "attachments", labelEn: "Attachments", labelAr: "الملحقات", state: "grey" },
       { key: "operator", labelEn: "Operator", labelAr: "المشغّل", state: operator, detail: operatorDetail },
     ],
-    // Overtime is retired (2026-09-05, app `2b095d63`): neither side is asked for a rate, so a row
-    // here could only restate a term nobody was offered — and `'0'` is a truthy sentinel that reads
-    // back as a rate. `rOvertime` stays built so restoring is one word in two arrays.
+    // Overtime is retired (2026-09-04, with the app's `2b095d63`): the renter is not asked for a
+  // rate and the supplier does not declare one, so a row here could only restate a term neither
+  // side was offered. `rOvertime` is kept built so the restore is one word in two arrays.
     contract: [rPayment, rSla, rMaint],
     // COMPARISON-only expanded set (the web side-by-side "Negotiable terms" section) — NOT on the bid
     // card. Carries the full deal-room negotiable + acknowledge terms with live overlay states.
     negotiable: [
       { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded, renteeValue: reqOperator ? "yes" : null },
-      { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat), renteeValue: opNat },
-      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail, renteeValue: reqOpCert },
+      /* 🔴 ~~Operator nationality.~~ Hidden on every surface (see `term-visibility.ts`).
+         It was the comparison's own column and the bid card reads none of it. */
+      { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail, renteeValue: reqOpCert, value: opDeclared },
       { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState, detail: safetyDetail, renteeValue: requiredCerts.length ? requiredCerts.join(",") : null },
-      { key: "fat_food", labelEn: "Operator FAT — Food", labelAr: "الإعاشة (F.A.T) — الطعام", state: contractState("fat_food", fatFood), renteeValue: fatFood },
-      { key: "fat_accommodation_transport", labelEn: "Operator FAT — Accommodation/Transport", labelAr: "الإعاشة (F.A.T) — الإقامة/النقل", state: contractState("fat_accommodation_transport", fatAccom), renteeValue: fatAccom },
-      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp), renteeValue: fuelResp },
+      { key: "fat_food", labelEn: "Operator food", labelAr: "طعام المشغّل", state: contractState("fat_food", fatFood), renteeValue: fatFood },
+      { key: "fat_accommodation_transport", labelEn: "Operator accommodation and transport", labelAr: "إقامة ونقل المشغّل", state: contractState("fat_accommodation_transport", fatAccom), renteeValue: fatAccom },
+      { key: "fuel_responsibility", labelEn: "Fuel responsibility", labelAr: "مسؤولية الوقود", state: contractState("fuel_responsibility", fuelResp), renteeValue: fuelResp, value: declared("fuel_responsibility") },
       rPayment, rSla, rMaint, // rOvertime retired — see the `contract` bucket above
       // mobilization_lead_time — CONFLICT_ELIGIBLE / Negotiable (app moved it Priced → Negotiable).
       { key: "mobilization_lead_time", labelEn: "Mobilization lead time", labelAr: "مهلة التعبئة", state: negContractState("mobilization_lead_time") },
@@ -744,13 +869,12 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
   // SupplierProfile). A supplier who joined by invite code has no `supplierProfile.companyName` of
   // their own, so without this they'd render under their PERSONAL name and be classified as an
   // individual, with no sign they bid on behalf of a verified company.
-  const supCompanyBrand =
-    supCompany?.isVerified === true && !supCompany.deletedAt ? s(supCompany.name) : undefined;
-  // The supplier's OWN company-name field (`supplierProfile.companyName` — what they typed in their
-  // profile), scanned across the projection shapes like the doc keys above. This is the name we display:
-  // `supplier.company.name` is the row ops created in the VERIFICATION queue, and the two drift (an ops
-  // typo / a placeholder / a legal-entity string), so the profile field is the supplier's own identity.
-  const supProfileCompanyName = profSources.map((o) => s(o.companyName) ?? s(o.company_name)).find(Boolean);
+  /* 🔴 **THE FIRM IS NAMED BY ITS REGISTRATION, and the web read neither `legalName` column.**
+     ~~`supplierProfile.companyName` first, the company row second, both gated on `isVerified`.~~ That
+     order was inverted against the backend's own (`identity-select.ts`) and the app's
+     (`counterparty_name.dart`), and the gate meant a firm nobody had approved yet read by its owner's
+     PERSONAL name on every surface. One rule now, in `counterparty-name.ts`, for both roles. */
+  const supCompanyBrand = companyBrandName(companyNamePartsOf(sup)) ?? undefined;
   // Company docs are read from the supplier's REAL verification fields projected in the bid list
   // (crNumber / vatNumber / national-address parts / localContentDocKey / sasoHeavyEquipDocKey). Show a
   // doc ONLY when its actual field is present — NEVER inferred from "verified" (a verified supplier can
@@ -762,6 +886,9 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
   const profVal = (...keys: string[]): string | null => { for (const o of profSources) for (const k of keys) { const v = s(o[k]); if (v) return v; } return null; };
   const supplierCrNumber = profVal("crNumber", "commercialRegistrationNumber", "commercial_registration_number");
   const supplierVatNumber = profVal("vatNumber", "taxNumber", "tax_number");
+  // Read through the same `profVal` scan as the rest — the field is already there, and the composed
+  // national address below has been using it all along.
+  const supplierCity = profVal("companyCity", "company_city", "city");
   // National address: a single field if present, else composed from its Saudi-address parts (app parity).
   const supplierNationalAddress =
     profVal("nationalAddress", "national_address", "companyAddress", "company_address") ||
@@ -805,13 +932,16 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
   // locked (agreed) term carries its negotiated value, so they overlay the Terms-modal state + the
   // request-term values + mob/demob/lead-time. `currentPrice` already carries the live negotiated rate.
   const lockedTerms = (Array.isArray(raw.lockedTerms) ? (raw.lockedTerms as Record<string, unknown>[]) : [])
-    .map((t) => ({ key: s(t.termKey) ?? "", value: t.lockedValue }))
+    .map((t) => ({ key: s(t.termKey) ?? "", value: t.lockedValue, at: s(t.lockedAt) }))
     .filter((t) => t.key);
   const unreadTerms = (Array.isArray(raw.unreadTerms) ? (raw.unreadTerms as unknown[]) : []).map(String);
-  // Pending counters WITH their proposed values (getBidList `counters: [{termKey, newValue}]`) — the
-  // deal-room overlay compares each to the rentee's ask to decide matched vs conflict (app parity).
+  /* Pending counters WITH their proposed values (getBidList `counters: [{termKey, newValue}]`) — the
+     deal-room overlay compares each to the rentee's ask to decide matched vs conflict (app parity).
+     ⚠️ **`side` and `occurredAt` are on the wire and this mapper dropped both.** The app reads them
+     (`BidCounter.side` / `.occurredAt`), and they are what lets a term row say WHO moved it and WHEN
+     rather than only what it now says. */
   const counters = (Array.isArray(raw.counters) ? (raw.counters as Record<string, unknown>[]) : [])
-    .map((c) => ({ key: s(c.termKey) ?? "", value: c.newValue }))
+    .map((c) => ({ key: s(c.termKey) ?? "", value: c.newValue, side: s(c.side), at: s(c.occurredAt) }))
     .filter((c) => c.key);
   const pm = (raw.progressMeter ?? {}) as Record<string, unknown>;
   const progress = { agreed: n(pm.agreed) ?? 0, total: n(pm.total) ?? 0 };
@@ -847,8 +977,19 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
 
   const lockedKeys = new Set(lockedTerms.map((t) => normKey(t.key)));
   const lockedValByKey = new Map(lockedTerms.map((t) => [normKey(t.key), t.value != null && t.value !== "" ? String(t.value) : null]));
+  const lockedAtByKey = new Map(lockedTerms.map((t) => [normKey(t.key), t.at ?? null]));
   const unreadKeys = new Set(unreadTerms.map(normKey));
-  const counterValByKey = new Map(counters.map((c) => [normKey(c.key), c.value != null && c.value !== "" ? String(c.value) : null]));
+  /* 🔴 **HIS counters, never hers.** `counters` carries the latest counter on a term WHICHEVER side
+     wrote it, and this overlay writes it into `value` — the column every surface reads as the
+     SUPPLIER's offer. So a renter who countered saw his own proposal reported back as the supplier's,
+     and worse: it equals his own ask by construction, so the row went GREEN as though the supplier had
+     agreed to something he has never seen. The app filters the same map to `c.side == 'supplier'` and
+     says why: a renter's suggestion must never read as the supplier's own term.
+     ⚠️ Only an EXPLICIT `rentee` is dropped. An older payload carries no side at all, and reading
+     that as hers would silently retire the whole overlay on every bid predating the field. */
+  const hisCounters = counters.filter((c) => (c.side ?? "").toLowerCase() !== "rentee");
+  const counterValByKey = new Map(hisCounters.map((c) => [normKey(c.key), c.value != null && c.value !== "" ? String(c.value) : null]));
+  const counterAtByKey = new Map(hisCounters.map((c) => [normKey(c.key), c.at ?? null]));
   // Enum-insensitive equality for the counter overlay (app parity: normalizeTermEnum) — case/underscore
   // agnostic + boolean/party synonyms (yes=true=included, no=false=excluded/not-included, renter=rentee).
   const normTok = (v: string): string => {
@@ -874,15 +1015,17 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
       const k = normKey(r.key);
       // Locked → "agreed", and carry the negotiated value so the cost responsibilities reflect what was
       // actually settled in the deal room (e.g. accepting the supplier's FAT flips the side to supplier).
-      if (lockedKeys.has(k)) return { ...r, state: "agreed" as TermState, value: lockedValByKey.get(k) ?? r.value ?? null };
+      if (lockedKeys.has(k)) return { ...r, state: "agreed" as TermState, value: lockedValByKey.get(k) ?? r.value ?? null, counterSide: null, updatedAt: lockedAtByKey.get(k) ?? null };
       // Pending counter (app parity: dealRoomValue = counter.newValue): compare to the rentee's ask —
       // equal → matched, differ → conflict. Without a rentee value to compare, fall back to "negotiating".
       const cv = counterValByKey.get(k);
       if (cv != null) {
+        // Every counter that reaches here is the supplier's, by the filter above.
+        const moved = { counterSide: "supplier" as const, updatedAt: counterAtByKey.get(k) ?? null };
         if (r.renteeValue != null && r.renteeValue !== "") {
-          return { ...r, value: cv, state: (normVal(cv) === normVal(r.renteeValue) ? "matched" : "conflict") as TermState };
+          return { ...r, ...moved, value: cv, state: (normVal(cv) === normVal(r.renteeValue) ? "matched" : "conflict") as TermState };
         }
-        return { ...r, value: cv, state: "negotiating" as TermState };
+        return { ...r, ...moved, value: cv, state: "negotiating" as TermState };
       }
       if (unreadKeys.has(k)) return { ...r, state: "negotiating" as TermState };
       return r;
@@ -896,6 +1039,21 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
   //  it reflects the latest negotiated rate and falls back to the original when there's no deal room.
   //  Prefer it; keep the locked PRICE term + the raw offer as fallbacks.
   const negRate = lockedVal((k) => k === "price");
+  /* 🔴 **THE SUPPLIER'S OWN LATEST, then acceptance, then his opening bid** (app parity,
+     `BidModel.displayPrice`). ~~`currentPrice ?? negRate ?? priceAmount`.~~ `currentPrice` is the
+     room's live rate WHOEVER moved it, so the RENTER'S OWN COUNTER rewrote the price on his own bid
+     card: he asked 16,800 against an offer of 18,400 and the card then read 16,800, as though the
+     supplier had agreed to it. A quotation is an offer from the seller to the buyer.
+     ⚠️ The `accepted` arm under it is NOT dead: a room created before the history carried its
+     proposal snapshot has no `supplierLatest`, and there acceptance is the only thing that makes the
+     room's figures safe to print.
+     ⚠️ An EMPTY `supplierLatest` is not an offer. Testing the object's PRESENCE would blank every
+     figure on a row the backend sent as `{}`, so the test is whether it carries anything at all. */
+  const supLatest = obj(raw.supplierLatest ?? raw.supplier_latest);
+  const hasSupLatest = s(supLatest.at) != null || n(supLatest.rate) != null;
+  const accepted = String(raw.status ?? "").trim().toUpperCase() === "ACCEPTED";
+  const supplierFigure = (latest: unknown, current: unknown, opening: unknown): number | null =>
+    (hasSupLatest ? n(latest) : null) ?? (accepted ? (n(current) ?? n(opening)) : n(opening));
 
   return {
     id: String(raw.id ?? ""),
@@ -909,22 +1067,26 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     // every shape that can carry it lives in `readSupplierCompanyId`, shared with `mapReceivedBids`:
     // ONE counterparty key needs one derivation, or the chat dock's anchor and its rows disagree.
     supplierCompanyId: readSupplierCompanyId(raw),
-    // Company name FIRST — the supplier's own profile field, not the verification-queue company row
-    // (nor the backend's `supplierDisplayName`, which resolves that row ahead of the profile). Falls
-    // back to the verified firm's brand, then the backend's resolved name, then the person's name.
+    /* The registration's order, then the person — `counterparty-name.ts`, which is the backend's
+       rule and the app's. `readSupplierDisplayName` runs the SAME function over the flat
+       received-bids shape, so one surface can no longer name the firm while another names the member.
+       ⚠️ The backend's own `supplierDisplayName` sits BELOW the four columns: it resolves the
+       company row ahead of the profile, which is the order this rule inverts. */
     supplierName:
-      supProfileCompanyName ??
-      supCompanyBrand ??
-      s(raw.supplierDisplayName) ??
-      ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
+      counterpartyDisplayName({
+        ...companyNamePartsOf(sup),
+        personName: [s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" "),
+      }) ||
+      s(raw.supplierDisplayName) ||
+      "Supplier",
     verified: supVerified,
     rating: n(sup.rating) ?? n(prof.rating),
     distanceKm,
     submittedAt: s(raw.createdAt),
     validUntil: s(raw.validUntil),
-    price: n(raw.currentPrice) ?? n(negRate) ?? n(raw.priceAmount), // live deal-room rate (app parity) → locked rate → original offer (T16)
-    mobPrice: n(negMobPrice) ?? n(raw.mobPrice),
-    demobPrice: n(negDemobPrice) ?? n(raw.demobPrice),
+    price: supplierFigure(supLatest.rate, n(raw.currentPrice) ?? n(negRate), raw.priceAmount),
+    mobPrice: supplierFigure(supLatest.mobPrice, negMobPrice, raw.mobPrice),
+    demobPrice: supplierFigure(supLatest.demobPrice, negDemobPrice, raw.demobPrice),
     priceUnit: s(raw.priceUnit),
     duration: n(raw.duration),
     numberOfUnits: n(rqItem.numberOfUnits) ?? 1,
@@ -955,7 +1117,7 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     eqVerified,
     compliance: {
       // A member of a verified firm IS a company entity, even with no company name of their own.
-      entityType: (supProfileCompanyName ?? supCompanyBrand) ? "company" : "individual",
+      entityType: supCompanyBrand ? "company" : "individual",
       activityLicense: hasCr,
       taxNumber: hasVat,
       nationalAddress: hasNationalAddr,
@@ -966,11 +1128,20 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     supplierCrNumber,
     supplierVatNumber,
     supplierNationalAddress,
+    supplierCity,
     supplierPhone: s(sup.phone),
     supplierEmail: s(sup.email), // not in the bid-list projection yet → null until the backend adds it
+    supplierLogoUrl:
+      mediaUrl(raw.supplierLogoUrl) ??
+      mediaUrl(raw.storeLogoUrl) ??
+      mediaUrl(obj(sup.store).logoUrl) ??
+      mediaUrl(obj(sup.store).logoKey) ??
+      mediaUrl(sup.logoUrl) ??
+      null,
     matchCount: n(raw.matchCount) ?? 0,
     conflictCount: n(raw.conflictCount) ?? 0,
     dealRoomId: s(raw.dealRoomId),
+    dealRoomStatus: s(raw.dealRoomStatus ?? raw.deal_room_status),
     expired: expired || raw.isExpired === true || raw.status === "EXPIRED",
     note: s(raw.note),
     requiredCerts,
@@ -1023,6 +1194,8 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
       fuelResponsibility: s(t3decl.fuel_responsibility),
     },
     agreedTermKeys: lockedTerms.map((t) => normKey(t.key)),
+    counters,
+    t3Declarations: t3decl,
     lockedTerms,
     unreadTerms,
     progress,
@@ -1073,6 +1246,36 @@ export function readSupplierCompanyId(raw: Record<string, unknown>): string | nu
     sid(company.id) ??
     profiles.map((o) => sid(o.companyId ?? o.company_id) ?? sid(o.supplierCompanyId ?? o.supplier_company_id)).find((x) => x != null) ??
     null
+  );
+}
+
+/**
+ * The counterparty's DISPLAY NAME, read the same way out of either projection.
+ *
+ * ── Why it is shared (owner, 2026-09-07) ────────────────────────────────────────────────────────
+ * *"This must show other offers' suppliers on this request… it will show other suppliers' names
+ * which are bidders on this equipment request."* The map's «Other offers» strip printed «Murad
+ * alabdullah» — the bidding PERSON — beside a header naming «Al-Faisal Contracting Est.», the FIRM,
+ * for the same offer. Two names for one counterparty, because there were two derivations: `mapBid`
+ * put the supplier's own profile company name first, and `mapReceivedBids` read the backend's
+ * `supplierDisplayName`, which resolves the member ahead of the firm.
+ *
+ * The precedence is `mapBid`'s, unchanged: the supplier's OWN company-name field, then the brand of
+ * a verified firm, then the backend's resolved name, then the person. A renter reads the firm he is
+ * dealing with; the individual who typed the bid is not a party to anything.
+ */
+export function readSupplierDisplayName(raw: Record<string, unknown>): string {
+  // The SAME rule `mapBid` runs, over the flat received-bids shape: `companyNamePartsOf` reads the
+  // nested profile shapes AND the object itself, which is what the spread projections carry.
+  const sup = obj(raw.supplier);
+  const person = [s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ");
+  // `||` at every step, never `??`: an absent first and last name joins to the EMPTY STRING, which
+  // `??` would keep and print as a nameless chip.
+  return (
+    counterpartyDisplayName({ ...companyNamePartsOf(sup), personName: person }) ||
+    s(raw.supplierDisplayName) ||
+    s(raw.supplierName) ||
+    "Supplier"
   );
 }
 
@@ -1141,7 +1344,7 @@ export type TermBucket = "conflict" | "pending" | "matched";
 // link "operator_included" == in-app "operator"). Counting one row per GROUP keeps in-app bids at the
 // same total (operator + operator_included fold to one). Without this, off-platform bids showed
 // "Conflict 0 · Matched 0" because none of their keys matched the in-app names.
-const COUNTED_TERM_GROUP: Record<string, string> = {
+export const COUNTED_TERM_GROUP: Record<string, string> = {
   operator: "operator", operator_included: "operator",
   safety_certifications: "certs", certs: "certs",
   fuel_responsibility: "fuel",
@@ -1153,6 +1356,53 @@ const COUNTED_TERM_GROUP: Record<string, string> = {
 // (pending / negotiating / grey / open-value) → Pending, so the three counts always sum to the row total.
 const bucketOfTermState = (s: TermState): TermBucket =>
   s === "conflict" ? "conflict" : s === "matched" || s === "agreed" ? "matched" : "pending";
+
+/**
+ * ── The two sides of a term, told apart (owner, 2026-09-06) ────────────────────────────────────
+ * *"No need to show on each term «renter: — supplier: —». Just show the value of the request the
+ * supplier did not match… unless the supplier proposes a different value, like the renter wants TÜV
+ * and the supplier said SPSP — then mention each side."*
+ *
+ * `detail` is built as one sentence, «Renter: X · Supplier: Y», by two different mappers (in-app
+ * `bidTerms`, off-platform `termRow`), and every reader printed it whole. That sentence is right for
+ * the one case it was written for — a supplier who offers something ELSE — and noise everywhere
+ * else: on a refusal it says «Supplier: Not confirmed», which is the state the row is already
+ * painted in.
+ *
+ * So the halves are parsed apart here, once, and each surface decides what to draw:
+ *
+ *  · `asked`   — what the renter's request stated. Falls back to `renteeValue`.
+ *  · `offered` — what the supplier put against it, and NULL when he simply did not meet it: a dash,
+ *                an empty half, or the words this codebase uses for a refusal. That null is the
+ *                signal "he named no alternative", which is what decides whether a reader shows one
+ *                value or two.
+ */
+export function termSides(row: TermRow | null | undefined, ar: boolean): { asked: string | null; offered: string | null } {
+  const clean = (v: string | null | undefined): string | null => {
+    const t = (v ?? "").trim();
+    if (!t || t === "—" || t === "-") return null;
+    // A refusal is not an offer. Both locales, both mappers.
+    if (/^(not confirmed|no)$/i.test(t) || t === "غير مؤكد" || t === "لا") return null;
+    return t;
+  };
+  const detail = row?.detail ? (ar ? row.detail.ar : row.detail.en) : null;
+  let asked: string | null = null;
+  let offered: string | null = null;
+  if (detail) {
+    for (const part of detail.split("·").map((x) => x.trim())) {
+      const askedHit = part.match(/^(?:renter|rentee|المستأجر)\s*[::]\s*(.+)$/i);
+      const offerHit = part.match(/^(?:supplier|المؤجّر|المؤجر)\s*[::]\s*(.+)$/i);
+      if (askedHit) asked = clean(askedHit[1]);
+      else if (offerHit) offered = clean(offerHit[1]);
+      else if (!asked && !offered) {
+        // A detail that is a sentence rather than a pair — it describes the term, so it reads as the
+        // supplier's side, which is the half every caller draws.
+        offered = clean(part);
+      }
+    }
+  }
+  return { asked: asked ?? clean(row?.renteeValue), offered: offered ?? clean(row?.value) };
+}
 
 export function bucketBidTerms(
   terms: { equipment: TermRow[]; contract: TermRow[]; supplier: TermRow[] },
@@ -1199,7 +1449,7 @@ export type BidSizeCounts = { exact: number; larger: number };
 /**
  * `sizeCounts` off the bid-list envelope (`renteeService.getBidList`).
  *
- * ⚠️ Counted BEFORE the size filter is applied, on both sides of it - so `larger` is what the
+ * ⚠️ Counted BEFORE the size filter is applied, on both sides of it — so `larger` is what the
  * default `exact` list is holding back, and it stays the same number once the renter asks to see
  * them. A surface that read it off the returned bids instead would say «0 hidden» in the only state
  * where the sentence matters.

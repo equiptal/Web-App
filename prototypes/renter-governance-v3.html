@@ -1,0 +1,1078 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Procurement integrity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* Moedatech design tokens, copied from src/app/globals.css :root. Never re-chosen here. */
+:root{
+  --navy-deep:#1c2738; --navy:#22384e; --navy-mid:#33506d;
+  --muted-dark:#444f57; --muted:#59646e; --muted-light:#8a95a0;
+  --border-strong:#c6c6c6; --border:#dcdcdc; --border-hair:#e4e4e4;
+  --surface3:#e8e8e8; --surface2:#f4f4f4; --surface:#ffffff; --background:#f4f4f4;
+  --brand:#f97316; --brand-deep:#c2570f; --brand-light:#e8b64c;
+  --brand-pale:#fee0cc; --brand-soft:#fef1e8;
+  --ok:#1d9e55; --ok-soft:#e2efe7; --ok-deep:#1d7a45;
+  --warn:#b98a1d; --warn-soft:#f7edd8; --warn-deep:#8a6412; --warn-border:#e0c583;
+  --danger:#c02626; --danger-soft:#f7e3e3; --danger-deep:#b91c1c; --danger-border:#e8c1c1;
+  --info:#3b556e; --info-soft:#e7ebee;
+  --font-sans:'Inter',system-ui,-apple-system,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --label:11px; --body:13px; --lead:15px; --head:19px; --radius:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);font-size:var(--body);line-height:1.5;color:var(--navy);
+  background:var(--background);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-weight:800;line-height:1.25}
+table{border-collapse:collapse;width:100%}
+.num{font-variant-numeric:tabular-nums}
+
+.bar{background:var(--navy-deep);color:#fff;height:52px;display:flex;align-items:center;gap:16px;padding:0 20px}
+.bar .mark{font-weight:800;font-size:var(--lead);letter-spacing:-.01em}
+.bar nav{display:flex;gap:2px;margin-inline-start:12px}
+.bar nav a{color:rgba(255,255,255,.75);text-decoration:none;font-size:12px;font-weight:400;padding:5px 11px;border-radius:var(--radius)}
+.bar nav a.on{background:#fff;color:var(--navy-deep);font-weight:600}
+.bar .who{margin-inline-start:auto;display:flex;align-items:center;gap:10px;font-size:12px;color:rgba(255,255,255,.75)}
+.bar .avatar{width:28px;height:28px;border-radius:999px;background:var(--navy-mid);display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff}
+
+.wrap{max-width:1360px;margin:0 auto;padding:20px 20px 64px}
+.head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+.head h1{font-size:var(--head)}
+.head p{color:var(--muted);font-size:12px;margin-top:3px;max-width:80ch}
+.head .acts{margin-inline-start:auto;display:flex;gap:8px;align-items:center}
+
+.filters{display:flex;gap:6px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.chip{font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--surface);
+  border-radius:999px;padding:4px 11px;cursor:pointer;color:var(--muted-dark)}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.filters .sep{width:1px;height:20px;background:var(--border);margin:0 4px}
+
+.hint{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--brand-deep);
+  background:var(--brand-soft);border:1px solid var(--brand-light);border-radius:var(--radius);
+  padding:6px 11px;margin-bottom:18px}
+.hint b{font-weight:800}
+
+.btn{font:inherit;font-size:12px;font-weight:600;border-radius:var(--radius);padding:7px 13px;
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--navy);cursor:pointer}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.primary:hover{background:#db6513}
+.btn.sm{padding:5px 10px;font-size:11px}
+
+[data-x]{cursor:pointer;position:relative}
+[data-x]:hover{outline:1.5px solid var(--brand);outline-offset:1px;border-radius:3px}
+th[data-x]:hover{outline-offset:-1px}
+[data-x].on{outline:1.5px solid var(--brand);outline-offset:1px;border-radius:3px;background:var(--brand-soft)}
+
+/* ── Leakage headline ─────────────────────────────────────────────── */
+.lead-row{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.big{background:var(--navy);color:#fff;border-radius:var(--radius);padding:16px 18px}
+.big .lbl{font-size:var(--label);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.6)}
+.big .n{font-size:34px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;margin:4px 0 2px}
+.big .sub{font-size:12px;color:rgba(255,255,255,.75)}
+.big .brk{display:flex;gap:16px;margin-top:11px;padding-top:11px;border-top:1px solid rgba(255,255,255,.14)}
+.big .brk div{font-size:var(--label);color:rgba(255,255,255,.6)}
+.big .brk b{display:block;font-size:14px;color:#fff;font-weight:700;font-variant-numeric:tabular-nums;margin-top:1px}
+.mini{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;
+  display:flex;flex-direction:column;justify-content:center}
+.mini .lbl{font-size:var(--label);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.mini .n{font-size:27px;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums;margin:3px 0 1px}
+.mini .sub{font-size:12px;color:var(--muted)}
+.mini.ok .n{color:var(--ok-deep)}
+.mini.bad .n{color:var(--danger-deep)}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:26px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.tile .n{font-size:23px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.tile .lbl{font-size:12px;color:var(--muted-dark);font-weight:600}
+.tile .sub{font-size:var(--label);color:var(--muted)}
+.tile.crit{border-inline-start:3px solid var(--danger)} .tile.crit .n{color:var(--danger-deep)}
+.tile.high{border-inline-start:3px solid var(--warn)} .tile.high .n{color:var(--warn-deep)}
+
+section{margin-bottom:28px}
+.sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.sec-head h2{font-size:15px}
+.sec-head .note{font-size:var(--label);color:var(--muted)}
+.sec-head .right{margin-inline-start:auto;font-size:12px;color:var(--muted)}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.scroll{overflow-x:auto;overflow-y:clip}
+th{font-size:var(--label);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);
+  font-weight:600;text-align:start;padding:9px 11px;background:var(--surface2);
+  border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:9px 11px;border-bottom:1px solid var(--border-hair);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:end}
+.dim{color:var(--muted);font-size:12px}
+.ref{font-weight:600;white-space:nowrap}
+.mach{font-size:12px;color:var(--muted);display:block;margin-top:1px}
+
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:var(--label);font-weight:600;
+  padding:2px 7px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok-deep);border:1px solid rgba(29,158,85,.3)}
+.pill.bad{background:var(--danger-soft);color:var(--danger-deep);border:1px solid var(--danger-border)}
+.pill.warn{background:var(--warn-soft);color:var(--warn-deep);border:1px solid var(--warn-border)}
+.pill.flat{background:var(--surface2);color:var(--muted-dark);border:1px solid var(--border)}
+.tick{color:var(--ok-deep);font-weight:800} .cross{color:var(--danger-deep);font-weight:800}
+.src{font-size:var(--label);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600;white-space:nowrap}
+.money{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.money .cur{font-size:var(--label);color:var(--muted);font-weight:400;margin-inline-start:3px}
+.over{color:var(--danger-deep)}
+.rank{font-weight:800;font-variant-numeric:tabular-nums}
+.rank.bad{color:var(--danger-deep)} .rank.warn{color:var(--warn-deep)} .rank.ok{color:var(--ok-deep)}
+
+.flags{display:flex;gap:4px;flex-wrap:wrap}
+.fl{font-size:10px;font-weight:800;letter-spacing:.03em;padding:1px 5px;border-radius:3px;white-space:nowrap}
+.fl.c{background:var(--danger);color:#fff}
+.fl.h{background:var(--warn);color:#fff}
+.fl.l{background:var(--surface3);color:var(--muted-dark)}
+
+/* ── Case queue ───────────────────────────────────────────────────── */
+.case{display:flex;gap:13px;padding:12px 15px;border-bottom:1px solid var(--border-hair);align-items:flex-start}
+.case:last-child{border-bottom:0}
+.score{flex:none;width:46px;text-align:center}
+.score .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.score .b{height:3px;border-radius:2px;margin-top:3px;background:var(--surface3);overflow:hidden}
+.score .b i{display:block;height:100%;border-radius:2px}
+.score.c .v{color:var(--danger-deep)} .score.c .b i{background:var(--danger)}
+.score.h .v{color:var(--warn-deep)} .score.h .b i{background:var(--warn)}
+.score.l .v{color:var(--muted)} .score.l .b i{background:var(--muted-light)}
+.case .body{flex:1;min-width:0}
+.case .t{font-weight:600;margin-bottom:2px}
+.case .why{font-size:12px;color:var(--muted-dark);margin-bottom:5px}
+.case .meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.case .val{flex:none;text-align:end;min-width:96px}
+.case .val .amt{font-weight:800;font-variant-numeric:tabular-nums;font-size:14px;color:var(--danger-deep)}
+.case .val .unit{font-size:var(--label);color:var(--muted)}
+.st{font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:999px;text-transform:uppercase}
+.st.new{background:var(--danger-soft);color:var(--danger-deep);border:1px solid var(--danger-border)}
+.st.rev{background:var(--warn-soft);color:var(--warn-deep);border:1px solid var(--warn-border)}
+.st.exp{background:var(--ok-soft);color:var(--ok-deep);border:1px solid rgba(29,158,85,.3)}
+.st.cls{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+
+/* ── Stats strip ──────────────────────────────────────────────────── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.stat .h{font-weight:700;font-size:13px;margin-bottom:2px}
+.stat .d{font-size:12px;color:var(--muted-dark);margin-bottom:10px}
+.bars{display:flex;align-items:flex-end;gap:4px;height:56px}
+.bars div{flex:1;border-radius:2px 2px 0 0;position:relative;background:var(--navy-mid)}
+.bars div.hot{background:var(--danger)}
+.bars div span{position:absolute;bottom:-15px;inset-inline-start:0;right:0;text-align:center;font-size:9px;color:var(--muted)}
+.statfoot{margin-top:22px;font-size:var(--label);color:var(--muted)}
+.statfoot b{color:var(--danger-deep);font-weight:700}
+
+/* ── Not available ────────────────────────────────────────────────── */
+.gap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:15px 17px}
+.gap h3{font-size:13px;margin-bottom:3px}
+.gap > p{font-size:12px;color:var(--muted);margin-bottom:12px}
+.gap ul{list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:9px 26px}
+.gap li{font-size:12px;display:flex;gap:8px;align-items:baseline}
+.gap li b{font-weight:600;color:var(--navy)}
+.gap li span{color:var(--muted)}
+.gap li::before{content:"";width:5px;height:5px;border-radius:999px;background:var(--muted-light);flex:none;transform:translateY(-2px)}
+.gap .grp{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  margin:14px 0 7px;grid-column:1/-1}
+.gap .grp::before{display:none}
+.gap .grp:first-child{margin-top:0}
+.foot{margin-top:24px;font-size:var(--label);color:var(--muted-light);line-height:1.7}
+
+/* ── Drawer ───────────────────────────────────────────────────────── */
+#scrim{position:fixed;inset:0;background:transparent;pointer-events:none;z-index:40}
+#scrim.open{pointer-events:auto}
+#dw{position:fixed;inset-block:0;inset-inline-end:0;width:min(455px,100vw);background:var(--surface);
+  border-inline-start:1px solid var(--border-strong);z-index:50;display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .2s ease;box-shadow:-1px 0 0 var(--border)}
+#dw.open{transform:translateX(0)}
+#dw header{padding:16px 20px 13px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start}
+#dw header .kind{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+#dw header h3{font-size:var(--lead);line-height:1.3}
+#dw header button{flex:none;width:28px;height:28px;border:1px solid var(--border);background:var(--surface);
+  border-radius:var(--radius);cursor:pointer;font:inherit;font-size:15px;color:var(--muted);line-height:1}
+#dw .scrollbody{overflow-y:auto;padding:16px 20px 32px;flex:1}
+#dw .blk{margin-bottom:19px}
+#dw .blk h4{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+#dw .blk p{font-size:var(--body);line-height:1.6}
+#dw .blk p.soft{color:var(--muted-dark)}
+#dw .ask{border-top:1px solid var(--border);padding:13px 20px;background:var(--surface2);display:flex;gap:8px;align-items:center}
+#dw .ask .t{flex:1;font-size:11px;color:var(--muted)}
+
+.state{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:800;letter-spacing:.04em;
+  padding:2px 7px;border-radius:999px;text-transform:uppercase}
+.state.live{background:var(--ok-soft);color:var(--ok-deep);border:1px solid rgba(29,158,85,.3)}
+.state.part{background:var(--warn-soft);color:var(--warn-deep);border:1px solid var(--warn-border)}
+.state.blocked{background:var(--danger-soft);color:var(--danger-deep);border:1px solid var(--danger-border)}
+
+ol.chain{list-style:none;counter-reset:s}
+ol.chain li{counter-increment:s;position:relative;padding-inline-start:28px;padding-bottom:13px}
+ol.chain li::before{content:counter(s);position:absolute;inset-inline-start:0;top:0;width:19px;height:19px;
+  border-radius:999px;background:var(--navy);color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center}
+ol.chain li::after{content:"";position:absolute;inset-inline-start:9px;top:22px;bottom:1px;width:1px;background:var(--border)}
+ol.chain li:last-child{padding-bottom:0} ol.chain li:last-child::after{display:none}
+ol.chain .m{font-weight:600;font-size:12px;margin-bottom:1px}
+ol.chain .d{font-size:12px;color:var(--muted-dark);line-height:1.55}
+ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
+  border:1px solid var(--border-hair);border-radius:3px;padding:0 4px}
+.ex{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;font-size:12px}
+.ex .eh{background:var(--surface2);padding:7px 10px;font-weight:700;border-bottom:1px solid var(--border)}
+.ex .er{display:flex;gap:9px;padding:6px 10px;border-bottom:1px solid var(--border-hair);align-items:baseline}
+.ex .er .a{flex:1;min-width:0}
+.ex .er .b{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.ex .er .c{color:var(--muted);white-space:nowrap;font-size:11px;min-width:64px;text-align:end}
+.ex .er.win{background:var(--danger-soft)}
+.ex .er.win .c{color:var(--danger-deep);font-weight:700}
+.ex .eo{background:var(--navy);color:#fff;padding:9px 10px;font-weight:600;line-height:1.5}
+.fields{display:flex;flex-wrap:wrap;gap:5px}
+.fields span{font-family:var(--mono);font-size:11px;background:var(--navy);color:#fff;border-radius:3px;padding:2px 7px}
+.fields span.no{background:var(--danger-soft);color:var(--danger-deep);border:1px solid var(--danger-border)}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span class="mark">Moedatech</span>
+  <nav><a href="#">Browse</a><a href="#">Dashboard</a><a href="#">Requests</a><a href="#" class="on">Integrity</a></nav>
+  <span class="who">Al Rajhi Contracting Est. <span class="avatar">YA</span></span>
+</div>
+
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <h1>Procurement integrity</h1>
+      <p>Every award checked against your own requirements, your own prices, your own supplier records and the timestamps the platform already keeps · 7 decided requests · 1 Aug to 18 Sep 2026</p>
+    </div>
+    <div class="acts">
+      <button class="btn">Export pack</button>
+      <button class="btn primary">Open 2 new cases</button>
+    </div>
+  </div>
+
+  <div class="filters">
+    <span class="chip on">All requests</span>
+    <span class="chip">Flagged only</span>
+    <span class="chip">Open cases</span>
+    <span class="sep"></span>
+    <span class="chip" data-x="filter-project">By project</span>
+    <span class="chip">By supplier</span>
+    <span class="chip">Last 90 days</span>
+  </div>
+
+  <div class="hint">◆ <b>Click anything</b> to see what it is, why it matters, and the exact moment in the product that produces the data</div>
+
+  <!-- ── Leakage headline ──────────────────────────────────────────── -->
+  <div class="lead-row">
+    <div class="big" data-x="leak">
+      <div class="lbl">Leakage, this period</div>
+      <div class="n">50,260 <span style="font-size:15px;font-weight:600;opacity:.65">SAR</span></div>
+      <div class="sub">4.1 percent of 1,238,400 awarded</div>
+      <div class="brk">
+        <div>Above compliant low<b>14,180</b></div>
+        <div>Agreed above bid<b>12,480</b></div>
+        <div>Overrun past end<b>23,600</b></div>
+      </div>
+    </div>
+    <div class="mini ok" data-x="whatif">
+      <div class="lbl">If every award took the lowest compliant bid</div>
+      <div class="n">14,180</div>
+      <div class="sub">SAR recoverable, same suppliers, same terms</div>
+    </div>
+    <div class="mini bad" data-x="casecount">
+      <div class="lbl">New cases</div>
+      <div class="n">2</div>
+      <div class="sub">of 5 · 1 in review, 1 explained, 1 closed</div>
+    </div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile crit" data-x="t-rule"><span class="n">2</span><span class="lbl">Own requirement bypassed</span><span class="sub">A compliant bid existed</span></div>
+    <div class="tile high" data-x="t-rank"><span class="n">2</span><span class="lbl">Winner not the cheapest</span><span class="sub">One was 3rd of 3</span></div>
+    <div class="tile high" data-x="t-timing"><span class="n">3</span><span class="lbl">Timing anomalies</span><span class="sub">Late bid, early award, short window</span></div>
+    <div class="tile high" data-x="t-ident"><span class="n">3</span><span class="lbl">Winners you cannot identify</span><span class="sub">3 of 7 awards failed a check</span></div>
+  </div>
+
+  <!-- ── Case queue ────────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>Cases</h2>
+      <span class="note">Ranked by weighted score, not a wall of alerts · every case can be sent to the buyer for explanation</span>
+      <span class="right">5 cases · 2 new</span>
+    </div>
+    <div class="card">
+
+      <div class="case" data-x="case-rule">
+        <div class="score c"><div class="v">78</div><div class="b"><i style="width:78%"></i></div></div>
+        <div class="body">
+          <div class="t">RFQ-1048 · requirement bypassed, winner ranked 3rd</div>
+          <div class="why">TÜV was required. The winner answered no and was the third cheapest of three. Two bids met the requirement, the cheapest at 450 SAR per day less</div>
+          <div class="meta">
+            <span class="st rev">Under review</span>
+            <span class="fl c">RULE BROKEN</span><span class="fl h">RANK 3 OF 3</span><span class="fl h">OVERPAID</span>
+          </div>
+        </div>
+        <div class="val"><div class="amt">11,700</div><div class="unit">SAR</div></div>
+      </div>
+
+      <div class="case" data-x="case-timing">
+        <div class="score c"><div class="v">71</div><div class="b"><i style="width:71%"></i></div></div>
+        <div class="body">
+          <div class="t">RFQ-1061 · the clock does not line up</div>
+          <div class="why">The winning bid arrived six hours after bidding closed, the award was recorded before the stated deadline, and three larger machines were never opened</div>
+          <div class="meta">
+            <span class="st new">New</span>
+            <span class="fl c">AWARD BEFORE CLOSE</span><span class="fl h">LATE BID ACCEPTED</span><span class="fl l">3 UNOPENED</span>
+          </div>
+        </div>
+        <div class="val"><div class="amt">2,480</div><div class="unit">SAR</div></div>
+      </div>
+
+      <div class="case" data-x="case-1051">
+        <div class="score h"><div class="v">58</div><div class="b"><i style="width:58%"></i></div></div>
+        <div class="body">
+          <div class="t">RFQ-1051 · awarded to a firm nothing can identify</div>
+          <div class="why">No commercial registration, no vendor-registered tick, no Moedatech account. The window was 24 hours and no bid met every requirement, so there was nothing to compare against</div>
+          <div class="meta">
+            <span class="st new">New</span>
+            <span class="fl h">UNKNOWN FIRM</span><span class="fl h">SHORT WINDOW</span><span class="fl l">NO COMPLIANT BID</span>
+          </div>
+        </div>
+        <div class="val"><div class="amt">0</div><div class="unit">of 3 checks</div></div>
+      </div>
+
+      <div class="case" data-x="case-reneg">
+        <div class="score h"><div class="v">51</div><div class="b"><i style="width:51%"></i></div></div>
+        <div class="body">
+          <div class="t">RFQ-1058 · won on price, agreed 20 percent higher</div>
+          <div class="why">Won at 1,180 per day, deal room closed at 1,420. Buyer answered: the original unit failed inspection and a newer one was substituted at the supplier's rate</div>
+          <div class="meta"><span class="st exp">Explained</span><span class="fl h">AGREED ABOVE BID</span></div>
+        </div>
+        <div class="val"><div class="amt">12,480</div><div class="unit">SAR</div></div>
+      </div>
+
+      <div class="case" data-x="case-mismatch">
+        <div class="score l"><div class="v">47</div><div class="b"><i style="width:47%"></i></div></div>
+        <div class="body">
+          <div class="t">RFQ-1064 · two records name different winners</div>
+          <div class="why">Nesma holds the accepted bid, the award names Al Faisal Rentals. Closed as a recording error after the award was corrected</div>
+          <div class="meta"><span class="st cls">Closed</span><span class="fl h">WINNER MISMATCH</span></div>
+        </div>
+        <div class="val"><div class="unit">corrected</div></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Award decision record ─────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>Award decision record</h2>
+      <span class="note">Click a column heading for what it means · click a row for that decision in full</span>
+      <span class="right">7 requests · 1,238,400 SAR</span>
+    </div>
+    <div class="card scroll">
+      <table style="min-width:1220px">
+        <thead>
+          <tr>
+            <th data-x="c-request">Request</th>
+            <th data-x="c-sentas">Sent as</th>
+            <th data-x="c-window">Window</th>
+            <th class="r" data-x="c-bids">Bids</th>
+            <th data-x="c-winner">Winner</th>
+            <th class="r" data-x="c-rank">Rank</th>
+            <th data-x="c-reached">Reached you by</th>
+            <th data-x="c-elig">Eligible</th>
+            <th data-x="c-terms">Met terms</th>
+            <th class="r" data-x="c-price">Price</th>
+            <th class="r" data-x="c-vslow">vs low</th>
+            <th data-x="c-flags">Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-x="r-1042">
+            <td><span class="ref">RFQ-1042</span><span class="mach">Crawler Excavator 20 ton</span></td>
+            <td><span class="src">Broadcast</span></td><td class="dim">72h</td>
+            <td class="r num">4</td>
+            <td>Zahid Tractor</td><td class="r rank ok">1</td>
+            <td><span class="pill flat">Platform</span></td>
+            <td><span class="tick">✓✓✓</span></td>
+            <td><span class="pill ok">All 6</span></td>
+            <td class="r money">3,900<span class="cur">/d</span></td>
+            <td class="r"><span class="pill ok">Lowest</span></td>
+            <td><span class="dim">None</span></td>
+          </tr>
+          <tr data-x="r-1048">
+            <td><span class="ref">RFQ-1048</span><span class="mach">Mobile Crane 100 ton</span></td>
+            <td><span class="src">Broadcast</span></td><td class="dim">72h</td>
+            <td class="r num">3</td>
+            <td>Arabian Cranes Co.</td><td class="r rank bad">3</td>
+            <td><span class="pill flat">Platform</span></td>
+            <td><span class="tick">✓✓✓</span></td>
+            <td><span class="pill bad">TÜV refused</span></td>
+            <td class="r money">4,800<span class="cur">/d</span></td>
+            <td class="r money over">+11,700</td>
+            <td><div class="flags"><span class="fl c">RULE BROKEN</span><span class="fl h">RANK 3</span></div></td>
+          </tr>
+          <tr data-x="r-1051">
+            <td><span class="ref">RFQ-1051</span><span class="mach">Telehandler 17 m ×2</span></td>
+            <td><span class="src">Broadcast</span></td><td class="dim">24h</td>
+            <td class="r num">2</td>
+            <td>Faisal Heavy Equip. Est.</td><td class="r rank ok">1</td>
+            <td><span class="pill warn">Your link</span></td>
+            <td><span class="cross">✗✗✗</span></td>
+            <td><span class="pill warn">4 of 6</span></td>
+            <td class="r money">1,150<span class="cur">/d</span></td>
+            <td class="r dim">No compliant</td>
+            <td><div class="flags"><span class="fl h">UNKNOWN FIRM</span><span class="fl h">SHORT WINDOW</span></div></td>
+          </tr>
+          <tr data-x="r-1055">
+            <td><span class="ref">RFQ-1055</span><span class="mach">Wheel Loader 966</span></td>
+            <td><span class="src">Direct</span></td><td class="dim">24h</td>
+            <td class="r num">1</td>
+            <td>Al Faisal Rentals</td><td class="r rank ok">1</td>
+            <td><span class="pill flat">Direct</span></td>
+            <td><span class="tick">✓</span><span class="cross">✗✗</span></td>
+            <td><span class="pill ok">All 4</span></td>
+            <td class="r money">2,240<span class="cur">/d</span></td>
+            <td class="r dim">No comparison</td>
+            <td><div class="flags"><span class="fl h">ASAP</span><span class="fl l">SOLE BID</span></div></td>
+          </tr>
+          <tr data-x="r-1058">
+            <td><span class="ref">RFQ-1058</span><span class="mach">Water Tanker 20 m³</span></td>
+            <td><span class="src">Broadcast</span></td><td class="dim">1 week</td>
+            <td class="r num">5</td>
+            <td>Nesma Heavy Equipment</td><td class="r rank ok">1</td>
+            <td><span class="pill flat">Platform</span></td>
+            <td><span class="tick">✓✓✓</span></td>
+            <td><span class="pill ok">All 5</span></td>
+            <td class="r money">1,180<span class="cur">/d</span></td>
+            <td class="r"><span class="pill ok">Lowest</span></td>
+            <td><div class="flags"><span class="fl h">AGREED +20%</span><span class="fl h">PRICE FOLLOW</span></div></td>
+          </tr>
+          <tr data-x="r-1061">
+            <td><span class="ref">RFQ-1061</span><span class="mach">Boom Lift 45 ft ×3</span></td>
+            <td><span class="src">Broadcast</span></td><td class="dim">48h</td>
+            <td class="r num">3</td>
+            <td>Zahid Tractor</td><td class="r rank warn">2</td>
+            <td><span class="pill flat">Platform</span></td>
+            <td><span class="tick">✓✓✓</span></td>
+            <td><span class="pill warn">Cert expired</span></td>
+            <td class="r money">860<span class="cur">/d</span></td>
+            <td class="r money over">+2,480</td>
+            <td><div class="flags"><span class="fl c">AWARD B4 CLOSE</span><span class="fl h">LATE BID</span></div></td>
+          </tr>
+          <tr data-x="r-1064">
+            <td><span class="ref">RFQ-1064</span><span class="mach">Forklift 5 ton ×2</span></td>
+            <td><span class="src">Broadcast</span></td><td class="dim">48h</td>
+            <td class="r num">4</td>
+            <td><span style="color:var(--danger-deep);font-weight:600">Records disagree</span></td>
+            <td class="r rank ok">1</td>
+            <td><span class="pill flat">Platform</span></td>
+            <td><span class="dim">?</span></td>
+            <td><span class="pill ok">All 4</span></td>
+            <td class="r money">640<span class="cur">/d</span></td>
+            <td class="r"><span class="pill ok">Lowest</span></td>
+            <td><div class="flags"><span class="fl h">MISMATCH</span><span class="fl l">EDITED POST-BID</span></div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Statistical signals ───────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>Patterns across requests</h2>
+      <span class="note">Tests that need no new data, only the bid values and timestamps you already hold</span>
+    </div>
+    <div class="stats">
+
+      <div class="stat" data-x="s-follow">
+        <div class="h">Price-follow</div>
+        <div class="d">How far the last bid to arrive undercut the standing lowest</div>
+        <div class="bars">
+          <div style="height:22%"></div><div style="height:58%"></div><div class="hot" style="height:94%"></div>
+          <div class="hot" style="height:88%"></div><div style="height:34%"></div><div style="height:18%"></div>
+          <div style="height:12%"></div><div style="height:26%"></div>
+        </div>
+        <div class="statfoot">Undercut, percent · <b>2 of 7 requests land in the 1 to 3 percent band</b>, where a bidder who could see the standing price would land</div>
+      </div>
+
+      <div class="stat" data-x="s-gap">
+        <div class="h">Winner to runner-up gap</div>
+        <div class="d">A recurring narrow gap means coordination, a spread means competition</div>
+        <div class="bars">
+          <div style="height:30%"></div><div class="hot" style="height:82%"></div><div class="hot" style="height:90%"></div>
+          <div style="height:44%"></div><div style="height:62%"></div><div style="height:28%"></div>
+          <div style="height:20%"></div><div style="height:16%"></div>
+        </div>
+        <div class="statfoot">Gap, percent · <b>two awards sit within half a point of 12 percent</b>, which is tighter than competition usually produces</div>
+      </div>
+
+      <div class="stat" data-x="s-benford">
+        <div class="h">Benford on bid values</div>
+        <div class="d">Leading digits of real prices follow a known curve. Invented ones rarely do</div>
+        <div class="bars">
+          <div style="height:88%"></div><div style="height:58%"></div><div style="height:42%"></div>
+          <div style="height:30%"></div><div class="hot" style="height:52%"></div><div style="height:22%"></div>
+          <div style="height:18%"></div><div style="height:14%"></div><div style="height:11%"></div>
+        </div>
+        <div class="statfoot">Digits 1 to 9 · <b>5 appears more than twice as often as expected</b>, on 28 bids. Indicative only at this volume</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Not available ─────────────────────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>Not checked</h2>
+      <span class="note">Named so nobody reads silence as clean · click one for exactly what it needs</span>
+    </div>
+    <div class="gap">
+      <h3>What the platform cannot answer yet</h3>
+      <p>Everything above runs on data already in your account. These do not, and each names the one thing missing</p>
+      <ul>
+        <li class="grp">Blocked by one missing field</li>
+        <li data-x="g-actor"><b>Who raised, who awarded, who approved a deviation</b> <span>no actor on a request or an award</span></li>
+        <li data-x="g-shares"><b>Who the request was actually shared with</b> <span>shares are written, never read back</span></li>
+        <li data-x="g-diff"><b>What changed in a post-bid edit</b> <span>the fact is stored, the diff is not</span></li>
+        <li data-x="g-deadline"><b>A deadline extended after bids landed</b> <span>only the current value is kept</span></li>
+        <li data-x="g-views"><b>Who viewed competitor bid values before close</b> <span>no access log exists</span></li>
+        <li data-x="g-case"><b>Case state, justification text, outcome</b> <span>nowhere to store a workflow</span></li>
+        <li class="grp">Blocked by a whole missing subject</li>
+        <li data-x="g-coi"><b>Conflict of interest and related parties</b> <span>no employee records, no owner identity, no declarations</span></li>
+        <li data-x="g-delivery"><b>Delivery reality: serial, plate, telematics, gate</b> <span>nothing records what physically arrived</span></li>
+        <li data-x="g-retro"><b>Equipment on site before its request existed</b> <span>arrival is only recorded if somebody marks it, and almost nobody does</span></li>
+        <li data-x="g-invoice"><b>Invoices, IBAN, payment diversion</b> <span>the platform handles no money</span></li>
+        <li data-x="g-approval"><b>Approval thresholds and splitting</b> <span>there is no approval step at all</span></li>
+        <li data-x="g-ratecard"><b>Rate card adherence, framework agreements</b> <span>no rate cards exist</span></li>
+        <li data-x="g-sanctions"><b>Debarment and sanctions screening</b> <span>no external list integration</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <p class="foot">
+    Every figure comes from your own requests, bids, link submissions, supplier records, deal rooms and awards.
+    Prices are compared per cycle through the same calculation the quotation uses, with Fridays excluded.
+    A flag is a prompt to ask, not a finding of wrongdoing, and every case carries a one-press request for the buyer's explanation.
+  </p>
+</div>
+
+<div id="scrim"></div>
+<aside id="dw" aria-hidden="true">
+  <header>
+    <div style="flex:1;min-width:0"><div class="kind" id="dwKind"></div><h3 id="dwTitle"></h3></div>
+    <button id="dwClose" aria-label="Close">✕</button>
+  </header>
+  <div class="scrollbody">
+    <div class="blk"><h4>What it is</h4><p id="dwWhat"></p></div>
+    <div class="blk"><h4>Why it matters</h4><p class="soft" id="dwWhy"></p></div>
+    <div class="blk" id="dwExBlk"><h4>Worked example</h4><div class="ex" id="dwEx"></div></div>
+    <div class="blk"><h4>Where the data comes from</h4><ol class="chain" id="dwChain"></ol></div>
+    <div class="blk"><h4>Fields read</h4><div class="fields" id="dwFields"></div></div>
+    <div class="blk"><h4>Status</h4><span id="dwState"></span></div>
+  </div>
+  <div class="ask"><span class="t">Most flags have an ordinary answer. Ask before concluding</span>
+    <button class="btn sm">Request explanation</button></div>
+</aside>
+
+<script>
+/* what it is · why it matters · [moment, what is written or read] · fields · live|part|blocked */
+const X = {
+
+/* ── Headline ──────────────────────────────────────────────────────── */
+"leak":{k:"Headline",t:"Leakage",
+
+ ex:{head:"The three parts, added up",rows:[
+  ["Paid above the cheapest bid that met your terms","14,180","2 awards"],
+  ["Agreed in the deal room above the bid that won","12,480","1 deal"],
+  ["Billed past the contracted end date","23,600","2 machines"]],
+  out:"50,260 SAR, which is 4.1 percent of the 1,238,400 you awarded this period"},
+ what:"Money the company spent above what the same decisions would have cost taken at the lowest compliant bid, honoured at the agreed price, and returned on time",
+ why:"The number that gets this page opened. An integrity module framed only as policing is switched off within a quarter, one framed as recovered money is defended",
+ chain:[["Awards are priced","Rate plus mobilization and demobilization, times units, times billable days, Fridays excluded, through the same calculation the quotation uses"],
+ ["Three gaps are summed","Above the lowest compliant bid, agreed above the bid that won, and days billed past the contracted end"],
+ ["Nothing is estimated","Each component traces to a row you can open"]],
+ f:["computeCycleTotals","Bid.price","QuotationView","Award.demobilizedAt"],s:"live"},
+
+"whatif":{k:"Counterfactual",t:"If every award took the lowest compliant bid",
+
+ ex:{head:"RFQ-1048, replayed under strict rules",rows:[
+  ["You awarded Arabian Cranes","4,800 /day","refused TÜV",1],
+  ["Cheapest bid that met TÜV, Nesma","4,350 /day","TÜV yes"],
+  ["Difference","450 /day",""],
+  ["Across 26 billable days","11,700 SAR",""]],
+  out:"Replay every request that way and 14,180 SAR comes back, with no supplier and no requirement changed"},
+ what:"What this period would have cost under strict lowest-compliant awarding, holding requirements and suppliers the same",
+ why:"It converts a list of complaints into a budget number. It is also the fairest test, because it only ever compares bids that met your own stated requirements",
+ chain:[["Every request is replayed","Bids filtered to those that answered yes to every required term"],
+ ["The cheapest compliant bid is taken","Where none exists the request is skipped rather than guessed"],
+ ["The difference is summed","Against what was actually awarded"]],
+ f:["requiredTerms","confirmations","t3Declarations","computeCycleTotals"],s:"live"},
+
+"casecount":{k:"Workflow",t:"Open cases",
+
+ ex:{head:"RFQ-1051, from flags to one case",rows:[
+  ["Four separate flags fire on one request","score 92","one case"],
+  ["Sent to the buyer for his answer","New","awaiting"],
+  ["RFQ-1058 came back with an answer","Explained","unit failed inspection"],
+  ["RFQ-1064 was a recording error","Closed","award corrected"]],
+  out:"You work a queue of 6, highest score first, instead of reading 14 loose alerts and giving up"},
+ what:"Flags rolled into cases, scored, and tracked from new through review to explained, substantiated or closed",
+ why:"A queue sorted by score is worked. A wall of alerts is ignored, then disabled. The state and the buyer's answer are the half that makes it a process rather than a report",
+ chain:[["Flags are grouped per request or per supplier","Several flags on one decision are one case, not six alerts"],
+ ["A weighted score orders the queue","Absent competition and broken requirements weigh most, missed opportunities least"],
+ ["The buyer is asked","One press sends the case for explanation, before anyone concludes anything"]],
+ f:["Case store"],s:"blocked"},
+
+/* ── Tiles ─────────────────────────────────────────────────────────── */
+"t-rule":{k:"Detector",t:"Own requirement bypassed",
+
+ ex:{head:"RFQ-1048 · your request said TÜV is required",rows:[
+  ["Nesma Heavy Equipment","4,350 /day","TÜV yes"],
+  ["Zahid Tractor","4,500 /day","TÜV yes"],
+  ["Arabian Cranes Co.","4,800 /day","TÜV no",1]],
+  out:"The only bid that refused your own requirement is the one that won, at 450 SAR per day more than the cheapest that met it"},
+ what:"Awards where the winner refused a term the request demanded while a bid that met it existed",
+ why:"The cleanest violation on the page. Nobody has to judge whether the decision was reasonable. You wrote the rule and your own award broke it",
+ chain:[["The request states its terms","Certificate, minimum year, operator certificate, who pays fuel, who moves it, stored per item as requiredTerms"],
+ ["Each bid answers them","App bids as t3Declarations, link bids as confirmations. An uploaded certificate also counts as an answer"],
+ ["The accepted bid is compared","Against the request's own terms, then against the cheapest bid that answered yes"]],
+ f:["requiredTerms","t3Declarations","confirmations","computeBidQuality"],s:"live"},
+
+"t-rank":{k:"Detector",t:"Winner not the cheapest",
+
+ ex:{head:"Where the winning bid sat in the price order",rows:[
+  ["RFQ-1042 · Zahid won at 3,900","rank 1 of 4","routine"],
+  ["RFQ-1061 · Zahid won at 860","rank 2 of 3","one sentence"],
+  ["RFQ-1048 · Arabian won at 4,800","rank 3 of 3","a meeting",1]],
+  out:"Rank 1 needs no explanation. Rank 3 of 3 means the most expensive bid on the table won"},
+ what:"Where the winning bid sat in the price order. Winning as the fourth cheapest of five is a far louder signal than winning as the second",
+ why:"A single non-lowest award is routine. Rank turns it into a scale: second is a judgement call, fourth of five needs a sentence of explanation",
+ chain:[["Every bid carries a price and a basis","Per day, week, month or job"],["All bids on the request are normalised","To one cycle, so a weekly and a daily rate sort against each other"],
+ ["The accepted bid's position is read","1 of 4, 3 of 3, and so on"]],
+ f:["Bid.price","rentalBasis","computeCycleTotals","Bid.status"],s:"live"},
+
+"t-timing":{k:"Detector",t:"Timing anomalies",
+
+ ex:{head:"Four clock checks, every time written by the system",rows:[
+  ["RFQ-1061 · award recorded","11 Sep 14:40","before close",1],
+  ["RFQ-1061 · bidding closed","11 Sep 17:00",""],
+  ["RFQ-1061 · winning bid arrived","11 Sep 23:20","6h 20m late",1],
+  ["RFQ-1051 and RFQ-1055 · bid window","24 hours","shortest available"]],
+  out:"The award was stamped before bidding closed and the bid that won arrived after it. Nobody typed those times, the system did"},
+ what:"Three clock checks: a bid accepted after close, an award recorded before close, and a bid window too short for anyone who was not expecting the request",
+ why:"Timing fraud leaves the cleanest evidence in the whole set, because timestamps are written by the system rather than typed by a person",
+ chain:[["The request is posted","createdAt is stamped, and the renter picks a window of 24, 48 or 72 hours or a week"],
+ ["Bids arrive","submittedAt on an app bid, createdAt on a link submission"],
+ ["The award is recorded","awardedAt on the project's award book, and mobilizedAt when the machine is marked as arrived"],
+ ["Four comparisons follow","And none of them needs anything new"]],
+ f:["RequestRecord.createdAt","offerDuration","Bid.submittedAt","Award.awardedAt","Award.mobilizedAt"],s:"live"},
+
+"t-ident":{k:"Detector",t:"Winners you cannot identify",
+
+ ex:{head:"Faisal Heavy Equip. Est., winner of RFQ-1051",rows:[
+  ["Registered as your vendor","No","you never ticked it",1],
+  ["Verified by Moedatech","No","holds no account",1],
+  ["Commercial registration on file","No","blank on the form",1]],
+  out:"All three checks fail on one counterparty. Across the period, 3 of 7 awards went to a firm failing at least one"},
+ what:"Awards to a firm with no commercial registration, no vendor-registered tick and no Moedatech account",
+ why:"You cannot tie him to a legal entity, check his papers, or chase him if the machine fails. Three independent checks failing on one counterparty is different from one missing field",
+ chain:[["The supplier is added","vendorRegistered starts off on every route, typed, imported or picked, so a tick is always a decision somebody made"],
+ ["Verification is the platform's, not yours","Set from Moedatech's own review, never inferred by the web"],
+ ["The CR arrives from the row or the bid form","Both are read, and absent counts as absent"]],
+ f:["vendorRegistered","verified","crNumber","SupplierRollup.appBids"],s:"live"},
+
+/* ── Cases ─────────────────────────────────────────────────────────── */
+"case-rule":{k:"Case · score 78",t:"RFQ-1048 · requirement bypassed",
+ what:"TÜV was required. The winner answered no, priced third of three, and was accepted anyway",
+ why:"Two findings that compound. The requirement was broken and it cost money, which removes both of the usual defences at once. The certificate is what lets that crane onto an inspected site",
+ chain:[["TÜV goes into the item's required terms","When the renter builds the request"],
+ ["Nesma bids 4,350 and answers yes","Zahid bids 4,500 and answers yes"],
+ ["Arabian Cranes bids 4,800 and answers no","And is accepted, at rank 3 of 3"],
+ ["The gap is 11,700 SAR","450 per day across 26 billable days"]],
+ f:["requiredTerms.equipmentCert","t3Declarations","Bid.price","Bid.status"],s:"live"},
+
+"case-timing":{k:"Case · score 71",t:"RFQ-1061 · the clock does not line up",
+ what:"The winning bid landed six hours after close, and the award was recorded before the stated deadline had passed",
+ why:"Those two cannot both be innocent. Either the deadline was moved, which is not recorded, or the decision was taken before the field was complete and the paperwork followed",
+ chain:[["Bidding closes at 17:00 on 11 Sep","From the window chosen at posting, unless a link deadline overrides it"],
+ ["Zahid submits at 23:20","submittedAt, six hours and twenty minutes past close"],
+ ["The award is stamped 11 Sep 14:40","awardedAt, before the close it was supposedly judged against"],
+ ["Three larger boom lifts were never opened","Counted by the size filter, never shown"]],
+ f:["Bid.submittedAt","requestExpiry","Award.awardedAt","sizeCounts.larger"],s:"live"},
+
+"case-1051":{k:"Case · score 58",t:"RFQ-1051 · awarded to a firm nothing can identify",
+ ex:{head:"Three checks on the winner of RFQ-1051",rows:[
+  ["Registered as your vendor","No","never ticked",1],
+  ["Verified by Moedatech","No","holds no account",1],
+  ["Commercial registration on file","No","blank on the form",1],
+  ["Bid window","24 hours","shortest available"]],
+  out:"Nothing here says the supplier did anything wrong. It says that if the machine fails or the invoice is wrong, you have no registered entity to go to"},
+ what:"The winner carries none of the three identity checks, on a request that ran for 24 hours and drew no bid meeting every requirement",
+ why:"This is about recourse, not suspicion. A firm with no commercial registration cannot be matched to a legal entity, chased through any authority, or checked by anyone outside your office",
+ chain:[["The supplier is added to your list","vendorRegistered starts off on every route, so a tick is always a decision somebody made"],
+ ["He holds no Moedatech account","So verified is false and the platform has reviewed nothing about him"],
+ ["The public bid form asks for a CR and a VAT number","Both came back empty"],
+ ["The window was 24 hours","Chosen at posting, the shortest offerDuration available"]],
+ f:["vendorRegistered","verified","crNumber","offerDuration"],s:"live"},
+
+"case-reneg":{k:"Case · score 51 · explained",t:"RFQ-1058 · agreed above the winning bid",
+ what:"Won at 1,180 per day, deal room closed at 1,420. The buyer answered that the original unit failed inspection and a newer one was substituted",
+ why:"Kept on the page after being explained, deliberately. A detector whose dismissals disappear cannot be tuned, and a reviewer needs to see what a good answer looks like",
+ chain:[["Five bids, Nesma lowest at 1,180","Awarded on that number"],
+ ["acceptBid closes the competition","The other four cannot be recalled from here"],
+ ["The rate moves in the room","proposeRate writes the proposal, TermHistoryEntry records what moved, when, and by which side"],
+ ["The quotation closes at 1,420","And becomes the contract document"]],
+ f:["Bid.price","proposeRate","TermHistoryEntry","QuotationView.agreedTerms"],s:"live"},
+
+"case-mismatch":{k:"Case · score 47 · closed",t:"RFQ-1064 · records disagree",
+ what:"Nesma holds the accepted bid, the project award named Al Faisal Rentals. Closed as a recording error once the award was corrected",
+ why:"Sometimes legitimate, which is exactly the problem. The award code says in its own header that it reads nothing from the deal room and may name a different supplier from whoever won the bid",
+ chain:[["A bid is accepted on the marketplace","The competitive outcome"],
+ ["An award is recorded on the project","A private tracking record with its own supplier, rate and units"],
+ ["The two never meet in the product","Until this page puts them side by side"]],
+ f:["Bid.status","Bid.wonViaSurvey","Award.supplierName"],s:"live"},
+
+/* ── Columns ───────────────────────────────────────────────────────── */
+"c-request":{k:"Column",t:"Request",
+ what:"The reference and the machine, one row per decided request",
+ why:"A multi-machine request fans out into one row per machine, so each decision is judged on its own bids rather than averaged with the others",
+ chain:[["The renter describes what he needs","The agent builds a draft with one card per machine"],
+ ["Submit fans it out","One request row per machine line, sharing a group id"]],
+ f:["RequestListItem.ref","requestGroupId"],s:"live"},
+
+"c-sentas":{k:"Column",t:"Sent as",
+ what:"Broadcast to the marketplace, or direct to one named firm",
+ why:"The biggest single determinant of how much competition was possible. A direct request cannot have a second bidder, so every column to its right reads differently",
+ chain:[["Broadcast","Dispatch notifies every supplier stocking that machine"],
+ ["Direct","Started by pressing a machine in one supplier's store. Nobody else is notified or can see it"]],
+ f:["RequestType","DirectTarget"],s:"live"},
+
+"c-window":{k:"Column",t:"Window",
+ what:"How long bidding was open: 24, 48 or 72 hours, or a week",
+ why:"A 24 hour window on a large hire favours whoever already knew it was coming. It is the quietest way to run a tender nobody else can answer",
+ chain:[["The renter picks a window at posting","offerDuration, counted from createdAt"],
+ ["He may also set a date on the shared link","setBidDeadline, which wins because it is the date the supplier's own form closes on"]],
+ f:["offerDuration","bidDeadline","requestExpiry"],s:"live"},
+
+"c-bids":{k:"Column",t:"Bids",
+ what:"Offers received, counting marketplace bids and shared-link submissions together",
+ why:"The starting point, not the answer. The column beside it is the one that matters",
+ chain:[["Marketplace bids","From suppliers with accounts"],["Link submissions","From outside firms filling the public form"],
+ ["Held back","Bids offering a larger machine are excluded by default and counted separately"]],
+ f:["fetchBids","fetchRequestSubmissions","sizeCounts.larger"],s:"live"},
+
+"c-winner":{k:"Column",t:"Winner",
+ what:"The firm that took the work, resolved to a company rather than to whoever pressed the button",
+ why:"Three separate records can name a winner and they do not have to agree, which is why a row can say they disagree",
+ chain:[["A bid is accepted","Bid.status becomes ACCEPTED"],
+ ["Or a survey reports the winner","wonViaSurvey, where the renter answered the outcome survey instead"],
+ ["Or an award is recorded on the project","Award.supplierName, which reads nothing from the other two"]],
+ f:["Bid.status","Bid.wonViaSurvey","Award.supplierName"],s:"live"},
+
+"c-rank":{k:"Column",t:"Rank",
+ what:"Where the winning bid sat in the price order on its own request",
+ why:"One number that carries most of the signal. Rank 1 needs no explanation, rank 2 needs a sentence, rank 4 of 5 needs a meeting",
+ chain:[["All bids on the request are normalised to one cycle","So a weekly rate and a daily rate sort against each other"],
+ ["They are ordered by delivered cost","Rate plus haulage, times units, times billable days"],
+ ["The accepted bid's position is read off","And shown against the count"]],
+ f:["Bid.price","rentalBasis","computeCycleTotals"],s:"live"},
+
+"c-reached":{k:"Column",t:"Reached you by",
+ what:"The route the winning offer travelled: a marketplace bid, your own shared link, or a direct request",
+ why:"It decides how much the platform knows about him. A marketplace bid carries a reviewed account, a registered fleet and checkable papers. A link submission carries whatever he typed into a form",
+ chain:[["Platform bid","An account holder bidding in the app"],
+ ["Your own link","An outside firm filling the public form. submitBidForm stores it as a submission, not a bid"],
+ ["Direct","Addressed to one supplier from the start"]],
+ f:["BidSource","LinkBidSubmission","RequestType"],s:"live"},
+
+"c-elig":{k:"Column",t:"Eligible",
+ what:"Three checks on the winner, read as they stood: registered by you, verified by the platform, commercial registration on file",
+ why:"Eligibility should be frozen at the moment of award rather than read today, because a supplier who gets his papers in order next month was still unchecked when he was paid",
+ chain:[["vendorRegistered is your own tick","Off by default on every route, so a tick is a decision"],
+ ["verified is the platform's review","Never inferred by the web"],
+ ["crNumber comes from the row or the bid form","Absent counts as absent"],
+ ["Today these are read LIVE","Freezing them at award needs a snapshot the platform does not take"]],
+ f:["vendorRegistered","verified","crNumber"],s:"part"},
+
+"c-terms":{k:"Column",t:"Met terms",
+ what:"How many of that request's own requirements the winning bid answered, including whether a supplied certificate had already expired",
+ why:"The requirement side is yours, so this never judges a supplier against something you did not ask for. A refusal here is your rule being broken",
+ chain:[["The request states its terms per machine","Certificate, minimum year, operator certificate, fuel and transport parties"],
+ ["The supplier answers each","On the app bid and on the public form alike"],
+ ["Documents are read too","Each offered unit's papers carry a type and an expiry date, so a certificate that lapses before the hire starts is caught"],
+ ["The machine's year is compared","Against the request's own minimum"]],
+ f:["requiredTerms","confirmations","OfferedUnitDoc.expiryDate","requestedMinYear"],s:"live"},
+
+"c-price":{k:"Column",t:"Price",
+ what:"The winning rate in the basis the supplier quoted",
+ why:"The number the award was justified by. Whether it survived the deal room is a different column and often a different number",
+ chain:[["The supplier prices his bid","A rate, its basis, and haulage both ways"],
+ ["A link bid may be quoted VAT inclusive","The form lets him say so, and the platform strips the 15 percent back out on submit so every stored price is comparable"]],
+ f:["Bid.price","rentalBasis","VAT_INCLUSIVE_TAG"],s:"live"},
+
+"c-vslow":{k:"Column",t:"vs low",
+ what:"The distance between the price awarded and the cheapest bid that met every requirement",
+ why:"The fair comparison. A cheaper bid that refused your certificate was never an option you could have taken, so counting it produces a number nobody accepts",
+ chain:[["Bids are filtered to the compliant ones","Answering yes to every required term on that request"],
+ ["Normalised to one cycle","Fridays excluded, the quotation's own calculation"],
+ ["The gap is taken against the accepted bid","And where no compliant bid exists the row says so rather than showing a zero"]],
+ f:["computeCycleTotals","requiredTerms","billableDays"],s:"live"},
+
+"c-flags":{k:"Column",t:"Flags",
+ what:"Which detectors fired on this row",
+ why:"A row with no flags is not proof of anything, only that no current rule matched it. The whole table is here so an untagged decision can still be read",
+ chain:[["Every rule runs across every decided request","Not sampled"],
+ ["A flag names the rule, never a person","No actor is stored on a request or an award"],
+ ["EDITED POST-BID is the exception worth reading","renteeEditUsed records that the request was changed after bids had landed. What changed is not stored"]],
+ f:["renteeEditUsed","Bid","Award"],s:"part"},
+
+/* ── Rows ──────────────────────────────────────────────────────────── */
+"r-1042":{k:"Decision · clean",t:"RFQ-1042 · Crawler Excavator 20 ton",
+ what:"Broadcast on a 72 hour window, four genuine bidders, awarded to the cheapest bid that met all six requirements",
+ why:"Here so the page is not only exceptions. Without an example of passing there is nothing to check the detectors against",
+ chain:[["Posted to the marketplace","Every supplier stocking the machine was notified"],
+ ["Four bids from four distinct contacts","No identity overlap"],
+ ["Zahid wins at rank 1","Lowest price, and one of three meeting every term"]],
+ f:["fetchBids","requiredTerms","bidSupplierKey"],s:"live"},
+
+"r-1048":{k:"Decision · 2 flags",t:"RFQ-1048 · Mobile Crane 100 ton",
+ what:"Three bids. Awarded to the only supplier who refused the required certificate, at rank 3 of 3",
+ why:"Rank is what turns this from an argument into a finding. The most expensive bid won, and it was the one that did not meet the spec",
+ chain:[["TÜV is required on the item","Written in when the request is built"],
+ ["Two bids answer yes at 4,350 and 4,500","One answers no at 4,800"],
+ ["The refusing bid is accepted","11,700 SAR above the compliant low across the hire"]],
+ f:["requiredTerms.equipmentCert","t3Declarations","Bid.price"],s:"live"},
+
+"r-1051":{k:"Decision · 3 flags",t:"RFQ-1051 · Telehandler 17 m ×2",
+ what:"A 24 hour window, two bids, and a winner carrying no registration of any kind",
+ why:"The window and the counterparty are the two facts worth reading together. A day is not long enough for a supplier who was not already watching, and the firm that answered cannot be checked by anyone",
+ chain:[["The request is posted on a 24 hour window","offerDuration, the shortest available, counted from createdAt"],
+ ["It is shared through the renter's own link","Two outside firms fill the public form. No marketplace supplier bids at all"],
+ ["Neither bid meets every requirement","So there is no compliant low to compare the award against"],
+ ["The winner carries no CR, no tick and no account","Read off the supplier row and the bid form together"]],
+ f:["offerDuration","LinkBidSubmission","crNumber","vendorRegistered"],s:"live"},
+
+"r-1055":{k:"Decision · 3 flags",t:"RFQ-1055 · Wheel Loader 966",
+ what:"A direct request marked ASAP, addressed to one firm, so exactly one bid was possible",
+ why:"Legitimate for an urgent replacement or a machine only one firm holds. It stops being legitimate as a habit, which is why the rate of ASAP direct requests is worth watching rather than any single one",
+ chain:[["The request is started from a supplier's store page","Which seeds a DIRECT request naming that firm"],
+ ["Dispatch skips it","No other supplier is notified or can see it, so one bid is the ceiling"],
+ ["Urgency is read beside it","The request was marked ASAP, the standard reason given for skipping competition"],
+ ["The rate is recorded with no comparison","Because none was possible"]],
+ f:["RequestType","DirectTarget","Urgency","Bid.price"],s:"live"},
+
+"r-1058":{k:"Decision · 2 flags",t:"RFQ-1058 · Water Tanker 20 m³",
+ what:"Five genuine bidders and a clean award at rank 1, followed by a 20 percent rise in the deal room. The winning bid also undercut the standing lowest by 1.4 percent, arriving last",
+ why:"The award decision was clean and the outcome was not. The bid that lost at 1,275 would have been cheaper than what this one was eventually paid",
+ chain:[["Five bids, Nesma last to arrive and lowest","Undercutting the standing price by 1.4 percent"],
+ ["Awarded on that number","The other four cannot be recalled after acceptBid"],
+ ["The rate moves to 1,420 in the room","Recorded with who moved it and when"],
+ ["The quotation closes at the new figure","12,480 SAR above the bid that won"]],
+ f:["Bid.submittedAt","Bid.price","TermHistoryEntry","QuotationView"],s:"live"},
+
+"r-1061":{k:"Decision · 2 flags",t:"RFQ-1061 · Boom Lift 45 ft ×3",
+ what:"The award was stamped before bidding closed, the winning bid arrived after it closed, three larger machines were never opened, and the winner's safety certificate expired before the hire started",
+ why:"Four separate checks fail on one row and three of them are pure timestamps, which are written by the system rather than typed by anyone",
+ chain:[["Bidding closes 11 Sep 17:00","From the 48 hour window"],
+ ["The award is stamped 11 Sep 14:40","Before the close it was judged against"],
+ ["Zahid submits 11 Sep 23:20","Six hours and twenty minutes late, and is accepted"],
+ ["His TÜV certificate expired 4 Sep","Read off the offered unit's own document expiry, against the hire start"]],
+ f:["Award.awardedAt","Bid.submittedAt","requestExpiry","OfferedUnitDoc.expiryDate"],s:"live"},
+
+"r-1064":{k:"Decision · 2 flags",t:"RFQ-1064 · Forklift 5 ton ×2",
+ what:"Four bids, a clean rank 1 award, and then two problems: the recorded award names a different supplier, and the request was edited after bids had landed",
+ why:"The edit is the one worth pulling. The platform records that a post-bid edit was used but not what it changed, so a requirement narrowed to fit one supplier looks identical to a corrected typo",
+ chain:[["Four bids, the lowest accepted","Bid.status ACCEPTED on Nesma"],
+ ["The award on the project names another firm","And nothing in the product compares the two"],
+ ["The request carries renteeEditUsed","Which the backend sets only when an edit lands with bids already on the request"],
+ ["What changed is not stored","So this flag can say that it happened and nothing more"]],
+ f:["renteeEditUsed","Bid.status","Award.supplierName"],s:"part"},
+
+/* ── Graph and stats ───────────────────────────────────────────────── */
+"s-follow":{k:"Statistical test",t:"Price-follow",
+ what:"How far the last bid to arrive undercut the lowest standing at that moment, across every request",
+ why:"The strongest single indicator of a leaked price, and it needs no access log. If the eventual winner repeatedly arrives last and lands one to three percent under, somebody is talking",
+ chain:[["Bids are ordered by arrival","submittedAt on app bids, createdAt on link submissions"],
+ ["For each bid the standing lowest is known","Every price before it in that order"],
+ ["The undercut is computed","And the distribution plotted across all requests"],
+ ["The 1 to 3 percent band is the tell","Enough to win, not enough to leave money behind"]],
+ f:["Bid.submittedAt","Bid.price","LinkBidSubmission.createdAt"],s:"live"},
+
+"s-gap":{k:"Statistical test",t:"Winner to runner-up gap",
+ what:"The distribution of the distance between first and second place across every request",
+ why:"Real competition produces a scattered distribution. A recurring gap at almost exactly the same percentage, involving the same suppliers, means the losing price was set rather than offered",
+ chain:[["Every request with two or more bids contributes one gap","First against second, normalised per cycle"],
+ ["The distribution is plotted","And clusters are looked for"],
+ ["A cluster is matched back to its suppliers","Which is where it stops being a statistic"]],
+ f:["Bid.price","computeCycleTotals","bidSupplierKey"],s:"live"},
+
+"s-benford":{k:"Statistical test",t:"Benford on bid values",
+ what:"Leading digits of genuine prices follow a known curve. Invented ones tend not to",
+ why:"Cheap to implement, needs nothing new, and works on any number set. It never proves anything by itself, which is why it sits here rather than in the case queue",
+ chain:[["Every bid value in the period is taken","Leading digit extracted"],
+ ["The observed distribution is compared","Against the expected curve"],
+ ["Volume decides whether it means anything","At 28 bids this is indicative and nothing more. It becomes useful in the hundreds"]],
+ f:["Bid.price"],s:"live"},
+
+"filter-project":{k:"Filter",t:"By project",
+ what:"Scopes every section to one site. A filter rather than the spine, because plenty of accounts never file requests under a project at all",
+ why:"Where projects are used it adds the one piece of human accountability available today: a project stores who created it, and requests and awards do not",
+ chain:[["A request may be filed under a project","Either chosen at creation or filed automatically after posting, when the site is new"],
+ ["Awards are keyed per project","In the project's own award book"],
+ ["The project names its creator","ownerUserId and ownerName, which the code states is displayed and never a permission check"],
+ ["Unfiled requests stay in the default view","Rather than disappearing when a filter is applied"]],
+ f:["Project.ownerName","AwardBook.requests","RequestRecord.projectId"],s:"part"},
+
+/* ── Blocked ───────────────────────────────────────────────────────── */
+"g-actor":{k:"Blocked",t:"Who raised, who awarded, who approved",
+ what:"No finding can name a person, because no request and no award stores who created it",
+ why:"The difference between a report and something you can act on. Non-lowest rate by buyer, segregation of duties, repeat-offender patterns and mandatory justification all wait on this one field",
+ chain:[["What exists","A project stores ownerUserId and ownerName, and the code says it is displayed and never a permission check"],
+ ["What does not","A request has no creator, an award has no author, an accept has no actor"],
+ ["Why nothing works around it","Every member of the company can create, edit, award and delete, so no other field narrows it"]],
+ f:["RequestRecord.createdBy","Award.createdBy","acceptedBy"],s:"blocked"},
+
+"g-shares":{k:"Blocked",t:"Who the request was shared with",
+ what:"A broadcast request quietly shared with one supplier who then wins it is a private tender wearing a public label",
+ why:"One of the most direct forms of steering, and the write already happens. Only the read is missing",
+ chain:[["The renter shares a request","POST /api/requests/{id}/shares records which supplier rows and which channel"],
+ ["An email share returns the recipients","The addresses the message actually left for"],
+ ["There is no endpoint to read it back","So this page cannot ask who a request reached"],
+ ["The write also swallows its own errors","So a missing record would not prove a request was never shared"]],
+ f:["GET /requests/{id}/shares"],s:"blocked"},
+
+"g-diff":{k:"Partly blocked",t:"What changed in a post-bid edit",
+ what:"The platform records that a request was edited after bids landed. It does not record what changed",
+ why:"Narrowing a requirement to match one supplier's fleet, or loosening it to let the intended winner qualify, is the classic method. Today it is visible as an event and invisible as an act",
+ chain:[["A post-bid edit is allowed once","The backend refuses the second with REQUEST_EDIT_ALREADY_USED"],
+ ["renteeEditUsed is set on the request","And the web reads it, so the flag is real"],
+ ["No before or after is kept","So the requirement this page compares against is whatever the request says now, not what the bidders answered"]],
+ f:["renteeEditUsed","Request edit diff"],s:"part"},
+
+"g-deadline":{k:"Blocked",t:"A deadline extended after bids landed",
+ what:"Moving the close once bids are in lets a chosen supplier through while looking perfectly ordinary afterwards",
+ why:"The late-bid detector works today only because that bid was never covered. Extend the deadline first and it disappears from every report",
+ chain:[["setBidDeadline writes a date to the shared link","And can be called again, any number of times"],
+ ["Only the current value is stored","No history, so an extension is indistinguishable from the original setting"]],
+ f:["bidDeadline history"],s:"blocked"},
+
+"g-views":{k:"Blocked",t:"Who viewed competitor bid values before close",
+ what:"Reading the field before the deadline, then telling somebody, is the mechanism behind every price-follow pattern",
+ why:"The price-follow test infers the leak from behaviour. An access log would prove it, and sealed bids would prevent it",
+ chain:[["Bid values are visible to the renter as they arrive","There is no sealing and no access log"],
+ ["So the leak can only be inferred","From the arrival order and the undercut, which is what this page does"],
+ ["The fix is architectural","Sealed values until close, with every read logged"]],
+ f:["Bid view log","Sealed bids"],s:"blocked"},
+
+"g-case":{k:"Blocked",t:"Case state, justification, outcome",
+ what:"The queue, the buyer's answer, the substantiation and the recovered amount all need somewhere to live",
+ why:"Without it every flag is permanent and nothing can be dismissed, so the page becomes noise on its second visit. This is the single feature that decides whether the module survives",
+ chain:[["A case needs a state","New, under review, explained, substantiated, closed"],
+ ["A justification needs a field and an author","Which is also the deviation approval your policy will ask for"],
+ ["Dismissals need to feed back","Or the weights never improve"]],
+ f:["Case store","Justification text","Outcome"],s:"blocked"},
+
+"g-coi":{k:"Blocked",t:"Conflict of interest and related parties",
+ what:"Matching supplier owners against your own employees, declared interests, ex-employees and family names",
+ why:"Usually where the real money is. Bid manipulation is noisy and visible. A brother-in-law's company is silent and legal-looking",
+ chain:[["The platform holds no employee records","No HR, no declarations, no ownership identity"],
+ ["A supplier's owner is not captured at all","Only a company name, a CR string and a contact"],
+ ["So there is nothing on either side to match","This is a data subject to build, not a query to write"]],
+ f:["Employee register","Owner national ID","Declared interests"],s:"blocked"},
+
+"g-delivery":{k:"Blocked",t:"Delivery reality",
+ what:"Serial or plate of the unit that actually arrived, model and year against what was bid, telematics hours against billed hours, gate check in and out",
+ why:"Paper fraud and physical fraud are different problems. Everything on this page audits the paper. A gate scan is what makes compliance a fact about the site rather than a claim about a document",
+ chain:[["The renter can mark a machine as arrived","A date, and nothing about which machine"],
+ ["No serial or plate is captured on the renter side","Those live on the supplier's listing papers"],
+ ["No hours, no telematics, no gate event exists","So ghost rentals are undetectable from here"]],
+ f:["Gate scan","Unit serial at delivery","Telematics"],s:"blocked"},
+
+"g-retro":{k:"Not usable yet",t:"Equipment on site before its request existed",
+ what:"A hire agreed off-platform, with the request raised afterwards so the paperwork exists. Every control downstream is then judging a decision already taken",
+ why:"Worth building the day the arrival date is reliable. It is off the page because the field is almost always empty, and a detector that never fires teaches people to ignore the page",
+ chain:[["The field does exist","Award.mobilizedAt is a date, not a flag, precisely so it can sit on a timeline, and the request carries its own createdAt"],
+ ["The comparison would be one subtraction","Arrived before created"],
+ ["But marking arrival is manual and optional","Nobody is required to do it and in practice very few do, the same reason projects go unused"],
+ ["It becomes real with a gate scan","Or with any arrival event the platform captures rather than asks for"]],
+ f:["Award.mobilizedAt","RequestRecord.createdAt"],s:"blocked"},
+
+"g-invoice":{k:"Blocked",t:"Invoices, IBAN, payment diversion",
+ what:"Duplicate invoices, invoice against a cancelled request, and a bank account changed days before a payment",
+ why:"Payment diversion is the highest-value single fraud in procurement and the platform cannot see any of it",
+ chain:[["The platform handles no money","No invoices, no payment records, no bank details anywhere in the renter data"],
+ ["The quotation is the furthest it goes","A contract document, not a payment instruction"]],
+ f:["Invoice records","Supplier IBAN"],s:"blocked"},
+
+"g-approval":{k:"Blocked",t:"Approval thresholds and splitting",
+ what:"Value bands, a named approver per band, and detection of several requests split to sit under one",
+ why:"Threshold splitting cannot be detected against thresholds that do not exist. It also blocks the preventive half: an inline warning at the moment of award beats a dashboard entry next week",
+ chain:[["There is no approval step in the product","Requests post straight out and awards are recorded directly"],
+ ["Every member can award","So there is no matrix to encode"],
+ ["This is a feature before it is a report","And the report is the easy half"]],
+ f:["Approval matrix","Value bands"],s:"blocked"},
+
+"g-ratecard":{k:"Blocked",t:"Rate cards and framework agreements",
+ what:"Awarded rates against negotiated framework rates, and off-contract spend",
+ why:"For an enterprise renter this is usually the largest single leak, because it is invisible to everyone except the person who negotiated the framework",
+ chain:[["No rate card exists in the platform","Only per-request budgets, which are a ceiling on one machine"],
+ ["A market median CAN be built from your own history","Same class, same period, which is the nearest available substitute and is worth building first"]],
+ f:["Rate card","Framework agreement"],s:"blocked"},
+
+"g-sanctions":{k:"Blocked",t:"Debarment and sanctions screening",
+ what:"Screening suppliers against Etimad debarment and any internal blocked list",
+ why:"Awarding to a debarred supplier is a compliance failure with consequences beyond the money, and the check is a lookup rather than an analysis",
+ chain:[["No external list is integrated","And no internal blocked list feature exists on the supplier record"],
+ ["A blocked flag on RenterSupplier would be the cheap half","One boolean, plus a hard stop at award"]],
+ f:["Blocked list","Etimad debarment"],s:"blocked"}
+};
+
+const dw=document.getElementById("dw"), scrim=document.getElementById("scrim");
+let lastEl=null;
+const STATE={live:["live","Runs on data you already have"],part:["part","Partly available, one piece missing"],blocked:["blocked","Needs something the platform does not store"]};
+
+function open(key,el){
+  const x=X[key]; if(!x) return;
+  if(lastEl) lastEl.classList.remove("on");
+  lastEl=el; el.classList.add("on");
+  document.getElementById("dwKind").textContent=x.k;
+  document.getElementById("dwTitle").textContent=x.t;
+  document.getElementById("dwWhat").textContent=x.what;
+  document.getElementById("dwWhy").textContent=x.why;
+  const exb=document.getElementById("dwExBlk");
+  if(x.ex){
+    exb.style.display="";
+    document.getElementById("dwEx").innerHTML =
+      `<div class="eh">${x.ex.head}</div>` +
+      x.ex.rows.map(r=>`<div class="er${r[3]?" win":""}"><span class="a">${r[0]}</span><span class="b">${r[1]}</span><span class="c">${r[2]||""}</span></div>`).join("") +
+      `<div class="eo">${x.ex.out}</div>`;
+  } else exb.style.display="none";
+  document.getElementById("dwChain").innerHTML=x.chain.map(([m,d])=>`<li><div class="m">${m}</div><div class="d">${d}</div></li>`).join("");
+  document.getElementById("dwFields").innerHTML=x.f.map(f=>`<span class="${x.s==="live"?"":"no"}">${f}</span>`).join("");
+  const st=document.getElementById("dwState"), c=STATE[x.s]||STATE.live;
+  st.className="state "+c[0]; st.textContent=c[1];
+  dw.classList.add("open"); dw.setAttribute("aria-hidden","false"); scrim.classList.add("open");
+  dw.querySelector(".scrollbody").scrollTop=0;
+}
+function close(){
+  dw.classList.remove("open"); dw.setAttribute("aria-hidden","true"); scrim.classList.remove("open");
+  if(lastEl){lastEl.classList.remove("on"); lastEl=null;}
+}
+document.addEventListener("click",(e)=>{
+  const el=e.target.closest("[data-x]");
+  if(el){open(el.dataset.x,el); return;}
+  if(!e.target.closest("#dw")) close();
+});
+document.getElementById("dwClose").addEventListener("click",close);
+scrim.addEventListener("click",close);
+document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
+</script>
+</body>
+</html>

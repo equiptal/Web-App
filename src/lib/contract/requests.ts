@@ -11,6 +11,7 @@
  */
 
 import { durationDaysBetween } from "@/lib/pricing/rental";
+import { toCertCodes, type CertCode } from "./bids";
 
 export type RequestStatus = "OPEN" | "ACTIVE" | "PARTIALLY_ACCEPTED" | "ACCEPTED" | "EXPIRED" | "FORCE_EXPIRED" | "HUB_CLOSED" | "CLOSED" | string;
 export type RequestType = "BROADCAST" | "DIRECT" | string;
@@ -39,6 +40,51 @@ export function statusMeta(s: string): { cls: string; en: string; ar: string } {
 }
 
 /**
+ * The firm a DIRECT request was sent to, for the surfaces that name it.
+ *
+ * 🔴 **The name and the logo are NOT on the wire yet, and this reads them tolerantly so the day they
+ * are, nothing else has to change.** `GET /rentees/me/requests/{id}` spreads the whole request row,
+ * so `supplierId` (an integer) arrives and nothing else: `getMyRequests` selects no supplier at all,
+ * and `getRequestDetail` adds none. A store cannot be resolved from it either - `/api/stores/:id` is
+ * keyed on the STORE and the list takes no supplier filter.
+ *
+ * So today this answers `{ id, name: null, logoUrl: null }` for a direct request and the surfaces
+ * say «Direct request» without naming anyone. It is the `DirectorySupplier.equipmentCount` pattern
+ * of 2026-09-08: read and render it now, and the field starts working the day it arrives.
+ *
+ * 🔴 **BACKEND, owed:** put the target firm on the request projections - `supplierName` at minimum,
+ * and `storeId` / `storeName` / `storeLogoUrl` for the mark. Both `getMyRequests` and
+ * `getRequestDetail`, since the modal reads one and the rail the other.
+ */
+export interface DirectTargetRef {
+  id: string;
+  name: string | null;
+  logoUrl: string | null;
+}
+
+export function directTarget(rec: Record<string, unknown> | null | undefined): DirectTargetRef | null {
+  if (!rec) return null;
+  const id = rec.supplierId;
+  if (id == null || id === "") return null;
+  const pick = (...keys: string[]): string | null => {
+    for (const k of keys) {
+      const path = k.split(".");
+      let v: unknown = rec;
+      for (const seg of path) v = typeof v === "object" && v !== null ? (v as Record<string, unknown>)[seg] : undefined;
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return null;
+  };
+  return {
+    id: String(id),
+    // Every spelling the two services might land on, store name first: it is the name the renter
+    // pressed to start this request, which is what he will recognise.
+    name: pick("storeName", "store.name", "supplierName", "supplier.name", "supplier.companyName", "supplierCompanyName"),
+    logoUrl: pick("storeLogoUrl", "store.logoUrl", "supplierLogoUrl", "supplier.logoUrl"),
+  };
+}
+
+/**
  * The backend accepts `DELETE /rentees/me/requests/{id}` only while a request is OPEN or ACTIVE —
  * anything else throws REQUEST_CANCEL_NOT_ALLOWED (app backend `request.service.ts:cancelRequest`).
  * Every cancel affordance gates on THIS, per item. It must never gate on a group-level roll-up: a
@@ -47,6 +93,29 @@ export function statusMeta(s: string): { cls: string; en: string; ar: string } {
  */
 export function isCancellable(status: RequestStatus | null | undefined): boolean {
   return status === "OPEN" || status === "ACTIVE";
+}
+
+/**
+ * **Can this request still take a bid?** — the question the dashboard's «Closes» column asks before
+ * it looks at any date (owner, 2026-08-29).
+ *
+ * A deadline says when bidding WOULD stop; the status says whether it already has. They disagree
+ * often — a request awarded on day one keeps a deadline three days out — and when they do, the
+ * status is the fact: a countdown beside a shut request tells the renter to wait for offers that can
+ * never arrive.
+ *
+ * `PARTIALLY_ACCEPTED` counts as OPEN, deliberately. A fanned-out RFQ with one item awarded still
+ * has siblings taking bids, which is the same reason {@link cancellableItems} works per item rather
+ * than off a group-level roll-up.
+ */
+export function isBiddingClosed(status: RequestStatus | null | undefined): boolean {
+  return !(status === "OPEN" || status === "ACTIVE" || status === "PARTIALLY_ACCEPTED");
+}
+
+/** A GROUP is closed only when every item in it is — one live sibling keeps the RFQ answerable. An
+ *  empty group is not closed: it is a group we know nothing about. */
+export function groupBiddingClosed(items: { status: RequestStatus }[]): boolean {
+  return items.length > 0 && items.every((i) => isBiddingClosed(i.status));
 }
 
 /** The members of a group the backend will actually cancel. Empty ⇒ nothing to cancel. */
@@ -96,39 +165,148 @@ export function representativeStatus(items: { status: RequestStatus }[]): Reques
 }
 
 /** Why one item can't be cancelled — shown inline when the renter taps its disabled ✕, so a greyed-out
- *  control always explains itself (a tooltip wouldn't, on touch). */
-export function cancelBlockedReason(status: RequestStatus, ar: boolean): string {
+ *  control always explains itself (a tooltip wouldn't, on touch), and by {@link cancelFailureLine}
+ *  after a press the backend refused.
+ *
+ *  ⚠️ `noun` because the same refusal is met at two scales: a line inside a fanned-out RFQ, and a
+ *  request standing on its own in the drawer. Calling a whole request «this item» there reads as a
+ *  statement about something else on the screen. */
+export function cancelBlockedReason(status: RequestStatus, ar: boolean, noun: "item" | "request" = "item"): string {
+  const isItem = noun === "item";
+  const EN = isItem ? "item" : "request";
+  const AR_THIS = isItem ? "هذا البند" : "هذا الطلب";
   switch (status) {
     case "ACCEPTED":
     case "PARTIALLY_ACCEPTED":
-      return ar ? "تم قبول عرض لهذا البند، لذلك لا يمكن إلغاؤه." : "A bid was accepted for this item, so it can’t be cancelled.";
+      return ar ? `تم قبول عرض ل${isItem ? "هذا البند" : "هذا الطلب"}، لذلك لا يمكن إلغاؤه.` : `A bid was accepted for this ${EN}, so it can’t be cancelled.`;
     case "EXPIRED":
     case "FORCE_EXPIRED":
-      return ar ? "انتهت صلاحية هذا البند، لذلك لا يمكن إلغاؤه." : "This item has expired, so it can’t be cancelled.";
+      return ar ? `انتهت صلاحية ${AR_THIS}، لذلك لا يمكن إلغاؤه.` : `This ${EN} has expired, so it can’t be cancelled.`;
     case "CANCELLED":
     case "ABANDONED":
-      return ar ? "هذا البند ملغى بالفعل." : "This item is already cancelled.";
+      return ar ? `${AR_THIS} ملغى بالفعل.` : `This ${EN} is already cancelled.`;
     default: {
       const m = statusMeta(status);
-      return ar ? `لا يمكن إلغاء بند حالته "${m.ar}".` : `An item that is “${m.en}” can’t be cancelled.`;
+      return ar
+        ? `لا يمكن إلغاء ${isItem ? "بند" : "طلب"} حالته "${m.ar}".`
+        : `${isItem ? "An item" : "A request"} that is “${m.en}” can’t be cancelled.`;
     }
   }
 }
+/**
+ * **What a cancel press actually achieved**, per request it aimed at.
+ *
+ * 🔴 A refused DELETE is NOT the same fact as «the request is still live», and reading it that way
+ * is what produced the report of 2026-09-20: the request was CANCELLED in the database while the
+ * screen said the act had failed, so the renter pressed again, and again, each press refused for
+ * the one reason that means it had already worked. Every verdict here is therefore taken from the
+ * request's OWN status after the attempt, never from the HTTP answer alone.
+ */
+export interface CancelReport {
+  /** Requests whose status is now CANCELLED — whether this press put them there or an earlier one. */
+  cancelled: number;
+  /**
+   * The rest, with the status they really carry (`null` when it could not be read at all) and the
+   * server's own words for the refusal.
+   *
+   * ⚠️ Both languages are carried rather than one resolved string: this is built in the API layer,
+   * which has no locale, and the app's rule is to print `messageAr` to an Arabic reader and
+   * `message` otherwise (`localizedError`). Resolving early would print English into an Arabic
+   * dialog on every refusal that has an Arabic twin.
+   */
+  refused: { id: string; status: RequestStatus | null; said?: string | null; saidAr?: string | null }[];
+}
+
+/**
+ * Is what the renter asked for satisfied for THIS request?
+ *
+ * ⚠️ `CANCELLED` and `ABANDONED` only. CLOSED, ACCEPTED and EXPIRED are uncancellable too and are
+ * NOT successes: there the press did not do what it said, and the renter has to be told which of
+ * the two happened, which is what {@link cancelBlockedReason} says in his own words.
+ */
+export function isCancelledStatus(status: RequestStatus | null | undefined): boolean {
+  return status === "CANCELLED" || status === "ABANDONED";
+}
+
+/**
+ * The line a part-done or refused cancellation prints, in the renter's language.
+ *
+ * Four shapes, because four different things happened and one sentence for all of them is how this
+ * screen stopped meaning anything:
+ *  - part of a fanned-out RFQ went and part did not → say the count, and keep the retry;
+ *  - the request is in a state that cannot be cancelled → say WHICH state, in the renter's words;
+ *  - we could not read the state but the SERVER gave a reason → print the server's reason, which is
+ *    the mobile app's rule verbatim (`localizedError(message, messageAr)` on its detail page). It
+ *    is the only text that names the actual refusal, and the app has always shown it while the web
+ *    threw it away for «that didn't go through»;
+ *  - nothing at all → that plain line, which is then the only honest one left.
+ */
+export function cancelFailureLine(report: CancelReport, ar: boolean, noun: "item" | "request" = "item"): string {
+  const { cancelled, refused } = report;
+  if (!refused.length) return "";
+  if (cancelled > 0) {
+    const total = cancelled + refused.length;
+    return ar
+      ? `تم إلغاء ${cancelled} من ${total}، ولم يتمّ إلغاء الباقي. حاول مجددًا.`
+      : `${cancelled} of ${total} were cancelled. The rest did not go through. Try again.`;
+  }
+  const known = refused.find((r) => r.status != null);
+  if (known?.status) return cancelBlockedReason(known.status, ar, noun);
+  const said = refused.map((r) => (ar ? r.saidAr || r.said : r.said)).find((v) => v?.trim());
+  if (said) return said.trim();
+  return ar ? "لم يتمّ الإجراء. حاول مجددًا." : "That didn’t go through. Try again.";
+}
+
+/**
+ * May the renter press again?
+ *
+ * No when every refusal is a state no retry can move — accepted, expired, closed. A «Try again» on
+ * one of those is a button that is going to refuse, which is the loop this change exists to end.
+ * Yes while a refused request is still OPEN/ACTIVE or its status could not be read: those really
+ * can be a blip.
+ */
+export function cancelRetryWorthIt(report: CancelReport): boolean {
+  return report.refused.some((r) => r.status == null || isCancellable(r.status));
+}
+
 export type Urgency = "ASAP" | "SOON" | "FAR_FUTURE" | string;
 
 /** One enriched equipment line as the backend returns it (taxonomy names folded in). */
 export interface RequestItem {
   id?: string;
+  /** ⚠️ For an off-catalogue line these come back as the EMPTY STRING, not null — they are NOT NULL
+   *  columns and `''` is the backend's sentinel. Never render them, and never test for `''`:
+   *  {@link RequestItem.isUndefined} is the contract. */
   categoryId: string | null;
   subtypeId: string | null;
   capacityId: string | null;
+  /**
+   * The renter's own name for a machine the catalogue cannot place, and the flag that says to read
+   * it. `isUndefined` is DERIVED by the backend on every read, never stored — branch on it, never
+   * recompute it from the ids.
+   *
+   * On such a line every taxonomy name is null in BOTH locales: the renter typed one language, and
+   * both locales show his words rather than an invented translation.
+   */
+  customEquipmentName?: string | null;
+  isUndefined?: boolean;
   categoryName: string | null;
   categoryNameAr: string | null;
   subtypeName: string | null;
   subtypeNameAr: string | null;
   capacityName: string | null;
   capacityNameAr: string | null;
+  /** The flat editorial ICON for the subtype. Almost always present. */
   subtypeImageUrl: string | null;
+  /**
+   * A PHOTOGRAPH of real equipment for the subtype — `equipment_image_key` on the taxonomy row, set
+   * per subcategory from c-hub.
+   *
+   * A second, independent slot rather than a better `subtypeImageUrl`: the backend is explicit that
+   * "the two are different pictures for different places, and a consumer that wants the icon must
+   * keep getting the icon". Null on most rows, so every reader falls back to the icon.
+   */
+  subtypeEquipmentImageUrl: string | null;
   categoryImageUrl: string | null;
   numberOfUnits: number;
   operatorIncluded: "YES" | "NO" | null;
@@ -137,10 +315,44 @@ export interface RequestItem {
   demobilizationByRentee: boolean | null;
   nightShiftRequired: boolean | null;
   operatorNationality: string | null;
+  /**
+   * The equipment-year ask, as the LIVE wire sends it — a minimum manufacture year (2020).
+   *
+   * `maxEquipmentAge` beside it is the deprecated alias the web still POSTS under and the backend
+   * coalesces (`minimumEquipmentYear ?? maxEquipmentAge`); it is not sent back. Read them through
+   * `requestedMinYear`, never either one alone — its note carries the two times that went wrong.
+   */
+  minimumEquipmentYear: number | null;
   maxEquipmentAge: number | null;
   dieselIncluded: boolean | null;
+  /**
+   * The DEPRECATED F.A.T rollup, and the two columns that superseded it.
+   *
+   * `fatRequired` is derived on create (`operatorIncluded && (fatFood || fatAccommodationTransport)`)
+   * and kept only for consumers that have not moved to the split. Writing it independently of the
+   * two below produces `fat_required = true` with both split columns null, which the admin surfaces
+   * read as "F.A.T included" while the bid form, which reads the split, can show nothing at all.
+   * `app-adapters` carries the whole ruling; anything that writes these must derive it the same way.
+   */
   fatRequired: boolean | null;
+  fatFood: boolean | null;
+  fatAccommodationTransport: boolean | null;
   safetyCertifications: string[] | null;
+  /** Free-text work type, crane subtypes only (backend `work_type`, VARCHAR(255)). */
+  workType: string | null;
+  /**
+   * Admin-defined `SubtypeAttachment` ids chosen for this item (backend `attachment_ids`), and the
+   * renter's own free-text additions beside them (`custom_attachments`).
+   *
+   * The ids mean nothing on their own: naming them needs that subtype's catalogue, which is
+   * `GET /api/equipment/attachments/{subtypeId}`. Any surface that shows them has to fetch it.
+   *
+   * `customAttachments` has no UI anywhere: the agent's parse can produce it, and the canvas never
+   * asks for it. A form that edits attachments therefore passes it through untouched rather than
+   * dropping it, which a wholesale item replacement would otherwise do.
+   */
+  attachmentIds: string[] | null;
+  customAttachments: string[] | null;
   additionalNotes: string | null;
 }
 
@@ -196,7 +408,24 @@ export interface RequestListItem {
   id: string;
   /** Multi-item submission group — all fanned-out requests from one submit share this (null = solo). */
   requestGroupId: string | null;
+  /**
+   * PROJ — the site this request is filed under, and which version of its terms it was posted with.
+   *
+   * A LABEL. Nothing in the marketplace branches on it: the request already holds its own copy of
+   * every value, so a project can be edited, emptied or deleted without touching it. Null means
+   * unfiled — either it predates projects, or the renter removed it from one, and both read the same
+   * because both are true in the same way.
+   *
+   * Distinct from `requestGroupId`, which is the fan-out group of ONE submission. A project spans
+   * many submissions over months; a group is three rows created in the same second.
+   */
+  projectId: string | null;
+  /** What to PRINT wherever a label is required: the human code where the payload carries one, else a
+   *  short stub of the id, so a list row is never blank. */
   displayId: string;
+  /** The human code ALONE — null when the payload carried none. A surface that needs a real reference
+   *  (the strip, an export header) reads this and asks elsewhere rather than quoting a cuid's head. */
+  code: string | null;
   /** RFQ group short code (`RFQ-NNNNN`) from my-requests once the backend returns it (T19); null until then. */
   groupRef: string | null;
   type: RequestType;
@@ -209,12 +438,39 @@ export interface RequestListItem {
   endDate: string | null;
   durationDays: number | null;
   createdAt: string | null;
+  /**
+   * When the request itself stops taking bids, as the BACKEND computes it.
+   *
+   * The authoritative deadline, and the only one that is reliably populated: `offerDuration` is not
+   * even returned on the list payload and is null on every request in staging, so the window fallback
+   * it feeds can never fire there. This arrives on every row of `my-requests`, which is why the
+   * expiry column can be filled without a per-row lookup.
+   */
+  expiresAt: string | null;
   bidCount: number;
+  /**
+   * The one post-bid edit has been spent. The cap is enforced server-side — `request.service.ts`
+   * updates conditionally on `bidCount > 0 && renteeEditUsed === false` — and the app reads this
+   * field to disable its Edit button and say why. Without it the renter fills the whole form and is
+   * only refused at save. Defaults false when the payload predates the field.
+   */
+  renteeEditUsed: boolean;
+  /** Certificates the request demands, normalised to the enum — the drawer's chips. */
+  requiredCerts: CertCode[];
   /** Who the request assigned mobilization / demobilization to (true = renter bears it, false = supplier). */
   mobByRentee: boolean | null;
   demobByRentee: boolean | null;
   /** The single fanned-out item (name + qty), used as the card title. */
-  item: { name: string; nameAr: string; qty: number; imageUrl: string | null; categoryId: string | null } | null;
+  /**
+   * The single fanned-out item (name + qty), used as the card title.
+   *
+   * `imageIsPhoto` says WHICH of the taxonomy's two picture kinds `imageUrl` is. They cannot be shown
+   * the same way: a photograph reaches its own edges and should fill a round mask by cropping, while
+   * an icon is a drawing with transparent margins built in and floats absurdly if cropped. Deciding
+   * that from the URL at the point of render would mean sniffing a bucket path; deciding it here,
+   * where the slot is chosen, costs a boolean and cannot go stale.
+   */
+  item: { name: string; nameAr: string; qty: number; imageUrl: string | null; imageIsPhoto: boolean; categoryId: string | null } | null;
 }
 
 /** A submission group — one or more single-item requests that share a `requestGroupId`. */
@@ -231,6 +487,8 @@ export interface RequestGroup {
   /** Full address (shown in the group context strip). */
   address: string | null;
   createdAt: string | null;
+  /** The EARLIEST `expiresAt` across the group's items — a group closes when its first item does. */
+  expiresAt: string | null;
   type: RequestType;
   totalBids: number;
   /** Sum of every item's unit count across the group ("N total equipment"). */
@@ -266,12 +524,39 @@ export function publicTaxonomyUrl(value: string | null | undefined): string | nu
   return `${TAXONOMY_ASSET_BASE}/${enc}`;
 }
 
-/** Best-effort item display name from the enriched taxonomy names (EN or AR). */
-function itemName(it: RequestItem, ar: boolean): string {
+/**
+ * Best-effort item display name from the enriched taxonomy names (EN or AR).
+ *
+ * **Taxonomy first, always** (owner, 2026-09-12): *"if null taxonomy then read from the user words,
+ * otherwise use taxonomy even if hidden"*. His own words appear in exactly one situation — the line
+ * carries no taxonomy name at all — and then in both locales, because he typed one language and we
+ * do not invent the other.
+ */
+export function itemName(it: RequestItem, ar: boolean): string {
   const parts = ar
     ? [it.subtypeNameAr ?? it.subtypeName, it.capacityNameAr ?? it.capacityName]
     : [it.subtypeName, it.capacityName];
-  return parts.filter(Boolean).join(" · ") || (ar ? it.categoryNameAr ?? "" : it.categoryName ?? "") || "—";
+  const taxonomy = parts.filter(Boolean).join(" · ") || (ar ? it.categoryNameAr ?? "" : it.categoryName ?? "");
+  return taxonomy || customEquipmentLabel(it) || "—";
+}
+
+/**
+ * The renter's own words for this line, or "" when the line has none.
+ *
+ * 🔴 ~~Gated on `isUndefined`.~~ Reversed 2026-09-12, with the meaning of the field itself: a name is
+ * «what the renter calls this machine» and is carried on ordinary lines too, while `isUndefined` is
+ * about BEHAVIOUR (no dispatch, no deal room, no QR) and says nothing about what to draw. A reader
+ * that branched on it would show his words for a HIDDEN line, which has a catalogue name and must
+ * read by it.
+ *
+ * So the display rule lives in the CALLER's order — taxonomy, then this — and this answers one
+ * question: what did he call it?
+ *
+ * Accepts the loose shape every projection shares (the inbox, the deal room and the chat dock each
+ * carry their own item type) rather than only {@link RequestItem}.
+ */
+export function customEquipmentLabel(it: { isUndefined?: boolean | null; customEquipmentName?: string | null } | null | undefined): string {
+  return (it?.customEquipmentName ?? "").trim();
 }
 
 /** Pull the list array out of whatever envelope the backend uses. */
@@ -287,6 +572,33 @@ export function shortRef(id: string | null | undefined): string {
   return (id ?? "").replace(/-/g, "").slice(0, 8).toUpperCase() || "—";
 }
 
+/**
+ * The request's OWN human code (`REQ-NNNNN`) off a raw record — null when the payload carries none.
+ *
+ * Defensive on the field name, as `groupRefOf` already is below (owner, 2026-08-25). The code IS
+ * minted at creation — `POST /agents/requests` answers with `requests[].shortCode`, and the
+ * confirmation screen prints it — but the list projection the workspace reads,
+ * `GET /marketplace/my-requests`, returns neither `displayId` nor `shortCode`. The strip then fell
+ * through to `shortRef(id)` and printed «CEXG7K2P»: the head of a cuid, which every request shares
+ * the start of and nobody can quote down the phone.
+ *
+ * So this tries every spelling the two services have used. A name we do not know is a code discarded
+ * for no reason; a null, on the other hand, is worth returning honestly, so the caller can ask the
+ * detail endpoint rather than dress an id up as a reference.
+ */
+export function requestCodeOf(r: Record<string, unknown>): string | null {
+  return (
+    str(r.displayId) ??
+    str(r.shortCode) ??
+    str(r.requestShortCode) ??
+    str(r.requestNumber) ??
+    str(r.requestCode) ??
+    str(r.reference) ??
+    str(r.code) ??
+    null
+  );
+}
+
 /** The RFQ group short code (`RFQ-NNNNN`) off a raw record — defensive on the field name the backend
  *  uses (T19). Null for an old record that predates it; callers fall back to the REQ id. */
 export function groupRefOf(r: RequestRecord): string | null {
@@ -298,7 +610,9 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
   return {
     id: r.id,
     requestGroupId: str(r.requestGroupId),
-    displayId: str(r.displayId) ?? str(r.shortCode) ?? shortRef(r.id),
+    projectId: str(r.projectId),
+    displayId: requestCodeOf(r as unknown as Record<string, unknown>) ?? shortRef(r.id),
+    code: requestCodeOf(r as unknown as Record<string, unknown>),
     groupRef: groupRefOf(r),
     type: r.type,
     status: r.status,
@@ -310,11 +624,23 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     // Prefer the stored value; else derive from start/end (backend never computes it from the dates).
     durationDays: num(r.estimatedDurationDays) ?? durationDaysBetween(str(r.startDate), str(r.endDate)),
     createdAt: str(r.createdAt),
+    expiresAt: str(r.expiresAt),
     bidCount: num(r.bidCount) ?? 0,
+    // `my-requests` spreads the whole request row, so this arrives already — it was simply never
+    // read here, which is why the web had no idea the one post-bid edit had been spent.
+    renteeEditUsed: r.renteeEditUsed === true,
+    requiredCerts: toCertCodes(r.requiredCerts),
     mobByRentee: it?.mobilizationByRentee ?? null,
     demobByRentee: it?.demobilizationByRentee ?? null,
     item: it
-      ? { name: itemName(it, false), nameAr: itemName(it, true), qty: it.numberOfUnits ?? 1, imageUrl: publicTaxonomyUrl(it.subtypeImageUrl ?? it.categoryImageUrl), categoryId: it.categoryId }
+      ? {
+          name: itemName(it, false),
+          nameAr: itemName(it, true),
+          qty: it.numberOfUnits ?? 1,
+          imageUrl: publicTaxonomyUrl(it.subtypeEquipmentImageUrl ?? it.subtypeImageUrl ?? it.categoryImageUrl),
+          imageIsPhoto: Boolean(it.subtypeEquipmentImageUrl),
+          categoryId: it.categoryId,
+        }
       : null,
   };
 }
@@ -328,7 +654,7 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
 export function parseAddress(label: string | null | undefined): { city: string | null; neighbourhood: string | null } {
   if (!label || !label.trim()) return { city: null, neighbourhood: null };
   const COUNTRY = /^(saudi arabia|ksa|kingdom of saudi arabia|المملكة العربية السعودية|السعودية)$/i;
-  const POSTCODE = /[\s,-]*[\d٠-٩]{4,}(?:[\s-][\d٠-٩]{4})?\s*$/; // trailing 4+ digit code
+  const POSTCODE = /[\s,-]*[\d٠-٩]{4,}(?:[\s-][\d٠-٩]{4})?\s*$/; // trailing 4+ digit code, either numeral system
   const parts = label.split(",").map((s) => s.trim()).filter(Boolean);
   if (parts.length && COUNTRY.test(parts[parts.length - 1])) parts.pop();
   if (parts.length === 0) return { city: null, neighbourhood: null };
@@ -369,6 +695,11 @@ export function groupRequests(items: RequestListItem[]): RequestGroup[] {
       locationLabel,
       address,
       createdAt: first.createdAt,
+      // Earliest wins: the group can only take bids for as long as its soonest-closing item can.
+      expiresAt: groupItems
+        .map((i) => i.expiresAt)
+        .filter((d): d is string => !!d)
+        .sort()[0] ?? null,
       type: first.type,
       totalBids: groupItems.reduce((s, i) => s + i.bidCount, 0),
       totalUnits: groupItems.reduce((s, i) => s + (i.item?.qty ?? 1), 0),

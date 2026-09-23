@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { restoreAccount } from "@/lib/api/profile-client";
+import { btn } from "@/lib/ds";
 
 /**
  * Restore-or-sign-out gate, shown when an OTP verify succeeds on a SELF-DELETED account (app parity:
@@ -63,17 +64,24 @@ export function RestoreAccountPrompt({
         <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-brand-soft text-brand">
           <Icon name="history" size={22} />
         </span>
-        <h2 className="text-[22px] font-extrabold tracking-[-.4px] text-navy">{a.restoreTitle}</h2>
+        {/* The prompt is drawn inside `CodeEntry`, which on the auth modal stands on the navy panel.
+            `text-inherit` takes the panel's own ink there and the page's navy everywhere else — one
+            rule rather than a tone prop threaded through a screen that has no other dark-specific
+            need. `Dialog`'s dark tone sets `text-white` on the panel, which is what it inherits. */}
+        <h2 className="text-display font-extrabold capitalize tracking-[-.4px] text-inherit">{a.restoreTitle}</h2>
       </div>
-      <p className="text-[14px] leading-[1.55] text-muted">{a.restoreBody}</p>
+      {/* `text-inherit` with an opacity, for the same reason as the heading above: white/70 on the
+          auth modal's navy, navy/70 on every other ground. A fixed `text-muted` was unreadable on the
+          one and `text-white/60` would be invisible on the other. */}
+      <p className="text-body leading-[1.55] text-inherit opacity-70">{a.restoreBody}</p>
 
-      {err && <p className="mt-[12px] text-[13px] font-semibold text-danger">{err}</p>}
+      {err && <p className="mt-3 text-body font-semibold text-danger">{err}</p>}
 
       <button
         type="button"
         onClick={restore}
         disabled={busy !== null}
-        className="mt-[22px] flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
+        className={btn("primary", "lg", { full: true, className: "mt-6 flex transition" })}
       >
         {busy !== "restore" && <Icon name="check" size={18} />}
         <span>{busy === "restore" ? a.restoring : a.restoreConfirm}</span>
@@ -83,7 +91,7 @@ export function RestoreAccountPrompt({
         type="button"
         onClick={declineAndSignOut}
         disabled={busy !== null}
-        className="mt-[10px] w-full rounded-[10px] border border-border bg-surface px-[24px] py-[13px] text-[13.5px] font-bold text-navy-mid transition hover:bg-surface2 disabled:opacity-50"
+        className={btn("secondary", "lg", { full: true, className: "mt-3 transition" })}
       >
         {a.restoreDeny}
       </button>

@@ -2,15 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
+import { Dialog } from "@/components/Dialog";
 import { useSession } from "@/lib/session";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { PhoneEntry } from "@/components/auth/PhoneEntry";
 import { EmailEntry } from "@/components/auth/EmailEntry";
 import { CodeEntry } from "@/components/auth/CodeEntry";
+import { AuthPanel, AuthToggle } from "@/components/auth/AuthPanel";
 import { normalizeTier, type RenterUser } from "@/lib/contract/auth";
 import { updateProfile, type ProfileUpdatePayload } from "@/lib/api/profile-client";
 import { EMAIL_FIRST_AUTH_ENABLED } from "@/lib/flags";
 import { Icon } from "@/components/ui";
+import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /** Mask a stored email for display: `mahmoud@gmail.com` → `m•••@gmail.com`. */
 function maskEmail(e: string): string {
@@ -32,26 +36,58 @@ function maskEmail(e: string): string {
  */
 export function AccountModal({ open, onClose, onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup }: { open: boolean; onClose: () => void; onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void }) {
   const { locale } = useLocale();
+  /** Which ground this open is drawing on — the flow tells the shell, so the two cannot disagree. */
+  const [dark, setDark] = useState(true);
+  /**
+   * True once the code has been verified and the account behind it is NOT yet an account.
+   *
+   * ── Sign in and create the account are ONE act (owner, 2026-09-13) ──────────────────────────────
+   * *"make the login and create account as one step but 2 modals, can't be done as 1 step only"*,
+   * after: *"a user can't be guest after login"*.
+   *
+   * 🔴 **They could be.** `guest` is a real backend state - `getUserTier` returns it until
+   * `firstName && lastName && city && jobTitle` all exist - and Modal 2 was an ordinary dismissible
+   * dialog. Verify a code, press the ✕, and the renter is signed in as a guest with a session, a
+   * phone and nothing else: every tier-gated action refuses him and the badge says «زائر». That is
+   * exactly the account the owner forwarded on 2026-09-10 (`+966566493886`), stuck on «مستوى حسابك
+   * لا يسمح بهذا الإجراء» over a profile form he was not allowed to submit.
+   *
+   * 🔴 **And `origin/main` is no better** - checked before building, because the owner asked to
+   * *"check the prod main and align the logic"*. The routing is the same line for line there; the
+   * whole main↔beta difference in this flow is the design-system pass (`btn()`, `Dialog`, tokens,
+   * the navy panel) plus the dropped `companyName` field. Prod has the identical hole, so aligning
+   * to it would have changed nothing.
+   *
+   * The second modal is therefore not dismissible. The way OUT is still there and is now an explicit
+   * act with its own name - «Leave and sign out» inside the form - because leaving here is abandoning
+   * a signup, not closing a dialog.
+   */
+  const [committed, setCommitted] = useState(false);
   if (!open) return null;
   return (
-    <div
-      dir={locale === "ar" ? "rtl" : "ltr"}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/45 p-4 sm:items-center"
-      onClick={onClose}
-    >
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface shadow-xl" onClick={(e) => e.stopPropagation()}>
+    // No header of its own: the flow inside titles each of its four phases, and a second title above
+    // that would name the container rather than the step. `Dialog` floats the close in the corner for
+    // exactly this case, so the way out is where it is in every other dialog.
+    //
+    // ~~One white panel for all four phases.~~ The two IDENTITY steps — entry and code — now open on
+    // the navy panel of the owner's comp (2026-08-30); the profile form and the keep/switch question
+    // stay on `--surface`, because they are ordinary forms and a dark ground would make the app's one
+    // long form the only dark one in it. `AccountFlow` reports which it is drawing, so the shell and
+    // the step cannot disagree about the ground under them.
+    <Dialog open onClose={onClose} size="xl" padded={false} tone={dark ? "dark" : "default"} dismissible={!committed}>
+      <div {...pin("auth-gate")} dir={locale === "ar" ? "rtl" : "ltr"}>
         {/* Fresh mount each open → the flow always starts at the right step for the current session. */}
-        <AccountFlow onCreated={onCreated} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} resumeToken={resumeToken} onNeedsSignup={onNeedsSignup} />
+        <AccountFlow onCreated={onCreated} onAbandon={onClose} title={title} subtitle={subtitle} postHeadline={postHeadline} postSubhead={postSubhead} resumeToken={resumeToken} onNeedsSignup={onNeedsSignup} onGround={setDark} onCommitted={setCommitted} />
       </div>
-    </div>
+    </Dialog>
   );
 }
 
 type Phase = "entry" | "code" | "profile" | "emailChoice";
 
-function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup }: { onCreated: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void }) {
+function AccountFlow({ onCreated, onAbandon, title, subtitle, postHeadline, postSubhead, resumeToken, onNeedsSignup, onGround, onCommitted }: { onCreated: () => void; onAbandon: () => void; title?: string; subtitle?: string; postHeadline?: string; postSubhead?: string; resumeToken?: string; onNeedsSignup?: (token: string, email: string | null) => void; onGround?: (dark: boolean) => void; onCommitted?: (on: boolean) => void }) {
   const t = useT();
-  const { status, user, signIn } = useSession();
+  const { status, user, signIn, signOut, refresh } = useSession();
   // A guest-tier session with a phone is a phone-first user who verified but never finished the profile
   // → resume at Modal 2 (Case 2, email required). Already basic/verified → nothing to fill → continue.
   const hasGuestSession = status === "authed" && !!user?.phone && user?.tier === "guest";
@@ -78,6 +114,36 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
     if (alreadyComplete) onCreated();
   }, [alreadyComplete, onCreated]);
 
+  /* The two identity steps draw on the comp's navy panel; the profile form and the keep/switch
+     question are ordinary forms and stay white. Reported UP rather than decided in the shell, so the
+     one place that knows which step is on screen is the one that says what it stands on. */
+  useEffect(() => {
+    onGround?.(phase === "entry" || phase === "code");
+  }, [phase, onGround]);
+
+  /* The profile step is the committed one: past it there is a verified code and no account. The
+     keep/switch question is NOT - that account is already complete, and its two buttons are both
+     answers, so there is nothing to trap anybody into. */
+  useEffect(() => {
+    onCommitted?.(phase === "profile");
+  }, [phase, onCommitted]);
+
+  /**
+   * Leave the half-finished signup.
+   *
+   * ⚠️ **It SIGNS OUT, and that is the point.** A phone-first renter already has a session by the
+   * time this form is on screen: closing without it is what left people signed in as guests. An
+   * email-first one has no account at all - only the onboarding token, which `AuthGate` keeps so the
+   * «Finish your signup» banner can resume him - so there is nothing to sign out of and the call is
+   * harmless either way.
+   */
+  const abandon = async () => {
+    if (status === "authed") {
+      try { await signOut(); } catch { /* the close still has to happen */ }
+    }
+    onAbandon();
+  };
+
   // Post-verify routing (existing session set): confirm the AUTHORITATIVE tier from /api/me (verify's
   // tier can be thin for a returning account), then continue / keep-switch / register.
   const afterVerified = async (u: RenterUser, xEmail: string | null) => {
@@ -99,8 +165,22 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
       setPhase("emailChoice");
       return;
     }
-    if (complete) onCreated();
-    else setPhase("profile"); // new PHONE user → Modal 2 Case 2 (email required; onboardingToken empty)
+    if (complete) {
+      /* ── Make the SESSION authoritative before the page reads it (owner, 2026-08-30) ──────────
+         `signIn(u)` above adopted verify's payload, whose tier "can be thin for a returning account"
+         — this function's own words, and the reason it asks `/api/me` at all. It corrected `tier`
+         locally for the routing and left the session holding the thin one, which is what
+         `canCreate` and the dashboard's blocks then read.
+
+         It matters now that the dashboard reloads on `sessionKey`: a returning `basic` account
+         arriving as `guest` in the session would refetch instantly and render the guest's answers,
+         which looks exactly like the bug this is meant to fix. `refresh()` re-reads
+         `/api/auth/session`, so the tier the page acts on is the server's. */
+      await refresh();
+      onCreated();
+      return;
+    }
+    setPhase("profile"); // new PHONE user → Modal 2 Case 2 (email required; onboardingToken empty)
   };
 
   // ── Modal 1 — get a code with phone OR email ──
@@ -108,33 +188,30 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
     // Email-first not enabled (backend still requires a phone) → phone-only entry, no toggle.
     if (!EMAIL_FIRST_AUTH_ENABLED) {
       return (
-        <div className="p-[22px]">
+        <AuthPanel>
           <PhoneEntry
+            tone="dark"
             title={title ?? t.auth.entryTitle}
             subtitle={subtitle ?? t.auth.entrySub}
             onCodeSent={(p) => { setCodePhone(p); setCodeEmail(null); setPhase("code"); }}
           />
-        </div>
+        </AuthPanel>
       );
     }
-    const seg = (mode: "phone" | "email", label: string) => (
-      <button
-        type="button"
-        onClick={() => setEntryMode(mode)}
-        aria-pressed={entryMode === mode}
-        className={`flex-1 rounded-[8px] py-2 text-[13px] font-bold transition ${entryMode === mode ? "bg-surface text-navy shadow-[0_1px_2px_rgba(28,53,80,.12)]" : "text-navy-mid"}`}
-      >
-        {label}
-      </button>
-    );
     return (
-      <div className="p-[22px]">
-        <div className="mb-[18px] grid grid-cols-2 gap-[6px] rounded-[10px] border border-border bg-surface2 p-[4px]">
-          {seg("phone", t.auth.withPhone)}
-          {seg("email", t.auth.withEmail)}
-        </div>
+      <AuthPanel
+        toggle={
+          <AuthToggle
+            mode={entryMode}
+            onMode={setEntryMode}
+            phoneLabel={t.auth.withPhone}
+            emailLabel={t.auth.withEmail}
+          />
+        }
+      >
         {entryMode === "phone" ? (
           <PhoneEntry
+            tone="dark"
             title={title ?? t.auth.entryTitle}
             subtitle={subtitle ?? t.auth.entrySub}
             onUseEmail={() => setEntryMode("email")}
@@ -142,13 +219,14 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
           />
         ) : (
           <EmailEntry
+            tone="dark"
             title={title ?? t.auth.entryTitle}
             subtitle={subtitle ?? t.auth.entrySub}
             onUsePhone={() => setEntryMode("phone")}
             onCodeSent={(em) => { setCodeEmail(em); setCodePhone(null); setPhase("code"); }}
           />
         )}
-      </div>
+      </AuthPanel>
     );
   }
 
@@ -157,8 +235,9 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
     const verifyPayload = codePhone ? { phone: codePhone } : { otpEmail: codeEmail };
     const resendPayload = codePhone ? { phone: codePhone, otpMethod: "SMS" } : { otpEmail: codeEmail, otpMethod: "EMAIL" };
     return (
-      <div className="p-[22px]">
+      <AuthPanel>
         <CodeEntry
+          tone="dark"
           dest={codePhone ?? codeEmail ?? ""}
           verifyPayload={verifyPayload}
           resendPayload={resendPayload}
@@ -166,7 +245,7 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
           onNeedsSignup={(token, email) => { setOnboardingToken(token); onNeedsSignup?.(token, email); setPhase("profile"); }}
           onEditNumber={() => setPhase("entry")}
         />
-      </div>
+      </AuthPanel>
     );
   }
 
@@ -194,16 +273,16 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
     };
     const body = t.auth.emailChoiceBody.replace("{stored}", maskEmail(storedEmail)).replace("{new}", typedEmail.trim());
     return (
-      <div className="p-[22px]">
+      <div className="p-6">
         <span className="mb-3 grid h-11 w-11 place-items-center rounded-full bg-brand-soft text-brand"><Icon name="mail" size={22} /></span>
-        <h2 className="mb-[6px] text-[22px] font-extrabold tracking-[-.4px] text-navy">{t.auth.emailChoiceTitle}</h2>
-        <p className="mb-[20px] text-[14px] leading-[1.55] text-muted">{body}</p>
-        {switchErr && <p className="mb-3 text-[13px] font-semibold text-danger">{t.auth.emailSwitchError}</p>}
+        <h2 className="mb-2 text-display font-extrabold tracking-[-.4px] text-navy">{t.auth.emailChoiceTitle}</h2>
+        <p className="mb-5 text-body leading-[1.55] text-muted">{body}</p>
+        {switchErr && <p className="mb-3 text-body font-semibold text-danger">{t.auth.emailSwitchError}</p>}
         <div className="flex gap-3">
-          <button type="button" onClick={() => onCreated()} disabled={switching} className="flex-1 rounded-[10px] border border-border bg-surface px-4 py-3 text-[14px] font-bold text-navy-mid transition hover:border-navy-mid disabled:opacity-50">
+          <button type="button" onClick={() => onCreated()} disabled={switching} className={btn("secondary", "lg", { className: "flex-1 transition" })}>
             {t.auth.emailKeep}
           </button>
-          <button type="button" onClick={useNew} disabled={switching} className="flex-1 rounded-[10px] border border-brand bg-brand px-4 py-3 text-[14px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50">
+          <button type="button" onClick={useNew} disabled={switching} className={btn("primary", "lg", { className: "flex-1 transition" })}>
             {switching ? t.auth.emailSwitching : t.auth.emailUseNew}
           </button>
         </div>
@@ -223,6 +302,7 @@ function AccountFlow({ onCreated, title, subtitle, postHeadline, postSubhead, re
       requireEmail={!emailFirst}
       phoneVerify={emailFirst ? { onboardingToken } : undefined}
       onSignIn={() => { setOnboardingToken(""); setCodeEmail(null); setCodePhone(null); setEntryMode("phone"); setPhase("entry"); }}
+      onAbandon={() => void abandon()}
       onDone={onCreated}
       headline={postHeadline ?? t.guest.postTitle}
       subhead={postSubhead ?? t.guest.postBody}

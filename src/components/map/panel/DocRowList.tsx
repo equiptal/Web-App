@@ -97,6 +97,7 @@ import {
   type PresenceStatus,
   type SelectionMode,
 } from "./machine-panel-model";
+import { pin } from "@/lib/uiPins";
 
 /** The status dot's look. `present`/`verified` green · `on_file` blue · **`missing` red**.
  *  ~~amber~~ — withdrawn 2026-08-09 with the rest of the amber family; `panel-proto.css` §missing
@@ -132,6 +133,14 @@ export interface DocRowView {
    * omitted. `null` keeps today's behaviour exactly: no checkbox, a held spacer, no dimming.
    */
   mode: SelectionMode | null;
+  /**
+   * **Absent, but its question is answered by a sibling** — `DocRow.answeredElsewhere` (owner,
+   * 2026-09-10). The row keeps its `missing` dot and its tick, and loses the RED: proof of ownership
+   * is four ways of answering one question, so once the istimara is on the file the customs card is
+   * an alternative nobody is short of. Everything else about the row is unchanged, which is what
+   * keeps «select all missing» and the ask able to reach it.
+   */
+  answeredElsewhere?: boolean;
   /**
    * May this row be ticked **right now**? **Defaults to true**, so a caller that has no opinion is
    * unchanged.
@@ -292,7 +301,7 @@ export function DocRowList({
       <div className="mp-grp-h">
         <span>{groupLabel}</span>
         {/* The prototype's own wording, both halves (2026-08-09): «يحتاج انتباه» over our «بحاجة إلى
-            إجراء», and «مكتملة» over «لا ينقص شيء». The owner's screenshot says «1 يحتاج انتباه» too,
+            إجراء», and «مكتملة» over «لا ينقص شيء». The owner's screenshot says «١ يحتاج انتباه» too,
             so this is one of the places where both sources agree and we had drifted. */}
         <span className={`mp-att-pill${attention === 0 ? " done" : ""}`}>
           {attention === 0
@@ -350,6 +359,10 @@ export function DocRowList({
         const actions = docRowActions(r);
         const openable = !!onView && actions.length > 0;
         const framed = viewingKey === r.key && actions.length > 0;
+        /* Red says «this is a gap». An absent row whose group is already answered is not one
+           (owner, 2026-09-10) — see `DocRowView.answeredElsewhere`. The DOT still says missing,
+           because the row is still empty and still askable; only the gap paint is withheld. */
+        const gap = r.dot === "missing" && !r.answeredElsewhere;
 
         /* The name, the status line and the thumbnail — the part of the row that IS the document, and
            therefore the part that opens it. The checkbox and the `↗` links stay outside it: a control
@@ -362,10 +375,10 @@ export function DocRowList({
                 the column the renter actually scans is the one that zig-zags. */}
             <span className="mp-rowtx">
               <b>{r.name}</b>
-              <span className={r.dot === "missing" ? "att" : undefined}>{r.status}</span>
+              <span className={gap ? "att" : undefined}>{r.status}</span>
             </span>
 
-            <span className={`mp-thumb${r.dot === "missing" ? " missing" : ""}`}>
+            <span className={`mp-thumb${gap ? " missing" : ""}`}>
               {r.thumbUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={r.thumbUrl} alt={r.name} />
@@ -380,7 +393,8 @@ export function DocRowList({
         return (
           <div
             key={r.key}
-            className={`mp-row${picked ? " picked" : ""}${framed ? " open" : ""}${r.dot === "missing" ? " missing" : ""}${dimmed ? " dim" : ""}`}
+            {...pin("doc-row")}
+            className={`mp-row${picked ? " picked" : ""}${framed ? " open" : ""}${gap ? " missing" : ""}${dimmed ? " dim" : ""}`}
           >
             {tickable || dimmed ? (
               <button

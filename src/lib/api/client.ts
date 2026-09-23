@@ -1,5 +1,7 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
-import type { RequestListItem, RequestRecord } from "@/lib/contract/requests";
+import { SOURCE_HEADER as TAXONOMY_SOURCE_HEADER } from "@/lib/contract/taxonomy";
+import type { CancelReport, RequestListItem, RequestRecord, RequestStatus } from "@/lib/contract/requests";
+import { isCancelledStatus } from "@/lib/contract/requests";
 import type { BidCard, BidSizeCounts } from "@/lib/contract/bids";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import type { CompanyDocsPayload } from "@/lib/contract/company-documents";
@@ -11,6 +13,15 @@ import { mapBidFormData, mapLinkSubmissions, type BidFormData, type LinkBidSubmi
 import type { InboxBid } from "@/lib/contract/inbox";
 import type { RenteeRequestDraft } from "@/lib/contract/rentee-request";
 import type { NotificationList, NotificationFilter } from "@/lib/contract/notifications";
+import type { Project, ProjectSummary } from "@/lib/contract/project";
+import { mapProjectSummary, projectToPayload } from "@/lib/contract/project";
+import { contentTypeFor } from "@/lib/contract/award";
+import type { Award, AwardDocument, ChartGroup } from "@/lib/contract/award";
+import type { WorkOrderItem, WorkOrderGroup } from "@/lib/contract/work-order";
+import { groupWorkOrderItems, termsFromWire } from "@/lib/contract/work-order";
+import type { TemplateOption } from "@/lib/contract/project-apply";
+import { machineTermsOfRequestItem } from "@/lib/contract/project-apply";
+import type { MachineTerms } from "@/lib/contract/work-order";
 
 /** Body of POST /api/me/bids/recommend. user_id is attached server-side. */
 export interface RecommendPayload {
@@ -32,10 +43,26 @@ export class ApiError extends Error {
   status?: number;
   /** The real upstream backend HTTP status (e.g. agents-backend), distinct from our relay's status. */
   backendStatus?: number;
+  /**
+   * The envelope's `details`, untouched.
+   *
+   * ⚠️ On a `VALIDATION_ERROR` this is zod's `flatten()` — `{ formErrors, fieldErrors }` — which is
+   * the only thing that names the field the backend refused. Carried as `unknown` because other
+   * codes put other shapes here (an export's `{ fallback }`, for one), and narrowing it at the door
+   * would silently drop those.
+   */
+  details?: unknown;
   constructor(
     kind: ApiErrorKind,
     message?: string,
-    extra?: { detail?: string; messageAr?: string; backendCode?: string; status?: number; backendStatus?: number },
+    extra?: {
+      detail?: string;
+      messageAr?: string;
+      backendCode?: string;
+      status?: number;
+      backendStatus?: number;
+      details?: unknown;
+    },
   ) {
     super(message ?? kind);
     this.kind = kind;
@@ -45,6 +72,7 @@ export class ApiError extends Error {
     this.backendCode = extra?.backendCode;
     this.status = extra?.status;
     this.backendStatus = extra?.backendStatus;
+    this.details = extra?.details;
   }
 }
 
@@ -68,11 +96,33 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   }
   if (!res.ok) {
     let code: ApiErrorKind = "unknown";
-    let extra: { detail?: string; messageAr?: string; backendCode?: string; status?: number; backendStatus?: number } = { status: res.status };
+    let extra: {
+      detail?: string;
+      messageAr?: string;
+      backendCode?: string;
+      status?: number;
+      backendStatus?: number;
+      details?: unknown;
+    } = { status: res.status };
     try {
-      const data = (await res.json()) as { code?: ApiErrorKind; detail?: string; messageAr?: string; backendCode?: string; backendStatus?: number };
+      const data = (await res.json()) as {
+        code?: ApiErrorKind;
+        detail?: string;
+        messageAr?: string;
+        backendCode?: string;
+        backendStatus?: number;
+        details?: unknown;
+      };
       if (data.code === "empty" || data.code === "network") code = data.code;
-      extra = { ...extra, detail: data.detail, messageAr: data.messageAr, backendCode: data.backendCode, backendStatus: data.backendStatus };
+      extra = {
+        ...extra,
+        detail: data.detail,
+        messageAr: data.messageAr,
+        backendCode: data.backendCode,
+        backendStatus: data.backendStatus,
+        // ⚠️ Which field the backend refused. See `ApiError.details`.
+        details: data.details,
+      };
     } catch {
       /* ignore */
     }
@@ -218,7 +268,15 @@ export function fetchRequestDetail(id: string): Promise<RequestRecord> {
   return getJson<RequestRecord>(`/api/me/requests/${encodeURIComponent(id)}`);
 }
 
-/** Cancel a request (DELETE) — allowed while OPEN/ACTIVE. */
+/**
+ * Cancel a request (DELETE) — allowed while OPEN/ACTIVE.
+ *
+ * ⚠️ **The refusal's own words are kept**, the way the mobile app keeps them: its detail page prints
+ * `localizedError(message, messageAr)` straight from the backend, so a renter there reads «a request
+ * can only be cancelled while it is open or active» while the web read «that didn't go through».
+ * The sentence that says WHY is the whole difference between a renter who stops and one who presses
+ * the same button five times.
+ */
 export async function cancelRequest(id: string): Promise<void> {
   let res: Response;
   try {
@@ -226,7 +284,74 @@ export async function cancelRequest(id: string): Promise<void> {
   } catch {
     throw new ApiError("network");
   }
-  if (!res.ok) throw new ApiError(res.status >= 500 ? "network" : "unknown", `HTTP ${res.status}`);
+  if (res.ok) return;
+  let code: string | undefined;
+  let detail: string | undefined;
+  let messageAr: string | undefined;
+  try {
+    // Our own route answers flat `{ code, detail, messageAr }`; `backendCode` carries the app's
+    // own (REQUEST_CANCEL_NOT_ALLOWED and friends), which is what a screenshot needs to be read by.
+    const body = (await res.json()) as { code?: string; backendCode?: string; detail?: string; message?: string; messageAr?: string };
+    code = body.backendCode ?? body.code;
+    detail = body.detail ?? body.message;
+    messageAr = body.messageAr;
+  } catch {
+    /* non-JSON body */
+  }
+  throw new ApiError(res.status >= 500 ? "network" : "unknown", `HTTP ${res.status}`, {
+    status: res.status,
+    backendCode: code,
+    detail,
+    messageAr,
+  });
+}
+
+/**
+ * **Cancel every request a press aimed at, then say what is actually true of each.**
+ *
+ * 🔴 The reason this exists rather than a bare `Promise.all(ids.map(cancelRequest))` (owner,
+ * 2026-09-20, on a request that was CANCELLED in the database while the screen said the act had
+ * failed): a refused DELETE does not mean the request is still live. It means the backend would not
+ * do it AGAIN — and the commonest cause of that is that it already did. So every refusal is settled
+ * by RE-READING the request rather than by believing the status code.
+ *
+ * ⚠️ `allSettled`, never `all`: on a fanned-out RFQ `all` rejects at the first refusal and throws
+ * away what the other items answered, so five cancelled lines and one accepted one reported as a
+ * total failure — and the retry then re-sent the five, which the backend refused in turn.
+ *
+ * ⚠️ A re-read that itself fails leaves the status `null`, which is «we do not know» and is treated
+ * as a real failure with the retry left open. Guessing either way here is how one of these two
+ * screens starts lying.
+ */
+export async function cancelRequests(ids: string[]): Promise<CancelReport> {
+  const settled = await Promise.allSettled(ids.map((id) => cancelRequest(id)));
+  const report: CancelReport = { cancelled: 0, refused: [] };
+  await Promise.all(
+    settled.map(async (r, i) => {
+      if (r.status === "fulfilled") {
+        report.cancelled += 1;
+        return;
+      }
+      let status: RequestStatus | null = null;
+      try {
+        status = (await fetchRequestDetail(ids[i]))?.status ?? null;
+      } catch {
+        /* unreadable — `null` says so, and the caller offers the retry */
+      }
+      if (isCancelledStatus(status)) {
+        report.cancelled += 1;
+        return;
+      }
+      const e = r.reason;
+      report.refused.push({
+        id: ids[i],
+        status,
+        said: e instanceof ApiError ? e.detail ?? null : null,
+        saidAr: e instanceof ApiError ? e.messageAr ?? null : null,
+      });
+    }),
+  );
+  return report;
 }
 
 /** Edit a request (PATCH a partial of its fields) — allowed while OPEN with 0 bids. */
@@ -238,7 +363,7 @@ export function updateRequest(id: string, patch: Record<string, unknown>): Promi
  * Bids received on a request (active then expired).
  *
  * `showLarger` widens the list to bids offering a machine LARGER than the one asked for. The
- * backend hides those by default, so this is a REFETCH and not a client-side filter - nothing held
+ * backend hides those by default, so this is a REFETCH and not a client-side filter — nothing held
  * locally can reveal a bid that never arrived. `sizeCounts.larger` says how many are being held.
  */
 export function fetchBids(requestId: string, showLarger = false): Promise<{ bids: BidCard[]; sizeCounts?: BidSizeCounts }> {
@@ -587,11 +712,24 @@ export function captureBidEvents(events: BidEventInput[]): void {
   }
 }
 
+/**
+ * True when the catalogue on screen is the built-in stand-in rather than the live one.
+ *
+ * 🔴 Read it before believing a short TYPE list. The route falls back to a 17-subtype fixture on any
+ * failure of the agents service, and without this a broken fetch and a thin catalogue are the same
+ * picture — which is how «our catalogue is missing machines» gets reported for a network fault.
+ * A module-level flag rather than a returned pair: the tree is consumed as a bare array in half a
+ * dozen places, and only the equipment card asks this question.
+ */
+let taxonomyIsFixture = false;
+export const taxonomyFromFixture = () => taxonomyIsFixture;
+
 /** Fetch the equipment taxonomy. */
 export async function fetchTaxonomy(): Promise<Taxonomy> {
   try {
     const res = await fetch("/api/taxonomy");
     if (!res.ok) throw new ApiError("network");
+    taxonomyIsFixture = res.headers.get(TAXONOMY_SOURCE_HEADER) === "fixture";
     return (await res.json()) as Taxonomy;
   } catch (e) {
     if (e instanceof ApiError) throw e;
@@ -710,4 +848,1498 @@ const OS_BASE = (process.env.NEXT_PUBLIC_OS_APP_URL || "https://os.moedatech.net
  */
 export function bidShareUrl(requestId: string): string {
   return `${OS_BASE}/bid/${requestId}`;
+}
+
+
+/* ============================================================================================== *
+ * PROJECTS — the renter's sites, their work orders, and who supplies what (web-app/007, W-T3)
+ * ============================================================================================== */
+
+/**
+ * Somebody else wrote to this site first.
+ *
+ * Awards live in one blob on the project row, so every write carries the `version` it read and the
+ * backend refuses a stale one. That is not an edge case to hide: two people share a site, and one
+ * person double-tapping Save or retrying a flaky request produces exactly the same thing.
+ *
+ * It carries `currentVersion` so a caller can re-read and re-apply rather than telling the renter
+ * "something went wrong" and leaving them to retry into the same wall.
+ */
+export class ProjectVersionConflict extends Error {
+  currentVersion: number | null;
+  constructor(currentVersion: number | null) {
+    super("project_version_stale");
+    this.name = "ProjectVersionConflict";
+    this.currentVersion = currentVersion;
+  }
+}
+
+/**
+ * The two other 409s an award write can answer with. Both are instructions, not dead ends:
+ * `units_exceed_quantity` means the line has fewer units left than were promised, and
+ * `request_not_filed` means the request has no site yet — so the UI opens the project picker
+ * instead of showing an error.
+ */
+export type AwardRefusal = "units_exceed_quantity" | "request_not_filed";
+
+export class AwardRefused extends Error {
+  reason: AwardRefusal;
+  details: unknown;
+  constructor(reason: AwardRefusal, details: unknown) {
+    super(reason);
+    this.name = "AwardRefused";
+    this.reason = reason;
+    this.details = details;
+  }
+}
+
+type ProjectFetchInit = { method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown };
+
+/**
+ * One fetch for every project call.
+ *
+ * It exists rather than reusing `postJsonMethod` for one reason: that helper collapses any failure
+ * into `ApiError("unknown")`, and here the backend's **code** is the whole message. A stale version,
+ * a units overrun and an unfiled request are three different things a renter can act on, and they
+ * all arrive as 409.
+ */
+async function projectFetch<T>(url: string, init: ProjectFetchInit = {}): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: init.method ?? "GET",
+      headers: init.body === undefined ? { Accept: "application/json" } : { "Content-Type": "application/json" },
+      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    });
+  } catch {
+    throw new ApiError("network");
+  }
+
+  /**
+   * A 204 has no body to parse. `deleteProject` answers one, and `res.json()` on an empty body
+   * rejects — so a delete that had already succeeded threw its way out as a network error.
+   */
+  if (res.status === 204) return undefined as T;
+  if (res.ok) return (await res.json()) as T;
+
+  let code: string | undefined;
+  let details: unknown;
+  /**
+   * The backend's own words, kept rather than dropped.
+   *
+   * ⚠️ Both envelopes, because two of them reach here. The agents relay forwards the upstream body
+   * verbatim — `{ success: false, error: { code, message, messageAr, details } }` — while this app's
+   * own routes answer a flat `{ code, detail, messageAr }`. Reading only the flat one is how a
+   * refusal that HAD a reason arrived as a bare status: «المستخدم غير موجود» became «try again».
+   */
+  let detail: string | undefined;
+  let messageAr: string | undefined;
+  try {
+    const body = (await res.json()) as {
+      code?: string;
+      detail?: string;
+      message?: string;
+      messageAr?: string;
+      details?: unknown;
+      error?: { code?: string; message?: string; messageAr?: string; details?: unknown };
+    };
+    code = body.code ?? body.error?.code;
+    details = body.details ?? body.error?.details;
+    detail = body.detail ?? body.message ?? body.error?.message;
+    messageAr = body.messageAr ?? body.error?.messageAr;
+  } catch {
+    /* non-JSON body */
+  }
+
+  if (res.status === 409) {
+    /**
+     * TWO codes, one meaning. The awards handlers answer `PROJECT_VERSION_STALE`; `updateProject`
+     * and the two work-order writes answer `PROJECT_VERSION_CONFLICT`. Both carry `currentVersion`
+     * and both want the same response — re-read, re-apply — so both land here. Knowing only one of
+     * them turned "somebody saved first" into a bare unknown error with no way forward.
+     */
+    if (code === "PROJECT_VERSION_STALE" || code === "PROJECT_VERSION_CONFLICT") {
+      const current = (details as { currentVersion?: number } | undefined)?.currentVersion;
+      throw new ProjectVersionConflict(typeof current === "number" ? current : null);
+    }
+    if (code === "UNITS_EXCEED_QUANTITY") throw new AwardRefused("units_exceed_quantity", details);
+    if (code === "REQUEST_NOT_FILED") throw new AwardRefused("request_not_filed", details);
+  }
+
+  throw new ApiError(res.status >= 500 ? "network" : "unknown", `HTTP ${res.status}`, {
+    status: res.status,
+    backendCode: code,
+    detail,
+    messageAr,
+    details,
+  });
+}
+
+const projectPath = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
+
+/* ----------------------------- Sites ----------------------------- */
+
+/** Every site this company has, newest first, with the roll-up each card shows. */
+export async function listProjects(): Promise<ProjectSummary[]> {
+  const rows = await projectFetch<Record<string, unknown>[]>("/api/projects");
+  return rows.map(mapProjectSummary);
+}
+
+export async function fetchProject(id: string): Promise<ProjectSummary> {
+  return mapProjectSummary(await projectFetch<Record<string, unknown>>(projectPath(id)));
+}
+
+export async function createProject(p: Pick<Project, "title" | "location" | "defaults">): Promise<ProjectSummary> {
+  return mapProjectSummary(await projectFetch<Record<string, unknown>>("/api/projects", { method: "POST", body: projectToPayload(p) }));
+}
+
+/**
+ * Edit a site.
+ *
+ * `applyToRequests` is the renter's explicit tick, and the ONLY way a project edit reaches anything
+ * already filed under it. Left empty, nothing propagates — which is the point of the whole design:
+ * a request copied its values at submit and never reads its project again, so a site edited in
+ * November cannot silently rewrite an RFQ posted in September.
+ */
+export async function updateProject(
+  id: string,
+  /**
+   * The version the form was opened on. **Required by the backend**, not optional — an edit without
+   * it fails its schema before any handler code runs, which is why every save of an existing site
+   * used to answer 422 while creating a new one worked.
+   */
+  expectedVersion: number,
+  p: Pick<Project, "title" | "location" | "defaults">,
+  applyToRequests: string[] = [],
+): Promise<ProjectSummary> {
+  const body = { ...projectToPayload(p), expectedVersion, applyToRequests };
+  return mapProjectSummary(await projectFetch<Record<string, unknown>>(projectPath(id), { method: "PATCH", body }));
+}
+
+/** Refused with 409 while anything is filed under the site — never a cascade. */
+/**
+ * Name one row on a site's chart, or clear its name with `null`.
+ *
+ * A MERGE on the backend: only this key moves. Sending the whole map would let two renters renaming
+ * two different rows overwrite each other, and the version check could not tell — both writes are
+ * well formed.
+ *
+ * Work orders do NOT come through here: they have a title of their own, written by the work-order
+ * PATCH, which follows the order wherever it goes.
+ */
+export async function renameRequestRow(
+  projectId: string,
+  expectedVersion: number,
+  requestId: string,
+  title: string | null,
+): Promise<void> {
+  await projectFetch(projectPath(projectId), {
+    method: "PATCH",
+    body: { expectedVersion, labels: { [requestId]: title } },
+  });
+}
+
+/**
+ * Record that a machine arrived, or left — without needing an award to hang it on.
+ *
+ * A MERGE on the backend, per row and per field: sending only `mobilizedAt` cannot clear a
+ * `demobilizedAt` recorded an hour ago, and two renters marking two different machines cannot
+ * overwrite one another.
+ *
+ * Awards keep their own marks, which are finer: two units from one vendor can arrive while a third
+ * from another has not. This is the row's own answer, for the case where nobody has been awarded
+ * anything yet.
+ */
+export async function markRow(
+  projectId: string,
+  expectedVersion: number,
+  rowId: string,
+  patch: { mobilizedAt?: string | null; demobilizedAt?: string | null },
+): Promise<void> {
+  await projectFetch(projectPath(projectId), {
+    method: "PATCH",
+    body: { expectedVersion, marks: { [rowId]: patch } },
+  });
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  await projectFetch(projectPath(id), { method: "DELETE" });
+}
+
+/**
+ * File a request under a site, move it between sites, or unfile it with `null`.
+ *
+ * **Filing changes no value on the request**, even where the new site says something different, and
+ * it is allowed after bids because it is not an edit. Moving between sites does drop the request's
+ * awards — name what is lost in the confirm before calling this.
+ */
+export async function assignToProject(requestId: string, projectId: string | null): Promise<void> {
+  // NOT `/api/me/requests/{id}` — that is the edit, which is refused after bids and spends the
+  // renter's one edit. Filing has its own route for exactly that reason.
+  await projectFetch(`/api/me/requests/${encodeURIComponent(requestId)}/project`, { method: "PATCH", body: { projectId } });
+}
+
+/* ----------------------------- The chart ----------------------------- */
+
+export interface ProjectChart {
+  project: ProjectSummary;
+  /** The version every award write must send back. Read it here, not from a stale card. */
+  version: number;
+  groups: ChartGroup[];
+  /**
+   * Papers filed against the SITE rather than any one award — a framework agreement, a permit.
+   *
+   * ⚠️ The backend has sent these since the chart existed and this client **dropped them on the
+   * floor**, so a paper filed at site level was invisible in the web: attachable through the API,
+   * listed nowhere. Nothing failed, which is why it lasted.
+   */
+  documents: AwardDocument[];
+}
+
+/**
+ * A machine on the chart whose name the CATALOGUE could not supply.
+ *
+ * ── The row that showed no machine at all (owner, 2026-09-08) ───────────────────────
+ * *"Some request items are not shown in the project if they were undefined, so let it read from the
+ * equipment taxonomy of the request or the new column, custom type, as free text."*
+ *
+ * `getChart` labels a request's item from its taxonomy pair alone (`label(subtypeId, capacityId)`),
+ * and an off-catalogue line has NEITHER id — so `label` arrives `null` and the row drew an empty
+ * name, leaving the request's code as the only thing on it. The same handler already falls back to
+ * `rawLabel` for a WORK ORDER's machines; only the request branch has no fallback.
+ *
+ * The proper fix is one line in that projection (a ticket is out). This reads the free-text name
+ * from the payload if it is there under any of the spellings the platform uses for it, so the web
+ * shows the renter's own words the moment the backend selects the column — and needs no second
+ * change when it does.
+ */
+const chartItemName = (raw: Record<string, unknown>): { label: string | null; labelAr: string | null } => {
+  const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const label = str(raw.label);
+  const labelAr = str(raw.labelAr);
+  /* ── Arabic never draws blank, whichever branch produced the name ───────────────────────
+     The two halves of the chart disagree by design in the projection: the request branch now falls
+     back to the typed name in BOTH languages, while the work-order branch fills `labelAr` from the
+     catalogue only — so an off-catalogue work order arrives with a name in `label` and `null` beside
+     it (found by the backend author, 2026-09-08). `FileRequestDialog` already wrote `labelAr ||
+     label` by hand for exactly this; doing it once here means no consumer has to remember. */
+  if (label) return { label, labelAr: labelAr ?? label };
+  /* `customEquipmentName` is the request column (2026-09-06); `rawLabel`/`rawSize` are what a work
+     order carries for the same idea. One reader for both, because a chart row draws both kinds. */
+  const custom =
+    str(raw.customEquipmentName) ??
+    str(raw.custom_equipment_name) ??
+    ([str(raw.rawLabel), str(raw.rawSize)].filter(Boolean).join(" ") || null);
+  // The renter typed his machine in ONE language, so the same words serve both directions.
+  return { label: custom, labelAr: labelAr ?? custom };
+};
+
+/** Everything the site's timeline draws, in one call. */
+export async function fetchChart(projectId: string): Promise<ProjectChart> {
+  const raw = await projectFetch<{
+    project: Record<string, unknown>;
+    version?: number;
+    groups?: Record<string, unknown>[];
+    documents?: AwardDocument[];
+  }>(`${projectPath(projectId)}/chart`);
+  const groups = (raw.groups ?? []).map((g) => {
+    const items = Array.isArray(g.items) ? (g.items as Record<string, unknown>[]) : [];
+    return { ...g, items: items.map((it) => ({ ...it, ...chartItemName(it) })) } as unknown as ChartGroup;
+  });
+  return {
+    project: mapProjectSummary(raw.project),
+    version: typeof raw.version === "number" ? raw.version : (mapProjectSummary(raw.project).version ?? 1),
+    groups,
+    documents: raw.documents ?? [],
+  };
+}
+
+/* ----------------------------- Work orders ----------------------------- */
+
+/** The site's own machines, already grouped into work orders. */
+export async function listWorkOrders(projectId: string): Promise<WorkOrderGroup[]> {
+  /**
+   * ⚠️ **The backend already groups these.** It answers
+   * `{ version, workOrders: [{ workOrderGroupId, title, when, items: [...] }] }`, and this function
+   * used to hand that OBJECT to `groupWorkOrderItems`, which expects a flat array of machines each
+   * carrying its own `workOrderGroupId`. So it re-grouped data that was already grouped, reading a
+   * key that does not exist at item level.
+   *
+   * The damage was quiet, which is why it lasted. Every group came back with `id: undefined`, so:
+   *
+   *  · `fetchTemplateTerms` looked its group up by id, never matched, and returned `null` — a
+   *    work-order template silently copied NO terms, which is exactly the thing a template is for.
+   *  · `startEditOrder` could not find the order either, and refused to open the form. That refusal
+   *    is what surfaced it (owner, 2026-08-31), because it is the one path that says so out loud
+   *    instead of quietly doing nothing.
+   *
+   * Read the shape the backend actually sends. `groupWorkOrderItems` stays for the callers that do
+   * receive a flat list.
+   */
+  const raw = await projectFetch<{ workOrders?: unknown[] } | unknown[]>(
+    `${projectPath(projectId)}/work-orders`,
+  );
+
+  // Tolerant of both shapes: a flat array is still grouped the old way rather than dropped.
+  if (Array.isArray(raw)) return groupWorkOrderItems(raw as WorkOrderItem[]);
+
+  const groups = Array.isArray(raw?.workOrders) ? raw.workOrders : [];
+
+  return groups.map((g) => {
+    const row = (g ?? {}) as Record<string, unknown>;
+    const when = (row.when ?? {}) as Record<string, unknown>;
+    const items = Array.isArray(row.items) ? (row.items as Record<string, unknown>[]) : [];
+    const groupId = String(row.workOrderGroupId ?? "");
+
+    const header: WorkOrderGroup["when"] = {
+      rentalBasis: (when.rentalBasis ?? null) as WorkOrderGroup["when"]["rentalBasis"],
+      extendable: (when.extendable ?? null) as boolean | null,
+      startDate: (when.startDate ?? null) as string | null,
+      endDate: (when.endDate ?? null) as string | null,
+      hoursPerDay: (when.hoursPerDay ?? null) as number | null,
+    };
+
+    return {
+      id: groupId,
+      projectId: (row.projectId ?? null) as string | null,
+      title: (row.title ?? null) as string | null,
+      when: header,
+      whenConflictAck: row.whenConflictAck === true,
+      items: items.map((it, i) => ({
+        id: String(it.id ?? ""),
+        // Restored from the group, which is the only place the backend puts it.
+        workOrderGroupId: groupId,
+        sortOrder: typeof it.sortOrder === "number" ? it.sortOrder : i,
+        projectId: (row.projectId ?? null) as string | null,
+        title: (row.title ?? null) as string | null,
+        when: header,
+        whenConflictAck: row.whenConflictAck === true,
+        ref: {
+          categoryId: (it.categoryId ?? null) as string | null,
+          subcategoryId: (it.subcategoryId ?? null) as string | null,
+          measurementId: (it.measurementId ?? null) as string | null,
+        },
+        rawLabel: (it.rawLabel ?? null) as string | null,
+        rawSize: (it.rawSize ?? null) as string | null,
+        quantity: typeof it.quantity === "number" ? it.quantity : 1,
+        attachmentIds: Array.isArray(it.attachmentIds) ? (it.attachmentIds as string[]) : [],
+        customAttachments: Array.isArray(it.customAttachments) ? (it.customAttachments as string[]) : [],
+        // The stored blob → the app's shape. This is the value the edit form reads back.
+        terms: termsFromWire(it.terms),
+        notes: (it.notes ?? null) as string | null,
+      })) as WorkOrderItem[],
+    };
+  });
+}
+
+/**
+ * Save a work order — create when `groupId` is absent, edit when it is there.
+ *
+ * **Send every machine's `id`.** The backend upserts by id; a machine sent without one is created
+ * fresh, and the awards, marks and purchase orders keyed to the id it used to have are scrubbed —
+ * because the renter renamed it. This is the single most expensive mistake available on this call.
+ */
+/**
+ * Create or update one work order.
+ *
+ * `groupId` decides the route and **never travels in the body**: both work-order schemas are
+ * `.strict()`, so an unknown key is a 422 rather than a field politely ignored. `expectedVersion` is
+ * required on create (the order writes awards into the project's blob) and absent on update (it does
+ * not). That asymmetry is the backend's, not ours — sending the field to the update would fail the
+ * same strict check.
+ */
+export async function saveWorkOrder(
+  projectId: string,
+  expectedVersion: number,
+  payload: { groupId?: string; body: Record<string, unknown> },
+): Promise<void> {
+  if (payload.groupId) {
+    await projectFetch(`/api/work-orders/${encodeURIComponent(payload.groupId)}`, { method: "PATCH", body: payload.body });
+    return;
+  }
+  await projectFetch(`${projectPath(projectId)}/work-orders`, {
+    method: "POST",
+    body: { ...payload.body, expectedVersion },
+  });
+}
+
+/** Deletes the machines AND their awards. The confirm counts both before this is called. */
+export async function deleteWorkOrder(groupId: string): Promise<void> {
+  await projectFetch(`/api/work-orders/${encodeURIComponent(groupId)}`, { method: "DELETE" });
+}
+
+/* ----------------------------- Awards ----------------------------- */
+
+export interface AwardInput {
+  requestId?: string | null;
+  workOrderItemId?: string | null;
+  supplierId?: string | null;
+  supplierName: string;
+  units: number;
+  rentalBasis?: Award["rentalBasis"];
+  rateAmount?: number | null;
+  /**
+   * Haulage, priced separately from the rental because it is charged once and the rate recurs.
+   *
+   * OMIT rather than send 0: the backend's schema is `.partial()`, and "not recorded" and "agreed,
+   * free" are different facts about a supplier. Declared here so the award dialog's two new boxes
+   * are typed rather than riding through on a spread that TypeScript does not check.
+   */
+  mobilizationAmount?: number | null;
+  demobilizationAmount?: number | null;
+}
+
+/** Every award write answers with the site's new version. Hold it — the next write sends it. */
+export interface AwardWriteResult {
+  award?: Award;
+  version: number;
+}
+
+export async function saveAward(projectId: string, expectedVersion: number, input: AwardInput): Promise<AwardWriteResult> {
+  return projectFetch<AwardWriteResult>(`${projectPath(projectId)}/awards`, {
+    method: "POST",
+    /**
+     * `rentalBasis` is REQUIRED and non-nullable on the way out, while the dialog lets it sit empty
+     * — a renter recording *who and how many* has often not been told *per what* yet. Monthly is the
+     * backend's own default for the same field on a work order, so an unanswered question reads the
+     * same on both paths instead of refusing the award outright.
+     */
+    body: { ...input, rentalBasis: input.rentalBasis ?? "monthly", expectedVersion },
+  });
+}
+
+/**
+ * Set or clear a mark. `mobilizedAt: null` undoes it.
+ *
+ * Dates, not flags, and no ordering rule between the two: *when* is the only thing the timeline can
+ * draw, and the only thing worth comparing against the date that was agreed.
+ */
+export async function markAward(
+  projectId: string,
+  awardId: string,
+  expectedVersion: number,
+  marks: { mobilizedAt?: string | null; demobilizedAt?: string | null },
+): Promise<AwardWriteResult> {
+  return projectFetch<AwardWriteResult>(`${projectPath(projectId)}/awards/${encodeURIComponent(awardId)}`, {
+    method: "PATCH",
+    body: { ...marks, expectedVersion },
+  });
+}
+
+/**
+ * Un-award. Never refused, including with documents attached — they go with it.
+ *
+ * The version rides in the query string because a `DELETE` body is not reliably forwarded by every
+ * layer between here and the backend.
+ */
+export async function deleteAward(projectId: string, awardId: string, expectedVersion: number): Promise<AwardWriteResult> {
+  return projectFetch<AwardWriteResult>(
+    `${projectPath(projectId)}/awards/${encodeURIComponent(awardId)}?expectedVersion=${expectedVersion}`,
+    { method: "DELETE" },
+  );
+}
+
+/**
+ * Run an award write, and re-run it once against a fresher version if somebody got there first.
+ *
+ * The retry is safe for the marks and for a delete, which land on the same value whatever order
+ * they arrive in. **It is not offered for creating an award**: replaying a create after someone
+ * else's write can promise the same units twice, so `saveAward` is called directly and its conflict
+ * is shown to the renter.
+ */
+export async function withFreshVersion<T>(
+  projectId: string,
+  version: number,
+  write: (version: number) => Promise<T>,
+): Promise<T> {
+  try {
+    return await write(version);
+  } catch (err) {
+    if (!(err instanceof ProjectVersionConflict)) throw err;
+    const fresh = err.currentVersion ?? (await fetchChart(projectId)).version;
+    return write(fresh);
+  }
+}
+
+/* ----------------------------- Templates ----------------------------- */
+
+/**
+ * What this site can be started FROM: its work orders and the requests already posted for it.
+ *
+ * Read off the chart, which already carries both kinds with their refs, their first machine and
+ * their own period — so the picker costs the one call the page was going to make anyway.
+ *
+ * **Project-scoped.** A renter's first request on a new site has nothing to copy, even though their
+ * last site's terms are usually right. Cross-project templates are deliberately out of v1: the
+ * moment the list spans sites it needs grouping, search and a rule about which site's terms win,
+ * and none of that earns its place before anyone has asked for it.
+ */
+export async function listTemplates(projectId: string): Promise<TemplateOption[]> {
+  const chart = await fetchChart(projectId);
+  /* One entry per MACHINE. Per group, a renter with a crane and a generator on one order could
+     reach the crane and never the generator — and terms belong to a machine, not to the order it
+     happens to sit in. */
+  return chart.groups.flatMap((g) =>
+    g.items.map((it) => ({
+      id: g.id,
+      kind: g.kind,
+      ref: g.title?.trim() || g.ref,
+      itemId: it.id,
+      machine: it.label ?? null,
+      quantity: it.quantity,
+      when: g.when,
+    })),
+  );
+}
+
+/**
+ * The terms behind one template, fetched only when the renter actually picks it.
+ *
+ * **A one-time copy.** The source is never read again, so deleting that work order next month
+ * changes nothing about the requests that started from it.
+ *
+ * It copies the machine TERMS and nothing else. Never the equipment — category, subtype, size,
+ * quantity and accessories always come from the text the renter typed, because a template that
+ * silently added a machine would post an RFQ for something nobody asked for. And never the budget:
+ * a ceiling is a number about one hire, and a stale one filters out every real bid with no error
+ * shown to anyone.
+ */
+export async function fetchTemplateTerms(projectId: string, option: TemplateOption): Promise<MachineTerms | null> {
+  if (option.kind === "work_order") {
+    const groups = await listWorkOrders(projectId);
+    const group = groups.find((g) => g.id === option.id);
+    /* THAT machine's terms, by id — not the group's first. Machines on one order legitimately
+       differ, and copying the first one's answers while naming the second is worse than copying
+       nothing: the renter has no reason to doubt what they asked for.
+
+       ⚠️ Looked up ACROSS every group rather than inside the one whose id matches. The group lookup
+       above returned undefined for months, because `listWorkOrders` re-grouped already-grouped data
+       and lost every group id — so this returned null and a work-order template copied no terms at
+       all, silently. The machine id is unique on its own; going through the group added a way to
+       fail and nothing else.
+
+       ⚠️ And NO second conversion. `listWorkOrders` already returns `MachineTerms`; this used to run
+       `termsFromWire` over that result, which reads WIRE keys (`delivery`, `ret`, `year`, `operator`)
+       off an object that carries the app's (`deliveryOverride`, `returnOverride`, …). It found none,
+       so it answered a fully blank terms object — non-null, so the intake's pills rendered, every
+       one of them empty, and OPERATOR read *Yes* because the pill treats a null as yes. Copying
+       nothing while saying «terms copied» is worse than the null it replaced. */
+    const row =
+      groups.flatMap((g) => g.items).find((it) => it.id === option.itemId) ?? group?.items[0];
+    return row ? row.terms : null;
+  }
+
+  const record = (await fetchRequestDetail(option.id)) as unknown as {
+    equipmentItems?: (Parameters<typeof machineTermsOfRequestItem>[0] & { id?: string })[];
+  };
+  const items = record.equipmentItems ?? [];
+  const item = items.find((it) => it.id === option.itemId) ?? items[0];
+  return item ? machineTermsOfRequestItem(item) : null;
+}
+
+/* ----------------------------- The fast path ----------------------------- */
+
+/** What `/rfq/quick` answers with. `fallback` means take the job path instead. */
+export interface QuickRfqResult {
+  tier?: 0 | 1;
+  fallback?: boolean;
+  reason?: string;
+  line_items?: Array<Record<string, unknown>>;
+  missing_required_fields?: unknown[];
+  field_notes?: unknown[];
+  rfq_id?: string | null;
+}
+
+/**
+ * Tier 1 — the equipment-only parse, answered synchronously.
+ *
+ * **Never throws.** Any failure comes back as `{ fallback: true }` and the caller runs the job path,
+ * because a renter must not lose their request because an optimisation was unavailable: the worst
+ * outcome here is the speed we already have.
+ */
+export async function processQuick(input: {
+  text: string;
+  language?: string;
+}): Promise<QuickRfqResult> {
+  try {
+    const res = await fetch("/api/agent/quick", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      /* `language` is read the way `processRfq` reads it — from <html lang> — rather than left to
+         the caller. It was declared on this input and the only caller never passed it, so
+         `JSON.stringify` dropped the key and the fast lane never sent a locale at all: an Arabic
+         renter typing English got English free-text here and Arabic on the job path, for the same
+         sentence. `created_by` is deliberately NOT set here: it comes from the `mt_user` cookie,
+         which only the BFF route can read (see `api/agent/quick/route.ts`). */
+      body: JSON.stringify({
+        message: input.text,
+        language:
+          input.language ??
+          (typeof document !== "undefined" ? document.documentElement.lang : undefined),
+        source: "web_rfq",
+      }),
+    });
+    if (!res.ok) return { fallback: true, reason: `http_${res.status}` };
+    return (await res.json()) as QuickRfqResult;
+  } catch {
+    return { fallback: true, reason: "network" };
+  }
+}
+
+/**
+ * Tell the corpus about a match the BROWSER made. Fire-and-forget in the strict sense: it is never
+ * awaited and never surfaced.
+ *
+ * Without it a client-side match writes no row, and once the fast path takes its share half the
+ * traffic stops teaching the learned rules — a decline that arrives over months and that nothing in
+ * any log would attribute to this change.
+ */
+export function ingestClientMatch(text: string, lineItems: Array<Record<string, unknown>>): void {
+  void fetch("/api/agent/ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: text, line_items: lineItems, source: "web_rfq" }),
+    keepalive: true, // survives the navigation into the canvas
+  }).catch(() => {});
+}
+
+/**
+ * Ask the agent to warm its prompt cache for the equipment-only path.
+ *
+ * A cache write costs more than a read, and the write happens on whichever call arrives first. If
+ * that is the renter's, they pay for it while watching a spinner; if it is this one, they do not.
+ *
+ * **Best-effort in the strict sense** — never awaited, never surfaced, and a failure changes
+ * nothing except that the renter pays today's price. It is an optimisation, and an optimisation
+ * that can make a request worse is not one.
+ */
+export function warmAgentCache(): void {
+  /**
+   * ⚠️ **It has never warmed anything.** `{ message: "warm", warm: true }` answers
+   * `{"fallback":true,"reason":"upstream_502"}` after ~3.9 seconds, measured on staging 2026-08-31.
+   * There is no `warm` key on the agent's contract, and *"warm"* is not equipment: Tier 0 refuses
+   * it, Tier 1 runs a model call on the word, and the handler errors. So the call cost four seconds
+   * of upstream time on every intake load, warmed no cache, and the renter went on paying the cache
+   * write — which is the exact cost this function exists to absorb.
+   *
+   * It failed invisibly by design: never awaited, never surfaced. The right property for an
+   * optimisation, and the reason nobody noticed it was doing nothing for weeks.
+   *
+   * **A real short line with `allow_tier0: false`** instead. That flag is already on the agent's
+   * contract — *"set false to force Tier 1"* — and forcing Tier 1 is the whole point: Tier 0 answers
+   * from the browser's own taxonomy and never reads the prompt, so a line that Tier 0 could handle
+   * would warm nothing either. This is one Haiku call on eight words, which is what the warm-up was
+   * always meant to cost.
+   */
+  void fetch("/api/agent/quick", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    /* `created_by` marks it, because this DOES write an RFQ row like any other Tier 1 call.
+       It cannot reach the few-shot corpus — that reads only `status IN ('reviewed','approved')`, a
+       human gate — but it does land in the review queue, and a reviewer meeting an identical
+       "1 excavator 20 ton" every few minutes deserves to know which rows to skip. `source` stays
+       `web_rfq`: it came from the web, and lying about that to tidy a queue would put a wrong fact
+       in the corpus to fix a cosmetic one. */
+    body: JSON.stringify({
+      message: "1 excavator 20 ton",
+      allow_tier0: false,
+      created_by: "web-cache-warm",
+    }),
+  }).catch(() => {});
+}
+
+/* ----------------------------- An award's papers ----------------------------- */
+
+/**
+ * Attach a paper to one award.
+ *
+ * `data` is a data URL. It rides in the JSON body rather than as multipart because every hop
+ * between here and storage already speaks JSON, and a purchase order is a page — the 10 MB ceiling
+ * the dialog enforces keeps that honest.
+ *
+ * These do NOT carry the project version. A document is its own row in the shared document store,
+ * keyed to the award's id; it never rewrites the awards blob, so there is nothing for a concurrent
+ * write to lose.
+ */
+/**
+ * `-` in the award slot files a paper against the SITE rather than one award.
+ *
+ * The backend has always accepted it (*"a framework agreement covering the whole job belongs to no
+ * single award"*); nothing in the web used it. It is what lets *Attach a document* be offered on a
+ * row nobody has awarded yet — see `SITE_LEVEL_AWARD` at the call site.
+ */
+export const SITE_DOCUMENT = "-";
+
+export async function attachDocument(
+  projectId: string,
+  awardId: string,
+  expectedVersion: number,
+  file: File,
+  kind: string,
+): Promise<{ version: number }> {
+  // 1 · ask where to put it. The key is namespaced by project on the backend, so this app never
+  //     invents a path and cannot write one project's paper under another's prefix.
+  const contentType = contentTypeFor(file.name);
+  if (!contentType) throw new ApiError("unknown", `unsupported file type: ${file.name}`);
+
+  const presign = await projectFetch<{ key: string; url: string }>(`${projectPath(projectId)}/documents/upload-url`, {
+    method: "POST",
+    // From the NAME, not `file.type`: the backend's enum has four entries and no fallback, and a
+    // file dragged in with an empty type would otherwise be announced as octet-stream and refused.
+    body: { filename: file.name, contentType },
+  });
+
+  // 2 · the bytes go STRAIGHT to storage. Not through this app, not through the agents backend —
+  //     a 40 MB scan would otherwise be a 40 MB JSON body crossing two hops to reach the same place.
+  const put = await fetch(presign.url, {
+    method: "PUT",
+    // Must match what the URL was signed for, or storage rejects the PUT.
+    headers: { "Content-Type": contentType },
+    body: file,
+  });
+  if (!put.ok) throw new ApiError("network", `upload failed (${put.status})`);
+
+  // 3 · only now does the award learn about it, by KEY. The version rides along because attaching
+  //     rewrites the awards blob like any other write.
+  return projectFetch<{ version: number }>(`${projectPath(projectId)}/awards/${encodeURIComponent(awardId)}/documents`, {
+    method: "POST",
+    body: { kind, key: presign.key, filename: file.name, expectedVersion },
+  });
+}
+
+/**
+ * A short-lived link to one of the site's papers, for opening or saving it.
+ *
+ * ⚠️ **Fetched at the moment of the click, never held.** The URL is a credential with ten minutes on
+ * it: stored on the document row it would be stale by the time the renter pressed it, and rendered
+ * into the page it would sit in the DOM for anyone with the tab open. So this asks, and the caller
+ * uses the answer immediately.
+ *
+ * The DOCUMENT id goes out, never the S3 key — the chart does not publish the key, which is what
+ * made these papers write-only until the backend gained this endpoint.
+ */
+export async function documentUrl(projectId: string, docId: string): Promise<string> {
+  const res = await projectFetch<{ url?: string }>(
+    `${projectPath(projectId)}/documents/${encodeURIComponent(docId)}/url`,
+  );
+  const url = res?.url;
+  if (!url) throw new ApiError("unknown", "no url returned for document");
+  return url;
+}
+
+/** Removes the row AND the stored file. Nothing cascades here, so this is the only thing that does. */
+export async function removeDocument(projectId: string, awardId: string, docId: string): Promise<void> {
+  await projectFetch(
+    `${projectPath(projectId)}/awards/${encodeURIComponent(awardId)}/documents/${encodeURIComponent(docId)}`,
+    { method: "DELETE" },
+  );
+}
+
+/* ----------------------------- The supplier list ----------------------------- */
+
+/**
+ * The shape moved to `contract/renter-suppliers.ts` (SUP-T11), where the whole feature reads it —
+ * the list screen, the share sheet's recipient picker and this file's own fetcher. It is re-exported
+ * here so `AwardDialog` and anything else importing it from the client keeps working.
+ */
+export type { RenterSupplier } from "@/lib/contract/renter-suppliers";
+import type { RenterSupplier, SupplierProfile } from "@/lib/contract/renter-suppliers";
+
+/**
+ * The renter's own suppliers, for the award picker.
+ *
+ * **Another feature owns this list**, and it ships before projects reach production. An empty array
+ * is a normal answer here, not a failure: the award dialog falls back to a typed supplier name,
+ * which is why an award always stores `supplierName` even when it has an id.
+ */
+export async function listRenterSuppliers(): Promise<RenterSupplier[]> {
+  try {
+    return await projectFetch<RenterSupplier[]>("/api/renter-suppliers");
+  } catch {
+    return [];
+  }
+}
+
+/* ── the writes (SUP-T12) ──────────────────────────────────────────────────────────────────────
+ *
+ * Every one throws on failure — deliberately, and unlike the read above.
+ *
+ * A read that cannot reach the registry can honestly answer "you have no suppliers", because that is
+ * what the renter sees either way. A WRITE cannot: telling someone their supplier was saved when it
+ * was not is a lie they discover weeks later, from a firm that never got a request. So these surface
+ * the error and the screen says what happened. */
+
+/** The profile: the row, its bids, its awards, and what the renter sent it. */
+export async function getRenterSupplier(id: string): Promise<SupplierProfile> {
+  return projectFetch<SupplierProfile>(`/api/renter-suppliers/${encodeURIComponent(id)}`);
+}
+
+export interface NewRenterSupplier {
+  name: string;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  crNumber?: string | null;
+  vendorRegistered?: boolean;
+  groups?: string[];
+  extra?: Record<string, string>;
+}
+
+/**
+ * Add one supplier the renter typed in.
+ *
+ * A phone or CR already in the company's list comes back 409 with the id of the row that holds it —
+ * `alreadyLinkedId` reads it out, so the caller can say "already in your list" and open that row
+ * instead of reporting a failure for something that is simply already true.
+ */
+export async function addRenterSupplier(input: NewRenterSupplier): Promise<RenterSupplier> {
+  return projectFetch<RenterSupplier>("/api/renter-suppliers", { method: "POST", body: input });
+}
+
+/**
+ * True when a write was refused because that phone or CR is already in this company's list.
+ *
+ * Not a failure the renter should see as one: it means the supplier is already there. The caller says
+ * *"already in your list"* and opens the row rather than reporting an error for something true.
+ *
+ * The row's id would let us open it directly; `projectFetch` keeps only the code today, so the caller
+ * refetches the list and finds it by phone. Worth carrying the id through when a second caller needs
+ * it — one is not enough reason to widen `ApiError`.
+ */
+export function isAlreadyLinked(err: unknown): boolean {
+  return err instanceof ApiError && err.backendCode === "ALREADY_LINKED";
+}
+
+export interface BulkResult {
+  /** `id` is null on a dry run — nothing was written, so there is nothing to name. */
+  created: { row: number; id: string | null }[];
+  merged: { row: number; id: string | null; on: "phone" | "email" | string }[];
+  rejected: { row: number; reason: "MISSING_CONTACT" | "MISSING_NAME" | string }[];
+  /**
+   * A row that landed, but not as typed.
+   *
+   * `INVALID_PHONE` · `INVALID_EMAIL` · `TRUNCATED` · `TOO_LONG` · `SAME_NAME_DIFFERENT_CONTACT`.
+   *
+   * ⚠️ **`SAME_NAME_DIFFERENT_CONTACT` is the one to design for.** The sheet names a supplier already
+   * on the list but reaches a different phone and e-mail, so it was added as a NEW row. Two firms a
+   * renter named the same are real, so the backend refuses to fold them — the preview asks.
+   */
+  warnings?: { row: number; field: string; reason: string; value?: string }[];
+}
+
+/**
+ * The spreadsheet import.
+ *
+ * `dryRun` runs the whole decision and **writes nothing**, so the renter sees his rejected rows and
+ * his duplicates while he can still fix the file. Partial success is the normal outcome either way —
+ * read all four arrays, and never report a count that came from the row total.
+ */
+export async function addRenterSuppliersBulk(rows: NewRenterSupplier[], dryRun = false): Promise<BulkResult> {
+  return projectFetch<BulkResult>("/api/renter-suppliers/bulk", {
+    method: "POST",
+    body: dryRun ? { rows, dryRun: true } : { rows },
+  });
+}
+
+/**
+ * Link suppliers who already have accounts. One already linked is skipped, not an error.
+ *
+ * ⚠️ **`supplierId` goes out as a NUMBER.** `users.id` is an integer in that database and the
+ * backend's schema says so — sending the string this app carries it as answered
+ * `422 VALIDATION_ERROR: items — Expected number, received string`, so *Add from Moedatech* could
+ * not link anybody (found end-to-end against the deployed stage, 2026-09-02).
+ *
+ * Coerced here rather than at the call site: every caller reads its id out of a payload where it is
+ * already a string, and one of them would eventually forget.
+ */
+export async function linkRenterSuppliers(
+  items: { supplierId: string | number; vendorRegistered: boolean }[],
+): Promise<{ created: { supplierId: number; id: string }[]; skipped: { supplierId: number }[] }> {
+  return projectFetch("/api/renter-suppliers/link", {
+    method: "POST",
+    body: { items: items.map((i) => ({ ...i, supplierId: Number(i.supplierId) })) },
+  });
+}
+
+/** The vendor flag, the contact the renter keeps, the groups. Idempotent: the toggle fires twice. */
+export async function updateRenterSupplier(
+  id: string,
+  patch: Partial<Pick<RenterSupplier, "vendorRegistered" | "contactName" | "email" | "phone" | "crNumber" | "groups">>,
+): Promise<RenterSupplier> {
+  return projectFetch<RenterSupplier>(`/api/renter-suppliers/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: patch,
+  });
+}
+
+/** Removes the LINK. The account, the store, the bids and the awards all stay — and it says so. */
+export async function removeRenterSupplier(
+  id: string,
+): Promise<{ deleted: boolean; keptBids?: number; keptAwards?: number }> {
+  return projectFetch(`/api/renter-suppliers/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+/**
+ * A firm that bid but holds no row yet.
+ *
+ * `supplierId` is set when they have a Moedatech account, so adding them makes a linked row rather
+ * than a typed one.
+ */
+export interface SupplierSuggestion {
+  companyName: string;
+  phone?: string | null;
+  /**
+   * The address the supplier gave on the bid form.
+   *
+   * ⚠️ Carried into the row when the renter adds them, and it is the difference between a supplier he
+   * can send his next request to and one he cannot: *Send to my suppliers* skips a row with no
+   * e-mail. Dropping it here would mean a firm that bid, gave an address, and still had to be chased
+   * for it by hand.
+   */
+  email?: string | null;
+  supplierId?: string | number | null;
+  /** How they reached the renter. `why` is the backend's own name for the same fact. */
+  via?: "app" | "link";
+  why?: string;
+  at?: string;
+}
+
+/** One row of the Moedatech supplier directory (backend S1). */
+export interface DirectorySupplier {
+  /** The account id — what a link row stores. A number on the wire, like every other user id. */
+  supplierId: string;
+  /** The firm. Falls back to the person when the account carries no company name. */
+  name: string;
+  /** The person behind the account, when it is not the same as the name above. */
+  contactName: string | null;
+  /**
+   * ⚠️ These three DO arrive, and the picker was built as though they did not.
+   *
+   * `backend-asks.md §4` asked for them on the strength of reading the handler's `SELECT`. The
+   * deployed route answers `{ id, name, company_name, city, is_verified, has_store }` — so the ask
+   * was already done and the picker was hiding a column it had (2026-09-02).
+   */
+  city: string | null;
+  verified: boolean;
+  hasStore: boolean;
+  /**
+   * How many machines the firm lists.
+   *
+   * RED **Null on every row today, and that is the backend gap, not a bug here** (owner,
+   * 2026-09-08: *"show the verified ones on Moedatech with the highest number of equipment"*, the
+   * same ask as 2026-09-03). `/agents/suppliers` answers
+   * `{ id, name, company_name, city, is_verified, has_store }` and nothing about equipment, so there
+   * is nothing to sort on. The field is read here so the ordering below starts working the day it
+   * arrives, with no second web change. See `docs/supplier-directory-ranking.md`.
+   */
+  equipmentCount: number | null;
+}
+
+/** One page of the directory, with what the pager needs to know. */
+export interface DirectoryPage {
+  rows: DirectorySupplier[];
+  page: number;
+  totalPages: number;
+  total: number;
+}
+
+
+/** A count off the wire, or null when the field is absent — never 0, which would be a claim. */
+const count = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+/**
+ * Browse or search every supplier who holds an account.
+ *
+ * ⚠️ **Every one, not only those with a store.** A firm with no shopfront is still a firm, and the
+ * renter who cannot find one here types it in by hand — which makes a second row for a company that
+ * already has an account, and every match after that runs against the wrong record.
+ *
+ * `q` empty means BROWSE (owner, 2026-09-02): the dialog opens on page one rather than on a "type to
+ * search" prompt, because a renter who does not yet know which firms are on Moedatech has nothing to
+ * type — and 1,492 of them is a list worth looking at.
+ *
+ * Verified accounts lead **within the page**. Ordering them first across all 1,492 is the backend's
+ * `ORDER BY` to give; this only lifts them inside the twenty being looked at, which is where it
+ * matters for a page-one browse.
+ *
+ * Returns an empty page rather than throwing: a picker that fails is a renter who cannot add a
+ * supplier.
+ */
+export async function searchSupplierDirectory(q: string, page = 1, limit = 20): Promise<DirectoryPage> {
+  const empty: DirectoryPage = { rows: [], page: 1, totalPages: 1, total: 0 };
+  try {
+    const raw = await projectFetch<unknown>(
+      `/api/supplier-directory?q=${encodeURIComponent(q)}&page=${page}&limit=${limit}`,
+    );
+    const env = (raw ?? {}) as Record<string, unknown>;
+    const list = Array.isArray(raw) ? raw : Array.isArray(env.data) ? (env.data as unknown[]) : [];
+    const meta = (env.meta ?? {}) as Record<string, unknown>;
+
+    const rows = list.flatMap((r) => {
+      const o = (r ?? {}) as Record<string, unknown>;
+      const id = o.id ?? o.supplierId ?? o.userId;
+      if (id == null) return [];
+      /**
+       * ⚠️ THE BACKEND SENDS `name`, and this read only `firstName`/`lastName`.
+       *
+       * Probed against staging on 2026-09-03 (owner: *"why are only 2 shown?"*). `/agents/suppliers`
+       * answers `{ id, name, company_name, city, is_verified, has_store }` — one display name, not a
+       * split pair — and `company_name` is null on all but a handful of accounts. So of the twenty
+       * rows on page one, eighteen had no company and no `firstName`, were read as having neither a
+       * company nor a person, and were dropped by the guard below. The dialog showed the two rows
+       * that happened to carry a company name, over a directory of 1,492.
+       *
+       * `name` is now the person's name when the pair is absent. The pair is still read first, in
+       * case the endpoint ever splits it, and a row with nothing nameable is still dropped: that
+       * guard was right, it was the input to it that was wrong.
+       */
+      const pair = [o.firstName ?? o.first_name, o.lastName ?? o.last_name]
+        .filter((x) => typeof x === "string" && x.trim())
+        .join(" ")
+        .trim();
+      const person = pair || (typeof o.name === "string" ? o.name.trim() : "");
+      const company = typeof (o.companyName ?? o.company_name) === "string" ? String(o.companyName ?? o.company_name).trim() : "";
+      // A row with neither a company nor a person cannot be shown or chosen sensibly.
+      if (!company && !person) return [];
+      const bool = (v: unknown) => v === true || v === 1 || v === "1";
+      return [
+        {
+          supplierId: String(id),
+          name: company || person,
+          contactName: company && person ? person : null,
+          city: typeof o.city === "string" ? o.city.trim() || null : null,
+          // `is_verified` and `has_store` arrive as 0/1 from a raw query, not as booleans.
+          verified: bool(o.isVerified ?? o.is_verified),
+      /* Every spelling the backend might reasonably pick, so the field lands whichever it sends. */
+      equipmentCount: count(o.equipmentCount ?? o.equipment_count ?? o.listingCount ?? o.listing_count),
+          hasStore: bool(o.hasStore ?? o.has_store),
+        },
+      ];
+    });
+
+    /**
+     * Verified first, then the firms with a shopfront, then the order the backend gave.
+     *
+     * ── What this is NOT (owner, 2026-09-03) ──────────────────────────────────────────────────
+     * *"The first 5 are verified, have a store, and have the largest number of equipment."*
+     *
+     * The first two of those three are answered here. The third cannot be: `/agents/suppliers`
+     * carries no equipment count, so there is nothing to sort on — and neither this nor the verified
+     * rule can be a TOP FIVE, because both sort the twenty rows of the page in hand rather than the
+     * 1,492 behind them. A verified firm with fifty machines sitting on page 60 stays on page 60.
+     *
+     * Ranking the directory itself is the backend's to do; see the note in
+     * `docs/supplier-directory-ranking.md`. Until it does, this is an honest local tidy of
+     * one page and is deliberately not dressed up as a recommendation.
+     *
+     * ⚠️ **Asked again on 2026-09-08**, and answered the same way: the equipment count is now READ
+     * (`equipmentCount`) and sorted on, so nothing here needs changing when the backend adds it. And
+     * *Show all* in the dialog fetches the whole directory in one call, which is what makes this
+     * sort a statement about all of it rather than about twenty rows.
+     */
+    rows.sort(
+      (a, b) =>
+        Number(b.verified) - Number(a.verified) ||
+        /* ⚠️ Inert until the backend sends a count: every row is null, so this compares 0 with 0
+           and the next rule decides. It is written now so the ordering the owner asked for starts
+           working the day the field arrives. */
+        (b.equipmentCount ?? 0) - (a.equipmentCount ?? 0) ||
+        Number(b.hasStore) - Number(a.hasStore),
+    );
+
+    return {
+      rows,
+      page: typeof meta.page === "number" ? meta.page : page,
+      totalPages: typeof meta.totalPages === "number" ? meta.totalPages : 1,
+      total: typeof meta.total === "number" ? meta.total : rows.length,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+/** Suggestions are a courtesy: an empty answer hides the band, which is what "none" should look like. */
+export async function listSupplierSuggestions(): Promise<SupplierSuggestion[]> {
+  try {
+    return await projectFetch<SupplierSuggestion[]>("/api/renter-suppliers/suggestions");
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The channels the record has a word for.
+ *
+ * `copy` is its own value rather than folded into `other`: it means *the renter took the words and
+ * sent them somewhere we cannot see*, which is a different fact from a channel we know. Verified
+ * against the deployed stage on 2026-09-02 — all four are accepted, `other` is refused.
+ */
+export type SendChannel = "email" | "whatsapp" | "sms" | "copy";
+
+/**
+ * Record who a request was declared sent to (SUP-T41), or who was invited (SUP-T42).
+ *
+ * **Declared, not observed.** The renter's own mail client sends the message, so this is the list he
+ * chose — not who received it and not who opened it. Every recipient of one request gets the same
+ * link, so the bid page sees a visit and never whose.
+ *
+ * Never throws at the caller: the send has already happened by the time this runs, and failing the
+ * UI over an audit row would tell a renter his message did not go out when it did.
+ */
+export async function recordRequestShare(
+  requestId: string,
+  renterSupplierIds: string[],
+  channel: SendChannel,
+): Promise<void> {
+  if (!renterSupplierIds.length) return;
+  try {
+    await projectFetch(`/api/requests/${encodeURIComponent(requestId)}/shares`, {
+      method: "POST",
+      body: { renterSupplierIds, channel },
+    });
+  } catch {
+    /* the message went out regardless */
+  }
+}
+
+/**
+ * One DNS record the renter's IT has to add before we may send as their domain.
+ *
+ * Three CNAMEs (the DKIM signing keys) and usually one TXT. Added once, per company, forever — not
+ * per request and not per renter.
+ */
+export interface MailDnsRecord {
+  type: "CNAME" | "TXT";
+  name: string;
+  value: string;
+}
+
+/**
+ * Why a share e-mail could not be sent from the renter's own address.
+ *
+ * ⚠️ `PERSONAL_DOMAIN` is deliberately NOT folded into `DOMAIN_NOT_VERIFIED`, and the difference is
+ * the whole reason the renter is told anything at all: one is a task his IT can finish, and the
+ * other is a task that does not exist. Nobody can add a DNS record to `gmail.com`, so showing that
+ * renter a list of records to forward would be sending him on an errand with no end.
+ */
+export type ShareEmailReason =
+  /**
+   * 🔴 **The one `sent: false` that is a SUCCESS.** Every other value means "we could not send,
+   * open the compose window"; this one means "here is the envelope, draw it and ask him". Branching
+   * on `sent` alone would treat a working preview as a failure and open a window behind it.
+   */
+  | "PREVIEW"
+  /** The renter has not connected Outlook. Offer the button. */
+  | "NOT_CONNECTED"
+  /** The stored token was rejected and dropped. Same button, worded as reconnect. */
+  | "RECONNECT_REQUIRED"
+  /** Graph refused mid-flight, usually consent revoked. Same button. */
+  | "SEND_REJECTED"
+  /** This stage has no Azure app registration, so there is nothing to connect to. */
+  | "NOT_CONFIGURED"
+  | "DOMAIN_NOT_VERIFIED"
+  | "PERSONAL_DOMAIN"
+  | "NO_SENDER_ADDRESS"
+  | "NO_RECIPIENTS"
+  /** Ours, not the backend's: the call failed, or this deployment has no agents backend. */
+  | "UNAVAILABLE";
+
+const SHARE_EMAIL_REASONS: ShareEmailReason[] = [
+  "PREVIEW",
+  "NOT_CONNECTED", "RECONNECT_REQUIRED", "SEND_REJECTED", "NOT_CONFIGURED",
+  "DOMAIN_NOT_VERIFIED", "PERSONAL_DOMAIN", "NO_SENDER_ADDRESS", "NO_RECIPIENTS",
+];
+
+/**
+ * The envelope, before anything leaves.
+ *
+ * 🔴 **`bcc` and `skipped` MUST come from the server, and that is the whole reason the preview is
+ * a round trip.** The recipient list is derived on the backend from the renter's own supplier rows,
+ * including the fallback to a linked account's address when a row carries no e-mail of its own. The
+ * panel cannot work out which suppliers actually get written to, nor which get dropped for having
+ * none. A preview built from what the client happens to know would not merely drift from the send:
+ * it could not be correct in the first place.
+ *
+ * The same code path produces the preview and the send, so what he confirms is what goes out.
+ */
+export interface ShareEmailPreview {
+  sent: false;
+  reason: "PREVIEW";
+  from: string;
+  /** `graph` also means a copy lands in his Sent folder. */
+  via: "graph" | "ses" | null;
+  to: string[];
+  bcc: string[];
+  subject: string;
+  recipients: number;
+  /** ⚠️ Row IDS, not a count. A number he cannot act on is not a preview. */
+  skippedIds: string[];
+}
+
+export type ShareEmailResult =
+  | ShareEmailPreview
+  | {
+      sent: true;
+      from: string;
+      /** Which engine put it on the wire. `graph` is the renter's own mailbox. */
+      via: "graph" | "ses" | null;
+      /** A string on the SES path, null on Graph. Never a delivery receipt either way. */
+      messageId: string | null;
+      /** True only on the Graph path: the message is in the renter's own Sent folder. */
+      inSentFolder: boolean;
+      /**
+       * The addresses it actually went to, when the backend names them.
+       *
+       * ⚠️ **Often EMPTY, and that is not a failure.** The recipients are derived server-side off
+       * the renter's supplier rows (see the note below), so this is whatever that answer chose to
+       * echo back — `[]` when it echoes nothing. A caller that wants to NAME the recipients has to
+       * decide for itself what to do with an empty list; it must never print the count as though
+       * these were the addresses.
+       */
+      recipientEmails: string[];
+      /*
+       * — `draftUrl` lived here —
+       *
+       * The Outlook path briefly created a DRAFT in the renter's mailbox and handed back a link to
+       * open. It needed `Mail.ReadWrite`, and real tenants refuse it: Moedatech's own granted
+       * `Mail.Send` at 20:31 on 2026-09-05 with no administrator, and refused the wider scope at
+       * 22:14 with "Need admin approval". An admin asked to approve *send mail as this user* often
+       * will; almost none will approve *read and write all their mail*.
+       *
+       * The requirement did not move, the mechanism did: he still sees every recipient and confirms
+       * before anything leaves, in OUR panel rather than in Outlook's composer.
+       */
+      recipients: number;
+      skipped: number;
+    }
+  | {
+      sent: false;
+      /**
+       * ⚠️ **Never `PREVIEW`.** That variant is a success and carries a different shape entirely,
+       * so excluding it here is what lets a reader narrow on the reason and reach the envelope.
+       */
+      reason: Exclude<ShareEmailReason, "PREVIEW">;
+      from: string | null;
+      domain: string | null;
+      dns: MailDnsRecord[];
+      /**
+       * Where to start the Outlook connection, or null when there is nothing to connect to.
+       *
+       * ⚠️ **This, not the reason, decides whether the button is drawn.** The plan is explicit
+       * about it: a web that lists reasons has to be redeployed the day the backend adds one, and it
+       * would offer a button that leads nowhere on a stage with no app registration.
+       */
+      connectPath: string | null;
+    };
+
+const dnsRecords = (v: unknown): MailDnsRecord[] =>
+  Array.isArray(v)
+    ? v.flatMap((r) => {
+        const o = r as Record<string, unknown>;
+        const type = o?.type === "TXT" ? "TXT" : o?.type === "CNAME" ? "CNAME" : null;
+        return type && typeof o.name === "string" && typeof o.value === "string"
+          ? [{ type, name: o.name, value: o.value }]
+          : [];
+      })
+    : [];
+
+/**
+ * Send the share e-mail from the renter's own address (SUP-BE-23).
+ *
+ * The panel calls this FIRST on every e-mail share and opens the compose window only when the answer
+ * says it could not send. So a renter whose domain is verified never sees a compose window, and a
+ * renter whose IT has not added the records yet keeps exactly today's behaviour.
+ *
+ * ⚠️ **Never throws, and never resolves to anything but a decision.** The caller is inside a click
+ * that has already posted the request; an exception here would leave a live request with no share
+ * and no window. Every failure — network, 502, a shape we do not recognise — comes back as
+ * `UNAVAILABLE`, which the panel treats exactly like an unverified domain.
+ *
+ * ⚠️ **The recipients are not passed.** The backend reads them off the supplier rows this renter
+ * owns; `renterSupplierIds` says WHICH of his rows, never which addresses. Once a domain is verified
+ * this endpoint signs mail with that company's DKIM, so a caller-supplied address list would be a
+ * relay hole rather than a convenience.
+ */
+export async function shareRequestEmail(
+  requestId: string,
+  renterSupplierIds: string[],
+  message: { subject: string; html: string; text: string },
+  /**
+   * Ask what WOULD be sent, and send nothing.
+   *
+   * ⚠️ Nothing is recorded on a preview, so it can be called as often as the selection changes.
+   */
+  opts: { dryRun?: boolean } = {},
+): Promise<ShareEmailResult> {
+  const nope = (reason: Exclude<ShareEmailReason, "PREVIEW">): ShareEmailResult =>
+    ({ sent: false, reason, from: null, domain: null, dns: [], connectPath: null });
+  if (!renterSupplierIds.length) return nope("NO_RECIPIENTS");
+
+  try {
+    const raw = await projectFetch<Record<string, unknown>>(
+      `/api/requests/${encodeURIComponent(requestId)}/share-email`,
+      { method: "POST", body: { renterSupplierIds, ...message, ...(opts.dryRun ? { dryRun: true } : {}) } },
+    );
+    if (raw?.sent === true) {
+      return {
+        sent: true,
+        from: typeof raw.from === "string" ? raw.from : "",
+        via: raw.via === "graph" || raw.via === "ses" ? raw.via : null,
+        // Null on the Graph path by design, so it stays nullable rather than being coerced to "".
+        messageId: typeof raw.messageId === "string" ? raw.messageId : null,
+        inSentFolder: raw.inSentFolder === true,
+        recipients: typeof raw.recipients === "number" ? raw.recipients : renterSupplierIds.length,
+        /* Both spellings, because the PREVIEW branch below already answers `bcc` and a sent
+           response may name the same list under either key. Absent on both → an empty array, which
+           the caller reads as «we were not told». */
+        recipientEmails: (() => {
+          const v = Array.isArray(raw.bcc) ? raw.bcc : Array.isArray(raw.recipientEmails) ? raw.recipientEmails : [];
+          return v.filter((x: unknown): x is string => typeof x === "string");
+        })(),
+        skipped: typeof raw.skipped === "number" ? raw.skipped : 0,
+      };
+    }
+    const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+
+    if (raw?.reason === "PREVIEW") {
+      return {
+        sent: false,
+        reason: "PREVIEW",
+        from: typeof raw.from === "string" ? raw.from : "",
+        via: raw.via === "graph" || raw.via === "ses" ? raw.via : null,
+        to: strings(raw.to),
+        bcc: strings(raw.bcc),
+        subject: typeof raw.subject === "string" ? raw.subject : message.subject,
+        recipients: typeof raw.recipients === "number" ? raw.recipients : strings(raw.bcc).length,
+        skippedIds: strings(raw.skippedIds),
+      };
+    }
+
+    const reason = raw?.reason;
+    return {
+      sent: false,
+      // An unknown reason degrades to UNAVAILABLE, which the panel treats as "open the window".
+      reason:
+        SHARE_EMAIL_REASONS.includes(reason as ShareEmailReason) && reason !== "PREVIEW"
+          ? (reason as Exclude<ShareEmailReason, "PREVIEW">)
+          : "UNAVAILABLE",
+      from: typeof raw?.from === "string" ? raw.from : null,
+      domain: typeof raw?.domain === "string" ? raw.domain : null,
+      dns: dnsRecords(raw?.dns),
+      connectPath: typeof raw?.connectPath === "string" && raw.connectPath ? raw.connectPath : null,
+    };
+  } catch {
+    // A refusal we could not reach is still a refusal to send. The window opens, the share goes out.
+    return nope("UNAVAILABLE");
+  }
+}
+
+/**
+ * Connecting the renter's own Outlook (SUP-BE-23, Graph path).
+ *
+ * ⚠️ **`configured` and `connected` are two different facts, and collapsing them draws a
+ * button that leads nowhere.** `configured: false` means this stage has no Azure app registration at
+ * all, so there is nothing to connect to and nothing should be offered. `connected: false` on a
+ * configured stage is an ordinary renter who simply has not pressed it yet.
+ */
+export interface MailConnectStatus {
+  configured: boolean;
+  connected: boolean;
+  provider: string | null;
+  accountEmail: string | null;
+  connectedAt: string | null;
+}
+
+/**
+ * The renter's mailbox connection, or `null` when we could not find out.
+ *
+ * 🔴 **`null` is NOT «not connected»** (owner, 2026-09-12: *"outlook is connected but the success
+ * modal is not shown and i didn't find it sent from my outlook"*).
+ *
+ * ~~Every failure answered a fabricated `connected: false`.~~ The panel asks this ONCE on mount and
+ * never again, so a single blip — a cold Lambda, a dropped request — turned a working connection off
+ * for the whole page: `emailWillGo` went false, the send took the «not connected» branch, the
+ * endpoint was never called, and nothing reached the supplier or his Sent folder. Nothing said so,
+ * because from the panel's side nothing had gone wrong.
+ *
+ * A caller that genuinely wants «nothing to offer» can read null that way. A caller about to SEND
+ * must ask again instead of acting on a guess.
+ */
+export async function mailConnectStatus(): Promise<MailConnectStatus | null> {
+  try {
+    const raw = await projectFetch<Record<string, unknown>>("/api/mail-connect/status");
+    return {
+      configured: raw?.configured === true,
+      connected: raw?.connected === true,
+      provider: typeof raw?.provider === "string" ? raw.provider : null,
+      accountEmail: typeof raw?.accountEmail === "string" ? raw.accountEmail : null,
+      connectedAt: typeof raw?.connectedAt === "string" ? raw.connectedAt : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Where to send the renter to grant consent, or null when this stage cannot.
+ *
+ * ⚠️ `returnTo` is checked against a host allow-list on the backend. An off-domain URL is
+ * refused and the renter lands on a bare page on the API host, so this must be a real product URL.
+ */
+export async function mailConnectUrl(returnTo: string): Promise<string | null> {
+  try {
+    const raw = await projectFetch<Record<string, unknown>>(
+      `/api/mail-connect/authorize?returnTo=${encodeURIComponent(returnTo)}`,
+    );
+    return raw?.available === true && typeof raw.url === "string" ? raw.url : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Forget the token we hold.
+ *
+ * ⚠️ **This is not a revocation and must never be worded as one.** Only the renter can
+ * withdraw the grant on Microsoft's side; the backend answers `revokedAtProvider: false` and says so.
+ */
+export async function mailDisconnect(): Promise<boolean> {
+  try {
+    await projectFetch("/api/mail-connect", { method: "DELETE" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The same record with no request behind it. Same rule: an audit row never fails the act. */
+export async function recordSupplierInvite(
+  renterSupplierIds: string[],
+  channel: SendChannel,
+): Promise<void> {
+  if (!renterSupplierIds.length) return;
+  try {
+    await projectFetch("/api/renter-suppliers/invites", { method: "POST", body: { renterSupplierIds, channel } });
+  } catch {
+    /* the invite went out regardless */
+  }
+}
+
+/** Every group in the company's list, with its count. */
+export async function listSupplierGroups(): Promise<{ name: string; count: number }[]> {
+  try {
+    return await projectFetch<{ name: string; count: number }[]>("/api/renter-suppliers/groups");
+  } catch {
+    return [];
+  }
+}
+
+/** Rename one group across every row that carries it. */
+export async function renameSupplierGroup(from: string, to: string): Promise<{ updated: number }> {
+  return projectFetch("/api/renter-suppliers/groups", { method: "PATCH", body: { from, to } });
+}
+
+/** Remove the label. **Never a supplier** — the count is how many rows became ungrouped. */
+export async function deleteSupplierGroup(name: string): Promise<{ updated: number }> {
+  return projectFetch(`/api/renter-suppliers/groups?name=${encodeURIComponent(name)}`, { method: "DELETE" });
 }

@@ -23,12 +23,14 @@
  * file holds no copy and no derivation.
  */
 
-import { equipmentIcon } from "@/components/requests/EquipImg";
+import { companyInitials } from "@/components/map/panel/machine-panel-model";
 import type { RequestCardView } from "@/lib/contract/request-card";
 /* The card's own chrome travels WITH it. These rules were `.bidmap`-scoped in `map-proto.css` until
    the owner put the same card in `/deal-room/[id]` (2026-08-11) — a surface that is not `.bidmap`,
    where the shared markup therefore painted as unstyled text. See `request-card.css`. */
 import "@/components/map/request-card.css";
+import { MachineGlyph } from "@/components/MachineGlyph";
+import { pin } from "@/lib/uiPins";
 
 export interface RequestCardProps {
   view: RequestCardView;
@@ -85,28 +87,48 @@ export function RequestCard({
      The card showed the same gold `precision_manufacturing` tile on every machine — a robot arm on an
      excavator — because the fallback named one glyph for the whole taxonomy. It now walks the same
      chain the rest of the feature walks (`EquipImg`, and `MapCanvas` for the pins): the unit's own
-     photo when its file has one, else the icon `equipmentIcon` derives from what the machine IS.
+     photo when its file has one, else `MachineGlyph` — the drawn excavator every other
+ *     no-artwork surface falls back to.
 
      The name it derives from is the card's own title — `model · spec`, whose spec half is the
      subcategory the fleet row carries — so the icon is keyed to the same words the reader sees. The
      fleet payload carries no taxonomy IMAGE url (`OfferedUnitDetail` has photos and nothing else),
      which is why the chain ends at the icon here rather than at a second picture.
 
-     `scope: "company"` is untouched: that card names a firm, not a machine, and its glyph is the
-     building it has always been. */
+     `scope: "company"` names a FIRM, not a machine, and since 2026-09-08 it wears the same mark
+     every other surface gives a counterparty: his initials in the green circle (see below). */
   const strip = (
     <>
       <span
+        {...pin("request-card-tile")}
         className={`bm-rq-tile${view.scope === "company" ? " is-co" : ""}${view.photoUrl ? " has-photo" : ""}`}
         aria-hidden="true"
       >
         {view.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={view.photoUrl} alt="" />
+        ) : view.scope === "company" ? (
+          /* ── The firm gets the app's own company mark (owner, 2026-09-08) ────────────────────────
+             *"Change the company icon to use the real company icons and colours used in other
+             places."* A gradient tile with a `apartment` glyph on it was this card's invention: every
+             other surface that names a counterparty — the chat dock's header, the company panel's
+             masthead, the inbox rows — draws his INITIALS in the green circle. So this does too, off
+             the same title the strip prints, which since 2026-09-08 is the firm's real name. */
+          <span className="bm-rq-initials">{companyInitials(view.title)}</span>
         ) : (
-          <span className="material-icons-outlined">
-            {view.scope === "company" ? "apartment" : equipmentIcon(view.title)}
-          </span>
+          /* 🔴 **The equipment card's own fallback, never a Material glyph** (owner, 2026-09-22:
+             *"the euqipment must show the image or the fallback image used on the equipemtn card
+             not this selly icon"*). That map takes a machine FAMILY to a glyph NAME, and for
+             anything it cannot place the answer is a tractor or the factory arm this product
+             retired on 2026-09-22 — a mark from a different industry standing in for an
+             excavator.
+             ⚠️ `MachineGlyph` is the drawn side-on excavator every other no-artwork surface
+             falls back to (the rail's disc, the details modal, the item tier, the machine card),
+             so a machine with no picture looks the same here as it does there. It paints with
+             `currentColor`, which is what lets the tile keep its own ink.
+             ⚠️ The MAP's markers still take the name-based map, and must: a `divIcon` is an
+             HTML string, where a React component cannot go. That split is recorded there. */
+          <MachineGlyph size={20} />
         )}
       </span>
       <span className="bm-rq-who">
@@ -141,9 +163,10 @@ export function RequestCard({
   const accent = tone === "answered" || tone === "partial" ? " is-done" : tone === "refused" ? " is-refused" : " is-open";
 
   return (
-    <article className={`bm-rq${accent}${draft ? " is-draft" : ""}${cue ? " is-cued" : ""}`}>
+    <article {...pin("map-request-card")} className={`bm-rq${accent}${draft ? " is-draft" : ""}${cue ? " is-cued" : ""}`}>
       {view.openable && view.equipmentId && onOpenMachine ? (
         <button
+          {...pin("request-card-id")}
           type="button"
           className="bm-rq-id is-open"
           onClick={() => onOpenMachine(view.equipmentId as string)}
@@ -156,10 +179,10 @@ export function RequestCard({
           <span className="bm-rq-go material-icons-outlined" aria-hidden="true">chevron_right</span>
         </button>
       ) : (
-        <div className="bm-rq-id">{strip}</div>
+        <div {...pin("request-card-id")} className="bm-rq-id">{strip}</div>
       )}
 
-      <div className="bm-rq-body">
+      <div {...pin("request-card-body")} className="bm-rq-body">
         <div className="bm-rq-kind">{view.kindLabel}</div>
         {view.docChips.length > 0 ? (
           <div className="bm-rq-chips">
@@ -173,7 +196,7 @@ export function RequestCard({
         {/* The live answer — no stored status, re-read from the machine on every render. Absent
             entirely when this surface holds no fleet to read it off. */}
         {view.status && (
-          <div className={`bm-rq-state is-${view.status.tone}`}>
+          <div {...pin("request-card-state")} className={`bm-rq-state is-${view.status.tone}`}>
             <span className="bm-rq-dot" aria-hidden="true" />
             <span>{view.status.label}</span>
           </div>
@@ -182,7 +205,7 @@ export function RequestCard({
       </div>
 
       {draft && (
-        <div className="bm-rq-acts">
+        <div {...pin("request-card-acts")} className="bm-rq-acts">
           <button type="button" className="bm-rq-btn ghost" onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </button>

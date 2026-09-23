@@ -1,0 +1,367 @@
+/**
+ * The requests workspace — the pure parts (docs/implementation-plans/requests-workspace/plan.md).
+ *
+ * One page holds three nested choices: which request, which item within it, and which supplier's bid.
+ * Each one narrows the next, and a change higher up has to leave the ones below it valid — pick a
+ * different request and the item you were looking at no longer exists. That resolution is arithmetic
+ * over lists, so it lives here where it can be tested without a browser.
+ *
+ * **NO React, NO DOM, NO i18n.**
+ */
+
+import { bucketBidTerms, type BidCard, type TermRow } from "./bids";
+import { groupBiddingClosed, type RequestGroup, type RequestListItem } from "./requests";
+
+/** Where a bid came from. The filter above the tabs switches between these. */
+export type BidSource = "app" | "offline";
+
+/** The source filter's three positions. */
+export type SourceFilter = "all" | BidSource;
+
+/** A bid as the workspace holds it: the card plus where it arrived from. */
+export interface WorkspaceBid {
+  card: BidCard;
+  source: BidSource;
+}
+
+/** One circle in the top rail. */
+/** One machine of a group, as the rail's circle and its zoomed view need it. */
+export interface RailMachine {
+  /** The fanned-out request's own id — so the zoomed view can say which line it belongs to. */
+  id: string;
+  /** What to call it. The group's own wording, already localised by the caller. */
+  name: string;
+  url: string | null;
+  isPhoto: boolean;
+  /** Units asked for on that line. */
+  qty: number;
+}
+
+export interface RailTile {
+  /** The group's id — what a selection stores. */
+  key: string;
+  /**
+   * `RFQ-NNNNN` for a multi-item submission, `REQ-NNNNN` for a lone request.
+   *
+   * The rail no longer PRINTS it — the circle is captioned with the date the request was raised
+   * (owner, 2026-08-27), which is what a renter scanning a row of them is actually placing. The code
+   * stays here because it is what the tile answers to on hover, and it is the string he quotes down
+   * the phone.
+   */
+  label: string;
+  /** When the request was raised, ISO. Null where the record did not carry one. */
+  createdAt: string | null;
+  /**
+   * Distinct LINE ITEMS in the group — different machines asked for, not copies of one.
+   *
+   * Kept apart from `units` because they answer different questions and the rail badges them
+   * differently. Three excavators is one item at three units; an excavator, a loader and a crane is
+   * three items — and summing THAT into «×3» would describe a request nobody made.
+   */
+  items: number;
+  /** Total units asked for across the group. Rendered only when it is more than one. */
+  units: number;
+  /** Bids that have arrived on the group — the badge on the tile. Zero draws no badge. */
+  bids: number;
+  imageUrl: string | null;
+  /** True when `imageUrl` is a PHOTOGRAPH rather than a drawn icon — the two need opposite fits
+   *  inside a round mask. See `RequestListItem.item`. */
+  imageIsPhoto: boolean;
+  /**
+   * EVERY machine in the group, in the group's own order, for the circle's montage and for the
+   * picture it opens (owner, 2026-09-21: *"cant we make the multi item take multi equipmet images
+   * small in this circule?"*).
+   *
+   * ⚠️ `imageUrl` above is the FIRST of these that has a picture, and it stays: a one-machine
+   * request is the ordinary case and drawing it through the montage code would be a grid of one.
+   * Both are derived in the same pass, so they cannot describe different machines.
+   *
+   * ⚠️ A line whose picture never loaded is kept here WITH a null `url`. It is still a machine the
+   * request asked for, it still has a name, and the zoomed view names it — dropping it would make
+   * the montage disagree with the ITEMS tabs about how many machines this request holds.
+   */
+  machines: RailMachine[];
+  /** Greyed and captioned in the rail; still selectable, because its bids are still worth reading. */
+  closed: boolean;
+}
+
+/** The three choices the page is currently showing. */
+export interface WorkspaceSelection {
+  groupId: string | null;
+  /** The `RequestListItem.id` — one fanned-out request, which is what bids hang off. */
+  itemId: string | null;
+  bidId: string | null;
+}
+
+export const EMPTY_SELECTION: WorkspaceSelection = { groupId: null, itemId: null, bidId: null };
+
+/**
+ * **A rail circle is shut exactly when the navy context bar says so** (owner, 2026-09-22, on a
+ * tile drawing full colour and a share badge under a bar reading CLOSED).
+ *
+ * 🔴 ~~`CLOSED_STATUSES` = {CLOSED, HUB_CLOSED, EXPIRED, FORCE_EXPIRED}, plus `isClosedRequest`
+ * and `isClosedGroup` over it.~~ That was a DENYLIST, and `groupBiddingClosed` - which the bar, the
+ * dashboard's «Closes» column and every cancel affordance already read - is an ALLOWLIST of the
+ * LIVE statuses ({OPEN, ACTIVE, PARTIALLY_ACCEPTED}). So `CANCELLED`, `ABANDONED` and `ACCEPTED`
+ * were shut to the bar and live to the circle above it: full colour, no «Closed» caption, and a
+ * share badge inviting bids the request can no longer take.
+ *
+ * ⚠️ **The two agree on the four the denylist named**, which is why this stood for a month: a
+ * request that EXPIRES reads the same either way, and it is a CANCELLATION that parts them.
+ *
+ * ⚠️ The 2026-08-31 ruling «the share badge carries `!tile.closed` so the rule is enforced
+ * where it is stated» was therefore only ever true for four statuses. One predicate makes it true
+ * for all of them - and the badge itself is gone (owner, 2026-09-22), so the rule it guarded is
+ * now the CIRCLE's own greyscale and caption.
+ */
+
+/**
+ * **Every machine of one group, in the order it was asked for** (owner, 2026-09-22: *"for multi
+ * item, make sure all mutli items requests are designed in this way"*).
+ *
+ * 🔴 Lifted out of `railTiles` because the rail stopped being the only surface that stands
+ * for a whole request: the workspace's context bar draws the same montage. Two derivations of
+ * «which machines does this request hold» is how the bar and the tile above it come to name
+ * different machines for one request, and NOTHING would fail when they did.
+ *
+ * ⚠️ A line whose picture never loaded is KEPT, with a null `url`. It is still a machine the
+ * request asked for, it still has a name, and both callers draw the name - dropping it would make
+ * the montage disagree with the ITEMS strip about how many machines this request holds.
+ */
+export function railMachines(group: RequestGroup, ar = false): RailMachine[] {
+  return group.items.map((i) => ({
+    id: i.id,
+    name: (ar ? i.item?.nameAr || i.item?.name : i.item?.name) ?? i.displayId,
+    url: i.item?.imageUrl ?? null,
+    isPhoto: i.item?.imageIsPhoto ?? false,
+    qty: i.item?.qty ?? 1,
+  }));
+}
+
+/** The rail, in the order `groupRequests` produced (newest first). */
+export function railTiles(groups: RequestGroup[], ar = false): RailTile[] {
+  return groups.map((g) => ({
+    key: g.id,
+    // The RFQ code is the group's own name; a lone request has none and answers to its REQ id.
+    label: g.groupRef ?? g.items[0]?.displayId ?? g.id,
+    createdAt: g.createdAt,
+    items: g.items.length,
+    units: g.totalUnits,
+    bids: g.totalBids,
+    // One lookup for all three, so the flag can never describe a different item's picture than the
+    // URL, and the montage can never disagree with the single picture it replaces.
+    ...(() => {
+      const withPic = g.items.find((i) => i.item?.imageUrl)?.item ?? null;
+      return {
+        imageUrl: withPic?.imageUrl ?? null,
+        imageIsPhoto: withPic?.imageIsPhoto ?? false,
+        machines: railMachines(g, ar),
+      };
+    })(),
+    closed: groupBiddingClosed(g.items),
+  }));
+}
+
+/**
+ * Resolve a selection against the data actually loaded, and repair it where it points at something
+ * that is not there. Called on every render, so the page never has to remember to fix itself:
+ *
+ * - no group chosen, or one that has since gone → the first group;
+ * - an item that does not belong to the resolved group → that group's first item;
+ * - a bid that is not among the item's bids → the first bid, or nothing when none have arrived.
+ *
+ * Passing `bids` for a different item is the normal case mid-load; it resolves to no bid, which is
+ * exactly right — the bids for the newly chosen item have not been fetched yet.
+ */
+export function resolveSelection(
+  groups: RequestGroup[],
+  bids: WorkspaceBid[],
+  wanted: WorkspaceSelection,
+): WorkspaceSelection {
+  const group = groups.find((g) => g.id === wanted.groupId) ?? groups[0] ?? null;
+  if (!group) return EMPTY_SELECTION;
+
+  const item = group.items.find((i) => i.id === wanted.itemId) ?? group.items[0] ?? null;
+  if (!item) return { groupId: group.id, itemId: null, bidId: null };
+
+  const bid = bids.find((b) => b.card.id === wanted.bidId) ?? bids[0] ?? null;
+  return { groupId: group.id, itemId: item.id, bidId: bid?.card.id ?? null };
+}
+
+/** The item a resolved selection points at. */
+export function selectedItem(groups: RequestGroup[], sel: WorkspaceSelection): RequestListItem | null {
+  const group = groups.find((g) => g.id === sel.groupId);
+  return group?.items.find((i) => i.id === sel.itemId) ?? null;
+}
+
+/** The group a resolved selection points at. */
+export function selectedGroup(groups: RequestGroup[], sel: WorkspaceSelection): RequestGroup | null {
+  return groups.find((g) => g.id === sel.groupId) ?? null;
+}
+
+/** The bids the source filter admits, in the order they were loaded. */
+export function filterBySource(bids: WorkspaceBid[], filter: SourceFilter): WorkspaceBid[] {
+  return filter === "all" ? bids : bids.filter((b) => b.source === filter);
+}
+
+/** The dial beside `Terms` on a bid card: how much of the terms this supplier answered. */
+export interface TermsDial {
+  /** Answered the way the request asked, or since agreed. */
+  met: number;
+  /** Answered, but against what was asked. */
+  against: number;
+  /** Not answered — the renter is still waiting on it. */
+  unanswered: number;
+  total: number;
+}
+
+/**
+ * Read the dial off a bid's terms.
+ *
+ * The two sources are counted differently, and deliberately — this mirrors what the shipped cards
+ * already do rather than inventing a third rule. An **app** bid is measured against the six
+ * negotiable terms the app itself tracks, where an unanswered one is a real gap the renter can chase.
+ * An **off-platform** bid has no negotiation, so it is measured against every required term the
+ * supplier actually answered on the form — which is why nothing there lands in `unanswered`.
+ *
+ * This is a measure of how completely the supplier answered, and never of how good the offer is;
+ * bid quality is `QualityRing`, a different thing on a different scale.
+ */
+export function termsDial(bid: BidCard, source: BidSource): TermsDial {
+  const { counts } = bucketBidTerms(bid.terms, bid.negotiableTerms, source === "offline" ? { all: true } : undefined);
+  const met = counts.matched;
+  const against = counts.conflict;
+  const unanswered = counts.pending;
+  return { met, against, unanswered, total: met + against + unanswered };
+}
+
+/**
+ * The machine the map should open on when the workspace sends the renter to a bid's documents.
+ *
+ * "The offered available unit" (owner, 2026-08-12): prefer one whose location the lessor has actually
+ * confirmed, because that is the machine the renter is being asked to trust; fall back to the first
+ * offered one, so the link always lands somewhere rather than dropping him on the list. Availability
+ * is read from `unitAvailability`'s own source field, never from `yardConfirmed`.
+ */
+export function documentsTargetUnit(
+  units: { equipmentId: string; locationSource?: string | null }[] | null | undefined,
+): string | null {
+  const offered = units ?? [];
+  if (offered.length === 0) return null;
+  return (offered.find((u) => u.locationSource === "unit_yard") ?? offered[0]).equipmentId;
+}
+
+/** What the drawer's Edit and Cancel controls may do with this request. */
+export interface RequestActions {
+  /** Edit is shown. It stays visible after a bid lands rather than vanishing. */
+  canEdit: boolean;
+  /** Shown, but spent — disabled, and it must say why. */
+  editCapUsed: boolean;
+  /** Editing costs the one allowed post-bid edit, so it is confirmed first. */
+  editNeedsConfirm: boolean;
+  canCancel: boolean;
+  /**
+   * **Sharing is offered only while the request can still take a bid** (owner, 2026-08-31).
+   *
+   * The link a share hands out is an invitation to quote. On a request the backend has shut, that
+   * invitation leads to a form that refuses the supplier — so the renter spends a contact on a
+   * closed door, and the supplier's answer is an error page.
+   *
+   * The same `live` the other three read: OPEN or ACTIVE, and nothing else.
+   */
+  canShare: boolean;
+}
+
+/**
+ * Mirror of the mobile app's rule (`request_detail_page.dart:165-174`, `638-674`), which the web
+ * contradicted: web hid Edit the moment a bid arrived, the app has allowed one post-bid edit since
+ * 2026-08-05 and it is live on `main`.
+ *
+ * - Open or active → Edit is shown. It never disappears, so the renter is told why rather than left
+ *   hunting for a button that used to be there.
+ * - No bids → edit freely, as often as you like.
+ * - Bids, first edit → confirm, because it is the only one.
+ * - Bids, edit spent → disabled, with the reason.
+ *
+ * The cap is the server's to enforce (`request.service.ts:830` updates conditionally on
+ * `bidCount > 0 && renteeEditUsed === false`); this only decides what the renter is shown, so that
+ * the refusal arrives before the form rather than after it.
+ */
+export function requestActions(req: Pick<RequestListItem, "status" | "bidCount" | "renteeEditUsed">): RequestActions {
+  const live = req.status === "OPEN" || req.status === "ACTIVE";
+  const hasBids = req.bidCount > 0;
+  return {
+    canEdit: live,
+    editCapUsed: live && hasBids && req.renteeEditUsed,
+    editNeedsConfirm: live && hasBids && !req.renteeEditUsed,
+    canCancel: live,
+    canShare: live,
+  };
+}
+
+/**
+ * The bid ids holding the lowest figure in a column. Ties all win — two suppliers charging the same
+ * to deliver are equally the cheapest, and picking one of them by list order would invent a
+ * difference the quotes do not contain. A bid with nothing stated cannot win.
+ */
+export function cheapest(bids: WorkspaceBid[], value: (b: WorkspaceBid) => number | null): Set<string> {
+  const stated = bids.filter((b) => {
+    const v = value(b);
+    return v != null && Number.isFinite(v);
+  });
+  if (stated.length < 2) return new Set(); // nothing to be cheaper *than*
+  const low = Math.min(...stated.map((b) => value(b) as number));
+  return new Set(stated.filter((b) => value(b) === low).map((b) => b.card.id));
+}
+
+/** The first term row matching any of these keys, looked for wherever the card keeps its terms. */
+export function findTerm(bid: BidCard, keys: string[]): TermRow | null {
+  const wanted = new Set(keys);
+  const pools = [bid.negotiableTerms ?? [], bid.terms.contract, bid.terms.equipment, bid.terms.supplier];
+  for (const pool of pools) {
+    const hit = pool.find((r) => wanted.has(r.key));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/** How many bids each filter position would show — the counts beside the filter. */
+export function sourceCounts(bids: WorkspaceBid[]): Record<SourceFilter, number> {
+  return {
+    all: bids.length,
+    app: bids.filter((b) => b.source === "app").length,
+    offline: bids.filter((b) => b.source === "offline").length,
+  };
+}
+
+/**
+ * Is the request named in the URL a NEW instruction, or this screen's own echo?
+ *
+ * 🔴 **The workspace read its entry parameters once per mount, and that was the bug** (owner's
+ * list: «Clicking on the bid doesn't take me directly where to the request», screenshot of the
+ * notification bell).
+ *
+ * A renter opening the bell is usually already on `/requests`. `router.push("/requests?r=<id>")` is
+ * a client-side navigation to the same route, so the component never remounts and a `read once`
+ * guard returns before it looks at `r`. The URL changed and the screen did not.
+ *
+ * ⚠️ **Reading it EVERY time is the opposite bug**, and the reason the once-only guard existed:
+ * the workspace `replaceState`s `?r=` whenever the renter picks a request, so a reader that trusted
+ * every change would drag him back to the notification's request each time he chose another.
+ *
+ * So it is decided by VALUE, not by a count of mounts. A request that is neither the one we last
+ * acted on nor the one already open can only have come from outside — the bell, the dashboard, a
+ * link a colleague pasted.
+ *
+ * @param incoming what `?r=` says now
+ * @param applied  the last `r` this screen acted on
+ * @param open     the item on screen, which is what the screen itself writes into `?r=`
+ */
+export function isNewEntryRequest(
+  incoming: string | null | undefined,
+  applied: string | null | undefined,
+  open: string | null | undefined,
+): boolean {
+  if (!incoming) return false;
+  return incoming !== applied && incoming !== open;
+}

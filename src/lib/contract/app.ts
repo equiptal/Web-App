@@ -16,6 +16,15 @@ export interface TaxonomyNode {
   aliases: string[];
   tag: string | null;
   sort_order?: number;
+  /**
+   * A PHOTOGRAPH of real equipment for this node — `equipment_image_key` on the taxonomy row, set per
+   * subcategory from the admin panel and served from the shared editorial bucket.
+   *
+   * Optional because the fixture catalogue carries none and an older agents build sent none. Null is
+   * the ORDINARY case — most rows have no photograph — so every reader falls back to the flat icon or
+   * to the glyph rather than treating absence as an error.
+   */
+  equipment_image_url?: string | null;
 }
 
 export interface TaxonomyResponse {
@@ -31,11 +40,25 @@ export interface SubtypeAttachmentOption {
   preSelected?: boolean;
 }
 
-/** One equipment line in POST /agents/requests. All 3 ids required (422 if null). */
+/**
+ * One equipment line in POST /agents/requests.
+ *
+ * Either **all three taxonomy ids**, or **`customEquipmentName` and none of them** (off-catalogue
+ * equipment the catalogue cannot place). Never neither, and never one or two: a partial triple is a
+ * 422 on purpose, because two of three ids resolves to nothing the matcher can use and would post a
+ * request that looks ordinary everywhere and reaches nobody.
+ *
+ * ⚠️ The ids are OMITTED for a custom line, never sent as `null`. They are `.optional()` on the
+ * backend, not `.nullable()`, so an explicit `null` fails validation where an absent key passes.
+ * `JSON.stringify` drops `undefined`, and `draftToCreateRequest` spreads each id in only when it has
+ * one.
+ */
 export interface CreateRequestItem {
-  categoryId: string;
-  subtypeId: string;
-  capacityId: string;
+  categoryId?: string;
+  subtypeId?: string;
+  capacityId?: string;
+  /** The renter's own name for a machine the catalogue cannot place. Trimmed, 1–120 chars. */
+  customEquipmentName?: string;
   /** Per-item equipment attachments: admin-defined SubtypeAttachment ids selected for this item.
    *  Backend `attachment_ids` (Json); the agents create schema defaults to []. */
   attachmentIds?: string[];
@@ -78,6 +101,12 @@ export interface CreateRequestItem {
 export interface CreateRequestPayload {
   userId: number; // agents-backend schema: z.number().int().positive()
   type: "BROADCAST" | "DIRECT";
+  /**
+   * The one supplier a DIRECT request goes to — an integer USER id, REQUIRED when `type` is DIRECT
+   * and rejected as a 400 without it (`createRequest.ts`: «supplierId is required for a DIRECT
+   * request»). Omitted for a broadcast, which fans out to every matching supplier instead.
+   */
+  supplierId?: number;
   rentalType: "DAILY" | "WEEKLY" | "MONTHLY" | "PER_JOB" | "LONG_TERM";
   /** Optional — omit and the server defaults to "now". Never invent one (ALIGNMENT rule 3). */
   startDate?: string;
@@ -97,6 +126,20 @@ export interface CreateRequestPayload {
   projectLat?: number;
   projectLng?: number;
   projectAddressLabel?: string;
+  /**
+   * PROJ - the site this request is filed under. **A LABEL, and nothing else.**
+   *
+   * Every value the project supplied was already copied into the fields above, in the browser,
+   * before this payload was built. The request never reads its project again, so editing the site
+   * next month cannot reach a request posted today - which is what lets a request and its project
+   * drift apart safely. There is no `projectVersion` beside it: the copies ARE the record of what
+   * the site's terms were at submit, held in full rather than by reference.
+   *
+   * Stamped on EVERY row of a fanned-out submission, never only the first.
+   */
+  projectId?: string;
+  /** Provenance only - the work order this request was started from. Changes no rendering. */
+  workOrderGroupId?: string;
   additionalNotes?: string;
   // §4.2 header fields (AC-15 hours/days/overtime, AC-27 access, AC-36/37 terms, AC-39/40 filters):
   workingHoursPerDay?: number; // int 1–24

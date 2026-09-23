@@ -21,6 +21,7 @@ import {
 } from "@/lib/contract/bid-map";
 import { bidSuppliers, bidSupplierKey, mapBidList, type BidCard, type OfferedUnitDetail, type UnitLocationSource } from "@/lib/contract/bids";
 import type { UnitReadiness } from "@/lib/contract/bid-readiness";
+import { channels } from "../setup/ds";
 
 /**
  * The pure selectors behind the deal-room equipment-verification surface (spec 004 §6.4, §6.8, §7.2).
@@ -159,6 +160,48 @@ describe("resolveUnitLocation — position, kept separate from commitment", () =
     expect(resolveUnitLocation(located("bid_yard", { distanceKm: Number.NaN })).distanceKm).toBeNull();
   });
 
+  /**
+   * ── `(0, 0)` is a sentinel, not a yard (owner, 2026-09-12) ────────────────────────────────────
+   * *"can we solve it without backend? like if no yard then show no equipment in map and show
+   * unspecified location"*.
+   *
+   * A yard row with no coordinates arrives carrying ZERO for both, and the half-point rule above
+   * guarded `null` only — so the point passed straight through as valid. The machine was plotted in
+   * the Atlantic and its card printed «5720.8 km from your project», which is the great-circle
+   * distance from Riyadh to Null Island to within a rounding step (5720.2 km, computed). The renter
+   * read a real yard 5,700 km away where the truth is a yard nobody has located.
+   */
+  it("treats (0, 0) as NO location, not as a point in the Gulf of Guinea", () => {
+    expect(resolveUnitLocation(unit({ locationSource: "listing_yard", lat: 0, lng: 0, distanceKm: 5720.8 }))).toEqual({
+      lat: null,
+      lng: null,
+      distanceKm: null,
+      locationSource: "none",
+    });
+  });
+
+  it("drops the DISTANCE with the point, because the backend computed it FROM that point", () => {
+    // Keeping it would print «5720.8 km» beside «Location not specified», which is the two halves of
+    // the bug disagreeing on one card.
+    expect(resolveUnitLocation(unit({ locationSource: "bid_yard", lat: 0, lng: 0, distanceKm: 5720.8 })).distanceKm).toBeNull();
+  });
+
+  it("keeps a real point that merely has a zero on ONE side", () => {
+    // The equator and the prime meridian are places. Only BOTH zeros are the sentinel.
+    expect(resolveUnitLocation(unit({ locationSource: "unit_yard", lat: 0, lng: 46.7, distanceKm: 9 })).lat).toBe(0);
+    expect(resolveUnitLocation(unit({ locationSource: "unit_yard", lat: 24.7, lng: 0, distanceKm: 9 })).lng).toBe(0);
+  });
+
+  it("keeps it OFF the map, which is what the renter asked for", () => {
+    expect(isPlottable(unit({ locationSource: "listing_yard", lat: 0, lng: 0 }))).toBe(false);
+  });
+
+  it("leaves the machine in the LIST, red and unconfirmed — it exists, it is simply not placed", () => {
+    // `none` is «a registered machine whose every location level is null», which is exactly this.
+    // Never `absent`: that means no machine at all, and would drop it off the fleet list entirely.
+    expect(unitAvailability({ locationSource: resolveUnitLocation(unit({ locationSource: "listing_yard", lat: 0, lng: 0 })).locationSource })).toBe("unconfirmed");
+  });
+
   it("excludes unlocatable units from the pin set (RM3-AC-22 — was cited as RMAP-AC-19)", () => {
     expect(isPlottable(located("bid_pin"))).toBe(true);
     expect(isPlottable(unit({ locationSource: "none" }))).toBe(false);
@@ -285,15 +328,15 @@ describe("the shortfall is ORANGE, and never availability's red (RM3-AC-06)", ()
   });
 
   it("is orange by measurement, not by name — red and green are both excluded", () => {
-    // The mutation this catches is `SHORTFALL_COLOUR = "#D9362A"`, which is still a constant called
+    // The mutation this catches is `SHORTFALL_COLOUR = "var(--danger)"`, which is still a constant called
     // SHORTFALL_COLOUR. Orange has a substantial green channel between the two; red does not.
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(SHORTFALL_COLOUR.slice(i, i + 2), 16));
+    const { r, g, b } = channels(SHORTFALL_COLOUR)!;
     expect(r).toBeGreaterThan(150); // warm
     expect(g).toBeGreaterThan(90); // …and not red, which has almost no green
     expect(g).toBeLessThan(r); // …and not yellow or green either
     expect(b).toBeLessThan(60);
 
-    const [rr, rg] = [1, 3].map((i) => parseInt(AVAILABILITY_COLOUR.unconfirmed.slice(i, i + 2), 16));
+    const { r: rr, g: rg } = channels(AVAILABILITY_COLOUR.unconfirmed)!;
     expect(rg).toBeLessThan(90); // the positive control: availability's red really is green-poor
     expect(rr).toBeGreaterThan(150);
   });
@@ -411,9 +454,8 @@ describe("requestTypeWord — the type word comes from the REQUEST's own type (R
 });
 
 describe("arabicIndicDigits — the pill's numeral, without `unitCountLabel`'s noun", () => {
-  /** Digits are Latin app-wide, in Arabic too (owner, via the app's `1aabf6db` of 2026-09-04:
-   * "the numbers should be in eng even in arabic"). These formatters used to convert; they no
-   * longer do. */
+  /** Digits are Latin app-wide, in Arabic too (owner, 2026-09-04: "the numbers should be in eng
+   * even in arabic"). These formatters used to convert; they no longer do. */
   it("writes Latin digits and never appends a word", () => {
     expect(arabicIndicDigits(3)).toBe("3");
     expect(arabicIndicDigits(11)).toBe("11");

@@ -6,6 +6,8 @@ import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { fetchMyCompany } from "@/lib/api/company-client";
 import type { MyCompany } from "@/lib/contract/company";
+import { btn } from "@/lib/ds";
+import { pin } from "@/lib/uiPins";
 
 /**
  * "My Company" entry on the profile tab — web twin of the app's `company_profile_card.dart`
@@ -49,21 +51,21 @@ export function MyCompanyCard() {
         : company.name;
 
   return (
-    <button
+    <button {...pin("my-company-card")}
       onClick={() => router.push("/company")}
-      className="mt-4 flex w-full items-center gap-3 rounded-[14px] border border-border bg-surface p-4 text-start transition hover:bg-surface2"
+      className={btn("secondary", "md", { full: true, className: "mt-4 flex text-start transition" })}
     >
-      <span className="grid h-10 w-10 flex-none place-items-center rounded-[10px] bg-surface2 text-navy-mid">
+      <span className="grid h-10 w-10 flex-none place-items-center rounded-sm bg-surface2 text-navy-mid">
         <Icon name="business_center" size={20} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[13.5px] font-bold text-navy">{c.myCompany}</p>
-        <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-muted">{subtitle}</p>
+        <p className="text-body font-semibold text-navy">{c.myCompany}</p>
+        <p className="mt-0.5 line-clamp-2 text-meta leading-relaxed text-muted">{subtitle}</p>
       </div>
       {/* Roster size is the one thing worth surfacing without a tap — it's how a member notices a
           colleague joined. Pending join requests are the owner's cue and live in the hub. */}
       {loaded && company?.isActive && (
-        <span className="inline-flex flex-none items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-[11.5px] font-bold text-navy-mid">
+        <span className="inline-flex flex-none items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-label font-semibold text-navy-mid">
           <Icon name="group" size={13} /> {company.activeMembers.length}
         </span>
       )}

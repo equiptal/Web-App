@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { bidCardDescription, bidCardModel } from "@/lib/bidCardModel";
 import { serverEnv } from "@/lib/config/env";
+import { mapBidFormData, type BidFormData } from "@/lib/contract/link-bids";
 
 /**
  * Link-preview (Open Graph) data for the public bid link `/bid/{slug}-{groupId}`.
@@ -41,6 +43,10 @@ export interface BidPreview {
   description: string;
   en: { title: string; description: string };
   ar: { title: string; description: string };
+  /** `EXC-170845` / `RFQ-00077`. Read straight, rather than parsed back out of the title. */
+  reference?: string | null;
+  /** The request the mobile app can be deep-linked to — `reqs[0]` for a multi-item group. */
+  requestId?: string | null;
 }
 
 /**
@@ -81,6 +87,40 @@ export async function fetchBidPreview(token: string, lang: "en" | "ar"): Promise
 }
 
 /**
+ * Fetch the request behind a link, for the card.
+ *
+ * `GET /public/bid-form/{token}` — public, no auth, and the same endpoint the bid form itself reads.
+ * It carries what the preview strings never did: the items with their sizes and counts, the project
+ * terms, the per-item required terms, the delivery and return party, the deadline.
+ *
+ * ⚠️ It **bumps `request_share_links.opened_count`**, so an unfurl bot counts as a supplier opening
+ * the link. Accepted deliberately (owner, 2026-09-01) — nothing reads that number today. If it ever
+ * becomes something a renter is shown, these fields move onto the read-only `/preview` endpoint and
+ * this function is the only thing that changes.
+ *
+ * Same rule as the preview: null on anything unexpected, and the card degrades rather than failing.
+ */
+export async function fetchBidForm(token: string): Promise<BidFormData | null> {
+  if (!serverEnv.agentsApiUrl) return null;
+  const base = serverEnv.agentsApiUrl.replace(/\/$/, "");
+  try {
+    const res = await fetch(`${base}/public/bid-form/${encodeURIComponent(token)}`, {
+      // Five minutes, like the preview: a newly set deadline reaches the card at the speed the text
+      // does, and a blast of shares does not hit the database once per recipient.
+      next: { revalidate: 300 },
+      signal: AbortSignal.timeout(PREVIEW_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const json: unknown = await res.json().catch(() => null);
+    const data = json && typeof json === "object" && "data" in json ? (json as { data: unknown }).data : json;
+    const mapped = data ? mapBidFormData(data) : null;
+    return mapped?.items?.length ? mapped : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The card image, served from this app's own `public/` — an opaque 1200×630 navy card with the logo
  * knocked out to white. **One image for every surface**: `preview.imageUrl` from the backend resolves
  * to this same file, and the emailed card renders it too, so a supplier who meets this link in Gmail
@@ -90,6 +130,13 @@ export async function fetchBidPreview(token: string, lang: "en" | "ar"): Promise
  * shouldn't disappear just because the backend was slow.
  */
 const OG_CARD_IMAGE = "/og-bid.png";
+
+/**
+ * What `/bid/[token]/og` renders, declared so every unfurler can lay the card out without fetching
+ * the picture first. Keep in step with `WIDTH`/`HEIGHT` in that route.
+ */
+export const OG_IMAGE_WIDTH = 1200;
+export const OG_IMAGE_HEIGHT = 630;
 
 /** Generic copy for when the preview is unavailable. Says nothing about the request — the safe default. */
 const FALLBACK = {
@@ -106,11 +153,14 @@ const FALLBACK = {
  */
 export function buildBidMetadata({
   preview,
+  form,
   slug,
   lang,
   origin,
 }: {
   preview: BidPreview | null;
+  /** The request itself, when it was readable — the source for everything but the reference. */
+  form?: BidFormData | null;
   slug: string;
   lang: "en" | "ar";
   /**
@@ -128,14 +178,42 @@ export function buildBidMetadata({
    */
   origin: string | null;
 }): Metadata {
-  const title = preview?.title || FALLBACK[lang].title;
-  const description = preview?.description || FALLBACK[lang].description;
+  const copy = (lang === "ar" ? preview?.ar : preview?.en) ?? {
+    title: preview?.title || FALLBACK[lang].title,
+    description: preview?.description || FALLBACK[lang].description,
+  };
+  const title = copy.title;
+  /**
+   * The line under the title, and on WhatsApp, Slack and Apple Mail the ONLY prose the card gets.
+   *
+   * Built from the fields when they are there, so it carries the city, the dates, the terms and the
+   * deadline — and, on a closed request, says so BESIDE the request rather than instead of it. The
+   * backend's own string replaces the whole description with "no longer accepting bids", so a link
+   * forwarded a week later names the equipment and loses where and when it was: SUP-BE-21.
+   */
+  const description = (form ? bidCardDescription(bidCardModel(preview, copy, lang, form)) : "") || copy.description;
   const path = `/bid/${slug}${lang === "ar" ? "?lang=ar" : ""}`;
   // Absolute, from the host actually serving this page — never resolved through metadataBase.
   const canonical = origin ? `${origin}${path}` : path;
-  // The backend already returns an absolute, stage-correct image URL; the constant is the fallback
-  // for a failed fetch, and gets the same absolute treatment so it can't point at the wrong host.
-  const image = preview?.imageUrl || (origin ? `${origin}${OG_CARD_IMAGE}` : OG_CARD_IMAGE);
+  /**
+   * The card image, in order of how much it knows about THIS request.
+   *
+   * 1. **This app's `og` route** — drawn per request: the reference, the equipment, the call to bid.
+   * 2. `preview.imageUrl` — for a caller with no origin to build an absolute URL from.
+   * 3. `OG_CARD_IMAGE` — a generic picture that says nothing about the request.
+   *
+   * ⚠️ **`preview.imageUrl` used to win, and that was the whole of SUP-T02** (found against the
+   * owner's own production token, 2026-09-01). It is not a rendering of the request: `previewImageUrl()`
+   * in the agents backend is `() => `${WEB_APP_URL}/og-bid.png``, a CONSTANT — the same 19 KB file for
+   * every request ever shared. So it was always set, `generated` was never reached, and every link
+   * unfurled with a picture of nothing while `/bid/{slug}/og` sat there returning a real card.
+   *
+   * Preferring ours is not a tie-break, it is the point: a static file cannot know the equipment. The
+   * backend's stays below it because a card with the brand on it beats no card at all, and a relative
+   * `og:image` is ignored by every unfurler.
+   */
+  const generated = origin ? `${origin}/bid/${slug}/og${lang === "ar" ? "?lang=ar" : ""}` : null;
+  const image = generated || preview?.imageUrl || OG_CARD_IMAGE;
 
   return {
     // The root layout's title template appends " — Moedatech", which is where the brand comes from.
@@ -149,7 +227,30 @@ export function buildBidMetadata({
       description,
       url: canonical,
       locale: lang === "ar" ? "ar_SA" : "en_US",
-      images: [{ url: image, alt: title }],
+      /**
+       * ── The card is DECLARED, not left to be measured ───────────────────────────────────────
+       *
+       * Width, height and type are what let a client lay the card out before the picture has
+       * arrived — and what make it choose the LARGE card rather than the thumbnail. Without them,
+       * some unfurlers fetch the image just to size it, and the slow ones give up first and draw a
+       * text-only card. LinkedIn is the strictest about it; WhatsApp and Outlook both render sooner
+       * with them present.
+       *
+       * `secureUrl` is the same absolute https URL, for the older clients that read only that key.
+       *
+       * 1200 × 630 is what `/bid/[token]/og` actually renders (`WIDTH`/`HEIGHT` there). If that
+       * route's size ever changes, these change with it or the card lays out wrong everywhere.
+       */
+      images: [
+        {
+          url: image,
+          secureUrl: image.startsWith("https://") ? image : undefined,
+          width: OG_IMAGE_WIDTH,
+          height: OG_IMAGE_HEIGHT,
+          type: "image/png",
+          alt: title,
+        },
+      ],
     },
     twitter: { card: "summary_large_image", title, description, images: [image] },
   };

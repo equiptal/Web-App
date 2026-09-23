@@ -16,29 +16,37 @@
  * | Surface | Number | Meaning |
  * |---|---|---|
  * | count pills + shortfall (§6.2, §6.3) | `unitsOffered` | what the offer is made of |
- * | this footer | `agreedUnits ?? unitsOffered` | what the money is based on |
+ * | this footer | `liveRentalUnits` — agreed, then the latest proposed, then offered, capped | what the money is based on |
  *
  * When they differ the footer **says so once** (RM3-AC-66) — two unexplained figures on one screen is
- * the defect that rule exists to stop. It never reads `currentRentalUnits` (the backend's
- * `lastProposedRentalUnits`): an unapproved counter must not rewrite what the offer says
- * (RM3-AC-67), and the input type below cannot even see the field.
+ * the defect that rule exists to stop.
+ *
+ * 🔴 ~~It never reads `currentRentalUnits` (the backend's `lastProposedRentalUnits`): an unapproved
+ * counter must not rewrite what the offer says (RM3-AC-67).~~ Withdrawn (owner, 2026-09-22: *"use
+ * same price as in bid card… all prices appear in all screens the same as bid card"*, and on the
+ * units rule *"check the app"*). The app withdrew RM3-AC-67 on 2026-08-14 (APP-RDR-25,
+ * `bid_map_price.dart`): its bid card and its deal room both read the live count, so a footer that
+ * did not was the one screen quoting a different total for the same bid. The web's bid card already
+ * reads `liveRentalUnits`; this footer now calls the same function. The count PILLS still describe
+ * the offer.
  *
  * **NO React, NO DOM, NO i18n.**
  */
 
 import { computeDealTotals, type DealTotals } from "./deal-room";
 import type { BidCard } from "./bids";
+import { liveRentalUnits } from "./comparison";
 
 /**
  * The price basis, exactly.
  *
  * A `Pick` of `BidCard` rather than a fresh shape, so a caller holding a bid passes it straight
- * through — and, more to the point, so `currentRentalUnits` is **not reachable from inside this
- * module**. RM3-AC-67 is then a property of the type, not a rule someone has to remember.
+ * through. It carries `currentRentalUnits` and `numberOfUnits` since 2026-09-22, because
+ * `liveRentalUnits` reads both.
  */
 export type PriceFooterBid = Pick<
   BidCard,
-  | "price" | "priceUnit" | "unitsOffered" | "agreedUnits"
+  | "price" | "priceUnit" | "unitsOffered" | "agreedUnits" | "currentRentalUnits" | "numberOfUnits"
   | "mobPrice" | "demobPrice" | "mobUnits" | "demobUnits" | "mobExcluded" | "demobExcluded"
   | "dealRoomId"
 >;
@@ -56,8 +64,7 @@ export interface PriceFooterModel {
   /**
    * The two disagree, so the footer must state it — once, here (RM3-AC-66).
    *
-   * False when no count was ever agreed: an un-negotiated bid prices on its own offered count, and
-   * there is nothing to explain.
+   * The bid card's own test: the priced count is not the offered count.
    */
   unitsDiffer: boolean;
   /** The rate's provenance: an untouched opening offer, or a figure the room has moved. */
@@ -79,9 +86,11 @@ export function priceFooterModel(
    *  the rental can only be shown at its raw rate (mobile §3), so pass it wherever it is known. */
   startDate: string | null = null,
 ): PriceFooterModel {
-  const offeredUnits = bid.unitsOffered > 0 ? bid.unitsOffered : 1;
+  // Both counts exactly as the bid card reads them (`BidCards.tsx`), so the two surfaces price one bid
+  // on one number.
+  const offeredUnits = bid.unitsOffered > 0 ? bid.unitsOffered : bid.numberOfUnits > 0 ? bid.numberOfUnits : 1;
   const agreed = bid.agreedUnits ?? null;
-  const pricedUnits = agreed ?? offeredUnits;
+  const pricedUnits = liveRentalUnits(bid);
   return {
     hasRoom: bid.dealRoomId != null,
     totals: computeDealTotals({
@@ -89,9 +98,8 @@ export function priceFooterModel(
       priceUnit: bid.priceUnit,
       periods: durationDays,
       startDate,
-      // `agreedUnits` first, `unitsOffered` second — the identical precedence `mapDealRoom` applies
-      // when it computes `priceUnits`, so a bid with a room prices the same on both surfaces.
-      agreedUnits: agreed,
+      // The live count, handed in as the priced count so `computeDealTotals` uses it as given.
+      agreedUnits: pricedUnits,
       numberOfUnits: offeredUnits,
       mobUnits: bid.mobUnits ?? null,
       demobUnits: bid.demobUnits ?? null,
@@ -102,7 +110,7 @@ export function priceFooterModel(
     }),
     offeredUnits,
     pricedUnits,
-    unitsDiffer: agreed != null && agreed !== offeredUnits,
+    unitsDiffer: pricedUnits !== offeredUnits,
     // A room whose price has not moved still reads as the opening offer — the source describes the
     // FIGURE, not whether a conversation exists.
     source: bid.dealRoomId != null && agreed != null ? "deal_room" : "opening_offer",

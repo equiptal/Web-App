@@ -1,0 +1,173 @@
+import { describe, it, expect } from "vitest";
+import { blankTerms, countDifferences } from "@/components/projects/TermsFields";
+import { workOrderPayload, blankMachine, type WorkOrderDraft } from "@/components/projects/WorkOrderForm";
+import { EMPTY_WHEN, termsToWire } from "@/lib/contract/work-order";
+
+/**
+ * Machine terms (spec §5.2 · PROJ-AC-43, PROJ-AC-44).
+ *
+ * These two criteria went unchecked through a whole ticket. W-T17 shipped with the note *"the
+ * per-machine terms editor is a stub"* in a commit body, which nothing reads afterwards — not the
+ * ticket list, not the UAT script, not the owner, who found it by trying to use the form. So the
+ * criteria are asserted here rather than trusted to a caveat.
+ */
+
+const draft = (over: Partial<WorkOrderDraft> = {}): WorkOrderDraft => ({
+  title: "Own fleet — Qiddiya",
+  when: { ...EMPTY_WHEN },
+  machines: [blankMachine()],
+  ...over,
+});
+
+describe("every machine states its own terms", () => {
+  it("always sends them, so nothing depends on an order-level fallback", () => {
+    /* The backend still has a fallback for a machine with an empty terms blob. It is left unused
+       rather than relied on: a row that says what it means cannot be changed later by editing
+       something else. */
+    const rows = workOrderPayload(draft(), { create: true }).body.items as Record<string, unknown>[];
+    expect("terms" in rows[0]).toBe(true);
+  });
+
+  it("gives a new machine the FIRST machine's terms, as a copy", () => {
+    /* This is what replaced the shared block (owner, 2026-08-31). The renter answers once and the
+       second machine arrives already answered — seeded, not linked, so editing one never edits the
+       other. */
+    const first = { ...blankTerms(), deliveryOverride: "supplier" as const };
+    const second = blankMachine(first);
+
+    expect(second.terms.deliveryOverride).toBe("supplier");
+
+    second.terms.deliveryOverride = "me";
+    expect(first.deliveryOverride, "the seed must not be shared by reference").toBe("supplier");
+  });
+
+  it("copies the nested operator block too, not just the flat fields", () => {
+    // A shallow copy would leave two machines sharing one operator object and editing each other.
+    const first = {
+      ...blankTerms(),
+      operator: { ...blankTerms().operator, fatFood: "supplier" } as ReturnType<typeof blankTerms>["operator"],
+    };
+    const second = blankMachine(first);
+
+    expect(second.terms.operator?.fatFood).toBe("supplier");
+    second.terms.operator!.fatFood = "me";
+    expect(first.operator?.fatFood).toBe("supplier");
+  });
+
+  it("starts blank when there is nothing to seed from", () => {
+    expect(blankMachine().terms).toEqual(blankTerms());
+  });
+});
+
+describe("how many fields a machine states differently", () => {
+  it("counts nothing when it follows the order", () => {
+    expect(countDifferences(null, blankTerms())).toBe(0);
+    expect(countDifferences(blankTerms(), blankTerms())).toBe(0);
+  });
+
+  it("counts each field that actually differs, so the card can say so (AC-43)", () => {
+    const shared = blankTerms();
+    const mine = { ...shared, deliveryOverride: "me" as const, equipmentYear: "2018" };
+    expect(countDifferences(mine, shared)).toBe(2);
+  });
+
+  it("does not count an empty box against an unset one", () => {
+    /* A renter who opened a field, typed, and cleared it again has changed nothing. Counting "" as
+       different from null would mark the card and mean nothing by it. */
+    const shared = blankTerms();
+    const mine = { ...shared, safetyCertsOtherText: "" };
+    expect(countDifferences(mine, shared)).toBe(0);
+  });
+
+  it("compares certificate sets by content, not by order", () => {
+    const shared = { ...blankTerms(), safetyCertsOverride: ["tuv", "aramco"] as never };
+    const mine = { ...blankTerms(), safetyCertsOverride: ["aramco", "tuv"] as never };
+    expect(countDifferences(mine, shared)).toBe(0);
+
+    const fewer = { ...blankTerms(), safetyCertsOverride: ["tuv"] as never };
+    expect(countDifferences(fewer, shared)).toBe(1);
+  });
+
+  it("counts a nested operator field, which a shallow compare would miss", () => {
+    /* `fatFood` rather than `nightShift`: night shift was removed from the form (owner,
+       2026-08-31) and is no longer compared, because counting a field nobody can set would make the
+       badge say 1 with nothing to point at. */
+    const shared = blankTerms();
+    const mine = {
+      ...shared,
+      operator: { ...shared.operator, fatFood: "supplier" } as typeof shared.operator,
+    };
+    expect(countDifferences(mine, shared)).toBe(1);
+  });
+});
+
+describe("reopening a work order must not blank its terms", () => {
+  /* The bug this guards, found by the owner asking *"what is the use of the info he entered per work
+     order if we don't consume it anywhere?"*:
+
+     `getChart` returns a machine's name, quantity and awards — and no terms. The edit path seeded
+     each machine from `blankMachine()`, and since every machine now ALWAYS sends its terms, saving
+     wrote those blanks over whatever the renter had entered. Thirteen answers per machine, destroyed
+     by opening a form and pressing save.
+
+     `listWorkOrders` is where the terms live, so `startEditOrder` fetches them and matches by
+     machine id. The payload assertion below is the part that bites: it is what turns a blank draft
+     into a destructive write. */
+
+  it("sends the terms it was given, not a blank block", () => {
+    const stored = { ...blankTerms(), deliveryOverride: "supplier" as const, equipmentYear: "2019" };
+    const d = draft({
+      groupId: "g1",
+      machines: [{ ...blankMachine(), id: "m1", rawLabel: "Welder", offCatalogue: true, terms: stored }],
+    });
+
+    const row = (workOrderPayload(d, { create: false }).body.items as Record<string, unknown>[])[0];
+    const sent = row.terms as Record<string, unknown>;
+
+    expect(sent.delivery).toBe("supplier");
+    expect(sent.year).toBe("2019");
+  });
+
+  it("would send blanks if the draft were seeded blank — which is why the fetch must not be skipped", () => {
+    /* Kept as a test rather than a comment: it states plainly that a blank draft IS a destructive
+       write, so nobody re-introduces a synchronous "just open the form" path. */
+    const d = draft({
+      groupId: "g1",
+      machines: [{ ...blankMachine(), id: "m1", rawLabel: "Welder", offCatalogue: true }],
+    });
+
+    const row = (workOrderPayload(d, { create: false }).body.items as Record<string, unknown>[])[0];
+    const sent = row.terms as Record<string, unknown>;
+
+    expect(sent.delivery, "a blank draft sends a blank term").toBeUndefined();
+    expect(sent.year).toBeUndefined();
+  });
+});
+
+/* ============================================================================================== *
+ * What the block asks, and in what order
+ * ============================================================================================== */
+
+describe("the terms a work order asks for", () => {
+  it("asks who pays for the fuel", () => {
+    /* Missing entirely until 2026-08-31, and it is money. Not the same question as the fuel TYPE,
+       which was removed deliberately: diesel-or-petrol is a property of the machine, while this is
+       the third leg of the same who-covers-what question as delivery and return. */
+    expect(blankTerms()).toHaveProperty("fuelResponsibilityOverride");
+    const withFuel = { ...blankTerms(), fuelResponsibilityOverride: "supplier" as const };
+    expect(countDifferences(withFuel, blankTerms())).toBe(1);
+  });
+
+  it("starts with the operator turned OFF", () => {
+    /* It is the question most often answered no. A toggle that starts on asks a renter hiring a
+       generator to switch something off before they can get past four questions about operator
+       nationality. The toggle IS the answer, so off means "no operator", not "unanswered". */
+    expect(blankTerms().operatorNeeded).toBe("no");
+  });
+
+  it("counts an operator turned ON as one difference from blank", () => {
+    // Machine 2 inherits machine 1's terms, so the badge has to notice this specific change.
+    const on = { ...blankTerms(), operatorNeeded: "yes" as const };
+    expect(countDifferences(on, blankTerms())).toBe(1);
+  });
+});

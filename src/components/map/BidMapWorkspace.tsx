@@ -36,27 +36,34 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { VerifiedMark } from "@/components/VerifiedMark";
 import dynamic from "next/dynamic";
 import { ChatDock } from "@/components/map/ChatDock";
 import type { MachinePin } from "@/components/map/MapCanvas";
 import { PriceFooter } from "@/components/map/PriceFooter";
 import { useRenteeRequestSender } from "@/components/map/useRenteeRequestSender";
-import { EquipmentList } from "@/components/map/EquipmentList";
+import { EquipmentFilterButton, EquipmentList } from "@/components/map/EquipmentList";
+import { durationDaysBetween } from "@/lib/pricing/rental";
 // The list's own card model, built here ONCE and handed to both readers — the cards in the column and
 // the hover box on each marker. Two calls would be two answers waiting to differ (RM3-AC-19).
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
 import { CompanyPanel, EquipmentDetail, type PanelRequestDraft } from "@/components/map/panel";
+import {
+  markYardExplained,
+  yardExplainedBefore,
+  YardExplainDialog,
+  type YardExplainState,
+} from "@/components/map/YardExplainDialog";
 import type { BidCard } from "@/lib/contract/bids";
 import { fetchBidCompanyDocuments, fetchBidFleet } from "@/lib/api/client";
 import { companyPanelSource, type CompanyDocsPayload } from "@/lib/contract/company-documents";
+import { documentsTargetUnit } from "@/lib/contract/workspace";
 import {
   arabicIndicDigits,
   countCase,
   isPlottable,
   LANDING_CUE_MS,
   requestTypeWord,
-  shortfallAlert,
-  unitCountLabel,
   unitCounts,
 } from "@/lib/contract/bid-map";
 import {
@@ -79,6 +86,7 @@ import {
 import { publicTaxonomyUrl, type RequestRecord } from "@/lib/contract/requests";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import "@/components/map/map-proto.css";
+import { pin } from "@/lib/uiPins";
 
 // `leaflet` reaches for `window` at import time, so the canvas is client-only — the same handling
 // `MapLocationPicker`/`GoogleMapLocationPicker` need in this repo.
@@ -89,10 +97,12 @@ const MapCanvas = dynamic(() => import("@/components/map/MapCanvas"), { ssr: fal
  * past this. Kept in step with `--bm-panel-w`'s fallback in `map-proto.css`; the two are the same
  * figure and a drift between them means the grip can drag below the width the cards are drawn for.
  *
- * ~~392, §5's figure.~~ **460 since 2026-08-20** (owner: *"make the cards and panel wider"*). See the
- * `.bm-panel` rule for what 392 had started costing the card.
+ * ~~392, §5's figure~~ → ~~460 since 2026-08-20~~ → **400 since 2026-08-31** (owner: *"reduce the
+ * cards width"*). 460 was bought to stop the old availability chip truncating; that chip and the
+ * distance's ask prompt are both gone, so the card's widest line is the figure itself. See the
+ * `.bm-panel` rule.
  */
-const PANEL_MIN_W = 460;
+const PANEL_MIN_W = 400;
 
 /** A bid this surface can resolve. v3 scopes the view to exactly ONE of these (spec 004 §4). */
 export type MapBid = BidCard & { itemLabel?: string; itemLabelAr?: string };
@@ -130,7 +140,10 @@ export interface BidMapWorkspaceProps {
    * INITIAL state: a renter who closes it must not have it reopened by a URL that has not changed.
    */
   openCompanyDocs?: boolean;
+  /** Arriving from a chat icon: the dock opens with the surface (owner, 2026-08-26). */
+  openChat?: boolean;
 }
+
 
 export function BidMapWorkspace({
   bid,
@@ -140,6 +153,7 @@ export function BidMapWorkspace({
   onRequestSent,
   onOpenCompanyDocs,
   openCompanyDocs = false,
+  openChat = false,
 }: BidMapWorkspaceProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -160,6 +174,17 @@ export function BidMapWorkspace({
   const [cueId, setCueId] = useState<string | null>(null);
   /** V7 — the machine whose detail has TAKEN OVER the panel, or null for the list. */
   const [detailId, setDetailId] = useState<string | null>(null);
+  /**
+   * Arriving from `View documents` in the requests workspace (`?panel=documents`). The papers are the
+   * errand, so the detail opens on its documents tab rather than on the machine, and the renter does
+   * not have to press again for the thing he asked for.
+   *
+   * It is consumed ONCE, by `openedForDocuments`, and never re-read: pressing Back to the list and
+   * then opening another machine must land on the machine tab like any other, or the deep link would
+   * quietly re-target every panel opened for the rest of the visit.
+   */
+  const [openedForDocuments, setOpenedForDocuments] = useState(false);
+  const documentsDeepLinkUsed = useRef(false);
   /** V9 — the company panel, which takes over the same way. */
   const [companyOpen, setCompanyOpen] = useState(openCompanyDocs);
   /**
@@ -368,8 +393,15 @@ export function BidMapWorkspace({
   /** The price basis' duration — `estimatedDurationDays`, which is EXACTLY the field `mapDealRoom`
    *  reads into `periods`. Reading a different one would make the footer's figures disagree with the
    *  deal room's for the same room (RM3-AC-24). */
+  //
+  // ⚠️ And the bid card's fallback (owner, 2026-09-22: *"use same price as in bid card"*): with no
+  // stored duration, the days between the request's dates, exactly as `mapRequestListItem` derives
+  // the `durationDays` the card prices on.
+  const requestStartDate = typeof request?.startDate === "string" ? request.startDate : null;
   const requestDurationDays =
-    typeof request?.estimatedDurationDays === "number" ? request.estimatedDurationDays : null;
+    typeof request?.estimatedDurationDays === "number"
+      ? request.estimatedDurationDays
+      : durationDaysBetween(requestStartDate, typeof request?.endDate === "string" ? request.endDate : null);
 
   /** The RFQ group, resolved the way `inboxGroupKey` resolves it: the fan-out group when the request
    *  has one, else the request itself — which simply means "this bid has no siblings". Read through
@@ -407,6 +439,10 @@ export function BidMapWorkspace({
      and pressing a chip is not a retraction of it. `equipmentListView` collapses on its own when the
      expansion stops meaning anything (nothing outside the offer survives the chips). */
   const [showAllEquipment, setShowAllEquipment] = useState(false);
+  /** The filter panel. Here, not in the list, because its button sits in the count pills' row
+   *  (owner, 2026-09-22). */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const closeFilters = useCallback(() => setFiltersOpen(false), []);
   const view = useMemo(
     () => equipmentListView(listed, bid, filterIds, { showAll: showAllEquipment }),
     [listed, bid, filterIds, showAllEquipment],
@@ -438,7 +474,12 @@ export function BidMapWorkspace({
   // generic icon inside the pin. The taxonomy bucket differs per env, so the URL is rebuilt against
   // the public one exactly as the rest of the app does.
   const itemImageUrl = publicTaxonomyUrl(item?.subtypeImageUrl ?? item?.categoryImageUrl ?? null);
-  const itemName = (ar ? item?.subtypeNameAr ?? item?.subtypeName : item?.subtypeName ?? item?.subtypeNameAr) ?? item?.subtypeName ?? null;
+  /* Taxonomy first, his words only when the line has none (owner, 2026-09-12). Not keyed on
+     `isUndefined`: a hidden line is undefined and still has a catalogue name to read by. */
+  const customItemName = (item?.customEquipmentName ?? "").trim() || null;
+  const itemName =
+    ((ar ? item?.subtypeNameAr ?? item?.subtypeName : item?.subtypeName ?? item?.subtypeNameAr) ?? item?.subtypeName ?? null) ??
+    customItemName;
 
   /* ── One opener for BOTH surfaces (owner, 2026-08-11) ──────────────────────────────────────────
      *"Clicking an equipment on the map must open the panel of this selected equipment."* A marker
@@ -488,6 +529,33 @@ export function BidMapWorkspace({
     },
     [onSelectMachine],
   );
+
+
+  /* ── Arriving from the workspace's `View documents` ────────────────────────────────────────────
+     Open the offered machine's detail on its documents tab, once the fleet is actually here — the
+     link cannot name a machine, because the workspace has the bid but not its fleet, so the choice is
+     made here where the machines are. `documentsTargetUnit` prefers one whose location the lessor
+     confirmed: that is the machine the renter is being asked to trust.
+
+     Guarded by a ref rather than by state so a re-render cannot re-fire it, and the query string is
+     scrubbed afterwards so a refresh — or a Back — does not reopen a panel the renter has closed. */
+  useEffect(() => {
+    if (documentsDeepLinkUsed.current || listed.length === 0) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("panel") !== "documents") return;
+    documentsDeepLinkUsed.current = true;
+    const target = documentsTargetUnit(listed);
+    if (!target) return;
+    // `openMachine`, never a hand-written selection: it is the one writer that keeps the ring, the
+    // card and the pin agreeing (AC-15), and a fourth copy of those statements here is how the two
+    // surfaces begin to disagree.
+    openMachine(target);
+    setOpenedForDocuments(true);
+    params.delete("panel");
+    const q = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${q ? `?${q}` : ""}`);
+  }, [listed, openMachine]);
 
   /* ── V17 · a filtered-out machine cannot stay selected ─────────────────────────────────────────
      Cards and markers move together (AC-15), so a selection pointing at a machine no chip lets
@@ -617,6 +685,27 @@ export function BidMapWorkspace({
     [askPending, panelDraftToWire],
   );
 
+  /* ── What a red distance means, and the ask behind it — owned HERE (owner, 2026-09-08) ─────────
+     ~~`EquipmentList` owned this state and rendered the layer.~~ The detail panel REPLACES the list
+     (`.bm-takeover`), so a layer owned by the list could not be reached from the detail's own yard
+     card, and the owner's ruling is that both open the same one: *"clicking it whether from the
+     details or from the fleet will open this"*.
+
+     The rule is unchanged: the FIRST press explains, every press after it asks straight away, and a
+     machine already asked about shows the question rather than offering to ask again. */
+  const [yardExplain, setYardExplain] = useState<YardExplainState | null>(null);
+  const onYardPress = useCallback(
+    (machine: FleetMachine, asked: boolean) => {
+      if (asked) { setYardExplain({ machine, asked: true }); return; }
+      if (!yardExplainedBefore()) { setYardExplain({ machine, asked: false }); return; }
+      // He has read it. Mark it again anyway — the flag is the only record, and a storage that came
+      // back empty once must not send him round the explanation on every later machine.
+      markYardExplained();
+      composeDraft(composeMachineRequest("availability", machine.equipmentId));
+    },
+    [composeDraft],
+  );
+
   /** The detail's machine, re-read from the CURRENT list on every render (AC-18) — nothing about a
    *  machine is held in this component's state except its id. A refetch that changes its availability
    *  changes the chip under the renter's eyes rather than leaving a stale copy open. */
@@ -690,9 +779,6 @@ export function BidMapWorkspace({
      footer prices on what was agreed, these pills describe what was offered (RM3-AC-65/67). */
   const counts = bid && fleet ? unitCounts(bid, fleet) : null;
   const kase = counts ? countCase(counts) : null;
-  /** V4's alert, or null. It carries the DIFFERENCE and not the offered total (RM3-AC-05), and its
-   *  own orange (RM3-AC-06) — both decided in the model, so neither is re-derived at the render. */
-  const shortfall = counts ? shortfallAlert(counts) : null;
 
   // NO "does the offer match" derivation here, deliberately (owner, 2026-08-11). Whether Accept is
   // available is the DEAL ROOM's rule — `termsMatched && priceMatches && unitsMatch`
@@ -816,8 +902,8 @@ export function BidMapWorkspace({
   return (
     // No `dir` here: the shell's direction is the locale's, and every offset in `map-proto.css` is a
     // logical property, so the panel lands on the inline-start edge in both (AC-30, AC-98).
-    <div className="bidmap" ref={rootRef} style={panelW == null ? undefined : ({ "--bm-panel-w": `${panelW}px` } as CSSProperties)}>
-      <div className="bm-canvas">
+    <div {...pin("bid-map-workspace")} className="bidmap" ref={rootRef} style={panelW == null ? undefined : ({ "--bm-panel-w": `${panelW}px` } as CSSProperties)}>
+      <div {...pin("bidmap-canvas")} className="bm-canvas">
         <MapCanvas
           site={site}
           addressLabel={request?.projectAddressLabel ?? null}
@@ -851,7 +937,7 @@ export function BidMapWorkspace({
           Fixed width, in flow beside the map rather than floating over it (§5). Its DOM position is
           what puts it on the inline-end edge — the same edge the prototype's `left: 18px` lands on in
           Arabic — and it mirrors with the reading direction instead of trading places with the map. */}
-      <aside className="bm-panel">
+      <aside {...pin("bidmap-panel")} className="bm-panel">
         {/* The grip lives on the panel's map-facing edge and is invisible until the pointer is on it —
             the surface already carries a lot of furniture and a permanent handle would be one more
             thing to read. `role="separator"` with the width on `aria-valuenow` is what makes it a
@@ -886,9 +972,15 @@ export function BidMapWorkspace({
               request={bid}
               ar={ar}
               L={L}
-              onBack={() => setDetailId(null)}
+              onBack={() => {
+                setDetailId(null);
+                // The arrival is spent. The next machine opened is opened on the machine tab.
+                setOpenedForDocuments(false);
+              }}
               onRequest={sendPanelRequest}
               askPending={panelAskPending}
+              onYardPress={onYardPress}
+              initialTab={openedForDocuments ? "documents" : undefined}
             />
           </div>
         ) : bid ? (
@@ -911,27 +1003,23 @@ export function BidMapWorkspace({
                     {/* The chip's label is short so the supplier's NAME survives the 392px row
                         (`en.ts`, owner 2026-08-19); the full sentence rides on `title`, where the
                         width costs nothing. The prototype's chip carries the same phrase there. */}
+                    {/* ~~The word «Verified» beside the tick.~~ The tick ALONE (owner, 2026-09-22: *"only
+                        show the verified icon not whole word but clicking on supplier will show it
+                        verified fine in the details"*). The company panel still says it in words;
+                        here the word rides on the tick's accessible name and its title. */}
                     {bid.verified && (
-                      <span className="bm-verified" title={t.bidMap.verifiedCompanyWhy}>
-                        {/* A bare CHECK, drawn at 11px in the chip's own ink — `rVerifiedChip`
-                            (prototype 4056). It was Material's `verified` badge, a filled rosette
-                            whose scallops carry their own meaning at 13px and read as a second mark
-                            beside the word rather than as the tick for it. The stroke here is the
-                            prototype's 2.6, so the glyph keeps the chip's weight without a fill. */}
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.6"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M20 6L9 17l-5-5" />
-                        </svg>
-                        {t.bidMap.verifiedCompany}
+                      <span
+                        className="bm-verified"
+                        title={t.bidMap.verifiedCompanyWhy}
+                        role="img"
+                        aria-label={t.bidMap.verifiedCompany}
+                      >
+                        {/* ~~A bare stroked check at 11px, in the chip's own ink (`rVerifiedChip`,
+                            prototype 4056).~~ The house mark (owner, 2026-09-02): one badge wherever
+                            something is vetted, so the chip here and the chip on a supplier's profile
+                            are the same claim in the same shape. It brings its own green rather than
+                            taking the chip's, which is what makes it recognisable on any ground. */}
+                        <VerifiedMark size={16} />
                       </span>
                     )}
                   </span>
@@ -951,6 +1039,11 @@ export function BidMapWorkspace({
                   </button>
                 </div>
               </div>
+
+              {/* ~~The other offers on this request.~~ In the page's BACK HEADER now (owner, 2026-09-07:
+                  *"these tabs must be in the back header, not on the company header"*), because under the
+                  supplier's own name it read as a property OF that supplier, which is not what it is.
+                  `OtherOffers` draws it and the route portals it into the bar the shell owns. */}
             </header>
 
             {/* ── V3 · the count pills ───────────────────────────────────────────────────────────
@@ -968,58 +1061,42 @@ export function BidMapWorkspace({
                     of a matched pair makes it the answer and the other the footnote, which is the
                     opposite of what a comparison is for — `map-proto.css` carries the full note. */}
                 {kase !== "single" && countPill(t.bidMap.countInOffer, counts.offered)}
+                {/* The filter, at the END of the pills' row (owner, 2026-09-22). Only once the fleet
+                    has answered, since the chips are built from it. */}
+                {fleet && (
+                  <EquipmentFilterButton
+                    view={view}
+                    open={filtersOpen}
+                    onToggle={() => setFiltersOpen((v) => !v)}
+                    onClear={() => setFilterIds([])}
+                  />
+                )}
               </div>
             )}
 
-            {/* ── V4 · the shortfall alert ───────────────────────────────────────────────────────
-                Renders on `short` and on nothing else, so its absence reliably means nothing is
-                claimed (RM3-AC-05). ORANGE, never red: on this surface red means availability only,
-                and a shortfall is an incomplete offer, not an unavailable machine (RM3-AC-06). It
-                states the DIFFERENCE — not the offered total — and the consequence: those units are
-                not on the map.
+            {/* ── V4 · the shortfall alert is WITHDRAWN (owner, 2026-09-10) ─────────────────────
+                On a panel whose first pill read «2 Crawler Excavators 20 ton registered» beside «2 in
+                this offer», it still said «1 in this offer with no registered equipment». Owner:
+                *"but he has 2 registered so remove it"*.
 
-                ONE SENTENCE AND A BUTTON, as the prototype draws it (decoded 3775–3784). The glyph,
-                the bold heading and the grey paragraph that were here until 2026-08-11 made a
-                three-part notice out of a fact that fits on one line, and the paragraph only
-                unpacked the consequence the sentence already carries. */}
-            {shortfall && (
-              <div className="bm-short" role="status">
-                <div className="bm-short-body">
-                  <div className="bm-short-t">
-                    {/* `shortfall.claimed` — the DIFFERENCE. `counts.offered` is the sentence's one
-                        plausible wrong number and is not reachable from this model at all. */}
-                    {fmt(t.bidMap.shortfall, { n: ar ? unitCountLabel(shortfall.claimed) : `${shortfall.claimed}` })}
-                  </div>
-                  {/* The reason the control beside this is inert, IN WORDS. A disabled button whose
-                      label merely changed to «تم الطلب» leaves the renter guessing whether the ask
-                      failed or the surface is broken; the rule is that his question is already with
-                      the lessor, and that is a sentence, not a state on a button. */}
-                  {shortfallPending && <div className="bm-short-s">{t.bidMap.askPendingWhy}</div>}
-                </div>
-                <button
-                  type="button"
-                  className="bm-short-act"
-                  // The composer is the whole of this action's contract: an `alternative` card with a
-                  // NULL `equipmentId` — there is no machine to name — which the backend pairs with
-                  // `scope: "company"`. `add_to_offer` is retired and rejected server-side, and is
-                  // unreachable from here by construction (RM3-AC-07).
-                  //
-                  // This control COMPOSES; it does not send. The draft card lands in the chat and
-                  // «أرسل الطلب» is what writes — which is also what creates the deal room when the
-                  // bid has none (004a §4.5), so opening the surface and pressing this both still
-                  // leave the supplier's offered count unfrozen.
-                  //
-                  // Routed through the ONE seam like every other ask, so the acknowledgement that
-                  // used to be this control's own `shortfallSent` flag is now the thing all four
-                  // asks share: a card in the room means the question is out.
-                  onClick={() => composeDraft(composeShortfallRequest())}
-                  disabled={sender.busy || shortfallPending}
-                  title={shortfallPending ? t.bidMap.askPendingWhy : undefined}
-                >
-                  {sender.busy ? t.bidMap.shortfallSending : shortfallPending ? t.bidMap.shortfallSent : t.bidMap.shortfallAction}
-                </button>
-              </div>
-            )}
+                🔴 **The two numbers count different things, and both use the word «registered».**
+                  · the PILL is `counts.owned` — `fleet.length`, every machine the lessor holds for
+                    this request;
+                  · the ALERT is `counts.claimed` — `offered − registered`, where `registered` counts
+                    only fleet rows carrying `inBid === true`, the ones committed to THIS bid.
+                So 2 owned, 2 offered, 1 flagged `inBid` produced a «1 unbacked» line under a pill
+                saying he has two. Read together they contradict each other; read apart, each is true.
+
+                ⚠️ **The alert is not necessarily WRONG, and this does not fix `inBid`.** Either the
+                lessor really attached one machine of the two, or the projection under-reports
+                `in_bid` — that is a backend question, and it is still open. What is removed is the
+                sentence that stated the gap in words the panel beside it contradicts.
+                ⚠️ The ASK survives. «Ask him to add it» and the list-foot's «Ask for different
+                equipment» were always ONE ask (`composeShortfallRequest`, an `alternative` naming no
+                machine), so the route to it is one press behind the list and nothing is stranded.
+                ⚠️ `shortfallAlert`, `SHORTFALL_COLOUR` and `countCase` are untouched, with their
+                tests: RM3-AC-05/06 are a contract this app shares with the mobile app, and the model
+                is what a corrected `inBid` would light up again. */}
 
             {/* ── A failed ask is stated; the RULE is not a failure (owner, 2026-08-11) ──────────
                 Two different things went through one red `role="alert"` box, and the owner saw the
@@ -1070,12 +1147,17 @@ export function BidMapWorkspace({
                   // the ONE seam every ask on this surface goes through — the shortfall, the card,
                   // the detail and both document surfaces — so there is exactly one place that stages
                   // an ask, one that creates the room, and one that reports a failure.
-                  onAskAvailability={(m) => composeDraft(composeMachineRequest("availability", m.equipmentId))}
+                  // The yard card's press. The LAYER it opens is this component's (see `onYardPress`),
+                  // because the detail panel opens the same one and replaces this list to do it.
+                  onYardPress={onYardPress}
                   // …and the same composer read for the other verb: a card whose «اطلب التأكيد» is
                   // already out shows it as asked instead of offering to ask again (owner, 2026-08-10).
                   askPending={(m) => askPending(composeMachineRequest("availability", m.equipmentId))}
                   onToggleShowAll={() => setShowAllEquipment((v) => !v)}
                   scrollRef={bodyRef}
+                  filtersOpen={filtersOpen}
+                  onCloseFilters={closeFilters}
+                  itemImageUrl={itemImageUrl}
                 />
               )}
 
@@ -1109,7 +1191,16 @@ export function BidMapWorkspace({
                 wizard bound to `DealRoom.tsx`'s local state (004a §4a.1). التفاصيل expands this in
                 place, taking vertical space from the list above rather than overlaying it — the
                 panel is a fixed-width column, so there is nowhere to overlay to. */}
-            <PriceFooter bid={bid} durationDays={requestDurationDays} />
+            {/* The START DATE too (owner, 2026-09-22). Without it the shared rental maths cannot count
+                Fridays and returns the bare rate, so the breakdown's rental, VAT and totals were not
+                the bid card's for the same bid. */}
+            <PriceFooter
+              bid={bid}
+              durationDays={requestDurationDays}
+              startDate={requestStartDate}
+              mobByRentee={item?.mobilizationByRentee ?? null}
+              demobByRentee={item?.demobilizationByRentee ?? null}
+            />
           </>
         ) : (
           // No bid resolved yet. The route renders its own not-found/loading states, so this is only
@@ -1143,6 +1234,7 @@ export function BidMapWorkspace({
       {bid && !offPlatform && (
         <ChatDock
           bid={bid}
+          initialOpen={openChat}
           groupKey={requestGroupKey}
           // The room as the SENDER knows it — the bid's own, or the one the first ask created. The
           // dock otherwise waits for `GET /received-bids` to mention a room that already exists, and
@@ -1180,6 +1272,18 @@ export function BidMapWorkspace({
           // the fleet's machines the offer actually names, and therefore which have a detail.
           onOpenMachine={openMachineFromChat}
           canOpenMachine={canOpenMachineFromChat}
+        />
+      )}
+
+      {/* The yard layer, portalled to `<body>` from inside itself. Mounted HERE rather than in either
+          column, so the fleet card and the detail panel — which replaces that card — open the same
+          one. `request={bid}` is what makes the specimen show this machine's own distance. */}
+      {yardExplain && (
+        <YardExplainDialog
+          state={yardExplain}
+          request={bid ?? undefined}
+          onClose={() => setYardExplain(null)}
+          onAsk={(m) => composeDraft(composeMachineRequest("availability", m.equipmentId))}
         />
       )}
     </div>

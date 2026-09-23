@@ -92,6 +92,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import { DocRowList } from "./DocRowList";
 import { useDownloadBatch } from "./doc-download";
+import { pin } from "@/lib/uiPins";
 import {
   arDigits,
   batchDocumentRequest,
@@ -239,7 +240,7 @@ export function EquipmentDocuments({
   const canRequest = mode === "request" && !!draft && !!onRequest && !pending;
 
   return (
-    <div className="mp-docs">
+    <div {...pin("equipment-documents")} className="mp-docs">
       {groups.map((g) => (
         <DocRowList
           key={g.key}
@@ -254,6 +255,8 @@ export function EquipmentDocuments({
             downloadUrl: r.downloadUrl,
             files: r.files,
             mode: docRowMode(r),
+            // An ownership alternative whose sibling is on the file: shown, askable, not red.
+            answeredElsewhere: r.answeredElsewhere,
             selectable: docRowSelectable(r, mode),
           }))}
           selected={selected}
@@ -316,7 +319,7 @@ export function EquipmentDocuments({
 
           The bar is the prototype's own (4408): 76 px, `0 18px`, `margin-top: auto` so it sits at the
           foot of a short list, and `position: sticky` so it is still there at the foot of a long one. */}
-      <div className="mp-sendrow">
+      <div {...pin("equipment-documents-foot")} className="mp-sendrow">
         <button type="button" className="mp-send" disabled={!canDownload} onClick={() => run(targets)}>
           {running
             ? L(`Saving ${batch.phase === "running" ? batch.done : 0}…`, `يُحفظ ${arDigits(batch.phase === "running" ? batch.done : 0)}…`)
@@ -337,7 +340,7 @@ export function EquipmentDocuments({
           }}
         >
           {pending
-            ? L("Asked — awaiting his reply", "طُلب — بانتظار ردّه")
+            ? L("Asked: awaiting his reply", "طُلب: بانتظار ردّه")
             : canRequest
               ? L(`Ask the supplier to send it (${requestCount})`, `اطلب من المورد إرساله (${arDigits(requestCount)})`)
               : L("Ask the supplier to send it", "اطلب من المورد إرساله")}

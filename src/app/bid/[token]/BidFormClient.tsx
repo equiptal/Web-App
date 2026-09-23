@@ -10,7 +10,7 @@ import { computeQuoteTotals, computeRentalTotal, durationDaysBetween, rentalDivi
 import { FileUploader, type UploaderKind } from "@/components/bid/FileUploader";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { computeBidQuality } from "@/lib/contract/bid-quality";
-import { partyToken } from "@/lib/contract/labels";
+import { latinDigits, partyToken } from "@/lib/contract/labels";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 import { equipmentIcon } from "@/components/requests/EquipImg";
 
@@ -32,17 +32,21 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
 // supplier bidding through the link was never told. The backend sends it ONLY when the renter
 // switched it on (null otherwise), so an untouched toggle stays hidden instead of adding a
 // "Night shift: No" row to every bid.
-// `fuelType` is NOT here (2026-09-05, following the app's `f48793ec`). It is the renter's
-// `fuelTypePreference` — what fuel they ASKED for — and it is a different fact from `fuel`,
+// `fuelType` is NOT here (2026-09-04, following the app's `f48793ec`). It is the renter's
+// `fuelTypePreference` — what fuel they asked for — and it is a different fact from `fuel`,
 // which is fuel RESPONSIBILITY and stays. The renter is not really choosing it either: the
-// system prefills it, so asking a supplier to confirm a value nobody chose added a row and
-// settled nothing. Still stored, still matched on; simply not shown to the supplier.
-const TERM_KEYS = ["operator", "nationality", "nightShift", "fatFood", "fatTransport", "fuel", "year", "operatorCert", "equipmentCert"] as const;
+// system prefills it (owner, 2026-09-03, when the same chip left the item pills), so asking a
+// supplier to confirm a value nobody chose added a row and settled nothing. Still stored, still
+// matched on; simply not shown to the supplier.
+/* 🔴 `nationality` is GONE from this list (2026-09-22, app parity: `bid_form_bloc.dart`
+   skips it with `isHiddenTermKey`). A term the supplier is never shown must not be one he is
+   asked to confirm — and `bid-quality.ts` dropped it in the same pass, because a term that is
+   never put to him cannot count against his answer. Same reasoning as `fuelType`, 2026-09-04. */
+const TERM_KEYS = ["operator", "nightShift", "fatFood", "fatTransport", "fuel", "year", "operatorCert", "equipmentCert"] as const;
 type TermKey = (typeof TERM_KEYS)[number];
 // Term names mirror the web app's canonical labels (bids.ts negotiable terms) so renter + supplier see the same wording.
 const TERM_LABEL: Record<TermKey, [string, string]> = {
   operator: ["Operator included", "تشمل مشغّل"],
-  nationality: ["Operator nationality", "جنسية المشغّل"],
   nightShift: ["Night shift required", "العمل الليلي مطلوب"],
   fatFood: ["Operator Food", "طعام المشغّل"],
   fatTransport: ["Operator Accommodation & Transport", "سكن وتنقّل المشغّل"],
@@ -53,7 +57,7 @@ const TERM_LABEL: Record<TermKey, [string, string]> = {
 };
 // A Material glyph per term, so each term card reads at a glance.
 const TERM_ICON: Record<TermKey, string> = {
-  operator: "engineering", nationality: "public", nightShift: "bedtime", fatFood: "restaurant", fatTransport: "night_shelter",
+  operator: "engineering", nightShift: "bedtime", fatFood: "restaurant", fatTransport: "night_shelter",
   fuel: "local_gas_station", year: "event", operatorCert: "workspace_premium", equipmentCert: "verified",
 };
 // App-download links for the footer CTA (off-platform suppliers → install the app to keep getting requests).
@@ -154,11 +158,11 @@ const CERT_BASE_LABEL: Record<string, [string, string]> = {
 
 // Per-section colour identity for the attachment cards (matches the uploader accent CSS vars).
 const ATT_ACCENT = {
-  photo: { c: "#e8830c", bg: "#fff7ed", bd: "#f6d5a8" },
-  own: { c: "#2563eb", bg: "#eef4ff", bd: "#c7d8fb" },
-  eqc: { c: "#0e9384", bg: "#ecfdf8", bd: "#9fe0d2" },
-  opc: { c: "#7c3aed", bg: "#f5f2ff", bd: "#dccdfb" },
-  co: { c: "#475569", bg: "#f1f5f9", bd: "#cbd5e1" },
+  photo: { c: "var(--brand)", bg: "var(--brand-soft)", bd: "var(--brand-pale)" },
+  own: { c: "var(--info)", bg: "var(--background)", bd: "var(--info-soft)" },
+  eqc: { c: "var(--info-deep)", bg: "var(--ok-soft)", bd: "var(--ok-soft)" },
+  opc: { c: "var(--info)", bg: "var(--background)", bd: "var(--info-soft)" },
+  co: { c: "var(--navy-mid)", bg: "var(--background)", bd: "var(--border-strong)" },
 } as const;
 
 /** A coloured attachment card — icon tile + title + description + Required/Optional pill, then the uploader. */
@@ -198,7 +202,7 @@ export default function BidFormClient({ token }: { token: string }) {
   const [notFound, setNotFound] = useState(false);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [contract, setContract] = useState<Record<string, boolean>>({});
-  const [company, setCompany] = useState({ companyName: "", crNumber: "", vatNumber: "", nationalAddress: "", contactInfo: "", city: "", notes: "", validUntil: "" });
+  const [company, setCompany] = useState({ companyName: "", crNumber: "", vatNumber: "", nationalAddress: "", contactInfo: "", contactEmail: "", city: "", notes: "", validUntil: "" });
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -267,7 +271,7 @@ export default function BidFormClient({ token }: { token: string }) {
   const setPrice = (id: string, field: "rentalRate" | "deliveryPrice" | "returnPrice", v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], [field]: v } }));
   const setOffered = (id: string, v: string) => setAnswers((p) => ({ ...p, [id]: { ...p[id], offeredUnits: v } }));
   // Units still open to a shared-link supplier = numberOfUnits − units already held by other suppliers'
-  // accepted (AWAITING) + confirmed (CLOSED) deals (backend PR #484 via `remainingUnits`). Absent → the
+  // accepted (AWAITING) + confirmed (CLOSED) deals (backend PR var(--ok-deep) via `remainingUnits`). Absent → the
   // full requested count (no regression). Only multi-unit MULTIPLE_SUPPLIERS lines ever cap below it.
   const remainingOf = (it: BidFormItem) => it.remainingUnits ?? it.numberOfUnits;
   const isFullyCovered = (it: BidFormItem) => remainingOf(it) <= 0;
@@ -405,6 +409,8 @@ export default function BidFormClient({ token }: { token: string }) {
         vatNumber: company.vatNumber.trim(),
         nationalAddress: company.nationalAddress.trim(),
         contactInfo: company.contactInfo.trim(),
+        // Optional, and sent only when it is there — an empty string would store "" as an address.
+        ...(company.contactEmail.trim() ? { contactEmail: company.contactEmail.trim() } : {}),
         city: company.city.trim() || undefined,
         // No backend flag for VAT-inclusive pricing — carry it as a tagged line in the notes (which
         // round-trip to the renter's submission view). The viewer surfaces it as a dedicated note.
@@ -436,7 +442,7 @@ export default function BidFormClient({ token }: { token: string }) {
       // Surface the backend's specific reason (e.g. the units-cap 400/409 "Offer between 1 and N…") instead
       // of a generic failure, so a race reads cleanly. Falls back to the generic message.
       const msg = e instanceof ApiError ? (ar ? (e.messageAr ?? e.detail) : (e.detail ?? e.messageAr)) : null;
-      alert(msg || L("Could not submit — the request may have closed, or please try again.", "تعذّر الإرسال — قد يكون الطلب أُغلق، أو حاول مرة أخرى."));
+      alert(msg || L("Could not submit. The request may have closed, or please try again.", "تعذّر الإرسال: قد يكون الطلب أُغلق، أو حاول مرة أخرى."));
     }
   }
 
@@ -518,7 +524,7 @@ export default function BidFormClient({ token }: { token: string }) {
       {submitted && (
         <div className="wrap"><div className="state"><div className="sic"><span className="material-icons-outlined">check_circle</span></div>
           <h2>{L("Bid submitted", "تم إرسال العرض")}</h2>
-          <p>{L("Your bid is now with the renter on the Moedatech platform — they can view it and compare it side by side with the other bids.", "عرضك الآن لدى المستأجر على منصة معداتك — يمكنه عرضه ومقارنته جنباً إلى جنب مع بقية العروض.")}</p>
+          <p>{L("Your bid is now with the renter on the Moedatech platform. They can view it and compare it side by side with the other bids.", "عرضك الآن لدى المستأجر على منصة معداتك: يمكنه عرضه ومقارنته جنباً إلى جنب مع بقية العروض.")}</p>
           <span className="recap"><span className="material-icons-outlined">payments</span>{sar} {nf(grand)}</span>
           <div className="state-actions"><button className="btn" onClick={resetForm}><span className="material-icons-outlined">add</span>{L("Submit another bid", "إرسال عرض آخر")}</button></div>
         </div></div>
@@ -537,7 +543,7 @@ export default function BidFormClient({ token }: { token: string }) {
             <QualityRing quality={quality} L={L} />
             <div className="qb-tx">
               <b>{L("Bid quality", "جودة العرض")}</b>
-              <span>{L("Confirm the renter's terms and attach equipment photos + documents to raise your match score — higher-quality bids stand out to the renter.", "أكّد شروط المستأجر وأرفق صور المعدة والمستندات لرفع درجة المطابقة — العروض عالية الجودة تبرز لدى المستأجر.")}</span>
+              <span>{L("Confirm the renter's terms and attach equipment photos + documents to raise your match score: higher-quality bids stand out to the renter.", "أكّد شروط المستأجر وأرفق صور المعدة والمستندات لرفع درجة المطابقة: العروض عالية الجودة تبرز لدى المستأجر.")}</span>
               {/* Breakdown — shows the supplier exactly which dimension to improve; each bar turns green when complete. */}
               <div className="qb-parts">
                 {([
@@ -572,6 +578,13 @@ export default function BidFormClient({ token }: { token: string }) {
                 {data.projectTerms.rentalBasis && <Cell k={L("Rental basis", "أساس الإيجار")}>{rentalBasisLabel(data.projectTerms.rentalBasis, L)}</Cell>}
                 {data.projectTerms.startDate && <Cell k={L("Rental start", "بدء الإيجار")}>{fmtDate(data.projectTerms.startDate)}</Cell>}
                 <Cell k={L("Rental end", "نهاية الإيجار")}>{data.projectTerms.endDate ? fmtDate(data.projectTerms.endDate) : L("Open-ended", "بدون نهاية محددة")}</Cell>
+                {/* ⚠️ `true` ONLY. `false` and `null` both draw nothing: null means the renter was
+                    never asked, and "not extendable" printed as a fact nobody stated is worse than
+                    silence. The backend has sent this since 2026-09-01 and this form was dropping it,
+                    so a supplier priced a flat month against a hire meant to run on. */}
+                {data.projectTerms.extendable === true && (
+                  <Cell k={L("May be extended", "قابل للتمديد")}>{L("Yes", "نعم")}</Cell>
+                )}
                 {data.projectTerms.hoursPerDay != null && <Cell k={L("Hours per day", "ساعات/يوم")}>{data.projectTerms.hoursPerDay}</Cell>}
                 {data.projectTerms.workingDaysPerWeek != null && <Cell k={L("Working days / week", "أيام العمل/أسبوع")}>{data.projectTerms.workingDaysPerWeek}</Cell>}
               </div>
@@ -579,7 +592,7 @@ export default function BidFormClient({ token }: { token: string }) {
 
               {data.contractTerms.length > 0 && (
                 <>
-                  <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms — for all items", "شروط العقد — لكل البنود")}
+                  <div className="subhead"><span className="material-icons-outlined">gavel</span>{L("Contract terms: for all items", "شروط العقد: لكل البنود")}
                     <button type="button" className={`yall${allContractYes ? " on" : ""}`} onClick={() => toggleContractYes(allContractYes)}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
                   </div>
                   <div className="treqgrid">
@@ -587,8 +600,10 @@ export default function BidFormClient({ token }: { token: string }) {
                       const ans = contract[c.key];
                       return (
                         <div key={c.key} className={`treqcell${ans === true ? " ok" : ""}${ans === false ? " declined" : ""}${showErrors && ans === undefined ? " needpick" : ""}`}>
-                          <div className="tc-main"><div className="tc-name"><span className="material-icons-outlined">gavel</span>{c.label}</div></div>
-                          <div className="tc-rw"><span className="q">{L("Renter's choice", "اختيار المستأجر")}</span> <i>{choiceLabel(c.value, ar)}</i></div>
+                          <div className="tc-main"><div className="tc-name"><span className="material-icons-outlined">gavel</span>{(ar && c.labelAr) || c.label}</div></div>
+                          {/* The backend's own Arabic where it sends it, and its digits normalised to
+                              Latin on the way in — `valueAr` is seeded «٢٤ ساعة». */}
+                          <div className="tc-rw"><span className="q">{L("Renter's choice", "اختيار المستأجر")}</span> <i>{ar && c.valueAr ? latinDigits(c.valueAr) : choiceLabel(c.value, ar)}</i></div>
                           <div className="tc-sw"><span className="q">{L("Your choice", "اختيارك")}</span><YesNo L={L} value={ans} onChange={(v) => setContract((p) => ({ ...p, [c.key]: v }))} /></div>
                         </div>
                       );
@@ -632,6 +647,11 @@ export default function BidFormClient({ token }: { token: string }) {
             const sub = pr.overall.subtotal;
             const line = (v: string) => (num(v) ? num(v) * oq : 0);
             // Supplier prices delivery/return ONLY when they handle it; if the renter does, no price row.
+            // null = the leg does not exist (self-mobile equipment drives itself to site). Distinct from
+            // "Renter", which means the renter handles a leg that does exist. `!= null` on purpose: it
+            // covers an older backend that omits the field, and won't hide a row on an empty string.
+            const delApplies = it.deliveryBy != null;
+            const retApplies = it.returnBy != null;
             const delBySup = partyToken(it.deliveryBy).toLowerCase() === "supplier";
             const retBySup = partyToken(it.returnBy).toLowerCase() === "supplier";
             const multiItem = data.items.length > 1; // opt-out only makes sense when there's more than one item
@@ -642,7 +662,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   <span className="item-ic"><ItemThumb src={it.imageUrl} name={rawLabel} /></span>
                   <div className="inm-wrap"><span className="inm">{label}</span>{size && <span className="imeta">· {size}</span>}
                     <span className={`units-chip${q > 1 ? " multi" : ""}`}><span className="msym">{q > 1 ? "layers" : "package_2"}</span>×{q} {q === 1 ? L("unit", "وحدة") : L("units", "وحدات")}</span>
-                    {fullyCovered && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: "#c0392b", background: "#fdecea", border: "1px solid #f3c0ba", borderRadius: 20, padding: "2px 9px" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>lock</span>{L("Fully covered", "مُغطّى بالكامل")}</span>}</div>
+                    {fullyCovered && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, fontWeight: 800, color: "var(--danger)", background: "var(--danger-soft)", border: "1px solid var(--danger-soft)", borderRadius: "var(--radius-lg)", padding: "2px 9px" }}><span className="material-icons-outlined" style={{ fontSize: 14 }}>lock</span>{L("Fully covered", "مُغطّى بالكامل")}</span>}</div>
                   <span className="ibadge">{L(`Item ${idx + 1} of ${data.items.length}`, `البند ${idx + 1} من ${data.items.length}`)}</span>
                 </div>
 
@@ -651,7 +671,7 @@ export default function BidFormClient({ token }: { token: string }) {
                 {multiItem && !fullyCovered && (
                   <button type="button" className={`supply-tog${skip ? " off" : ""}`} onClick={() => toggleSupply(it.requestItemId)}>
                     <span className="supply-sw"></span>
-                    <span className="supply-tx">{skip ? L("You can't supply this item — tap to include it", "لا يمكنك توفير هذا البند — اضغط لإضافته") : L("I can supply this item", "أستطيع توفير هذا البند")}</span>
+                    <span className="supply-tx">{skip ? L("You can't supply this item: tap to include it", "لا يمكنك توفير هذا البند: اضغط لإضافته") : L("I can supply this item", "أستطيع توفير هذا البند")}</span>
                     {!skip && <span className="supply-skip">{L("Can't supply? Skip it", "لا تستطيع؟ استبعده")}</span>}
                   </button>
                 )}
@@ -664,7 +684,7 @@ export default function BidFormClient({ token }: { token: string }) {
                 ) : skip ? (
                   <div className="skip-note">
                     <span className="material-icons-outlined">block</span>
-                    <span>{L("Not included in your bid. You won't price this item or confirm its terms — bid on the items you can supply.", "غير مُدرَج في عرضك. لن تُسعّر هذا البند أو تؤكّد شروطه — قدّم عرضك على البنود التي تستطيع توفيرها.")}</span>
+                    <span>{L("Not included in your bid. You won't price this item or confirm its terms: bid on the items you can supply.", "غير مُدرَج في عرضك. لن تُسعّر هذا البند أو تؤكّد شروطه: قدّم عرضك على البنود التي تستطيع توفيرها.")}</span>
                   </div>
                 ) : (
                 <>
@@ -678,18 +698,18 @@ export default function BidFormClient({ token }: { token: string }) {
                         choose to supply fewer than the units still open. Capped at `remaining` (units not
                         already covered by others). Hidden when only 1 unit is left (no choice). */}
                     {remaining > 1 && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, whiteSpace: "nowrap", background: "#fff", border: "1px solid #e6c690", borderRadius: 10, padding: "6px 12px" }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 800, color: "#1c3550" }}>{L("Units you can supply", "الوحدات المتاحة لديك")}</span>
-                      <span style={{ display: "inline-flex", alignItems: "center", border: "2px solid #f79009", borderRadius: 9, overflow: "hidden" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, whiteSpace: "nowrap", background: "var(--surface)", border: "1px solid var(--brand-light)", borderRadius: "var(--radius-md)", padding: "6px 12px" }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 800, color: "var(--navy)" }}>{L("Units you can supply", "الوحدات المتاحة لديك")}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", border: "2px solid var(--brand)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
                         <button type="button" aria-label={L("Fewer units", "تقليل")} disabled={oq <= 1}
                           onClick={() => setOffered(it.requestItemId, String(Math.max(1, oq - 1)))}
-                          style={{ width: 36, height: 36, border: "none", background: oq <= 1 ? "#f6efe2" : "#fff5e8", color: oq <= 1 ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq <= 1 ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>−</button>
-                        <span style={{ minWidth: 38, textAlign: "center", fontSize: 16, fontWeight: 900, color: "#1c3550" }}>{oq}</span>
+                          style={{ width: 36, height: 36, border: "none", background: oq <= 1 ? "var(--brand-soft)" : "var(--brand-soft)", color: oq <= 1 ? "var(--brand-light)" : "var(--brand-deep)", fontSize: 22, fontWeight: 900, cursor: oq <= 1 ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>−</button>
+                        <span style={{ minWidth: 38, textAlign: "center", fontSize: 16, fontWeight: 900, color: "var(--navy)" }}>{oq}</span>
                         <button type="button" aria-label={L("More units", "زيادة")} disabled={oq >= remaining}
                           onClick={() => setOffered(it.requestItemId, String(Math.min(remaining, oq + 1)))}
-                          style={{ width: 36, height: 36, border: "none", background: oq >= remaining ? "#f6efe2" : "#fff5e8", color: oq >= remaining ? "#c9b48c" : "#b45309", fontSize: 22, fontWeight: 900, cursor: oq >= remaining ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>+</button>
+                          style={{ width: 36, height: 36, border: "none", background: oq >= remaining ? "var(--brand-soft)" : "var(--brand-soft)", color: oq >= remaining ? "var(--brand-light)" : "var(--brand-deep)", fontSize: 22, fontWeight: 900, cursor: oq >= remaining ? "default" : "pointer", lineHeight: 1, fontFamily: "inherit" }}>+</button>
                       </span>
-                      <span style={{ color: "#6b8fa8", fontWeight: 800, fontSize: 14 }}>/ {remaining}</span>
+                      <span style={{ color: "var(--muted)", fontWeight: 800, fontSize: 14 }}>/ {remaining}</span>
                     </span>
                     )}
                   </div>
@@ -705,7 +725,7 @@ export default function BidFormClient({ token }: { token: string }) {
 
                 {terms.length > 0 && (
                   <>
-                    <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms — can you meet each?", "الشروط — هل يمكنك الالتزام بكلٍّ منها؟")}
+                    <div className="subhead"><span className="material-icons-outlined">fact_check</span>{L("Terms: can you meet each?", "الشروط: هل يمكنك الالتزام بكلٍّ منها؟")}
                       <button type="button" className={`yall${allItemYes ? " on" : ""}`} onClick={() => toggleItemYes(it, allItemYes)}><span className="yall-sw"></span>{L("Yes to all", "نعم للكل")}</button>
                     </div>
                     <div className="treqgrid">
@@ -735,9 +755,9 @@ export default function BidFormClient({ token }: { token: string }) {
 
                 <div className="subhead"><span className="material-icons-outlined">request_quote</span>{L("Pricing", "التسعير")}
                   {/* Inline VAT toggle — clarifies right at the price box whether the entered prices include 15% VAT. */}
-                  <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: 7, overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
+                  <span style={{ marginInlineStart: "auto", display: "inline-flex", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", overflow: "hidden", textTransform: "none", letterSpacing: 0 }}>
                     {([[false, L("Excl. VAT", "قبل الضريبة")], [true, L("Incl. VAT", "شامل الضريبة")]] as [boolean, string][]).map(([v, lab]) => (
-                      <button key={String(v)} type="button" onClick={() => setVatIncluded(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatIncluded === v ? "var(--navy)" : "var(--surface1)", color: vatIncluded === v ? "#fff" : "var(--muted)" }}>{lab}</button>
+                      <button key={String(v)} type="button" onClick={() => setVatIncluded(v)} style={{ border: "none", cursor: "pointer", font: "inherit", textTransform: "none", letterSpacing: 0, fontWeight: 800, fontSize: 10.5, padding: "3px 9px", background: vatIncluded === v ? "var(--navy)" : "var(--surface)", color: vatIncluded === v ? "var(--surface)" : "var(--muted)" }}>{lab}</button>
                     ))}
                   </span>
                 </div>
@@ -760,8 +780,9 @@ export default function BidFormClient({ token }: { token: string }) {
                       <td className="num"><input className={`ptbl-in${showErrors && num(a?.rentalRate ?? "") <= 0 ? " invalid" : ""}`} inputMode="numeric" value={a?.rentalRate ?? ""} onChange={(e) => setPrice(it.requestItemId, "rentalRate", e.target.value)} placeholder="0" /></td>
                       <td className="num tot">{num(a?.rentalRate ?? "") ? nf(pr.overall.rental * vatMul) : "—"}</td>
                     </tr>
-                    {/* Delivery/Return are always shown. When the RENTER handles them, they're read-only
-                        (no price input) — the supplier just sees the renter is responsible. */}
+                    {/* A leg is shown only when it exists. When the RENTER handles an existing leg, the row is
+                        read-only (no price input) — the supplier just sees the renter is responsible. */}
+                    {delApplies && (
                     <tr>
                       <td><div className="it-lbl">{L("Delivery to site", "النقل إلى الموقع")}</div><div className="it-sub2">{delBySup ? L("price × qty", "السعر × العدد") : L("handled by the renter", "على المستأجر")}</div></td>
                       <td className="num">{L("Trip", "رحلة")}</td><td className="num">{oq}</td>
@@ -770,6 +791,8 @@ export default function BidFormClient({ token }: { token: string }) {
                         : <td className="num"><span className="byrenter">{L("Renter", "المستأجر")}</span></td>}
                       <td className="num tot">{delBySup ? (num(a?.deliveryPrice ?? "") ? nf(line(a!.deliveryPrice)) : "—") : "—"}</td>
                     </tr>
+                    )}
+                    {retApplies && (
                     <tr>
                       <td><div className="it-lbl">{L("Return from site", "النقل من الموقع")}</div><div className="it-sub2">{retBySup ? L("price × qty", "السعر × العدد") : L("handled by the renter", "على المستأجر")}</div></td>
                       <td className="num">{L("Trip", "رحلة")}</td><td className="num">{oq}</td>
@@ -778,6 +801,7 @@ export default function BidFormClient({ token }: { token: string }) {
                         : <td className="num"><span className="byrenter">{L("Renter", "المستأجر")}</span></td>}
                       <td className="num tot">{retBySup ? (num(a?.returnPrice ?? "") ? nf(line(a!.returnPrice)) : "—") : "—"}</td>
                     </tr>
+                    )}
                   </tbody>
                 </table></div>
                 {/* Why the rental total isn't just the rate — the single most surprising number on this
@@ -801,7 +825,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   <span className="material-icons-outlined au-ic">workspace_premium</span>
                   <div className="au-tx">
                     <b>{L("Photos & documents raise your bid quality", "الصور والمستندات ترفع جودة عرضك")}</b>
-                    <span>{L("Bids with equipment photos and supporting documents score higher and stand out — the renter is far more likely to pick a complete, verified bid and close the deal with you.", "العروض المرفقة بصور المعدة والمستندات الداعمة تحصل على درجة أعلى وتبرز أكثر — والمستأجر أميل بكثير لاختيار عرض مكتمل وموثّق وإتمام الصفقة معك.")}</span>
+                    <span>{L("Bids with equipment photos and supporting documents score higher and stand out. The renter is far more likely to pick a complete, verified bid and close the deal with you.", "العروض المرفقة بصور المعدة والمستندات الداعمة تحصل على درجة أعلى وتبرز أكثر، والمستأجر أميل بكثير لاختيار عرض مكتمل وموثّق وإتمام الصفقة معك.")}</span>
                   </div>
                 </div>
 
@@ -827,7 +851,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   const slots = parseCertSlots(it.requiredTerms.equipmentCert, "");
                   return slots.length ? (
                     <AttachSection icon="workspace_premium" accent={ATT_ACCENT.eqc}
-                      title={L("Equipment certificate", "شهادة المعدة")} desc={L("Attach if you have it — strengthens your bid", "أرفقها إن توفّرت — تقوّي عرضك")} pill={L("Optional", "اختياري")}>
+                      title={L("Equipment certificate", "شهادة المعدة")} desc={L("Attach if you have it: strengthens your bid", "أرفقها إن توفّرت: تقوّي عرضك")} pill={L("Optional", "اختياري")}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {slots.map((sl) => (
                           <FileUploader key={sl.code} token={token} folder="documents" accent={ATT_ACCENT.eqc}
@@ -844,7 +868,7 @@ export default function BidFormClient({ token }: { token: string }) {
                   const slots = parseCertSlots(it.requiredTerms.operatorCert, "operator_");
                   return slots.length ? (
                     <AttachSection icon="badge" accent={ATT_ACCENT.opc}
-                      title={L("Operator certificate", "شهادة المشغّل")} desc={L("Attach if you have it — strengthens your bid", "أرفقها إن توفّرت — تقوّي عرضك")} pill={L("Optional", "اختياري")}>
+                      title={L("Operator certificate", "شهادة المشغّل")} desc={L("Attach if you have it: strengthens your bid", "أرفقها إن توفّرت: تقوّي عرضك")} pill={L("Optional", "اختياري")}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {slots.map((sl) => (
                           <FileUploader key={sl.code} token={token} folder="documents" accent={ATT_ACCENT.opc}
@@ -863,7 +887,7 @@ export default function BidFormClient({ token }: { token: string }) {
           })}
 
           {/* Grand total */}
-          <div className="grand"><span className="gk">{L("Grand total — all items (incl. VAT)", "الإجمالي الكلي — كل البنود (شامل الضريبة)")}</span><span className="gv">{grand > 0 ? nf(grand) : "—"} {sar}</span></div>
+          <div className="grand"><span className="gk">{L("Grand total: all items (incl. VAT)", "الإجمالي الكلي: كل البنود (شامل الضريبة)")}</span><span className="gv">{grand > 0 ? nf(grand) : "—"} {sar}</span></div>
 
           {/* Your details */}
           <div className="sec">
@@ -887,22 +911,32 @@ export default function BidFormClient({ token }: { token: string }) {
             </div>
             <div className="frow">
               <Field label={L("Phone", "رقم الجوال")} req invalid={showErrors && !company.contactInfo.trim()} L={L}><input type="tel" inputMode="tel" value={company.contactInfo} onChange={(e) => setCompany({ ...company, contactInfo: e.target.value })} placeholder={L("e.g. 05XXXXXXXX", "مثال: 05XXXXXXXX")} /></Field>
+              {/* Optional, and beside the phone rather than below the notes, because the two answer the
+                  same question — how the renter reaches you — and a supplier fills them together.
+
+                  Not required on purpose: a bid is what this page exists to collect, and refusing one
+                  over an address would trade the whole point of the page for a nicety. */}
+              <Field label={L("E-mail", "البريد الإلكتروني")} L={L}><input type="email" inputMode="email" value={company.contactEmail} onChange={(e) => setCompany({ ...company, contactEmail: e.target.value })} placeholder="name@company.com" /></Field>
+            </div>
+            <div className="frow">
               <Field label={L("City", "المدينة")} L={L}><input value={company.city} onChange={(e) => setCompany({ ...company, city: e.target.value })} placeholder={L("e.g. Riyadh", "مثال: الرياض")} /></Field>
             </div>
-            <p style={{ margin: "-4px 0 2px", fontSize: 11.5, color: "var(--muted)" }}>{L("Your phone lets you continue this bid in the Moedatech app later.", "رقمك يتيح لك متابعة هذا العرض في تطبيق مؤيداتك لاحقاً.")}</p>
+            {/* What each one buys the SUPPLIER, not what it buys us — that is the only version of this
+                sentence he has a reason to read. */}
+            <p style={{ margin: "-4px 0 2px", fontSize: 11.5, color: "var(--muted)" }}>{L("Your phone lets you continue this bid in the Moedatech app later. Your e-mail is how this renter sends you their next request.", "رقمك يتيح لك متابعة هذا العرض في تطبيق معداتك لاحقاً. وبريدك هو الطريقة التي يرسل بها هذا المستأجر طلبه القادم إليك.")}</p>
             {QUOTE_EXPIRY_ENABLED && <Field label={L("Quote valid until", "صلاحية العرض حتى")} L={L}><input type="date" value={company.validUntil} onChange={(e) => setCompany({ ...company, validUntil: e.target.value })} /></Field>}
-            <div className="notes-field"><label>{L("Notes — for the whole quotation", "ملاحظات — لكامل عرض السعر")}<span className="optx">{L("Optional", "اختياري")}</span></label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
+            <div className="notes-field"><label>{L("Notes: for the whole quotation", "ملاحظات: لكامل عرض السعر")}<span className="optx">{L("Optional", "اختياري")}</span></label><textarea value={company.notes} onChange={(e) => setCompany({ ...company, notes: e.target.value })} /></div>
 
             {/* Optional extra company docs — Local Content / SASO heavy equipment / Other. */}
             <div className="subhead"><span className="material-icons-outlined">folder_open</span>{L("Other company documents", "مستندات أخرى للشركة")}<span className="optx">{L("Optional", "اختياري")}</span></div>
             <FileUploader token={token} folder="documents" kinds={companyExtraKinds} value={coExtra} onChange={setCoExtra} L={L} disabled={submitting} />
           </div>
 
-          {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{!hasSupplied ? (allCovered ? L("Every item is already fully covered by other suppliers' accepted bids — there's nothing left to bid on.", "جميع البنود مُغطّاة بالفعل من عروض مؤجّرين آخرين المقبولة — لا يوجد ما يمكن تقديم عرض عليه.") : L("Mark at least one item as one you can supply — a bid can't be empty.", "حدّد بنداً واحداً على الأقل تستطيع توفيره — لا يمكن أن يكون العرض فارغاً.")) : L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}
+          {showErrors && !valid && <div className="submit-err"><span className="material-icons-outlined">error_outline</span>{!hasSupplied ? (allCovered ? L("Every item is already fully covered by other suppliers' accepted bids. There's nothing left to bid on.", "جميع البنود مُغطّاة بالفعل من عروض مؤجّرين آخرين المقبولة. لا يوجد ما يمكن تقديم عرض عليه.") : L("Mark at least one item as one you can supply. A bid can't be empty.", "حدّد بنداً واحداً على الأقل تستطيع توفيره. لا يمكن أن يكون العرض فارغاً.")) : L("Please complete the highlighted items: answer every term, enter a rate for each item, and fill all company details.", "الرجاء إكمال العناصر المظللة: أجب عن كل شرط، وأدخل سعراً لكل بند، واملأ جميع بيانات الشركة.")}</div>}
           <div className="submit-bar"><button className="btn primary lg" disabled={submitting} onClick={onSubmit}><span className="material-icons-outlined">send</span>{submitting ? L("Submitting…", "جارٍ الإرسال…") : L("Submit bid", "إرسال العرض")}</button>
             <div className="submit-note">{L("Once submitted, your bid is final and can't be edited from this link.", "بعد الإرسال، يصبح عرضك نهائياً ولا يمكن تعديله من هذا الرابط.")}</div>
           </div>
-          <div className="footer-note">{L("Private bid link — your details are shared only with the renter.", "رابط عرض خاص — تُشارك بياناتك مع المستأجر فقط.")}</div>
+          <div className="footer-note">{L("Private bid link. Your details are shared only with the renter.", "رابط عرض خاص: تُشارك بياناتك مع المستأجر فقط.")}</div>
         </div>
       )}
 
@@ -918,13 +952,16 @@ export default function BidFormClient({ token }: { token: string }) {
           <div className="dlapp-btns">
             {device !== "android" && (
               <a className="store-badge" href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Download on the App Store">
-                <svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" /></svg>
+                <svg viewBox="0 0 24 24" fill="var(--surface)" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" /></svg>
                 <span className="sb-tx"><small>{L("Download on the", "حمّله من")}</small><b>App Store</b></span>
               </a>
             )}
             {device !== "ios" && (
               <a className="store-badge" href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" aria-label="Get it on Google Play">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gpgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#00e0ff" /><stop offset=".45" stopColor="#00e676" /><stop offset=".75" stopColor="#ffcd00" /><stop offset="1" stopColor="#ff3b3b" /></linearGradient></defs><path fill="url(#gpgrad)" d="M4 2.4v19.2l15-9.6z" /></svg>
+                {/* Google Play’s own four colours, in its own glyph. A brand mark is not a palette colour, and
+                    a token for this yellow would only ever mean “Google Play’s yellow”. */}
+                {/* eslint-disable-next-line no-restricted-syntax */}
+                <svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="gpgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--info)" /><stop offset=".45" stopColor="var(--ok)" /><stop offset=".75" stopColor="#ffcd00" /><stop offset="1" stopColor="var(--danger)" /></linearGradient></defs><path fill="url(#gpgrad)" d="M4 2.4v19.2l15-9.6z" /></svg>
                 <span className="sb-tx"><small>{L("GET IT ON", "احصل عليه من")}</small><b>Google Play</b></span>
               </a>
             )}

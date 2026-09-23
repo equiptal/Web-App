@@ -1,0 +1,976 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<title>Renter Dashboard — Moedatech</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap"
+  rel="stylesheet"
+/>
+
+<!--
+  Moedatech — RENTER DASHBOARD · v2 — one page, no tabs.
+
+    Requests   latest 3, then "Show all"
+    Projects   rail + Gantt
+    Suppliers  the private record
+    Stores     the public market
+
+  EVERYTHING HERE IS THE SYSTEM'S OWN, not invented:
+    · statuses are REQUEST_STATUS — Open · Active · Partially accepted · Accepted ·
+      Expired · Closed · Cancelled (contract/requests.ts). Nothing else exists.
+    · actions are the four the request drawer really has (RequestDrawer.tsx):
+      share the bid link · edit (once, confirmed) · cancel.
+      Cancel is disabled unless isCancellable(status); edit is disabled once
+      renteeEditUsed is true, and says why.
+    · there is NO "open room" on a request — a deal room belongs to a BID.
+    · there is NO "close to new bids" — no such endpoint. Removed.
+    · there is NO invite-a-supplier — supplierId is singular. Removed.
+-->
+
+<style>
+  :root{
+    --navy-deep:#16263f; --navy:#1c3550; --navy-mid:#2a4f72;
+    --muted-dark:#5a6b82; --muted:#6b8fa8; --muted-light:#9aa7b8;
+    --border-strong:#c3d2e0; --border:#d4e0ec;
+    --surface3:#e4edf5; --surface2:#eff4f9; --background:#f5f8fc; --surface:#ffffff;
+    --brand:#f79009; --brand-hover:#e58108; --brand-press:#cc7207;
+    --brand-deep:#b45309; --brand-pale:#fde8cc; --brand-soft:#fff4e5;
+    --ok:#1daf58; --ok-soft:#e7f7ee; --ok-deep:#15803d;
+    --warn:#d4780a; --warn-soft:#fff3e0; --warn-deep:#8a4f08;
+    --danger:#d9362a; --danger-soft:#fcebea; --danger-deep:#b03636;
+    --info:#1a7ec8; --info-soft:#e6f2fb; --info-deep:#0e4f7e;
+    --t-label:11px; --t-meta:12.5px; --t-body:13px; --t-subhead:15px; --t-title:17px; --t-display:22px;
+    /* The web's own cut (globals.css): a 1px corner inset rather than a true square —
+       the corner is taken off, not rounded. Pills stay pills; a pill is a shape, not a radius. */
+    --r-sm:2px; --r-md:4px; --r-lg:6px; --r-full:999px;
+    --c-sm:30px; --c-md:34px; --c-lg:44px;
+    --t:150ms cubic-bezier(.32,.72,.24,1);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--background);color:var(--navy);
+    font-family:"Nunito",-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:var(--t-body);line-height:1.5;-webkit-font-smoothing:antialiased}
+  [dir="rtl"] body{font-family:"IBM Plex Sans Arabic","Nunito",sans-serif}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3,h4{margin:0;line-height:1.25;font-weight:800;letter-spacing:-.02em}
+  p{margin:0}
+  table{border-collapse:collapse;width:100%}
+  ::selection{background:var(--brand-pale);color:var(--navy)}
+  .icon{font-family:"Material Symbols Rounded";line-height:1;display:inline-block;direction:ltr;
+    -webkit-font-feature-settings:"liga";user-select:none;font-variation-settings:"opsz" 24,"wght" 400,"FILL" 0}
+  .led,.dot,.low .icon{border-radius:50%}
+  .num{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+  :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){ *,*::before,*::after{transition:none !important} }
+
+  .wrap{max-width:1560px;margin:0 auto;padding:0 16px}
+  @media (min-width:640px){ .wrap{padding:0 24px} }
+  @media (min-width:1280px){ .wrap{padding:0 32px} }
+
+  /* ── app bar ────────────────────────────────────────────────────────────── */
+  .appbar{position:sticky;top:0;z-index:40;height:62px;background:var(--navy);color:#fff;
+    border-bottom:1px solid rgba(255,255,255,.12);display:flex;align-items:center;padding:0 24px}
+  .wordmark{display:flex;align-items:center;gap:8px;font-weight:800;font-size:var(--t-title)}
+  .wordmark .m{width:var(--c-sm);height:var(--c-sm);border-radius:var(--r-sm);background:#fff;color:var(--navy);
+    display:grid;place-items:center;font-size:var(--t-title)}
+  .navslot{position:absolute;inset-inline:0;display:none;justify-content:center;pointer-events:none}
+  @media (min-width:1100px){ .navslot{display:flex} }
+  .navslot ul{pointer-events:auto;display:flex;gap:4px;list-style:none;margin:0;padding:0}
+  .navtab{display:inline-flex;align-items:center;height:var(--c-md);border-radius:var(--r-full);padding:0 16px;
+    font-size:var(--t-body);font-weight:600;color:rgba(255,255,255,.72);transition:background var(--t),color var(--t)}
+  .navtab:hover{background:rgba(255,255,255,.1);color:#fff}
+  .navtab[aria-current="page"]{background:#fff;color:var(--navy);font-weight:800}
+  .barright{margin-inline-start:auto;display:flex;align-items:center;gap:14px;z-index:1}
+  .iconbtn{position:relative;width:var(--c-md);height:var(--c-md);border-radius:var(--r-full);display:grid;
+    place-items:center;color:rgba(255,255,255,.8);transition:background var(--t),color var(--t)}
+  .iconbtn:hover{background:rgba(255,255,255,.12);color:#fff}
+  .iconbtn .icon{font-size:var(--t-display)}
+  .dot{position:absolute;top:4px;inset-inline-end:4px;min-width:16px;height:16px;border-radius:50%;
+    background:var(--brand);color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;padding:0 4px}
+  .avatar{width:var(--c-md);height:var(--c-md);border-radius:var(--r-full);border:1px solid rgba(255,255,255,.4);
+    display:grid;place-items:center;font-size:var(--t-meta);font-weight:800}
+
+  /* ── section scaffolding ────────────────────────────────────────────────── */
+  .sec{padding:20px 0 0}
+  .sec + .sec{padding-top:28px}
+  /* Section header — option G (owner, 2026-08-29): a navy plate carrying the section's
+     glyph, the title over its summary, and the action on the trailing edge. No band and no
+     box: the page already has enough bordered rectangles, and the plate is what the eye
+     finds when scrolling rather than a fourth rule. */
+  .shead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .shead .plate{width:38px;height:38px;flex:none;background:var(--navy);color:#fff;
+    display:grid;place-items:center;border-radius:var(--r-sm)}
+  .shead .plate .icon{font-size:var(--t-display)}
+  .shead .txt{min-width:0}
+  .shead h2{font-size:var(--t-title)}
+  .shead .sum{display:block;color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  .shead .sum b{color:var(--navy);font-weight:800}
+  .shead .sum .risk{color:var(--danger-deep);font-weight:800}
+  .shead .spacer{flex:1}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:var(--c-md);
+    border-radius:var(--r-md);padding:0 14px;font-size:var(--t-body);font-weight:700;
+    transition:background var(--t),border-color var(--t),color var(--t)}
+  .btn .icon{font-size:var(--t-subhead)}
+  .btn-primary{background:var(--brand);color:#fff}
+  .btn-primary:hover{background:var(--brand-hover)}
+  .btn-primary:active{background:var(--brand-press)}
+  .btn-secondary{border:1px solid var(--border);background:var(--surface);color:var(--navy)}
+  .btn-secondary:hover{background:var(--surface2);border-color:var(--border-strong)}
+  .btn-navy{background:var(--navy);color:#fff}
+  .btn-navy:hover{background:var(--navy-mid)}
+  .btn-sm{height:var(--c-sm);font-size:var(--t-meta);padding:0 10px}
+  .link{font-size:var(--t-meta);font-weight:800;color:var(--brand-deep);display:inline-flex;align-items:center;gap:4px}
+  .link:hover{text-decoration:underline;text-underline-offset:3px}
+  .link .icon{font-size:var(--t-subhead)}
+  [dir="rtl"] .link .icon{transform:scaleX(-1)}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+
+  /* ── requests + bid rail ────────────────────────────────────────────────── */
+  .reqlayout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;align-items:stretch}
+  .reqmain{min-width:0;display:flex;flex-direction:column}
+  .reqmain > .panel{flex:1;display:flex;flex-direction:column}
+  .reqmain > .panel > .tscroll{flex:1}
+
+  .tscroll{overflow-x:auto}
+  thead th{background:var(--surface2);border-bottom:1px solid var(--border);text-align:start;padding:8px 14px;
+    font-size:var(--t-label);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-dark);white-space:nowrap}
+  tbody td{border-bottom:1px solid var(--border);padding:10px 14px;vertical-align:middle}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr{transition:background var(--t)}
+  tbody tr:hover{background:var(--surface2)}
+
+  .where{display:flex;align-items:center;gap:6px;font-size:var(--t-body);font-weight:800;min-width:150px}
+  .where .icon{font-size:var(--t-subhead);color:var(--muted)}
+  .what{display:flex;align-items:center;gap:10px;min-width:200px}
+  .thumb{width:34px;height:34px;border-radius:var(--r-sm);background:var(--surface3);display:grid;place-items:center;
+    color:var(--navy-mid);flex:none;position:relative}
+  .thumb .icon{font-size:var(--t-display)}
+  .thumb .q{position:absolute;bottom:-4px;inset-inline-end:-4px;background:var(--navy);color:#fff;
+    font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;border-radius:var(--r-full);padding:0 4px;
+    border:2px solid var(--surface)}
+  .what .n{font-size:var(--t-body);font-weight:800}
+  .what .n .more{color:var(--muted);font-weight:600}
+  .when{white-space:nowrap;font-size:var(--t-meta);color:var(--muted)}
+  .when b{display:block;font-size:var(--t-body);font-weight:800;color:var(--navy)}
+  .bidcell{white-space:nowrap}
+  .bidcell .v{font-family:"IBM Plex Mono",monospace;font-size:var(--t-subhead);font-weight:600}
+  .bidcell .v.zero{color:var(--danger-deep)}
+  .bidcell .best{display:block;color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  .bidcell .best b{color:var(--navy);font-weight:800}
+  .new{display:inline-flex;align-items:center;background:var(--brand);color:#fff;border-radius:var(--r-full);
+    padding:1px 7px;font-size:var(--t-label);font-weight:800;margin-inline-start:6px}
+  .badge{display:inline-flex;align-items:center;gap:5px;border-radius:var(--r-full);padding:3px 9px;
+    font-size:var(--t-label);font-weight:800;white-space:nowrap}
+  .badge .led{width:6px;height:6px;border-radius:var(--r-full)}
+  .st-full{background:var(--info-soft);color:var(--info-deep)} .st-full .led{background:var(--info)}
+  .st-awarded{background:var(--brand-soft);color:var(--brand-deep);box-shadow:inset 0 0 0 1px var(--brand-pale)}
+  .st-awarded .led{background:var(--brand)}
+  .st-contracted{background:var(--navy);color:#fff} .st-contracted .led{background:#fff}
+  .st-onrent{background:var(--ok-soft);color:var(--ok-deep)} .st-onrent .led{background:var(--ok)}
+  .st-ended{background:var(--surface3);color:var(--muted-dark)} .st-ended .led{background:var(--muted)}
+  .st-expired{background:var(--warn-soft);color:var(--warn-deep)} .st-expired .led{background:var(--warn)}
+  .st-closed{background:var(--surface3);color:var(--muted-dark)} .st-closed .led{background:var(--muted)}
+
+  /* icon actions, on the row itself */
+  .nostate{font-size:var(--t-meta);color:var(--muted-light)}
+  .rowacts{display:flex;align-items:center;gap:4px;justify-content:flex-end}
+  .act{width:var(--c-sm);height:var(--c-sm);border-radius:var(--r-sm);display:grid;place-items:center;
+    color:var(--navy-mid);transition:background var(--t),color var(--t)}
+  .act:hover{background:var(--surface3);color:var(--navy)}
+  .act .icon{font-size:var(--t-subhead)}
+  .act.primary{display:inline-flex;align-items:center;justify-content:center;background:var(--navy);color:#fff;
+    width:auto;padding:0 12px;gap:6px;font-size:var(--t-meta);font-weight:700;white-space:nowrap}
+  .act.primary:hover{background:var(--navy-mid);color:#fff}
+  .act.danger{color:var(--danger)}
+  .act.danger:hover{background:var(--danger-soft);color:var(--danger-deep)}
+  .act.danger[aria-disabled="true"]{color:var(--danger);opacity:.4}
+  .act.danger[aria-disabled="true"]:hover{background:transparent;color:var(--danger)}
+  .act[aria-disabled="true"]{color:var(--muted-light);cursor:not-allowed}
+  .act[aria-disabled="true"]:hover{background:transparent;color:var(--muted-light)}
+
+  /* the bid rail — one thin row per bid */
+  .rail{display:flex;flex-direction:column;min-height:0;background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+  .railhead{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--brand-soft);
+    border-bottom:1px solid var(--brand-pale)}
+  .railhead .icon{font-size:var(--t-subhead);color:var(--brand-deep)}
+  .railhead h3{font-size:var(--t-body);color:var(--brand-deep)}
+  .railhead .spacer{flex:1}
+  .railhead button{font-size:var(--t-label);font-weight:800;color:var(--brand-deep)}
+  .railhead button:hover{text-decoration:underline;text-underline-offset:3px}
+  /* three toasts stand exactly as tall as the three request rows beside them;
+     anything newer than that scrolls, and the foot says how much is down there */
+  .railbody{flex:1;min-height:0;overflow:auto;scrollbar-width:thin}
+  .railfoot{display:flex;align-items:center;gap:6px;padding:7px 12px;border-top:1px solid var(--border);
+    background:var(--surface2);font-size:var(--t-label);font-weight:700;color:var(--muted-dark)}
+  .railfoot .icon{font-size:var(--t-body);color:var(--muted)}
+  .toast{display:flex;align-items:center;gap:10px;width:100%;text-align:start;padding:9px 11px;
+    border-bottom:1px solid var(--border);transition:background var(--t);
+    opacity:0;transform:translateY(-6px);animation:pop 260ms cubic-bezier(.32,.72,.24,1) forwards}
+  .toast:nth-child(2){animation-delay:60ms}
+  .toast:nth-child(3){animation-delay:120ms}
+  .toast:nth-child(4){animation-delay:180ms}
+  .toast:nth-child(5){animation-delay:240ms}
+  @keyframes pop{to{opacity:1;transform:none}}
+  .toast:last-child{border-bottom:0}
+  .toast:hover{background:var(--surface2)}
+  .toast .av{width:28px;height:28px;border-radius:var(--r-full);background:var(--surface3);border:1px solid var(--border);
+    display:grid;place-items:center;font-size:var(--t-meta);font-weight:800;color:var(--navy);flex:none}
+  .toast .body{flex:1;min-width:0}
+  .toast .l1,.toast .l2{display:flex;align-items:baseline;gap:8px;min-width:0}
+  .toast .l2{margin-top:2px}
+  .toast .n{font-size:var(--t-body);font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .toast .p{margin-inline-start:auto;flex:none;font-family:"IBM Plex Mono",monospace;font-size:var(--t-body);font-weight:600}
+  .toast .p small{font-family:"Nunito",sans-serif;font-size:var(--t-label);font-weight:600;color:var(--muted);margin-inline-start:3px}
+  .toast .eq{font-size:var(--t-meta);color:var(--navy-mid);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .toast .loc{font-size:var(--t-meta);color:var(--muted);white-space:nowrap;flex:none}
+  .toast .ago{margin-inline-start:auto;flex:none;color:var(--muted-light);font-size:var(--t-label);white-space:nowrap}
+  .toast .low{flex:none;display:inline-flex;align-items:center;gap:3px;background:var(--ok-soft);color:var(--ok-deep);
+    border-radius:var(--r-full);padding:0 6px;font-size:10px;font-weight:800}
+  .toast .low .icon{font-size:11px}
+
+  .projframe{display:block;width:100%;height:640px;border:1px solid var(--border);background:var(--surface)}
+
+  /* ── projects ───────────────────────────────────────────────────────────── */
+  .plane{display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;align-items:start}
+  .prail{display:grid;gap:6px}
+  .pcard{text-align:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+    padding:10px 12px;border-inline-start:3px solid transparent;transition:background var(--t),border-color var(--t)}
+  .pcard:hover{background:var(--surface2);border-color:var(--border-strong)}
+  .pcard[aria-current="true"]{border-color:var(--navy);background:var(--surface2)}
+  .pcard.alert{border-inline-start-color:var(--danger)}
+  .pcard .n,.pcard .m{display:block}
+  .pcard .n{font-size:var(--t-body);font-weight:800}
+  .pcard .m{color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  .pcard .m .risk{color:var(--danger-deep);font-weight:700}
+
+  .pmeta{display:flex;flex-wrap:nowrap;align-items:stretch;border-bottom:1px solid var(--border);
+    overflow-x:auto;scrollbar-width:thin}
+  .pmeta .cell{flex:none;padding:10px 14px;border-inline-end:1px solid var(--border);min-width:120px}
+  .pmeta .wide{min-width:200px;max-width:320px}
+  .pmeta .wide .v{display:flex;align-items:center;gap:6px}
+  .pmeta .rename{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 6px;
+    color:var(--brand-deep);font-size:var(--t-label);font-weight:700;
+    transition:background var(--t),color var(--t)}
+  .pmeta .rename:hover{background:var(--brand-soft)}
+  .pmeta .rename .icon{font-size:var(--t-body)}
+  .pmeta .titleedit{display:flex;align-items:center;gap:6px;margin-top:3px}
+  .pmeta .titleedit input{height:var(--c-sm);min-width:180px;border:1px solid var(--brand);background:var(--surface);
+    padding:0 8px;font:inherit;font-size:var(--t-body);font-weight:800;color:var(--navy);outline:0}
+  .pmeta .auto{font-size:var(--t-label);font-weight:600;color:var(--muted-light)}
+  .pmeta .addr{display:flex;align-items:center;gap:5px;max-width:280px;margin-top:3px;
+    font-size:var(--t-meta);color:var(--muted);transition:color var(--t)}
+  .pmeta .addr:hover{color:var(--info-deep)}
+  .pmeta .addr .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    text-decoration:underline;text-underline-offset:3px}
+  .pmeta .addr .icon{font-size:var(--t-body);flex:none}
+  .pmeta .k{font-size:var(--t-label);font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .pmeta .v{font-size:var(--t-body);font-weight:800;margin-top:2px}
+  .pmeta .spacer{flex:1;border:0;min-width:0;padding:0}
+  .pmeta .tail{border-inline-start:1px solid var(--border);border-inline-end:0}
+  .pmeta .go{flex:none;padding:8px 14px;display:flex;align-items:center;gap:8px}
+  .pmeta .go .btn{white-space:nowrap}
+  .notice{display:flex;align-items:center;gap:10px;margin:12px;padding:9px 12px;border-radius:var(--r-md);
+    font-size:var(--t-body);font-weight:600}
+  .notice.danger{background:var(--danger-soft);color:var(--danger-deep)}
+  .notice.warn{background:var(--warn-soft);color:var(--warn-deep)}
+  .notice .icon{font-size:var(--t-subhead)}
+  .gantt{border-top:1px solid var(--border);overflow-x:auto}
+  .gmin{min-width:760px}
+  .grow{display:flex;border-bottom:1px solid var(--border)}
+  .grow:last-child{border-bottom:0}
+  .gcol{width:210px;flex:none;padding:10px 14px;border-inline-end:1px solid var(--border)}
+  .gcol .n{font-size:var(--t-body);font-weight:800}
+  .gcol .m{color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  .gtrack{flex:1;position:relative;min-height:50px}
+  .greq{display:flex;background:var(--surface2);border-bottom:1px solid var(--border)}
+  .greq .gcol{display:flex;align-items:center;gap:10px;padding:7px 14px;border-inline-end:1px solid var(--border)}
+  .greq .ref{font-family:"IBM Plex Mono",monospace;font-size:var(--t-meta);font-weight:600;color:var(--navy)}
+  .greq .open{display:inline-flex;align-items:center;gap:5px;color:var(--navy);
+    transition:color var(--t)}
+  .greq .open .ref{text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+  .greq .open:hover{color:var(--brand-deep)}
+  .greq .open:hover .ref{text-decoration-color:var(--brand)}
+  .greq .open .icon{font-size:var(--t-body);color:var(--muted)}
+  .greq .open:hover .icon{color:var(--brand)}
+  [dir="rtl"] .greq .open .icon{transform:scaleX(-1)}
+  .gcol .m b{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--navy)}
+  .greq .gtrack{min-height:0}
+  .ghead{background:var(--surface2);font-size:var(--t-label);font-weight:800;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--muted-dark)}
+  .ghead .gcol{padding:7px 14px}
+  .ghead .gtrack{min-height:30px}
+  .gmonth{position:absolute;top:0;bottom:0;border-inline-start:1px solid var(--border);padding:7px 0 0 8px;white-space:nowrap}
+  [dir="rtl"] .gmonth{padding:7px 8px 0 0}
+  .gtoday{position:absolute;top:0;bottom:0;width:0;border-inline-start:2px dashed var(--brand);z-index:2}
+  .gtoday span{position:absolute;top:-22px;transform:translateX(-50%);background:var(--brand);color:#fff;
+    font-size:10px;font-weight:800;border-radius:var(--r-full);padding:2px 7px;white-space:nowrap}
+  [dir="rtl"] .gtoday span{transform:translateX(50%)}
+  .bar{position:absolute;top:50%;transform:translateY(-50%);height:20px;border-radius:var(--r-sm);
+    display:flex;align-items:center;padding:0 8px;font-size:var(--t-label);font-weight:800;white-space:nowrap;overflow:hidden}
+  /* the ramp says how committed the row is: a tint while it is only offered,
+     a tinted-but-bordered box once awarded, solid navy once contracted, solid
+     green while it runs, red once it has run past its period. */
+  .bar.s-full{background:var(--info-soft);color:var(--info-deep);border:1px dashed var(--info)}
+  .bar.awarded{background:var(--brand-soft);color:var(--brand-deep);border:1px solid var(--brand)}
+  .bar.contracted{background:var(--navy);color:#fff}
+  .bar.rent{background:var(--ok);color:#fff}
+  .bar.plan{background:var(--surface3);color:var(--muted-dark);border:1px dashed var(--border-strong)}
+  .bar.over{background:var(--danger-soft);color:var(--danger-deep);border:1px solid var(--danger)}
+  /* the request's own movement, drawn behind the rental bar:
+     posted → first bid → fulfilled (enough units offered to cover it) → awarded */
+  .bar.s-posted{background:var(--surface3);color:var(--muted-dark);border:1px solid var(--border-strong)}
+  .bar.s-bids{background:var(--info-soft);color:var(--info-deep);border:1px solid var(--info)}
+  .bar.s-full{background:var(--ok-soft);color:var(--ok-deep);border:1px solid var(--ok)}
+  .bar.s-await{background:var(--brand-soft);color:var(--brand-deep);border:1px solid var(--brand-pale)}
+  .mstep.full{background:var(--ok-soft);color:var(--ok-deep)} .mstep.full .led{background:var(--ok)}
+
+  .tick{position:absolute;top:50%;width:9px;height:9px;transform:translate(-50%,-50%) rotate(45deg);
+    background:var(--surface);border:2px solid var(--navy-mid);z-index:3}
+  [dir="rtl"] .tick{transform:translate(50%,-50%) rotate(45deg)}
+  .tick.ok{border-color:var(--ok)}
+  .tick.info{border-color:var(--info)}
+  .tick.brand{border-color:var(--brand)}
+
+  .glegend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 14px;
+    border-top:1px solid var(--border);background:var(--surface2);font-size:var(--t-label);
+    font-weight:700;color:var(--muted-dark)}
+  .glegend span{display:inline-flex;align-items:center;gap:5px}
+  .glegend .k{font-size:var(--t-label);letter-spacing:.06em;text-transform:uppercase;color:var(--muted-light)}
+  .glegend .sw{width:16px;height:8px;display:block}
+  .glegend .sw.empty{border:1px dashed var(--border-strong);background:transparent}
+  .glegend .sep{width:1px;height:12px;background:var(--border);margin-inline:4px}
+  .bar.want{background:repeating-linear-gradient(135deg,var(--surface2),var(--surface2) 6px,var(--surface3) 6px,var(--surface3) 12px);
+    color:var(--muted-dark);border:1px dashed var(--border-strong)}
+  .mstep.pre{background:var(--info-soft);color:var(--info-deep)} .mstep.pre .led{background:var(--info)}
+
+
+  /* ── the cycle — status and the action that advances it, in one control ──── */
+  .cycle{padding:12px 14px;border-bottom:1px solid var(--border)}
+  .steps{display:flex;align-items:stretch;gap:0;overflow-x:auto;scrollbar-width:none}
+  .steps::-webkit-scrollbar{display:none}
+  .step{flex:1 1 0;min-width:104px;position:relative;padding:0 8px;text-align:center}
+  .step .line{position:absolute;top:13px;inset-inline-start:-50%;width:100%;height:2px;background:var(--border)}
+  .step:first-child .line{display:none}
+  .step.done .line,.step.now .line{background:var(--ok)}
+  .step .knob{position:relative;width:26px;height:26px;border-radius:var(--r-full);margin:0 auto;
+    display:grid;place-items:center;background:var(--surface2);border:1px solid var(--border);color:var(--muted)}
+  .step .knob .icon{font-size:var(--t-body)}
+  .step.done .knob{background:var(--ok);border-color:var(--ok);color:#fff}
+  .step.now .knob{background:var(--navy);border-color:var(--navy);color:#fff}
+  .step.blocked .knob{background:var(--warn-soft);border-color:var(--warn);color:var(--warn-deep)}
+  .step .lbl{font-size:var(--t-label);font-weight:800;color:var(--muted);margin-top:6px;white-space:nowrap}
+  .step.done .lbl{color:var(--ok-deep)}
+  .step.now .lbl{color:var(--navy)}
+  .step .sub{display:block;font-size:10px;font-weight:600;color:var(--muted-light);margin-top:2px;white-space:nowrap}
+
+  .cyclebar{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:10px;
+    border-top:1px solid var(--border);flex-wrap:wrap}
+  .cyclebar .now{font-size:var(--t-body);font-weight:800}
+  .cyclebar .why{font-size:var(--t-meta);color:var(--muted)}
+  .cyclebar .spacer{flex:1}
+  .cyclebar .soon{font-size:var(--t-label);color:var(--muted-light)}
+
+  .mstep{display:inline-flex;align-items:center;gap:5px;border-radius:var(--r-full);padding:2px 8px;
+    font-size:var(--t-label);font-weight:800;background:var(--surface2);color:var(--muted-dark);margin-top:4px}
+  .mstep .led{width:6px;height:6px;border-radius:var(--r-full);background:var(--muted)}
+  .mstep.ok{background:var(--ok-soft);color:var(--ok-deep)} .mstep.ok .led{background:var(--ok)}
+  .mstep.warn{background:var(--warn-soft);color:var(--warn-deep)} .mstep.warn .led{background:var(--warn)}
+  .mstep.danger{background:var(--danger-soft);color:var(--danger-deep)} .mstep.danger .led{background:var(--danger)}
+
+
+  /* ── a machine row's own menu, and the requests that feed the project ───── */
+  .gcol{position:relative}
+  .gmenu{position:absolute;inset-inline-start:6px;top:10px}
+  .dots{width:24px;height:24px;border-radius:var(--r-sm);display:grid;place-items:center;color:var(--muted);
+    transition:background var(--t),color var(--t)}
+  .dots:hover{background:var(--surface3);color:var(--navy)}
+  .dots .icon{font-size:var(--t-subhead)}
+  .gsheet{position:absolute;inset-inline-start:0;top:26px;z-index:30;min-width:216px;background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--r-md);padding:4px;display:none}
+  .gmenu.open .gsheet{display:block}
+  .gsheet button{display:flex;align-items:center;gap:9px;width:100%;height:var(--c-md);border-radius:var(--r-sm);
+    padding:0 10px;font-size:var(--t-body);font-weight:600;color:var(--navy);text-align:start;transition:background var(--t)}
+  .gsheet button:hover{background:var(--surface2)}
+  .gsheet .icon{font-size:var(--t-subhead);color:var(--muted)}
+  .gsheet .rule{height:1px;background:var(--border);margin:4px 0}
+  .gsheet .soon{margin-inline-start:auto;font-size:10px;color:var(--muted-light);font-weight:700}
+  .gcol.hasmenu{padding-inline-start:34px;padding-inline-end:26px}
+  /* cancel sits in the corner of the row, as a bare ✕ */
+  .gx{position:absolute;inset-inline-end:0;top:0;width:22px;height:22px;display:grid;place-items:center;
+    color:var(--danger);transition:background var(--t),color var(--t)}
+  .gx:hover{background:var(--danger);color:#fff}
+  .gx .icon{font-size:var(--t-body)}
+
+  .fromreq{display:inline-flex;align-items:center;gap:4px;font-family:"IBM Plex Mono",monospace;
+    font-size:10px;color:var(--muted-light);margin-top:3px}
+
+  /* ── suppliers ──────────────────────────────────────────────────────────── */
+  .sup{display:flex;align-items:center;gap:10px;min-width:200px}
+  .slogo{width:34px;height:34px;border-radius:var(--r-sm);background:var(--surface3);display:grid;place-items:center;
+    font-size:var(--t-body);font-weight:800;color:var(--navy);flex:none}
+  .sup .n{font-size:var(--t-body);font-weight:800;display:flex;align-items:center;gap:6px}
+  .sup .m{color:var(--muted);font-size:var(--t-meta);margin-top:2px}
+  .rel{white-space:nowrap;font-size:var(--t-meta);color:var(--muted)}
+  .rel b{font-family:"IBM Plex Mono",monospace;color:var(--navy);font-weight:600;font-size:var(--t-body)}
+  .rel .sub{display:block;margin-top:2px}
+  .terms{font-size:var(--t-meta);color:var(--muted-dark);max-width:230px}
+  .papers{display:flex;gap:4px;flex-wrap:wrap}
+  .paper{display:inline-flex;align-items:center;gap:3px;border-radius:var(--r-sm);padding:2px 6px;
+    font-size:var(--t-label);font-weight:700;background:var(--surface2);color:var(--muted-dark)}
+  .paper.ok{background:var(--ok-soft);color:var(--ok-deep)}
+  .paper.soon{background:var(--warn-soft);color:var(--warn-deep)}
+  .paper.miss{background:var(--danger-soft);color:var(--danger-deep)}
+  .asof{display:block;color:var(--muted-light);font-size:var(--t-label);margin-top:4px}
+
+  /* ── stores ─────────────────────────────────────────────────────────────── */
+  .scards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+  .scard{text-align:start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+    overflow:hidden;transition:background var(--t),border-color var(--t)}
+  .scard:hover{background:var(--surface2);border-color:var(--border-strong)}
+  .sshot{aspect-ratio:2/1;background:var(--surface3);display:grid;place-items:center;position:relative}
+  .sshot .icon{font-size:30px;color:var(--muted-light)}
+  .sshot .v{position:absolute;top:6px;inset-inline-end:6px;width:18px;height:18px;border-radius:var(--r-full);
+    background:var(--ok);color:#fff;display:grid;place-items:center}
+  .sshot .v .icon{font-size:12px;color:#fff}
+  .sbody{padding:9px 12px 11px}
+  .sbody .n,.sbody .m{display:block}
+  .sbody .n{font-size:var(--t-body);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sbody .m{color:var(--muted);font-size:var(--t-meta);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .foot{padding:28px 0 40px;text-align:center;color:var(--muted-light);font-size:var(--t-meta)}
+  .empty{padding:28px;text-align:center;color:var(--muted);font-size:var(--t-body)}
+
+  @media (max-width:1280px){ .scards{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  @media (max-width:1180px){ .reqlayout{grid-template-columns:minmax(0,1fr)}
+    .railbody{max-height:260px} }
+  @media (max-width:1024px){ .plane{grid-template-columns:minmax(0,1fr)}
+    .prail{grid-auto-flow:column;grid-auto-columns:220px;overflow-x:auto} }
+  @media (max-width:720px){ .scards{grid-template-columns:repeat(2,minmax(0,1fr))} .appbar{padding-inline:16px} }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <a class="wordmark" href="#"><span class="m icon" aria-hidden="true">construction</span>moedatech</a>
+  <nav class="navslot" aria-label="Main"><ul>
+    <li><a class="navtab" href="#" aria-current="page" data-en="Dashboard" data-ar="لوحة التحكم">Dashboard</a></li>
+    <li><a class="navtab" href="#stores" data-en="Stores" data-ar="المتاجر">Stores</a></li>
+    <li><a class="navtab" href="#" data-en="My Organization" data-ar="منشأتي">My Organization</a></li>
+  </ul></nav>
+  <div class="barright">
+    <button class="iconbtn" aria-label="Inbox"><span class="icon" aria-hidden="true">mail</span><span class="dot">2</span></button>
+    <button class="iconbtn" aria-label="Notifications"><span class="icon" aria-hidden="true">notifications</span><span class="dot">7</span></button>
+    <span class="avatar">YA</span>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="sec" id="requests"></section>
+  <section class="sec" id="projects"></section>
+  <section class="sec" id="suppliers"></section>
+  <section class="sec" id="stores"></section>
+  <p class="foot" data-en="Moedatech · renter dashboard prototype" data-ar="معداتك · نموذج لوحة المستأجر">Moedatech · renter dashboard prototype</p>
+</main>
+
+<script>
+var TODAY = "2026-08-27";
+function L(en, ar){ return lang === "ar" ? ar : en; }
+function money(n){ return n.toLocaleString("en-US"); }
+function d(s){ var p = s.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+function days(a, b){ return Math.round((b - a) / 86400000); }
+
+/* ── THE STATES ────────────────────────────────────────────────────────────
+   Five, and a request with no bids has none at all — nothing has happened to it
+   yet, so it carries no chip. Each state names the thing that moves it on:
+
+     (no bids)        —            waiting on suppliers; no status
+     Fulfilled        you          partially or fully, by units offered vs asked
+     Awarded          you          accept from the bids sheet
+     Contracted       you          attach the PO / contract
+     On rent          you          mark as received  → billing starts
+     Ended            you|clock    request off-hire, or the agreed period passes
+
+   Endings: Expired (deadline passed, nothing accepted) · Cancelled (you cancelled).
+
+   Only Contracted needs storage that does not exist. The rest derive from
+   REQUEST_STATUS, bidCount, unitsOffered/agreedUnits against item.qty, and dates. */
+var STATES = [
+  { k:"fulfilled",  enEn:"Fulfilled",  enAr:"مغطّى",       cls:"st-full",
+    moveEn:"suppliers offered enough units to cover it", moveAr:"عرض المؤجّرون وحدات تكفي لتغطيته" },
+  { k:"awarded",    enEn:"Awarded",    enAr:"مُرسَاة",      cls:"st-awarded",
+    moveEn:"you accepted a bid",                         moveAr:"قبلت عرضاً" },
+  { k:"contracted", enEn:"Contracted", enAr:"متعاقد",     cls:"st-contracted",
+    moveEn:"the PO and contract are on file",            moveAr:"أمر الشراء والعقد محفوظان" },
+  { k:"onrent",     enEn:"On rent",    enAr:"قيد الإيجار", cls:"st-onrent",
+    moveEn:"you marked it received — billing starts",    moveAr:"سجّلت الاستلام — تبدأ الفوترة" },
+  { k:"ended",      enEn:"Ended",      enAr:"منتهية",     cls:"st-ended",
+    moveEn:"off-hire raised, or the agreed period passed", moveAr:"طُلب الإنهاء أو انقضت الفترة" }
+];
+function stateOf(k){ for (var i = 0; i < STATES.length; i++) if (STATES[i].k === k) return STATES[i]; return null; }
+function stateIndex(k){ for (var i = 0; i < STATES.length; i++) if (STATES[i].k === k) return i; return -1; }
+
+/* The chip a row shows. `offered`/`awarded` are unit counts against `qty`, so a
+   multi-unit request reads "3/5" rather than pretending it is all-or-nothing. */
+function stateChip(r){
+  if (r.st === "cancelled") return { cls:"st-closed", txt:L("Cancelled", "ملغى") };
+  if (r.st === "expired") return { cls:"st-expired", txt:L("Expired", "منتهي الصلاحية") };
+  if (!r.st){
+    if (!r.bids) return null;                       /* no bids → no status at all */
+    var full = r.offered >= r.qty;
+    return { cls:"st-full",
+             txt:(full ? L("Fulfilled", "مغطّى") : L("Partially fulfilled", "مغطّى جزئياً"))
+                 + (r.qty > 1 ? " " + r.offered + "/" + r.qty : "") };
+  }
+  var st = stateOf(r.st);
+  if (!st) return null;   /* unknown key → no chip, never a crash */
+  var frac = (r.qty > 1 && r.awarded != null && r.st === "awarded") ? " " + r.awarded + "/" + r.qty : "";
+  return { cls:st.cls, txt:L(st.enEn, st.enAr) + frac };
+}
+
+var REQUESTS = [
+  { locEn:"Qiddiya — Zone 4", locAr:"القدية — المنطقة ٤", ic:"agriculture", qty:5,
+    nEn:"Excavator 20t", nAr:"حفّار ٢٠ طن", moreEn:"+2 more", moreAr:"+٢ أخرى",
+    sentEn:"18 Aug", sentAr:"١٨ أغسطس", agoEn:"9 days ago", agoAr:"قبل ٩ أيام",
+    bids:10, fresh:3, best:8400, qty:5, offered:5, awarded:0, st:null, edited:false },
+  { locEn:"Diriyah Gate", locAr:"بوابة الدرعية", ic:"elevator", qty:4,
+    nEn:"Manlift 16m", nAr:"مناولة أفراد ١٦م", moreEn:"", moreAr:"",
+    sentEn:"10 Aug", sentAr:"١٠ أغسطس", agoEn:"17 days ago", agoAr:"قبل ١٧ يوماً",
+    bids:6, fresh:0, best:3400, qty:4, offered:4, awarded:2, st:"awarded", edited:true },
+  { locEn:"King Khalid Airport", locAr:"مطار الملك خالد", ic:"precision_manufacturing", qty:1,
+    nEn:"Tower crane 8t", nAr:"رافعة برجية ٨ طن", moreEn:"", moreAr:"",
+    sentEn:"22 Aug", sentAr:"٢٢ أغسطس", agoEn:"5 days ago", agoAr:"قبل ٥ أيام",
+    bids:1, fresh:1, best:46000, qty:1, offered:1, awarded:0, st:null, edited:false },
+  { locEn:"Aramco — Dhahran", locAr:"أرامكو — الظهران", ic:"bolt", qty:1,
+    nEn:"Generator 250 kVA", nAr:"مولّد ٢٥٠ ك.ف.أ", moreEn:"", moreAr:"",
+    sentEn:"20 Aug", sentAr:"٢٠ أغسطس", agoEn:"7 days ago", agoAr:"قبل ٧ أيام",
+    bids:0, fresh:0, best:0, qty:1, offered:0, awarded:0, st:null, edited:false },
+  { locEn:"Jubail Pipe Rack", locAr:"جبيل — رفوف الأنابيب", ic:"local_shipping", qty:2,
+    nEn:"Tipper 30t", nAr:"قلّاب ٣٠ طن", moreEn:"", moreAr:"",
+    sentEn:"2 Aug", sentAr:"٢ أغسطس", agoEn:"25 days ago", agoAr:"قبل ٢٥ يوماً",
+    bids:4, fresh:0, best:4300, qty:2, offered:2, awarded:2, st:"onrent", edited:true }
+];
+
+/* bid events — /api/me/received-bids : currentPrice · equipmentName · request.location */
+var BIDS = [
+  { supEn:"Zahid Tractor", supAr:"زاهد تراكتور", price:8400, eqEn:"Excavator 20t", eqAr:"حفّار ٢٠ طن",
+    locEn:"Qiddiya", locAr:"القدية", low:true, agoEn:"2h", agoAr:"٢س" },
+  { supEn:"Nesma Rental", supAr:"نسما للتأجير", price:8900, eqEn:"Excavator 20t", eqAr:"حفّار ٢٠ طن",
+    locEn:"Qiddiya", locAr:"القدية", low:false, agoEn:"5h", agoAr:"٥س" },
+  { supEn:"Hejaz Earthmovers", supAr:"معدات الحجاز", price:6100, eqEn:"Telehandler 4t", eqAr:"مناولة ٤ طن",
+    locEn:"Qiddiya", locAr:"القدية", low:false, agoEn:"yesterday", agoAr:"أمس" },
+  { supEn:"Almajdouie Equipment", supAr:"المجدوعي للمعدات", price:46000, eqEn:"Tower crane 8t", eqAr:"رافعة برجية ٨ طن",
+    locEn:"Airport", locAr:"المطار", low:true, agoEn:"yesterday", agoAr:"أمس" },
+  { supEn:"Al-Rajhi Equipment", nAr:"الراجحي", supAr:"الراجحي للمعدات", price:3400, eqEn:"Manlift 16m", eqAr:"مناولة ١٦م",
+    locEn:"Diriyah", locAr:"الدرعية", low:false, agoEn:"2 days", agoAr:"يومان" }
+];
+
+var PROJECTS = [
+  /* A project carries only what its requests can give it:
+       location  — the site the requests were raised for
+       start     — the EARLIEST startDate across them
+       end       — the LATEST endDate across them
+     Nothing is typed in except the name. Two requests at one site with different
+     dates do not conflict: the project's window simply spans both. */
+  { id:"p1", nEn:null, nAr:null,   /* no name set → derived from the address */
+    locEn:"Qiddiya Zone 4, Qiddiya City, Riyadh 13511, Saudi Arabia",
+    locAr:"القدية المنطقة ٤، مدينة القدية، الرياض ١٣٥١١، السعودية",
+    pin:"24.7136,46.6753", start:"2026-09-01", end:"2026-12-31",
+    units:3, alert:false,
+    reqs:[{ref:"RFQ-1042"},{ref:"RFQ-1051"}],
+    machines:[
+      { eqEn:"Excavator 20t", eqAr:"حفّار ٢٠ طن", units:2, from:"RFQ-1042",
+        supEn:"Zahid Tractor", supAr:"زاهد تراكتور", money:"8,600 SAR/mo", moneyAr:"٨٬٦٠٠ ر.س/شهر",
+        st:"contracted", rent:["2026-09-01","2026-11-30"] },
+      { eqEn:"Telehandler 4t", eqAr:"مناولة تلسكوبية ٤ طن", units:1, from:"RFQ-1042",
+        supEn:"Al-Rajhi Equipment", supAr:"الراجحي للمعدات", money:"5,900 SAR/mo", moneyAr:"٥٬٩٠٠ ر.س/شهر",
+        st:"awarded", rent:["2026-09-15","2026-11-30"] },
+      /* fulfilled but not awarded — the bar shows the state, the card has no money yet */
+      { eqEn:"Generator 250 kVA", eqAr:"مولّد ٢٥٠ ك.ف.أ", units:2, from:"RFQ-1051",
+        st:null, bids:2, qty:2, offered:2, want:["2026-10-01","2026-12-31"] }
+    ] },
+
+  { id:"p2", nEn:"Diriyah — packages 3 & 4", nAr:"الدرعية — الحزمتان ٣ و٤",   /* renter named it */
+    locEn:"Diriyah Gate, At Turaif, Diriyah 13712, Saudi Arabia",
+    locAr:"بوابة الدرعية، الطريف، الدرعية ١٣٧١٢، السعودية",
+    pin:"24.7370,46.5750", start:"2026-07-05", end:"2026-10-15",
+    units:5, alert:true,
+    noticeEn:"The agreed period on 4 manlifts ended 12 days ago — raise the off-hire or agree an extension",
+    noticeAr:"انتهت الفترة المتّفقة لـ٤ مناولات قبل ١٢ يوماً — اطلب الإنهاء أو اتّفق على تمديد",
+    reqs:[{ref:"RFQ-0994"},{ref:"RFQ-1012"}],
+    machines:[
+      { eqEn:"Manlift 16m", eqAr:"مناولة أفراد ١٦م", units:4, from:"RFQ-0994",
+        supEn:"Al-Rajhi Equipment", supAr:"الراجحي للمعدات", money:"3,400 SAR/mo", moneyAr:"٣٬٤٠٠ ر.س/شهر",
+        st:"ended", rent:["2026-07-05","2026-08-31"], over:["2026-08-31","2026-09-12"] },
+      { eqEn:"Water tanker 20k L", eqAr:"صهريج ماء ٢٠ ألف لتر", units:1, from:"RFQ-1012",
+        supEn:"Saudi Diesel", supAr:"الديزل السعودية", money:"5,750 SAR/mo", moneyAr:"٥٬٧٥٠ ر.س/شهر",
+        st:"onrent", rent:["2026-08-15","2026-10-15"] }
+    ] },
+
+  { id:"p3", nEn:null, nAr:null,
+    locEn:"Aramco North Park, Dhahran 34465, Eastern Province, Saudi Arabia",
+    locAr:"حديقة أرامكو الشمالية، الظهران ٣٤٤٦٥، المنطقة الشرقية، السعودية",
+    pin:"26.2884,50.1500", start:"2026-09-10", end:"2026-11-10", units:0, alert:false,
+    noticeEn:"No bids yet — nothing to award, so nothing is on the chart",
+    noticeAr:"لا عروض بعد — لا شيء للإرساء، فلا شيء على المخطط",
+    reqs:[{ref:"RFQ-1031"}],
+    machines:[
+      { eqEn:"Generator 250 kVA", eqAr:"مولّد ٢٥٠ ك.ف.أ", units:1, from:"RFQ-1031",
+        st:null, bids:0, qty:1, offered:0, want:["2026-09-10","2026-11-10"] }
+    ] }
+];
+
+var SUPPLIERS = [
+  { n:"Zahid Tractor", nAr:"زاهد تراكتور", city:"Riyadh", cityAr:"الرياض",
+    invited:6, bids:4, awarded:2, replyEn:"~14h", replyAr:"~١٤س", quoted:9000, settled:8600,
+    termsEn:"30-day payment · mobilisation included", termsAr:"دفع ٣٠ يوماً · شامل النقل",
+    papers:[["CR","ok"],["VAT","ok"],["Insurance","soon"]], asOfEn:"as of their bid, 12 Aug", asOfAr:"حتى عرضهم ١٢ أغسطس" },
+  { n:"Al-Rajhi Equipment", nAr:"الراجحي للمعدات", city:"Riyadh", cityAr:"الرياض",
+    invited:5, bids:5, awarded:2, replyEn:"~6h", replyAr:"~٦س", quoted:3600, settled:3400,
+    termsEn:"60-day payment · bare rental", termsAr:"دفع ٦٠ يوماً · بدون مشغّل",
+    papers:[["CR","ok"],["VAT","ok"],["Insurance","ok"]], asOfEn:"as of their bid, 24 Aug", asOfAr:"حتى عرضهم ٢٤ أغسطس" },
+  { n:"Saudi Diesel", nAr:"الديزل السعودية", city:"Dammam", cityAr:"الدمام",
+    invited:4, bids:3, awarded:1, replyEn:"~22h", replyAr:"~٢٢س", quoted:5750, settled:5750,
+    termsEn:"45-day payment · fuel on renter", termsAr:"دفع ٤٥ يوماً · الوقود على المستأجر",
+    papers:[["CR","ok"],["VAT","ok"],["SASO","miss"]], asOfEn:"as of their bid, 2 Aug", asOfAr:"حتى عرضهم ٢ أغسطس" },
+  { n:"Almajdouie Equipment", nAr:"المجدوعي للمعدات", city:"Jeddah", cityAr:"جدة",
+    invited:3, bids:1, awarded:0, replyEn:"~3d", replyAr:"~٣ي", quoted:46000, settled:0,
+    termsEn:"30-day payment · erection quoted separately", termsAr:"دفع ٣٠ يوماً · التركيب منفصل",
+    papers:[["CR","ok"],["VAT","soon"],["Insurance","ok"]], asOfEn:"as of their bid, 24 Aug", asOfAr:"حتى عرضهم ٢٤ أغسطس" },
+  { n:"Nesma Rental", nAr:"نسما للتأجير", city:"Jeddah", cityAr:"جدة",
+    invited:4, bids:0, awarded:0, replyEn:"never", replyAr:"لم يردّوا", quoted:0, settled:0,
+    termsEn:"no bid on record", termsAr:"لا عرض مسجّل",
+    papers:[], asOfEn:"no bid — no papers to read", asOfAr:"لا عرض — لا أوراق" }
+];
+
+var STORES = [
+  {n:"Zahid Tractor", nAr:"زاهد تراكتور", city:"Riyadh", cityAr:"الرياض", eq:210, ic:"agriculture", ver:true},
+  {n:"Al-Rajhi Equipment", nAr:"الراجحي للمعدات", city:"Riyadh", cityAr:"الرياض", eq:128, ic:"elevator", ver:true},
+  {n:"Bin Quraya", nAr:"بن قريّة", city:"Dhahran", cityAr:"الظهران", eq:143, ic:"precision_manufacturing", ver:true},
+  {n:"Saudi Diesel", nAr:"الديزل السعودية", city:"Dammam", cityAr:"الدمام", eq:174, ic:"bolt", ver:true},
+  {n:"Nesma Rental", nAr:"نسما للتأجير", city:"Jeddah", cityAr:"جدة", eq:118, ic:"construction", ver:true},
+  {n:"Neom Plant Partners", nAr:"شركاء معدات نيوم", city:"Tabuk", cityAr:"تبوك", eq:134, ic:"local_shipping", ver:true}
+];
+
+var lang = "en", showAll = false, proj = "p1";
+/* how many request rows are drawn. `fitRows()` grows this after paint until the
+   table card is as full as the bid rail beside it — no empty space under the last row. */
+var visible = 3, fitPasses = 0, openRow = null, editing = null;
+
+/* ══ requests ═══════════════════════════════════════════════════════════════ */
+function renderRequests(){
+  var open = REQUESTS.filter(function(r){ return !r.st || r.st === "fulfilled"; }).length;
+  var fresh = REQUESTS.reduce(function(n, r){ return n + r.fresh; }, 0);
+  var nobids = REQUESTS.filter(function(r){ return r.bids === 0; }).length;
+  var rows = showAll ? REQUESTS : REQUESTS.slice(0, visible);
+
+  var body = rows.map(function(r){
+    var st = stateChip(r);
+    var canCancel = !r.st || r.st === "fulfilled";
+    return '<tr>'
+      + '<td><span class="where"><span class="icon" aria-hidden="true">location_on</span>' + L(r.locEn, r.locAr) + '</span></td>'
+      + '<td><div class="what"><span class="thumb"><span class="icon" aria-hidden="true">' + r.ic + '</span>'
+      +   (r.qty > 1 ? '<span class="q">×' + r.qty + '</span>' : '') + '</span>'
+      +   '<span class="n">' + L(r.nEn, r.nAr)
+      +   (r.moreEn ? ' <span class="more">' + L(r.moreEn, r.moreAr) + '</span>' : '') + '</span></div></td>'
+      + '<td><span class="when"><b>' + L(r.sentEn, r.sentAr) + '</b>' + L(r.agoEn, r.agoAr) + '</span></td>'
+      + '<td><span class="bidcell"><span class="v' + (r.bids === 0 ? " zero" : "") + '">' + r.bids + '</span>'
+      +   (r.fresh ? '<span class="new">+' + r.fresh + '</span>' : '')
+      +   (r.best ? '<span class="best">' + L("best", "الأفضل") + ' <b>' + money(r.best) + '</b> SAR/'
+      +     L("mo", "شهر") + '</span>' : '<span class="best">' + L("no bids yet", "لا عروض بعد") + '</span>')
+      + '</span></td>'
+      + '<td>' + (st ? '<span class="badge ' + st.cls + '"><span class="led"></span>' + st.txt + '</span>'
+                       : '<span class="nostate">' + L("waiting on suppliers", "بانتظار المؤجّرين") + '</span>') + '</td>'
+      + '<td><div class="rowacts">'
+      +   (r.bids > 0
+          ? '<button class="act primary"><span class="icon" aria-hidden="true">gavel</span>'
+            + L("Bids", "العروض") + '</button>'
+          : '')
+      +   '<button class="act" title="' + L("Share the bid link", "شارك رابط العروض") + '" aria-label="'
+      +     L("Share the bid link", "شارك رابط العروض") + '"><span class="icon" aria-hidden="true">ios_share</span></button>'
+      +   '<button class="act" ' + (r.edited ? 'aria-disabled="true" title="'
+            + L("The one post-bid edit is already used", "استُخدم التعديل الوحيد بعد العروض") + '"'
+          : 'title="' + L("Edit the request", "عدّل الطلب") + '"')
+      +     ' aria-label="' + L("Edit the request", "عدّل الطلب") + '"><span class="icon" aria-hidden="true">edit</span></button>'
+      +   '<button class="act danger" ' + (canCancel ? 'title="' + L("Cancel the request", "ألغِ الطلب") + '"'
+          : 'aria-disabled="true" title="' + L("Only an open or active request can be cancelled",
+              "الطلب المفتوح أو النشط فقط يمكن إلغاؤه") + '"')
+      +     ' aria-label="' + L("Cancel the request", "ألغِ الطلب") + '"><span class="icon" aria-hidden="true">close</span></button>'
+      + '</div></td></tr>';
+  }).join("");
+
+  var bidrows = BIDS.map(function(b){
+    return '<div class="toast">'
+      + '<span class="av">' + L(b.supEn, b.supAr).charAt(0) + '</span>'
+      + '<span class="body">'
+      +   '<span class="l1"><span class="n">' + L(b.supEn, b.supAr) + '</span>'
+      +     '<span class="p">' + money(b.price) + '<small>SAR/' + L("mo", "شهر") + '</small></span></span>'
+      +   '<span class="l2"><span class="eq">' + L(b.eqEn, b.eqAr) + '</span>'
+      +     '<span class="loc">· ' + L(b.locEn, b.locAr) + '</span>'
+      +     (b.low ? '<span class="low"><span class="icon" aria-hidden="true">trending_down</span>'
+            + L("lowest", "الأدنى") + '</span>' : '')
+      +     '<span class="ago">' + L(b.agoEn, b.agoAr) + '</span></span>'
+      + '</span></div>';
+  }).join("");
+
+  document.getElementById("requests").innerHTML =
+      '<div class="shead"><span class="plate"><span class="icon" aria-hidden="true">assignment</span></span>'
+    +   '<span class="txt"><h2>' + L("My Requests", "طلباتي") + '</h2>'
+    +   '<span class="sum"><b>' + open + '</b> ' + L("open", "مفتوح") + ' · <b>' + fresh + '</b> '
+    +     L("new bids", "عرضاً جديداً") + (nobids ? ' · <span class="risk">' + nobids + ' '
+    +     L("with no bids", "بلا عروض") + '</span>' : '') + '</span></span>'
+    +   '<span class="spacer"></span>'
+    +   '<button class="btn btn-primary"><span class="icon" aria-hidden="true">add</span>'
+    +     L("New request", "طلب جديد") + '</button></div>'
+    + '<div class="reqlayout"><div class="reqmain"><div class="panel"><div class="tscroll"><table>'
+    +   '<thead><tr>'
+    +     '<th>' + L("Site", "الموقع") + '</th>'
+    +     '<th>' + L("Equipment", "المعدّة") + '</th>'
+    +     '<th>' + L("Sent", "أُرسل") + '</th>'
+    +     '<th>' + L("Bids", "العروض") + '</th>'
+    +     '<th>' + L("Status", "الحالة") + '</th>'
+    +     '<th style="text-align:end">' + L("Actions", "إجراءات") + '</th>'
+    +   '</tr></thead><tbody>' + body + '</tbody></table></div>'
+    +   (REQUESTS.length > rows.length || showAll
+        ? '<div style="padding:10px 14px;border-top:1px solid var(--border);text-align:center">'
+          + '<button class="link" onclick="toggleAll()">'
+          + (showAll ? L("Show less", "اعرض أقل")
+                     : L("Show all " + REQUESTS.length + " requests", "اعرض كل الطلبات " + REQUESTS.length))
+          + '<span class="icon" aria-hidden="true">' + (showAll ? "expand_less" : "expand_more") + '</span></button></div>'
+        : '')
+    + '</div></div>'
+    + '<aside class="rail"><div class="railhead"><span class="icon" aria-hidden="true">gavel</span>'
+    +   '<h3>' + BIDS.length + ' ' + L("new bids", "عروض جديدة") + '</h3><span class="spacer"></span>'
+    +   '<button>' + L("Seen", "تمّت") + '</button></div>'
+    +   '<div class="railbody" onscroll="railOverflow()">' + bidrows + '</div>'
+    +   '<div class="railfoot" hidden><span class="icon" aria-hidden="true">expand_more</span>'
+    +     '<span class="n"></span></div>'
+    + '</aside></div>';
+}
+function toggleAll(){ showAll = !showAll; fitPasses = 0; renderRequests();
+  if (!showAll) fitRows();
+  railOverflow(); }
+
+/* Grow the table until it fills the height the bid rail sets, then stop.
+   Measured rather than guessed, because a row's height changes with the
+   equipment name, the badge and the language. */
+function fitRows(){
+  if (showAll || visible >= REQUESTS.length || fitPasses > 6) return;
+  var box = document.querySelector("#requests .reqmain .tscroll");
+  var table = box && box.querySelector("table");
+  var body = table && table.querySelector("tbody");
+  if (!box || !table || !body || !body.rows.length) return;
+
+  /* the box is stretched by the grid; the table keeps its natural height, so the
+     gap between them is the empty space under the last row. */
+  var rowH = body.rows[body.rows.length - 1].getBoundingClientRect().height;
+  var free = box.clientHeight - table.offsetHeight;
+  var extra = Math.floor(free / Math.max(rowH, 1));
+  if (extra < 1) return;
+
+  visible = Math.min(REQUESTS.length, visible + extra);
+  fitPasses++;
+  renderRequests();
+  railOverflow();
+  fitRows();
+}
+
+/* The foot only speaks when rows are genuinely out of view, and says how many. */
+function railOverflow(){
+  var body = document.querySelector("#requests .railbody");
+  var foot = document.querySelector("#requests .railfoot");
+  if (!body || !foot) return;
+  var hidden = 0;
+  var top = body.scrollTop, bottom = top + body.clientHeight;
+  for (var i = 0; i < body.children.length; i++){
+    var el = body.children[i];
+    if (el.offsetTop + el.offsetHeight > bottom + 1) hidden++;
+  }
+  if (hidden > 0){
+    foot.hidden = false;
+    foot.querySelector(".n").textContent = L(hidden + " more new bids below", "و" + hidden + " عروض جديدة أدناه");
+  } else {
+    foot.hidden = true;
+  }
+}
+
+/* ══ projects ═══════════════════════════════════════════════════════════════ */
+function span(p){
+  var from = d(p.start), to = d(p.end);
+  p.machines.forEach(function(m){
+    [m.rent, m.over, m.want, [m.posted || p.start, m.close || m.awarded || p.start]].forEach(function(s){
+      if (!s) return;
+      if (d(s[0]) < from) from = d(s[0]);
+      if (d(s[1]) > to) to = d(s[1]);
+    });
+  });
+  from = new Date(from.getFullYear(), from.getMonth(), 1);
+  to = new Date(to.getFullYear(), to.getMonth() + 1, 1);
+  return { from:from, to:to, total:days(from, to) };
+}
+function pct(x, s){ return (days(s.from, x) / s.total) * 100; }
+function tick(iso, s, tone, label){
+  if (!iso) return "";
+  var x = pct(d(iso), s);
+  if (x < 0 || x > 100) return "";
+  return '<span class="tick ' + tone + '" style="inset-inline-start:' + x + '%" title="' + label + ' · ' + iso + '"></span>';
+}
+
+/* How a request moved, as segments between the dates it actually moved on:
+     posted → first bid → FULFILLED → awarded → awaiting start → running
+   "Fulfilled" is the state before awarding: suppliers have offered enough units to
+   cover what was asked (sum of unitsOffered >= item.qty), so the need CAN be met —
+   the renter simply has not chosen yet. */
+function history(m, s){
+  if (!m.posted) return "";
+  var end = m.awarded || m.close || TODAY;
+  var out = "";
+  out += bar("s-posted", [m.posted, m.firstBid || end], L("Posted", "نُشر"), s);
+  if (m.firstBid){
+    out += bar("s-bids", [m.firstBid, m.full || end],
+               (m.bids ? m.bids + " " + L("bids", "عروض") : L("Bids in", "عروض واردة")), s);
+    if (m.full) out += bar("s-full", [m.full, m.awarded || end], L("Fulfilled", "مغطّى"), s);
+  }
+  if (m.awarded && m.rent) out += bar("s-await", [m.awarded, m.rent[0]], L("Awaiting start", "بانتظار البدء"), s);
+  out += tick(m.posted, s, "", L("Posted", "نُشر"));
+  out += tick(m.firstBid, s, "info", L("First bid", "أول عرض"));
+  out += tick(m.full, s, "ok", L("Fulfilled — enough units offered", "مغطّى — وحدات كافية معروضة"));
+  out += tick(m.awarded, s, "brand", L("Awarded", "أُرسي"));
+  return out;
+}
+
+function bar(cls, range, label, s){
+  if (!range) return "";
+  var a = Math.max(0, pct(d(range[0]), s)), b = Math.min(100, pct(d(range[1]), s));
+  if (b <= a) return "";
+  return '<span class="bar ' + cls + '" title="' + label + ' · ' + range[0] + ' → ' + range[1] + '" '
+    + 'style="inset-inline-start:' + a + '%;width:' + (b - a) + '%">' + ((b - a) > 14 ? label : "") + '</span>';
+}
+
+/* A project's title: the renter's own if they set one, otherwise the first and
+   most specific part of the address, with any postcode stripped. Same idea as the
+   CCC prototype's locLabel() — the shortest thing that still says WHERE. */
+function shortSite(addr){
+  var first = String(addr || "").split(",")[0].trim();
+  return first.replace(/\s*\d{4,}\s*/g, " ").trim() || addr;
+}
+function projectTitle(p){
+  var own = L(p.nEn, p.nAr);
+  return own ? own : shortSite(L(p.locEn, p.locAr));
+}
+
+function renderProjects(){
+  /* ── The projects surface lives in its own prototype now (owner, 2026-08-30) ────────────────
+     `renter-projects-v1.html` is the agreed model — project → work order → request, awards as
+     rows, renter-set mobilised/demobilised pins, no state ramp — and it is 2,400 lines with its
+     own modals and its own vocabulary. Merging it in would mean renaming some twenty shared
+     symbols (`L`, `money`, `bar`, `PROJECTS`, `renderProjects`…) and as many class names, with
+     the requests and suppliers sections underneath it as collateral.
+
+     So the dashboard hands the section over instead: same tokens, same radii, one source of
+     truth for the surface, and editing it in one file changes it in both. The frame reports its
+     own height back (see `postHeight` there), because an iframe cannot size itself. */
+  document.getElementById("projects").innerHTML =
+      '<div class="shead"><span class="plate"><span class="icon" aria-hidden="true">apartment</span></span>'
+    +   '<span class="txt"><h2>' + L("My Projects", "مشاريعي") + '</h2>'
+    +     '<span class="sum">' + L("every site, what is on it, and until when",
+                                   "كل موقع، وما فيه، وحتى متى") + '</span></span>'
+    +   '<span class="spacer"></span>'
+    +   '<a class="link" href="renter-projects-v1.html" target="_blank" rel="noreferrer">'
+    +     L("Open full view", "افتح العرض الكامل") + '<span class="icon" aria-hidden="true">open_in_new</span></a>'
+    + '</div>'
+    + '<iframe id="projframe" class="projframe" title="' + L("My Projects", "مشاريعي") + '" '
+    +   'src="renter-projects-v1.html?embed=1&lang=' + lang + '"></iframe>';
+}
+
+/* The frame's own height, as it reports it — capped so a very tall project cannot swallow the
+   page, at which point it scrolls inside its own frame. */
+window.addEventListener("message", function(e){
+  var d = e && e.data;
+  if (!d || d.type !== "moedatech:projects-height") return;
+  var f = document.getElementById("projframe");
+  if (f) f.style.height = Math.min(Math.max(d.height, 320), 1400) + "px";
+});
+
+/* ══ suppliers ══════════════════════════════════════════════════════════════ */
+function renderSuppliers(){
+  var body = SUPPLIERS.map(function(s){
+    var papers = s.papers.length
+      ? s.papers.map(function(x){
+          var ic = x[1] === "ok" ? "check" : x[1] === "soon" ? "schedule" : "close";
+          return '<span class="paper ' + x[1] + '"><span class="icon" aria-hidden="true" style="font-size:11px">'
+            + ic + '</span>' + x[0] + '</span>';
+        }).join("")
+      : '<span class="paper">' + L("none on file", "لا أوراق") + '</span>';
+    return '<tr>'
+      + '<td><div class="sup"><span class="slogo">' + s.n.charAt(0) + '</span><span>'
+      +   '<span class="n">' + L(s.n, s.nAr) + '</span>'
+      +   '<span class="m">' + L(s.city, s.cityAr) + '</span></span></div></td>'
+      + '<td><span class="rel"><b>' + s.bids + '</b>/' + s.invited + ' ' + L("answered", "ردّوا")
+      +   '<span class="sub">' + (s.awarded ? L("you awarded ", "أرسيت ") + s.awarded + "×"
+                                            : L("never awarded", "لم تُرسِ")) + ' · ' + L(s.replyEn, s.replyAr) + '</span></span></td>'
+      + '<td><span class="rel">' + (s.quoted ? '<b>' + money(s.quoted) + '</b>' : "—")
+      +   '<span class="sub">' + (s.settled ? L("settled ", "استقرّ ") + money(s.settled)
+                                            : L("no deal closed", "لا صفقة")) + '</span></span></td>'
+      + '<td><span class="terms">' + L(s.termsEn, s.termsAr) + '</span></td>'
+      + '<td><span class="papers">' + papers + '</span><span class="asof">' + L(s.asOfEn, s.asOfAr) + '</span></td>'
+      + '<td><div class="rowacts"><button class="act primary">'
+      +   '<span class="icon" aria-hidden="true">storefront</span>' + L("Store", "المتجر") + '</button></div></td>'
+      + '</tr>';
+  }).join("");
+
+  document.getElementById("suppliers").innerHTML =
+      '<div class="shead"><span class="plate"><span class="icon" aria-hidden="true">handshake</span></span>'
+    +   '<span class="txt"><h2>' + L("My Suppliers", "مؤجّروني") + '</h2>'
+    +   '<span class="sum">' + L("what they did for you — Stores holds the public facts",
+                                 "ما فعلوه لك — المتاجر تحمل الحقائق العامة") + '</span></span></div>'
+    + '<div class="panel"><div class="tscroll"><table><thead><tr>'
+    +   '<th>' + L("Supplier", "المؤجّر") + '</th>'
+    +   '<th>' + L("Your record", "سجلّك معهم") + '</th>'
+    +   '<th>' + L("Quoted you", "سعّروا لك") + '</th>'
+    +   '<th>' + L("Terms you agreed", "الشروط المتّفقة") + '</th>'
+    +   '<th>' + L("Papers", "الأوراق") + '</th>'
+    +   '<th style="text-align:end"></th>'
+    + '</tr></thead><tbody>' + body + '</tbody></table></div></div>';
+}
+
+/* ══ stores ═════════════════════════════════════════════════════════════════ */
+function renderStores(){
+  document.getElementById("stores").innerHTML =
+      '<div class="shead"><span class="plate"><span class="icon" aria-hidden="true">storefront</span></span>'
+    +   '<span class="txt"><h2>' + L("Stores", "المتاجر") + '</h2>'
+    +   '<span class="sum">' + L("the market — what suppliers publish, the same for everyone",
+                                 "السوق — ما ينشره المؤجّرون، ذاته للجميع") + '</span></span>'
+    +   '<span class="spacer"></span><a class="link" href="#">' + L("Browse all 214", "تصفّح الكل ٢١٤")
+    +   '<span class="icon" aria-hidden="true">arrow_forward</span></a></div>'
+    + '<div class="scards">' + STORES.map(function(s){
+        return '<button class="scard" type="button"><span class="sshot">'
+          + '<span class="icon" aria-hidden="true">' + s.ic + '</span>'
+          + (s.ver ? '<span class="v"><span class="icon" aria-hidden="true">check</span></span>' : '')
+          + '</span><span class="sbody"><span class="n">' + L(s.n, s.nAr) + '</span>'
+          + '<span class="m">' + s.eq + ' ' + L("machines", "معدّة") + ' · ' + L(s.city, s.cityAr) + '</span></span></button>';
+      }).join("") + '</div>';
+}
+
+function render(){
+  /* each section is rendered on its own: a fault in one must not blank the others */
+  [renderRequests, renderProjects, renderSuppliers, renderStores].forEach(function(fn){
+    try { fn(); } catch (e) { console.error(fn.name, e); }
+  });
+}
+render();
+requestAnimationFrame(function(){ fitRows(); railOverflow(); });
+var fitTimer;
+window.addEventListener("resize", function(){
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(function(){ visible = 3; fitPasses = 0; renderRequests(); fitRows(); railOverflow(); }, 150);
+});
+</script>
+</body>
+</html>

@@ -29,8 +29,8 @@ If you do not know the target URL, **ask once** and then write it into this file
 
 | Environment | URL |
 | --- | --- |
-| prod | _(unset — ask and record)_ |
-| staging | _(unset — ask and record)_ |
+| prod | https://web.moedatech.net |
+| staging | https://webstaging.moedatech.net |
 
 ## Part 1 — Smoke
 

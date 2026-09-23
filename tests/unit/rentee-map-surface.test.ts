@@ -28,7 +28,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { LANDING_CUE_MS, REQUEST_ACTION_COLOUR, SHORTFALL_COLOUR } from "@/lib/contract/bid-map";
+import { AVAILABILITY_COLOUR, LANDING_CUE_MS, REQUEST_ACTION_COLOUR, SHORTFALL_COLOUR } from "@/lib/contract/bid-map";
+import { channels, NAVY_TOKENS } from "../setup/ds";
 
 const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(resolve(ROOT, rel), "utf8");
@@ -242,10 +243,10 @@ describe("the selected marker is emphasised by geometry, never by a colour (RM3-
   });
 
   it("puts NO availability colour in any selected-only rule — selection is not a third state", () => {
-    // The mutation: "make it more visible" answered with `background: #2563EB` on the disc, or worse
+    // The mutation: "make it more visible" answered with `background: var(--info)` on the disc, or worse
     // with a green/red of its own. Either turns "the one being looked at" into something a machine IS.
     for (const rule of selectedRules) {
-      for (const availability of ["#16a34a", "#d9362a", "rgba(22, 163, 74", "rgba(217, 54, 42"]) {
+      for (const availability of ["var(--ok)", "var(--danger)"]) {
         expect(rule.toLowerCase(), rule).not.toContain(availability);
       }
     }
@@ -307,89 +308,140 @@ describe("the filter is a panel over the column, dismissed by an X", () => {
     }
   });
 
-  it("states the count in BOTH places, from one builder, and always against the whole offer", () => {
+  // ~~"states the count in BOTH places"~~: the line above the list is gone (owner, 2026-09-22:
+  // *"remove this 1 of 2"*). The panel's foot still states it, from the same builder.
+  it("states the count in the filter panel's foot, from one builder, against the whole offer", () => {
     // With the cards covered, the panel's foot is the only thing telling the renter what a chip just
     // cost — and the mutation to catch is a second, hand-built count that reads `view.machines.length`
     // over `view.shown`, or a denominator that quietly becomes the filtered figure.
-    expect(list.match(/countLine\(\)/g)).toHaveLength(2);
+    expect(list.match(/countLine\(\)/g)).toHaveLength(1);
     expect(list).toMatch(/num\(view\.total\)/);
     expect(list).toMatch(/num\(view\.shown\)/);
     expect(list).not.toMatch(/view\.machines\.length/);
   });
 });
 
-/* ═════════ the card's controls are the CARD's, not floating on it (owner, 2026-08-11) ═════════ */
+/* ═════════ the card is the distance, and the distance is the ask (owner, 2026-08-28) ═════════ */
 
-describe("the card's controls each keep a row, and both keep their rules", () => {
+describe("the card carries three things, and the ask is the largest of them", () => {
   const list = strip(read(LIST));
   const css = read(CSS);
 
-  // ── Superseded twice, and the second one is the v3 prototype's own card ──────────────────────
-  // ~~"puts both controls in one cluster on the distance row"~~ (owner, 2026-08-11) — withdrawn on
-  // sight: *"for the asked make it beside not confirmed"*, *"the details button make it as before"*.
-  // ~~"«التفاصيل» alone on the distance row"~~ (same day) — withdrawn 2026-08-19 against
-  // `app-decoded.js:4009`, which draws it on the TITLE row. What cured the "floating" pill was the
-  // `#F2F6FA` ground it gained, not the row it was moved to, and the ground travels with it.
-  //
-  // The rule that survived both moves is the one being pinned here: row 3 carries the distance and
-  // nothing else. It is `nowrap`, so any control sharing it clips the distance mid-word — and the
-  // distance is the fact this list is sorted on.
-  it("puts the ask beside the availability chip, «التفاصيل» on the title row, and NOTHING beside the distance", () => {
-    const r1 = region(read(LIST), '<div className="bm-eq-r1">', '<div className="bm-eq-r2">');
-    const r2 = region(read(LIST), '<div className="bm-eq-r2">', '<div className="bm-eq-r3">');
-    const r3 = region(read(LIST), '<div className="bm-eq-r3">', '<div className="bm-eq-r4">');
-    // Details rides the trailing edge of the title, which is where the reader's eye already is.
-    expect(r1).toMatch(/bm-eq-acts/);
-    expect(r1).toMatch(/bm-eq-details/);
-    // The ask answers the chip, so it shares the chip's row…
-    expect(r2).toMatch(/bm-eq-chip/);
-    expect(r2).toMatch(/bm-eq-ask/);
-    // …and neither control is left on the distance row, which is now the distance alone.
-    expect(r3).not.toMatch(/bm-eq-ask/);
-    expect(r3).not.toMatch(/bm-eq-details/);
-    expect(r3).not.toMatch(/bm-eq-acts/);
+  /* ── Superseded three times, and this is the fourth arrangement ───────────────────────────────
+     ~~"both controls in one cluster on the distance row"~~ (owner, 2026-08-11) — withdrawn on sight.
+     ~~"«التفاصيل» alone on the distance row"~~ (same day) — withdrawn 2026-08-19 against the v3
+     prototype's own card, which draws it on the title row.
+     ~~"four rows: title · state · distance · certificates"~~ — withdrawn 2026-08-28, whole:
+     *"redesign the whole card, remove all what it has now."*
+
+     What the card states now, in the order the renter asks it: how far and how sure (one object),
+     what the machine is, and — in the corner — how complete its file is and the way into it. The
+     photo, the availability chip, the «in this offer» badge, the platform's tick and the certificate
+     line are all gone; each of them was answering a question the renter had not asked yet. */
+  it("gives the distance its own object and puts nothing else on that line", () => {
+    expect(list).toMatch(/className=\{`bm-eq-yard \$\{yard\}`\}/);
+    expect(list).toMatch(/className="bm-eq-yard ok"/);
+    // The three blocks, and no fourth.
+    for (const part of ["bm-eq-hd", "bm-eq-yard", "bm-eq-model"]) expect(list, part).toContain(part);
+    // The old furniture, by name — a later edit that brings any of it back goes red here.
+    // `bm-eq-photo` is deliberately NOT on this list: the picture came back on 2026-08-29 by the
+    // owner's word, as a banner with the corner controls riding it. Nothing else did.
+    for (const gone of ["bm-eq-chip", "bm-eq-cert", "bm-eq-inoffer", "bm-eq-vd", "bm-eq-r1", "bm-eq-r4"]) {
+      expect(list, gone).not.toContain(gone);
+    }
   });
 
-  /* ── «في هذا العرض» rides the PHOTO, and row 2 is why (owner, 2026-08-19) ──────────────────────
-     Rendered against fixtures at the panel's real 392px, row 2 does not fit: the text column is 262px
-     and the availability chip, this badge and «اطلب التأكيد» need about 278. What gave way was the
-     chip — truncated to «لم يؤكد تو…» on exactly the cards where availability is the open question,
-     to make room for a fact the count pills above already state.
+  it("draws the machine's own photo, and lets it open the file", () => {
+    // *"I want the images of the front image of equipment back."* It is the model's `photo` — the
+    // front shot, else any shot, else null — and a machine with none says so rather than shimmering
+    // forever at something that will never arrive.
+    expect(list).toMatch(/className=\{`bm-eq-photo\$\{photo \? "" : " is-empty"\}`\}/);
+    /* ~~A raw `<img src={photo}>` with an «eqNoPhoto» sentence beside it.~~ Both went to the shared
+       `Photo` (2026-09-02, "one placeholder for every picture that is not there"), which also covers
+       the case the old branch could not see: a machine that NAMES a photograph the bucket does not
+       hold, where `photo` is non-null and the browser drew its broken glyph.
 
-     The badge did not go: it answers a different question from the chip (app parity, 2026-08-17) and
-     folding the two made one of them lie. It moved to the photo, the card's only unused surface.
-
-     Pinned because the constraint is invisible in the markup — a later edit could move it back into
-     row 2, and everything would still typecheck, render and read fine on a wide panel. */
-  it("puts the in-offer badge on the PHOTO, never back on the state row", () => {
-    const src = read(LIST);
-    const photo = region(src, "className={`bm-eq-photo", '<div className="bm-eq-tx">');
-    const r2 = region(src, '<div className="bm-eq-r2">', '<div className="bm-eq-r3">');
-    expect(photo).toMatch(/bm-eq-inoffer/);
-    expect(r2).not.toMatch(/bm-eq-inoffer/);
-    // …and it is positioned onto the picture rather than sitting in the cell's flow.
-    expect(cssBlock(read(CSS), ".bidmap .bm-eq .bm-eq-inoffer {")).toMatch(/position:\s*absolute/);
+       What this test is about has not changed — the card draws the MODEL's `photo`, and a machine
+       with none says so rather than shimmering forever at something that will never arrive. Only the
+       component that does it has. */
+    expect(list).toMatch(/<Photo src=\{photo\}/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-photo.is-empty {")).toMatch(/animation:\s*none/);
+    // The 104px SIDE cell, not a banner (owner, 2026-08-29). A full-width picture gave a machine
+    // with no photo a third of the card to say «No photo» in.
+    const photo = cssBlock(css, ".bidmap .bm-eq .bm-eq-photo {");
+    expect(photo).toMatch(/width:\s*104px/);
+    expect(photo).toMatch(/align-self:\s*stretch/);
   });
 
-  it("keeps «اطلب التأكيد» a REAL button on the card, so an unconfirmed machine is askable without opening it (RM3-AC-13)", () => {
-    // The mutation the move could have introduced: the ask demoted to a link into the detail, or
-    // dropped under the stretched open layer where the card's own press would swallow it.
-    expect(list).toMatch(/\{askAvailability && \(\s*<button/);
-    expect(list).toMatch(/onClick=\{\(\) => onAskAvailability\?\.\(machine\)\}/);
-    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-ask {")).toMatch(/pointer-events:\s*auto/);
-    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-details {")).toMatch(/pointer-events:\s*auto/);
+  it("keeps the availability tone identical on a selected card (owner, 2026-08-29)", () => {
+    // *"When a card is selected dont let the selection color affect the red or green color."* The
+    // fills were `color-mix(…, transparent)`, which composites over the card's ground — and a
+    // selected card's ground is not white, so the same machine's green shifted the moment it was
+    // pressed. Mixed into `var(--surface)` they are opaque and identical either way.
+    for (const sel of [".bidmap .bm-eq .bm-eq-yard.ok {", ".bidmap .bm-eq .bm-eq-yard.no,"]) {
+      const block = cssBlock(css, sel);
+      expect(block, sel).toMatch(/background:\s*color-mix\(in srgb, var\(--\w[\w-]*\) \d+%, var\(--surface\)\)/);
+      expect(block, sel).not.toMatch(/background:\s*color-mix\([^;]*transparent\)/);
+    }
+    // …and no `.bm-eq.on` rule may reach the state object at all.
+    expect(css).not.toMatch(/\.bm-eq\.on[^{]*\.bm-eq-yard/);
   });
 
-  it("still takes the ask's colour from the model, never from the stylesheet (RM3-AC-33)", () => {
-    // The ground the control gained is the stylesheet's; the INK is still `askAvailability.colour`,
-    // which is the one place RM3-AC-33 is decided.
-    expect(list).toMatch(/style=\{\{ color: askAvailability\.colour \}\}/);
+  it("says nothing about offer membership, on the card OR between the cards", () => {
+    // Two removals, one reason. *"Remove this in this offer badge as renter doesnt care if a unit is
+    // in the offer but not avaialbe so he cares only if available or not"* (2026-08-19) took the
+    // badge off the card; *"remove this Also in his fleet — not in this offer sentence"*
+    // (2026-08-31) took the divider out from between them. What he chooses on is whether a machine
+    // can be confirmed for him.
+    expect(list).not.toContain("pinInOffer");
+    expect(list).not.toContain("eqBeyondOffer");
+    // The ORDER still puts the offer first — that is `listedMachines`, not this file — and the MAP
+    // still tags membership on the pin. Neither fact became unknowable.
+    expect(strip(read("src/components/map/MapCanvas.tsx"))).toContain("pinInOffer");
   });
 
-  it("keeps the card exactly four rows, so every card in the column is still one height (RM3-AC-32)", () => {
-    // The cluster had to cost nothing: a fifth row for two controls would have been a worse answer to
-    // "give the list its room" than the floating controls it replaced.
-    for (const row of ["bm-eq-r1", "bm-eq-r2", "bm-eq-r3", "bm-eq-r4"]) expect(list, row).toContain(row);
+  it("keeps the machine askable WITHOUT opening the detail, which is RM3-AC-13 (and now louder)", () => {
+    // The mutation the redesign could have introduced: the ask demoted to a link into the detail, or
+    // buried under the stretched find-on-map layer where the card's own press would swallow it. It is
+    // now the biggest target on the card, and the CSS has to let it be pressed.
+    expect(list).toMatch(/onClick=\{\(\) => onYardPress\(machine, yard === "asked"\)\}/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yard.no,")).toMatch(/pointer-events:\s*auto/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-open {")).toMatch(/pointer-events:\s*auto/);
+  });
+
+  it("explains the red BEFORE it asks, once, and then never again", () => {
+    /* The first press teaches, every press after it asks. Both halves matter: a tutorial that opened
+       every time would stand between the renter and the one control he is meant to press.
+
+       The RULE is unchanged; only its home is. It moved to `BidMapWorkspace` on 2026-09-08, because
+       the machine detail draws the same yard card and REPLACES this list to do it — a decision owned
+       by the list could not be reached from there at all. So the assertions read the workspace, and
+       the list is proved to hold no copy of the state machine. */
+    const surface = strip(read(WORKSPACE));
+    expect(surface).toMatch(/if \(!yardExplainedBefore\(\)\) \{ setYardExplain\(\{ machine, asked: false \}\); return; \}/);
+    expect(surface).toMatch(/composeDraft\(composeMachineRequest\("availability", machine\.equipmentId\)\)/);
+    // …and an already-asked machine never reaches the ask at all: it opens the question he put.
+    expect(surface).toMatch(/if \(asked\) \{ setYardExplain\(\{ machine, asked: true \}\); return; \}/);
+    // One owner of the layer, so the two mounts cannot answer the same press differently.
+    expect(list).not.toContain("setYardExplain");
+  });
+
+  it("paints the distance with AVAILABILITY's red, not with the ask's blue", () => {
+    // `askAvailability.colour` is `var(--info)` — the ASK's colour, and right while it painted a
+    // separate «Ask him to confirm» prompt. That prompt is gone (owner, 2026-08-31), and left on the
+    // button the same ink would have turned the FIGURE blue: *"keep the font of distance red"*. One
+    // fact, one ink — the number and how trustworthy it is are a single statement.
+    expect(list).not.toContain("askAvailability.colour");
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yard.no,")).toMatch(/color:\s*var\(--danger\)/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-yard.ok {")).toMatch(/color:\s*var\(--ok-deep\)/);
+    // The figure itself never sets its own colour — it inherits the state's.
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-km {")).toMatch(/color:\s*currentColor/);
+  });
+
+  it("keeps every card one height, which is what makes the column scannable (RM3-AC-32)", () => {
+    // Three blocks, none of which appear or disappear with the data: the corner holds a `min-height`
+    // whether or not the dots render, the distance always draws, and the model line always has a name.
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-hd {")).toMatch(/min-height:\s*\d+px/);
     expect(list).not.toContain("bm-eq-r5");
   });
 });
@@ -507,12 +559,15 @@ describe("the landing cue is finite (RM3-AC-35)", () => {
      cue, so the card never appears to shift"* — is a rendered-appearance fact. What CAN be asserted is
      that the keyframes never animate geometry and always carry the resting shadow first; the
      perceptual claim itself stays a visual check in T41. */
-  it("animates no geometry, and carries the resting shadow in every keyframe (the assertable part)", () => {
+  it("animates no geometry, and rings without moving anything (the assertable part)", () => {
     const frames = css.slice(css.indexOf("@keyframes bmCue"), css.indexOf("}", css.indexOf("100%", css.indexOf("@keyframes bmCue"))));
     expect(frames).toMatch(/0%/);
     expect(frames).toMatch(/100%/);
     for (const stop of frames.split("\n").filter((l) => /\d+%/.test(l))) {
-      expect(stop, stop).toMatch(/var\(--eq-rest\)/);
+      // It was a two-shadow stack whose first layer carried the card's resting elevation. There are
+      // no shadows now, so the cue is an outline — painted outside the box and taking no space,
+      // which is the property that actually mattered: a pulsing card cannot nudge its neighbours.
+      expect(stop, stop).toMatch(/outline/);
       expect(stop, stop).not.toMatch(/transform|margin|width|height|top|left/);
     }
   });
@@ -524,23 +579,39 @@ describe("the landing cue is finite (RM3-AC-35)", () => {
    visual check; what is assertable — and what a "condense it" instruction actually endangers — is that
    nothing was condensed by being deleted. */
 
-describe("the shortfall survived the condensing whole (RM3-AC-05)", () => {
-  const alert = region(read(WORKSPACE), "{shortfall && (", "</button>");
+describe("the shortfall alert is WITHDRAWN from the panel (owner, 2026-09-10)", () => {
+  /**
+   * *"but he has 2 registered so remove it"* — on a panel whose first pill read «2 Crawler
+   * Excavators 20 ton registered» while the alert under it said «1 in this offer with no registered
+   * equipment». Both used the word «registered» for different counts: the pill is `counts.owned`
+   * (the fleet), the alert is `offered − registered` where `registered` counts only rows flagged
+   * `inBid`. Read together they contradict; read apart, each is true.
+   *
+   * ~~«the shortfall survived the condensing whole (RM3-AC-05)»~~, which pinned the alert's copy,
+   * its ask and its gate. What replaces it pins the removal AND the two things that had to survive
+   * it — otherwise "remove the alert" and "remove the ask with it" look identical from here.
+   */
+  const src = strip(read(WORKSPACE));
 
-  it("still states the DIFFERENCE, and still carries the ask", () => {
-    // `shortfall.claimed` is the difference; `counts.offered` is the sentence's one plausible wrong
-    // number, and it is not reachable from this model at all.
-    expect(alert).toMatch(/shortfall\.claimed/);
-    expect(alert).not.toMatch(/counts\.offered/);
-    expect(alert).toMatch(/composeShortfallRequest\(\)/);
-    expect(alert).toMatch(/t\.bidMap\.shortfallAction/);
-    // …and the reason the control is inert, when it is, is still a sentence rather than a state on a
-    // button — the line most at risk from a change made to save vertical space.
-    expect(alert).toMatch(/shortfallPending && <div className="bm-short-s">/);
+  it("draws no shortfall alert", () => {
+    expect(src).not.toMatch(/\{shortfall && \(/);
+    expect(src).not.toMatch(/bm-short-t/);
+    expect(src).not.toMatch(/t\.bidMap\.shortfall\b/);
   });
 
-  it("is still gated on `short` alone, so its ABSENCE still means nothing is claimed", () => {
-    expect(strip(read(WORKSPACE))).toMatch(/const shortfall = counts \? shortfallAlert\(counts\) : null/);
+  it("keeps the ASK, which was never the alert's alone", () => {
+    // «Ask him to add it» and the list-foot's «Ask for different equipment» are ONE ask — an
+    // `alternative` naming no machine — so removing the alert must not take the route with it.
+    expect(src).toMatch(/composeShortfallRequest\(\)/);
+    expect(src).toMatch(/shortfallPending/);
+  });
+
+  it("leaves the MODEL alone, so a corrected `inBid` can light it again", () => {
+    // RM3-AC-05/06 are a contract shared with the mobile app. The panel stopped rendering it; the
+    // rule that decides it is untouched, and `bid-map.test.ts` still holds it.
+    const model = read("src/lib/contract/bid-map.ts");
+    expect(model).toMatch(/export function shortfallAlert/);
+    expect(model).toMatch(/countCase\(counts\) !== "short"/);
   });
 });
 
@@ -552,33 +623,46 @@ describe("the surface's stylesheet carries the same colour tokens the models do"
 
   it("paints the shortfall alert orange, and nowhere near availability's red (RM3-AC-06)", () => {
     const alert = cssBlock(css, ".bidmap .bm-short {");
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(SHORTFALL_COLOUR.slice(i, i + 2), 16));
-    // The stylesheet writes the token as an rgba tint, so it is matched by channel rather than by hex.
-    expect(alert).toContain(`rgba(${r}, ${g}, ${b}`);
-    // And the availability red is not in the alert at all, in either notation.
-    expect(hex(alert)).not.toContain("d9362a");
-    expect(alert).not.toContain("rgba(217, 54, 42");
+    // The stylesheet tints the token rather than naming a colour, so the alert is matched on it.
+    expect(alert).toContain(SHORTFALL_COLOUR);
+    // …and the token really is orange, resolved through the palette. A name proves nothing on its own.
+    const { r, g, b } = channels(SHORTFALL_COLOUR)!;
+    expect(r).toBeGreaterThan(150);
+    expect(g).toBeGreaterThan(90);
+    expect(g).toBeLessThan(r);
+    expect(b).toBeLessThan(g);
+    // And the availability red is not in the alert at all.
+    expect(alert).not.toContain(AVAILABILITY_COLOUR.unconfirmed);
     // The sentence's ink is the same warm family, never the red. This assertion used to read
     // `.bm-short-ic` — the alert's warning glyph, which the v3 alignment removed on 2026-08-11 along
     // with the heading and the body paragraph (the prototype's alert is one line and a button). The
     // criterion is unchanged; only the element wearing the colour is, so the assertion followed it to
-    // the line of text. `#8a4f08` is the prototype's own ink for this sentence (decoded 3779) — a
+    // the line of text. `var(--brand-deep)` is the prototype's own ink for this sentence (decoded 3779) — a
     // darkened orange, and the check that matters is that it is warm and is not the availability red.
     const line = hex(cssBlock(css, ".bidmap .bm-short-t {"));
-    expect(line).toContain("#8a4f08");
-    expect(line).not.toContain("d9362a");
+    expect(line).toContain("var(--warn-deep)");
+    expect(line).not.toContain(AVAILABILITY_COLOUR.unconfirmed);
   });
 
-  it("paints the card's ask blue, never navy (RM3-AC-33)", () => {
-    const ask = cssBlock(css, ".bidmap .bm-eq .bm-eq-ask {");
-    expect(hex(ask)).toContain(hex(REQUEST_ACTION_COLOUR));
-    for (const navy of ["#16304f", "#1c3550", "#0f2238"]) expect(hex(ask)).not.toContain(navy);
+  it("paints the ask's own control in the brand orange, and never navy (RM3-AC-33, half withdrawn)", () => {
+    /* The card's prompt takes its ink from the model inline (asserted in the card block above), so the
+       stylesheet's share of this rule is the layer's CTA — the one control the renter is meant to
+       press once the red has been explained to him.
+
+       ~~It must be `--action`, the blue.~~ Withdrawn by the owner on 2026-09-08: *"make the ask
+       button orange as our design system"*. The half of AC-33 that survives is the half the AC was
+       written to protect — the control is NOT navy, so beside a red explanation it cannot read as
+       switched off — and the brand orange is what every other primary button in the product is. */
+    const cta = cssBlock(css, ".bm-eqyx-cta {");
+    expect(hex(cta)).toContain("var(--brand)");
+    expect(hex(cta)).not.toContain(hex(REQUEST_ACTION_COLOUR));
+    for (const navy of NAVY_TOKENS) expect(hex(cta)).not.toContain(navy);
   });
 
   it("has an availability red the stylesheet really does draw — the positive control", () => {
-    // Both assertions above are negatives about `#D9362A`. If the surface had stopped using it, they
+    // Both assertions above are negatives about `var(--danger)`. If the surface had stopped using it, they
     // would be vacuous.
-    expect(hex(css)).toContain("d9362a");
+    expect(css).toContain(AVAILABILITY_COLOUR.unconfirmed);
   });
 });
 
@@ -613,6 +697,11 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       "draftBusy",
       "fleet",
       "groupKey",
+      // `initialOpen` joined on 2026-08-26, when the chat icon on a bid card stopped opening the deal
+      // room and started opening THIS dock (`?chat=1`). It travels down as an INITIAL state and
+      // carries nothing back: the renter closing the dock must stay closed, and a tab press still
+      // moves nothing on the surface.
+      "initialOpen",
       "onCancelDraft",
       "onConfirmDraft",
       // `onOpenCompanyDocs` joined on 2026-08-19 with the dock's ⋮ kebab. It is a REPORT, not a
@@ -672,10 +761,18 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
     expect(callbacks.sort()).toEqual([
       "canOpenMachine",
       "onCancelDraft",
+      // Closing an EMBEDDED dock (2026-09-22). It carries nothing and names no surface: the page
+      // that stood the dock in a column is the only thing that knows what closing it means, and on
+      // the map the prop is absent, so the ✕ there still keeps `setOpen(false)`.
+      "onClose",
       "onConfirmDraft",
       // Reports that the renter asked for the company's papers, and names no surface — the workspace
       // answers it with V9's panel, and the dock cannot tell it to do anything else.
       "onOpenCompanyDocs",
+      // The way to THIS bid's equipment map, for the inbox, which reaches it from nowhere else
+      // (2026-09-22). Takes nothing and returns nothing — the caller already knows which bid the
+      // dock is on, so no id crosses this boundary either.
+      "onOpenEquipment",
       "onOpenMachine",
       "onOutstandingAsks",
     ]);
@@ -788,36 +885,62 @@ describe("no ask control on this surface writes — they compose (owner, 2026-08
   });
 });
 
-/* ── The availability chip is never stripped (owner, 2026-08-20) ─────────────────────────────────
-   *"Keep the not confirmed shown totally, not stripped."*
+/* ── The distance is never stripped, and it is the card (owner, 2026-08-20 · 2026-08-28) ─────────
+   ~~"Keep the not confirmed shown totally, not stripped."~~ superseded by the redesign that removed
+   the chip it was about. The chip used to render «Not confirmed …» on exactly the cards whose open
+   question is whether the machine is confirmed, because it shared a nowrap row with «Ask him to
+   confirm» and was the only thing on it that could give.
 
-   The chip had been rendering «Not confirmed …» on exactly the cards whose open question is whether
-   the machine is confirmed — because `.bm-eq-ask` carries `flex-shrink: 0` and the chip did not, so
-   when «Ask him to confirm» and the chip could not both fit on one nowrap line, the CHIP was what
-   gave way.
-
-   Widening the panel fixed the symptom at one width. These pin the RULE, which holds at every width:
-   nothing on row 2 shrinks, and the row wraps instead. */
-describe("the availability chip reads whole at any panel width", () => {
+   Nothing shares the distance's line now, so the class of bug is gone by construction rather than by
+   a `flex-wrap`. What survives, and is pinned here, is the rule underneath both: the availability the
+   card states must never be the thing that gets cut. */
+describe("the distance and its state read whole at any panel width", () => {
   const css = read(CSS);
 
-  it("lets row 2 wrap rather than squeezing what is on it", () => {
-    const r2 = cssBlock(css, ".bidmap .bm-eq .bm-eq-r2 {");
-    expect(r2).toMatch(/flex-wrap:\s*wrap/);
-    // A row that wraps needs a row-gap, or the two lines touch.
-    expect(r2).toMatch(/gap:\s*\d+px\s+\d+px/);
+  it("gives the distance the column's full width, starting where every other line starts", () => {
+    // ~~Centred and hugging its figure.~~ Withdrawn the same day it landed (owner, 2026-08-31): the
+    // hug gave the text column three different left edges — readiness, distance, model — and the
+    // empty space it removed was the card's own margin. One start, one end, three lines.
+    const yard = cssBlock(css, ".bidmap .bm-eq .bm-eq-yard {");
+    expect(yard).toMatch(/width:\s*100%/);
+    expect(yard).toMatch(/justify-content:\s*flex-start/);
+    expect(yard).toMatch(/text-align:\s*start/);
+    // …and the readiness above it stretches to the same two edges rather than floating mid-row.
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-rd {")).toMatch(/flex:\s*1/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-rdbar {")).toMatch(/flex:\s*1/);
+    // The card is a row — the picture in its 104px cell, the text beside it — and the text column is
+    // the column: the corner control, the distance, the model and the foot each own their line.
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-in {")).toMatch(/align-items:\s*stretch/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-tx {")).toMatch(/flex-direction:\s*column/);
+    // …and it can shrink, which is what lets the model line ellipsise rather than widen the card.
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-tx {")).toMatch(/min-width:\s*0/);
   });
 
-  it("never lets the chip be the thing that gives", () => {
-    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-chip {")).toMatch(/flex-shrink:\s*0/);
+  it("puts the file's completeness on the first line and the machine's name on the last", () => {
+    // ~~One dot per requirement~~ → a bar and its fraction (owner, 2026-08-31), and the corners the
+    // owner named: the readiness on the first line's leading edge beside the control that opens the
+    // papers it counts, the model and year in the bottom leading corner.
+    expect(css).not.toMatch(/\.bm-eq-rdot/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-hd {")).toMatch(/justify-content:\s*space-between/);
+    expect(cssBlock(css, ".bidmap .bm-eq .bm-eq-rdbar {")).toMatch(/border-radius:\s*999px/);
+    const model = cssBlock(css, ".bidmap .bm-eq .bm-eq-model {");
+    expect(model).toMatch(/text-align:\s*start/);
+    // `margin-top: auto` is what pins the name to the BOTTOM of a text column that may be taller.
+    expect(model).toMatch(/margin-top:\s*auto/);
+    // The colour is the readiness band's, never availability's — three bands, three fills.
+    for (const band of ["green", "yellow", "red"]) {
+      expect(css).toContain(`.bidmap .bm-eq .bm-eq-rd.${band} .bm-eq-rdfill`);
+    }
   });
 
-  it("truncates the chip's label nowhere — an ellipsis is still a stripped label", () => {
-    const label = cssBlock(css, ".bidmap .bm-eq .bm-eq-chip .bm-eq-chip-l {");
-    expect(label).not.toMatch(/text-overflow/);
-    expect(label).not.toMatch(/overflow:\s*hidden/);
-    // `nowrap` stays: the label breaking across two lines inside a capsule is its own kind of wrong.
-    expect(label).toMatch(/white-space:\s*nowrap/);
+  it("marks a selected card by its OUTLINE, never by greying what it says", () => {
+    // *"Selecting a card only highlight its borders but doesnt make it grey"* (owner, 2026-08-31).
+    // The fill was the one channel of selection that touched the card's content — it cooled the
+    // photograph's surround and every value on it, and the states here carry colour that must not
+    // move. The border, the accent bar and the file control still say which card is chosen.
+    const on = cssBlock(css, ".bidmap .bm-eq.on {");
+    expect(on).toMatch(/background:\s*var\(--surface\)/);
+    expect(on).toMatch(/border-color:\s*var\(--navy\)/);
   });
 
   it("keeps the panel's width and the resize floor in step", () => {

@@ -1,33 +1,136 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useT, fmt } from "@/lib/i18n";
+import { useEffect, useMemo, useState } from "react";
+import { Dialog } from "@/components/Dialog";
+import { useT, useLocale } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Button, Badge, Icon } from "@/components/ui";
+import { Button, Icon } from "@/components/ui";
+import { Mansour } from "@/components/Mansour";
+import type { EquipmentItem } from "@/lib/contract/draft";
+import type { TaxonomyNode } from "@/lib/contract/stores";
+import { iconForRef, reelIcons, taxonomyIcons, type TaxonomyIcons } from "@/lib/contract/taxonomy-icons";
+import { pin } from "@/lib/uiPins";
+
+/**
+ * The agent at work: one ring, the catalogue's own drawing of the machine, one line.
+ *
+ * ── What the owner asked for ────────────────────────────────────────────────────────────────────
+ * 2026-09-12: *"make it very simple processing icon ... no need for steps and many complicated
+ * text ... the taxonomy he is thinking of and processing so images of taxonomy in our db will be
+ * shown in processing according to what the agent is matching"*.
+ * 2026-09-13, on a shot of a lone spinner: *"didnt we say it must show equipment he is trying to
+ * map, the ui is so dull"*.
+ *
+ * ~~A four-stage rail, a four-line activity feed, a percentage pill, a progress bar and a counts
+ * line.~~ Six devices narrating a request the server answers in ONE shot. They are gone. What is
+ * left is the one thing the renter is waiting to learn — WHICH MACHINE — drawn as the catalogue
+ * draws it.
+ *
+ * ── The two states ──────────────────────────────────────────────────────────────────────────────
+ *  · READING — the catalogue is flicked through, a drawing every 380ms, with NOTHING named. That is
+ *    the licence for showing them: unnamed and moving they read as a search, which is what is
+ *    happening. Naming one would claim a match that has not been made.
+ *  · MATCHED — each item the agent returned, in the canvas's own order: its own drawing, its name,
+ *    and «Matched from our catalogue» under it.
+ *
+ * 🔴 **The drawings come from `/api/stores/taxonomy`, NOT from the agents taxonomy.** The first cut
+ * read `equipmentImageUrl` off `/api/taxonomy`, found 1 row of 413 with a picture, and drew a glyph
+ * because of it — which is the empty screen the owner photographed. The artwork was one endpoint
+ * away, the app backend's tree that the browse filters already use, and the ids are the same in
+ * both: all 58 agent subtypes resolve to a drawing. See `taxonomy-icons.ts`.
+ */
+
+/** How long each matched machine holds the screen. Long enough to read, short enough not to delay. */
+const REVEAL_MS = 700;
+/** The last beat after the final machine, before the canvas replaces this. */
+const HANDOVER_MS = 420;
+/** How fast the catalogue is flicked through while the request is still in flight. */
+const REEL_MS = 380;
 
 export function Processing() {
   const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
   const { state, actions } = useRfq();
   const { busy, error, draft, errorDetail } = state;
 
-  const stages = [t.processing.stage1, t.processing.stage2, t.processing.stage3, t.processing.stage4];
+  /** The items the agent returned, in the order the canvas will list them. */
+  const items: EquipmentItem[] = useMemo(
+    () => (draft ? draft.items.filter((i) => !i.removed) : []),
+    [draft],
+  );
 
-  // Walk the 4 stages while parsing (the real call is async; this paces the loader, AC-04).
-  const [stage, setStage] = useState(0);
+  /** Which machine is on screen. -1 while the request is still in flight. */
+  const [at, setAt] = useState(-1);
+  const [icons, setIcons] = useState<TaxonomyIcons>(() => new Map());
+  const [broken, setBroken] = useState<string | null>(null);
+  /** Where the reel has got to while reading. Meaningless once there is an answer. */
+  const [spin, setSpin] = useState(0);
+
+  /* The app backend's tree, for its drawings alone. A separate request from the agents taxonomy the
+     store already holds, and a cheap one: the browse filters fetch the same thing, and it works
+     signed out — which this flow needs, because a guest can run the whole of it. */
   useEffect(() => {
-    if (!busy) return;
-    setStage(0);
-    const id = setInterval(() => setStage((n) => Math.min(n + 1, stages.length - 1)), 2200);
-    return () => clearInterval(id);
-  }, [busy, stages.length]);
+    let live = true;
+    fetch("/api/stores/taxonomy", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
+      .then((d: { taxonomy: TaxonomyNode[] }) => {
+        if (live) setIcons(taxonomyIcons(d.taxonomy ?? []));
+      })
+      .catch(() => {
+        /* No drawings. The screen still reads — Mansour holds the ring and the line still says what
+           is happening. A failed picture must never stop the request the renter is waiting on. */
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
 
-  // Auto-advance to the wizard once parsing completes — no manual "Next" (brief pause to show counts).
   const done = !busy && !!draft && !error;
+  const reel = useMemo(() => reelIcons(icons), [icons]);
+
+  useEffect(() => {
+    if (busy) setAt(-1);
+  }, [busy]);
+
+  // The reel, while reading. It stops the moment there is something real to show.
+  useEffect(() => {
+    if (done || !reel.length) return;
+    const id = setInterval(() => setSpin((n) => n + 1), REEL_MS);
+    return () => clearInterval(id);
+  }, [done, reel.length]);
+
+  // One machine at a time, then the canvas. Nothing here is paced against a clock while the request
+  // is in flight — the reveal starts when the answer does.
   useEffect(() => {
     if (!done) return;
-    const id = setTimeout(() => actions.enterWizard(), 1400);
+    if (at + 1 < items.length) {
+      const id = setTimeout(() => setAt((n) => n + 1), at < 0 ? 0 : REVEAL_MS);
+      return () => clearTimeout(id);
+    }
+    const id = setTimeout(() => actions.enterWizard(), HANDOVER_MS);
     return () => clearTimeout(id);
-  }, [done, actions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done, at, items.length]);
+
+  const item: EquipmentItem | null = at >= 0 ? items[at] ?? null : null;
+
+  /**
+   * What is in the ring: the matched machine's drawing, else whatever the reel is on.
+   *
+   * An off-catalogue line has no ref at all and resolves to nothing, which is right — the catalogue
+   * has no drawing of a machine it does not carry, and Mansour holds the ring instead.
+   */
+  const picture = item ? iconForRef(icons, item.ref) : reel.length ? reel[spin % reel.length] : null;
+
+  /** What the agent resolved this line to, named as the canvas will name it. */
+  const name = useMemo(() => {
+    if (!item) return "";
+    const a = item.agentNames;
+    const sub = a ? (ar ? a.subtypeAr || a.subtype : a.subtype) : "";
+    const cap = a ? (ar ? a.capacityAr || a.capacity : a.capacity) : "";
+    return [sub, cap].filter(Boolean).join(" ") || item.rawLabel || t.processing.oneMachine;
+  }, [item, ar, t]);
 
   /* ----------------------------- Error (AC-09 / AC-10) — clear modal ----------------------------- */
   if (error) {
@@ -41,90 +144,251 @@ export function Processing() {
     const body = isEmpty ? t.errors.emptyBody : agentBusy ? t.errors.busyBody : agentDown ? t.errors.unavailableBody : t.errors.networkBody;
     const icon = isEmpty ? "search_off" : agentBusy ? "hourglass_empty" : agentDown ? "cloud_off" : "wifi_off";
     return (
-      <div
-        className="fixed inset-0 z-[70] flex items-center justify-center bg-navy/45 p-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="proc-err-title"
-        onClick={(e) => { if (e.target === e.currentTarget) actions.goIntake(); }}
-      >
-        <div className="relative w-full max-w-sm rounded-2xl bg-surface p-7 text-center shadow-[0_24px_60px_rgba(16,32,58,.35)]">
-          <button
-            onClick={() => actions.goIntake()}
-            aria-label={t.common.close}
-            className="absolute end-3 top-3 grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-surface3 hover:text-navy"
-          >
-            <Icon name="close" size={18} />
-          </button>
+      /* ── The shared dialog, keeping its own shape (owner, 2026-08-28: one design for every modal)
+         ─────────────────────────────────────────────────────────────────────────────────────────
+         It drew its own scrim, panel, and close — and its own focus handling, which is to say none.
+         `Dialog` supplies all four.
+
+         It passes NO title, deliberately. A failure is read from the middle out: the glyph, then
+         what went wrong, then the way back. Putting that title into a header bar at the leading edge
+         would make this look like every panel and read like none of them. A title-less dialog floats
+         its close in the corner, which is exactly the control this was hand-rolling. */
+      <Dialog open onClose={() => actions.goIntake()} size="sm">
+        <div className="text-center">
           <div className={`mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full ${isEmpty || agentBusy ? "bg-warn-soft text-warn" : "bg-danger-soft text-danger"}`}>
             <Icon name={icon} size={34} />
           </div>
-          <h2 id="proc-err-title" className="text-[19px] font-extrabold tracking-tight text-navy">{title}</h2>
-          <p className="mx-auto mt-2 max-w-[300px] text-[14px] leading-relaxed text-muted">{body}</p>
+          <h2 id="proc-err-title" className="text-title font-extrabold tracking-tight text-navy">{title}</h2>
+          <p className="mx-auto mt-2 max-w-[300px] text-body leading-relaxed text-muted">{body}</p>
           {errorDetail?.detail && (
-            <p className="mx-auto mt-3 max-w-[320px] break-words rounded-lg bg-surface3 px-3 py-2 text-start font-mono text-[11.5px] leading-snug text-muted">{errorDetail.detail}</p>
+            <p className="mx-auto mt-3 max-w-[320px] break-words rounded-sm bg-surface3 px-3 py-2 text-start font-mono text-label leading-snug text-muted">{errorDetail.detail}</p>
           )}
-          <Button className="mt-6 w-full py-3 text-[15px]" onClick={() => actions.process()}>
+          <Button className="mt-6 w-full py-3 text-subhead" onClick={() => actions.process()}>
             <Icon name="refresh" size={19} /> {t.common.retry}
           </Button>
         </div>
-      </div>
+      </Dialog>
     );
   }
 
-  // Once the result is in, mark everything complete.
-  const effectiveStage = done ? stages.length : stage;
-  const barPct = done ? 100 : Math.round(((stage + 1) / stages.length) * 100);
-
   return (
-    <div className="mx-auto mt-9 max-w-[460px] text-center">
-      {/* loadicon: the AI agent glyph (our agent mark) + spinning ring; check when done */}
-      <div className="relative mx-auto mb-[22px] grid h-[84px] w-[84px] place-items-center rounded-full border border-border bg-surface shadow-[0_6px_20px_rgba(28,53,80,.06)]">
-        {!done && <span className="absolute -inset-px rounded-full border-[3px] border-transparent border-r-brand border-t-brand motion-safe:animate-spin" />}
-        <Icon name={done ? "task_alt" : "smart_toy"} size={34} className={done ? "text-ok" : "text-warn"} />
+    <ProcessingView
+      imageUrl={picture && broken !== picture ? picture : null}
+      title={item ? name : t.processing.reading}
+      caption={item ? t.processing.matched : null}
+      /* An ITEM on screen is an answer; the reel is not. The two states already differ by the
+         caption, and this is the same fact moving the ring and the drawing. */
+      found={!!item}
+      onImageError={() => setBroken(picture)}
+    />
+  );
+}
+
+/**
+ * What the screen actually draws, with the state taken out of it.
+ *
+ * Split from {@link Processing} so `dev/preview` can photograph its states: the screen is on its
+ * feet for a few seconds inside a flow that needs a session, a project and a live agent, which is
+ * not a thing anyone can look at while changing it. This is the real component — `Processing`
+ * renders this and nothing else.
+ */
+export function ProcessingView({
+  imageUrl,
+  title,
+  caption,
+  found = false,
+  onImageError,
+}: {
+  /** The catalogue's drawing of the machine on screen, or null for the agent alone. */
+  imageUrl: string | null;
+  /** One line: what is happening, or — once there is an answer — the machine. */
+  title: string;
+  /** Drawn only under a machine's name, to mark it as a finding rather than a label. */
+  caption: string | null;
+  /**
+   * This drawing is the agent's ANSWER, not one more candidate from the reel.
+   *
+   * It is what makes the machine arrive rather than appear (owner, 2026-09-13: *"when the image is
+   * found show it appear to the screen like winner"*): the ring closes, and the drawing overshoots
+   * and settles. Drawn straight through to CSS, so `prefers-reduced-motion` still gets the result
+   * with none of the flourish.
+   */
+  found?: boolean;
+  onImageError?: () => void;
+}) {
+  return (
+    <div {...pin("create-processing")} className="flex min-h-[70vh] flex-col items-center justify-center gap-6 px-4 text-center">
+      {/* ── The ring, and what is inside it ────────────────────────────────────────────────────────
+          ONE moving thing besides the picture. A 3px ring of `brand` at a sixth strength with a
+          solid quarter turning through it: the design system's own orange, no gradient, no glow, no
+          second tile. It never reports a POSITION, because there is none to report — the server
+          answers this request in one shot, which is what the bar and the percentage pill were
+          pretending otherwise about.
+
+          144px, not 104. The screen holds three things and a viewport of air; at the smaller size it
+          read as a spinner somebody forgot to build a page around (owner, 2026-09-13: *"the ui is so
+          dull"*).
+
+          `object-contain`: these are flat DRAWINGS carrying their own transparent margin, and
+          cropping one enlarges the margin rather than the machine — the requests rail's own note,
+          2026-08-31. Its other rule, the 1.34 scale, belongs to a 52px circle where a letterboxed
+          drawing leaves more hole than machine; at 118px there is room to simply fit it. */}
+      {/* ── It comes TOWARD him when the machine lands (owner, 2026-09-14) ────────────────────
+          *"once he detected the equipment make the image big and zoomed in, as transition to the
+          front of user"*. The name he was reaching for is a **dolly-in** — the camera moving toward
+          the subject — which in CSS is a scale on the whole assembly rather than on the picture.
+          🔴 It MUST be the assembly, not the drawing. `object-contain` already fills the disc's
+          width at these ratios, so any lasting scale on the image pushes the machine's ends out
+          through a circle that clips them (the note on the `<img>` below measures this). Growing the
+          ring and the disc together gives the same «bigger, closer» reading and cannot clip: there
+          is simply more circle.
+          ⚠️ `motion-safe`, and the size is the resting state either way — a renter who asked for
+          less motion still gets the big machine, just without the travel. */}
+      {/* ── BIGGER and louder (owner, 2026-09-23: *"make the circle of image bigger and more visible
+          and catchy"*) ───────────────────────────────────────────────────────────────────────────
+          ~~144 / 134~~ → 184 / 172, a 4px ring, and a pale brand halo ring standing 10px outside it
+          on both states, so the circle reads from across the room. A RING, not a shadow: the owner
+          took shadows off the whole product on 2026-08-26. Every ratio the notes below measure is
+          unchanged, since the drawing's fit is relative to the disc. */}
+      <span
+        className={`relative grid h-[184px] w-[184px] flex-none place-items-center transition-transform duration-500 ease-out motion-reduce:transition-none${
+          found ? " motion-safe:scale-[1.14]" : ""
+        }`}
+      >
+        <span aria-hidden="true" className="pointer-events-none absolute -inset-[10px] rounded-full border-[6px] border-brand/10" />
+        {/* ── The ring says which of the two states this is ─────────────────────────────────────
+            SEARCHING: a quarter of brand turning through a pale circle — the catalogue being read.
+            FOUND: the circle CLOSES, stops, and takes the full brand edge, arriving with the machine
+            on one timeline (`found-ring`). The search ending is the other half of «he found it»;
+            leaving the quarter spinning over a settled answer would say it is still looking.
+
+            ⚠️ `key` on the state so React REPLACES the element rather than re-styling it — a CSS
+            animation on a kept node does not re-run, and the ring would close without the flourish
+            the drawing beside it is doing. */}
+        <span
+          key={found ? "found" : "searching"}
+          aria-hidden="true"
+          className={
+            found
+              ? "absolute inset-0 rounded-full border-4 border-brand found-ring"
+              : "absolute inset-0 rounded-full border-4 border-brand/15 border-t-brand motion-safe:animate-spin"
+          }
+          style={found ? undefined : { animationDuration: "1.1s" }}
+        />
+        {/* ── WHITE under the drawing (owner, 2026-09-14) ───────────────────────────────────
+            *"i want the equipment image to fit the circle with no background appearing like a square
+            inside a circle"*.
+            🔴 The square is the FILE, not the layout. 13 of the 44 seeded taxonomy assets are
+            `.jpg`, which cannot carry alpha, so they bring their own white rectangle — and on
+            `surface2` that rectangle is visible as a square inside the circle. CSS cannot key it out
+            (measured 2026-09-08: Leaflet's transform isolates the marker, so a blend mode never
+            reaches what is behind). White is what those files' own ground IS, so on white they have
+            nothing left to show.
+            ⚠️ The real fix is still transparent PNGs in the bucket, which would fix the app too.
+            This hides it wherever the file's ground is white, which is every one of the thirteen. */}
+        {/* ── The «winner» flourish (owner, 2026-09-14: *"add any transition that makes the image
+            appear as the detected one, as winner"*) ─────────────────────────────────────────────
+            One halo, thrown outward from the disc and gone in 700ms. It is OUTSIDE the disc on
+            purpose: the disc clips, so a ripple drawn inside it would be a circle expanding into a
+            circle it can never leave.
+            ⚠️ Once, not a loop. A pulse that keeps going says «still working», which is the exact
+            opposite of what this moment means — and it is the state the spinner above just left. */}
+        {found && (
+          <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full border-2 border-brand found-halo motion-reduce:hidden" />
+        )}
+        <span className="grid h-[172px] w-[172px] place-items-center overflow-hidden rounded-full bg-surface">
+          {imageUrl ? (
+            /* ── A URL that fails falls back to the agent ──────────────────────────────────────
+               A plain `<img>`, the same as the requests rail and for the same two reasons. The
+               taxonomy's objects are not public-read on every environment, so a well-formed URL can
+               answer 403 and `onError` is the only signal a client gets; and `next/image` would need
+               this S3 host in `next.config.ts`'s `remotePatterns`, which it is not — it throws at
+               render rather than degrading, which is the opposite of what this slot needs.
+
+               `key` on the URL so a swap is a NEW element: without it the browser keeps the old
+               pixels until the next decode, and the reel stutters instead of flicking. */
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              key={imageUrl}
+              src={imageUrl}
+              alt=""
+              draggable={false}
+              onError={onImageError}
+              /* ── It FITS, and nothing is cut (owner, 2026-09-13: *"make the processing circle
+                 fit the image fully"*) ──────────────────────────────────────────────────────────
+                 🔴 **The scale is GONE, and the disc grew instead** (118 → 134, five pixels inside
+                 the ring). Both earlier values clipped, and the second one was measured to prove it:
+                 the catalogue's drawings are ~1.83:1 with NO horizontal margin — the rail measured
+                 `spider-crane.png` at 1024×559 and drew it 52×28 in a 52px box, edge to edge. So
+                 `contain` already fills the width, and ANY scale above 1 pushes the machine's ends
+                 out through the circle: at 1.5 the spider crane lost both outriggers.
+                 The geometry, for the next person who tries: a w×h picture fits inside a circle of
+                 diameter D when w·√(1+(h/w)²) ≤ D. At 1.83:1 that is w ≤ 0.87D — and `contain`
+                 gives w = D exactly, so 1.0 is already the ceiling, not a starting point.
+                 The machine is big because the DISC is, which is the only lever that cannot clip.
+                 ⚠️ The FOUND pop is on the image, not on the disc: the disc is `overflow-hidden`
+                 and an animation on it would clip the overshoot to a circle that is itself growing. */
+              /* ── It FILLS the circle, as the request rail's tiles do (owner, 2026-09-14) ───
+                 *"for the square image, zoom in inside the circle to fit, like the ones in the
+                 requests line header"*. `contain` alone letterboxes: these drawings are ~1.83:1, so
+                 in a round hole they draw a wide band with the disc's own ground above and below it —
+                 which is the «square inside a circle» he has been pointing at.
+                 `scale-[1.34]` is the rail's own figure (2026-09-12, measured there: 52 ÷ 28, the
+                 factor that turns that letterbox into a filled tile). The ends crop, and that is the
+                 trade the rail already took after `object-cover` was tried on the live rail and
+                 rejected for cutting the machine into a jumble.
+                 ⚠️ Safe only because the disc is `overflow-hidden rounded-full`. */
+              className={`h-full w-full scale-[1.34] object-contain${found ? " found-pop" : ""}`}
+            />
+          ) : (
+            /* No drawing — an off-catalogue line, or the tree failed to load. The agent holds the
+               ring rather than an empty grey disc. */
+            <Mansour size={92} state="live" />
+          )}
+        </span>
+
+        {/* ── He keeps the corner whenever the ring holds a machine ─────────────────────────────
+            The machine is the subject and he is the one who found it: a mark on the trailing-bottom
+            edge, on the app's own ground so he reads as standing ON the tile rather than inside it.
+            This is where the old screen's green «it is running» dot sat, and it does that job with
+            something that also says WHO. */}
+        {imageUrl && (
+          <span className="absolute -bottom-1 -end-1 grid h-[46px] w-[46px] place-items-center rounded-full border border-border bg-surface">
+            <Mansour size={36} state="live" />
+          </span>
+        )}
+      </span>
+
+      {/* One line. While the request is in flight it says what is happening; from the moment the
+          answer lands it says the MACHINE, which is the only thing here worth reading. The caption
+          under it is what makes the name a FINDING rather than a label — without it a machine name
+          alone on a loading screen reads as the thing being waited for. */}
+      <div className="flex min-h-[56px] max-w-[420px] flex-col items-center gap-1.5">
+        <p className="text-title font-extrabold tracking-tight text-navy">{title}</p>
+        {caption && <p className="text-meta font-semibold text-muted">{caption}</p>}
       </div>
 
-      <h2 className="text-[21px] font-extrabold tracking-tight">{t.processing.title}</h2>
-      <p className="mb-[26px] mt-1.5 text-[13.5px] text-muted">{t.processing.sub}</p>
+      {/* ── The processing line (owner, 2026-09-13: *"show process line anyways too"*) ─────────────
+          🔴 **It reports no POSITION, and it cannot.** `processRfq` is one request and the server
+          answers once, which is why the old percentage bar went on 2026-09-12 - it was a number
+          moving on a timer, and it lied in the renter's favour right up until it stalled. He asked
+          for the line back anyway; the honest form of «anyway» is INDETERMINATE - a short segment
+          travelling the track, saying «working» and claiming nothing.
 
-      {/* stages */}
-      <div className="mx-auto mb-6 flex max-w-full sm:max-w-[330px] flex-col gap-[13px] text-start">
-        {stages.map((label, i) => {
-          const s = i < effectiveStage ? "done" : i === effectiveStage ? "active" : "todo";
-          return (
-            <div key={i} className={`flex items-center gap-[11px] text-[13.5px] font-semibold ${s === "todo" ? "text-muted/50" : s === "active" ? "text-navy" : "text-navy-mid"}`}>
-              <span
-                className={`grid h-[22px] w-[22px] flex-none place-items-center rounded-full text-[11px] font-extrabold ${
-                  s === "done"
-                    ? "bg-ok text-white"
-                    : s === "active"
-                      ? "border-2 border-brand border-t-transparent motion-safe:animate-spin"
-                      : "border-2 border-border"
-                }`}
-              >
-                {s === "done" ? "✓" : ""}
-              </span>
-              {label}
-            </div>
-          );
-        })}
-      </div>
+          On a match it stops and the track FILLS: the same news the ring closing and the machine
+          landing are giving at that moment.
 
-      {/* progress bar */}
-      <div className="mx-auto h-1.5 max-w-full sm:max-w-[330px] overflow-hidden rounded-full bg-surface3">
-        <div className="h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${barPct}%` }} />
-      </div>
-
-      {/* When done: AC-56 summary counts + continue. */}
-      {done && draft && (
-        <div className="mt-7">
-          <div className="flex flex-wrap justify-center gap-2">
-            <Badge tone="brand">{fmt(t.processing.summaryItems, { count: draft.summary.totalItems })}</Badge>
-            {draft.summary.needsValidation > 0 && <Badge tone="warn">{fmt(t.processing.summaryNeedCheck, { count: draft.summary.needsValidation })}</Badge>}
-            {draft.summary.notAvailable > 0 && <Badge tone="danger">{fmt(t.processing.summaryNotAvailable, { count: draft.summary.notAvailable })}</Badge>}
-          </div>
-        </div>
-      )}
+          ⚠️ 180px and 3px, under the line rather than across the page. A full-width bar would be
+          the loudest thing on a screen whose subject is the machine in the circle.
+          ⚠️ `aria-hidden`: the title above it already says what is happening, in words. A progress
+          bar with no value announces nothing a screen reader can use. */}
+      <span aria-hidden="true" className="h-[3px] w-[180px] overflow-hidden rounded-full bg-surface3">
+        {found ? (
+          <span className="block h-full w-full rounded-full bg-brand" />
+        ) : (
+          <span className="block h-full w-[30%] rounded-full bg-brand proc-seg" />
+        )}
+      </span>
     </div>
   );
 }

@@ -9,15 +9,52 @@ export const RENTAL_BASES: RentalBasis[] = ["daily", "weekly", "monthly"];
 export type OvertimeRate = "without" | "1.5x" | "2x"; // AC-15
 export const OVERTIME_RATES: OvertimeRate[] = ["without", "1.5x", "2x"];
 
-/** Min manufacture year — matches the mobile request form: 2015+ / 2018+ / 2020+ / 2022+ + Any. */
-export const EQUIPMENT_YEARS = ["2015+", "2018+", "2020+", "2022+", "any"] as const;
+/**
+ * Minimum manufacture year, as the app asks it.
+ *
+ * ⚠️ This was `2015+ / 2018+ / 2020+ / 2022+ / any`, and the comment claimed those matched the mobile
+ * form. They do not. `year_stepper.dart` offers **every year from 2010 to the current one, newest
+ * first**, in a searchable sheet — and the backend stores a plain number (`equipmentYear`, `type:
+ * 'number'` in the export catalogue). So a renter on the web could only ask for a band the app has no
+ * way to express, and the two surfaces disagreed about the same field (owner, 2026-09-01).
+ *
+ * Computed, not frozen: a hardcoded list is wrong every January, and it is wrong quietly — the newest
+ * year simply stops being offered.
+ */
+export const EQUIPMENT_YEAR_MIN = 2010;
+
+export function equipmentYears(now: Date = new Date()): string[] {
+  const years: string[] = [];
+  for (let y = now.getFullYear(); y >= EQUIPMENT_YEAR_MIN; y--) years.push(String(y));
+  // "Any" leads: it is the answer for most requests, and burying it under sixteen years would make
+  // the common case the one that takes scrolling.
+  return ["any", ...years];
+}
+
+/**
+ * The bands this app used to offer. **Never offered again — kept so old drafts still render.**
+ * A request saved last month with `2018+` must not display as a blank field.
+ */
+export const LEGACY_EQUIPMENT_YEAR_BANDS = ["2015+", "2018+", "2020+", "2022+"] as const;
 
 // 2026-07 cert rule: equipment certs offered are TÜV + Aramco (SPSP/SASO dropped from selection but
 // legacy values still RENDER for old data, so they stay in the union). Aramco is equipment-only.
 export type SafetyCertificate = "tuv" | "aramco" | "spsp" | "saso-technical" | "other"; // AC-50 (+ web-app/002 free-text "other")
 export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "aramco", "other"];
-/** Operator per-item certificate options — Aramco is NOT an operator cert (equipment-only, app parity). */
-export const OPERATOR_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "saso-technical", "other"];
+/**
+ * Operator per-item certificate options — Aramco is NOT an operator cert (equipment-only, app parity).
+ *
+ * `saso-technical` was offered here and is no longer: **no parse can produce it.** The normalization
+ * agent's operator dimension accepts only `SPSP` and `TÜV` (`rfq-prompt.ts`: *"operator_license_levels
+ * — an ARRAY — ONLY "SPSP" / "TÜV""*), so offering SASO as a live choice let a renter demand a
+ * certificate the platform never recognises on that side — and an unrecognised cert becomes a
+ * document every bidder is asked for. It stays in the {@link SafetyCertificate} union so existing
+ * data still RENDERS; it is simply not selectable any more.
+ *
+ * Note that SASO does exist elsewhere: `saso-registration` is a request-level "Other" certificate
+ * (see {@link OTHER_CERTIFICATES}), which is a different thing from an operator's licence.
+ */
+export const OPERATOR_CERTIFICATES: SafetyCertificate[] = ["tuv", "spsp", "other"];
 
 /**
  * Normalize a stored/legacy equipment-cert value to a canonical code. App parity:

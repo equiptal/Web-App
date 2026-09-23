@@ -126,6 +126,34 @@ export interface BidQuote {
    */
   perUnit: { rental: number; mob: number; demob: number; subtotal: number; vat: number; total: number };
 }
+/**
+ * **The count the money is multiplied by** — app parity, `v3_bid_card._liveRentalUnits`.
+ *
+ * The negotiated count wins, so every surface's price tracks the deal room: a renter who cut a
+ * four-unit offer to two sees two on the deal room's quote panel AND two behind the bid card's
+ * overall total. Falling back to `unitsOffered` there made the card multiply by a count the deal
+ * room had already moved off, and the two surfaces printed different totals for one bid.
+ *
+ * `unitsOffered` — what the supplier put on the table — is the fallback, then the request's own
+ * count, then one.
+ *
+ * **Clamped to `numberOfUnits`**, the count the RFQ asked for, because a count above the request
+ * could never be billed — the app clamps the same way (`rental_pricing.dart:48-50`), the deal room's
+ * `live_position.dart` clamps the same way, and `submitBid` refuses an offer above the uncovered
+ * remainder. Never below one: a bid carrying no counts anywhere is still one machine's worth of
+ * price.
+ */
+export function liveRentalUnits(bid: Pick<BidCard, "agreedUnits" | "currentRentalUnits" | "unitsOffered" | "numberOfUnits">): number {
+  const live =
+    (bid.agreedUnits != null && bid.agreedUnits > 0) ? bid.agreedUnits
+    : (bid.currentRentalUnits != null && bid.currentRentalUnits > 0) ? bid.currentRentalUnits
+    : (bid.unitsOffered && bid.unitsOffered > 0) ? bid.unitsOffered
+    : (bid.numberOfUnits > 0 ? bid.numberOfUnits : 1);
+  const cap = bid.numberOfUnits;
+  if (!(cap > 0)) return Math.max(1, live);
+  return Math.min(Math.max(1, live), cap);
+}
+
 export function computeBidQuote(
   bid: BidCard,
   /** `startDate` is what lets the rental exclude Fridays (mobile parity). Without it the rental falls
@@ -133,15 +161,8 @@ export function computeBidQuote(
   opts?: { fallbackDays?: number | null; units?: number; startDate?: string | null },
 ): BidQuote {
   const rate = num(bid.price) ?? 0;
-  // Live deal-room rental count (app parity: v3_bid_card `_liveRentalUnits`) — the negotiated count wins
-  // so the card price tracks the deal room; falls back to the offered/requested count. An explicit
-  // opts.units (comparison unit toggle) still overrides.
-  const liveUnits =
-    (bid.agreedUnits != null && bid.agreedUnits > 0) ? bid.agreedUnits
-    : (bid.currentRentalUnits != null && bid.currentRentalUnits > 0) ? bid.currentRentalUnits
-    : (bid.unitsOffered && bid.unitsOffered > 0) ? bid.unitsOffered
-    : (bid.numberOfUnits || 1);
-  const units = opts?.units ?? liveUnits;
+  // An explicit opts.units (comparison unit toggle) overrides the live count.
+  const units = opts?.units ?? liveRentalUnits(bid);
   const dpp = rentalDivisor(bid.priceUnit);
   const fb = num(opts?.fallbackDays);
   // No stated duration and no request fallback → ONE FULL PERIOD at exactly the quoted rate.

@@ -1,0 +1,1163 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Procurement integrity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* Moedatech design tokens, copied from src/app/globals.css :root. Never re-chosen here. */
+:root{
+  --navy-deep:#1c2738; --navy:#22384e; --navy-mid:#33506d;
+  --muted-dark:#444f57; --muted:#59646e; --muted-light:#8a95a0;
+  --border-strong:#c6c6c6; --border:#dcdcdc; --border-hair:#e4e4e4;
+  --surface3:#e8e8e8; --surface2:#f4f4f4; --surface:#ffffff; --background:#f4f4f4;
+  --brand:#f97316; --brand-deep:#c2570f; --brand-light:#e8b64c; --brand-soft:#fef1e8;
+  --ok:#1d9e55; --ok-soft:#e2efe7; --ok-deep:#1d7a45;
+  --warn:#b98a1d; --warn-soft:#f7edd8; --warn-deep:#8a6412; --warn-border:#e0c583;
+  --danger:#c02626; --danger-soft:#f7e3e3; --danger-deep:#b91c1c; --danger-border:#e8c1c1;
+  --font-sans:'Inter',system-ui,-apple-system,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --label:11px; --body:13px; --lead:15px; --head:19px; --radius:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans);font-size:var(--body);line-height:1.5;color:var(--navy);
+  background:var(--background);-webkit-font-smoothing:antialiased}
+h1,h2{font-weight:800;line-height:1.25}
+table{border-collapse:collapse;width:100%}
+
+.bar{background:var(--navy-deep);color:#fff;height:52px;display:flex;align-items:center;gap:16px;padding:0 20px}
+.bar .mark{font-weight:800;font-size:var(--lead)}
+.bar nav{display:flex;gap:2px;margin-inline-start:12px}
+.bar nav a{color:rgba(255,255,255,.75);text-decoration:none;font-size:12px;padding:5px 11px;border-radius:var(--radius)}
+.bar nav a.on{background:#fff;color:var(--navy-deep);font-weight:600}
+.bar .who{margin-inline-start:auto;display:flex;align-items:center;gap:10px;font-size:12px;color:rgba(255,255,255,.75)}
+.bar .avatar{width:28px;height:28px;border-radius:999px;background:var(--navy-mid);display:grid;place-items:center;font-size:11px;font-weight:800}
+
+.wrap{max-width:1460px;margin:0 auto;padding:22px 20px 64px}
+.head{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.head h1{font-size:var(--head)}
+.head p{color:var(--muted);font-size:12px;margin-top:3px}
+.head .acts{margin-inline-start:auto;display:flex;gap:8px}
+.btn{font:inherit;font-size:12px;font-weight:600;border-radius:var(--radius);padding:7px 13px;
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--navy);cursor:pointer}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.sm{padding:5px 10px;font-size:11px}
+
+[data-x]{cursor:pointer}
+[data-x]:hover{outline:1.5px solid var(--brand);outline-offset:1px;border-radius:3px}
+th[data-x]:hover{outline-offset:-1px}
+td[data-x]{position:relative}
+td[data-x]::after{content:"›";position:absolute;inset-inline-end:3px;top:11px;font-size:13px;
+  font-weight:700;color:var(--border);line-height:1;transition:color .12s}
+td[data-x]:hover::after,td[data-x].on::after{color:var(--brand)}
+[data-x].on{outline:1.5px solid var(--brand);outline-offset:1px;border-radius:3px}
+
+/* ── Five figures, each answering a question ──────────────────────── */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:26px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px 15px;
+  display:flex;flex-direction:column}
+.kpi .n{font-size:27px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .n small{font-size:14px;font-weight:700;opacity:.6}
+.kpi .l{font-size:12.5px;font-weight:600;color:var(--navy);margin-top:4px}
+.kpi .s{font-size:var(--label);color:var(--muted);margin-top:2px}
+.kpi .s b{color:var(--danger-deep);font-weight:700}
+.kpi.good .n{color:var(--ok-deep)} .kpi.warn .n{color:var(--warn-deep)} .kpi.bad .n{color:var(--danger-deep)}
+
+section{margin-bottom:26px}
+.sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:9px;flex-wrap:wrap}
+.sec-head h2{font-size:15px}
+.sec-head .note{font-size:var(--label);color:var(--muted)}
+.tabs{margin-inline-start:auto;display:flex;gap:4px}
+.tab{font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);
+  border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--muted-dark)}
+.tab.on{background:var(--navy);border-color:var(--navy);color:#fff}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.scroll{overflow-x:auto;overflow-y:clip}
+th{font-size:var(--label);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);
+  font-weight:600;text-align:start;padding:9px 12px;background:var(--surface2);
+  border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:11px 12px;border-bottom:1px solid var(--border-hair);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:end}
+th:first-child,td:first-child{min-width:230px}
+.ref{font-weight:700;white-space:nowrap}
+.sub{font-size:12px;color:var(--muted);display:block;margin-top:1px}
+.sub.bad{color:var(--danger-deep)}
+.money{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.delta{font-size:12px;font-variant-numeric:tabular-nums;display:block;margin-top:1px}
+.delta.up{color:var(--danger-deep);font-weight:600}
+.delta.dn{color:var(--ok-deep);font-weight:600}
+.delta.flat{color:var(--muted)}
+.way{font-size:var(--label);text-transform:uppercase;letter-spacing:.04em;font-weight:600;color:var(--muted);white-space:nowrap}
+.way.direct{color:var(--warn-deep)} .way.link{color:var(--warn-deep)}
+.rk{font-size:12px;font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.rk.ok{color:var(--muted-dark)} .rk.warn{color:var(--warn-deep)} .rk.bad{color:var(--danger-deep)}
+.none{font-size:12px;color:var(--muted-light)}
+
+/* One scale per row: where the award sits among its own bids, and against the market */
+.pos{width:176px;display:inline-block;text-align:start}
+.rail{position:relative;height:16px}
+.rail::before{content:"";position:absolute;top:7px;left:0;right:0;height:2px;background:var(--surface3);border-radius:2px}
+.rail i{position:absolute;top:6px;height:4px;background:var(--border-strong);border-radius:2px}
+.rail b.mkt{position:absolute;top:2px;width:2px;height:12px;background:var(--navy-mid);margin-inline-start:-1px}
+.rail b.awd{position:absolute;top:3px;width:10px;height:10px;border-radius:999px;background:var(--navy);
+  margin-inline-start:-5px;border:2px solid #fff;box-shadow:0 0 0 1px var(--navy)}
+.rail b.awd.bad{background:var(--danger);box-shadow:0 0 0 1px var(--danger)}
+.posnote{font-size:11px;color:var(--muted);display:block;margin-top:1px;white-space:nowrap}
+.sub2{display:block;color:var(--muted-light);font-size:10.5px;margin-top:2px;white-space:nowrap}
+.guide{background:var(--surface);border:1px solid var(--border);border-inline-start:3px solid var(--brand);
+  border-radius:var(--radius);padding:10px 14px;font-size:12.5px;color:var(--muted-dark);margin-bottom:18px}
+.guide b{color:var(--navy);font-weight:700}
+.posnote b{font-weight:700} .posnote b.up{color:var(--danger-deep)} .posnote b.dn{color:var(--ok-deep)}
+.poskey{display:flex;gap:18px;padding:10px 15px;border-top:1px solid var(--border);
+  background:var(--surface2);font-size:12px;color:var(--muted-dark);flex-wrap:wrap;align-items:center}
+.poskey span{display:flex;align-items:center;gap:6px}
+.poskey .k1{width:22px;height:4px;border-radius:2px;background:var(--border-strong)}
+.poskey .k2{width:2px;height:12px;background:var(--navy-mid)}
+.poskey .k3{width:10px;height:10px;border-radius:999px;background:var(--navy);border:2px solid #fff;box-shadow:0 0 0 1px var(--navy)}
+.find{display:flex;flex-direction:column;gap:4px;min-width:262px}
+.f{display:inline-flex;align-items:center;gap:6px;font-size:12px;width:fit-content;
+  padding:2px 8px 2px 6px;border-radius:999px;border:1px solid transparent}
+.f::before{content:"";width:5px;height:5px;border-radius:999px;background:currentColor;flex:none}
+.f.block{background:var(--danger-soft);color:var(--danger-deep);border-color:var(--danger-border)}
+.f.open{background:var(--warn-soft);color:var(--warn-deep);border-color:var(--warn-border)}
+
+/* ── Split rows ───────────────────────────────────────────────────── */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.row2{display:flex;align-items:center;gap:12px;padding:10px 15px;border-bottom:1px solid var(--border-hair)}
+.row2:last-of-type{border-bottom:0}
+.row2 .g{flex:1;min-width:0}
+.row2 .t{font-weight:600;font-size:12.5px}
+.row2 .s{font-size:12px;color:var(--muted)}
+.row2 .d{flex:none;font-size:var(--label);font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.row2 .d.bad{background:var(--danger-soft);color:var(--danger-deep);border:1px solid var(--danger-border)}
+.row2 .d.warn{background:var(--warn-soft);color:var(--warn-deep);border:1px solid var(--warn-border)}
+.row2 .track{flex:none;width:130px;height:7px;border-radius:999px;background:var(--surface3);overflow:hidden}
+.row2 .track i{display:block;height:100%;border-radius:999px;background:var(--navy-mid)}
+.row2 .track i.flag{background:var(--danger)}
+.row2 .pc{flex:none;width:42px;text-align:end;font-weight:700;font-variant-numeric:tabular-nums;font-size:12.5px}
+.pfoot{padding:10px 15px;border-top:1px solid var(--border);background:var(--surface2);font-size:12px;color:var(--muted-dark)}
+.pfoot b{color:var(--navy)}
+.phead{padding:9px 15px;border-bottom:1px solid var(--border);background:var(--surface2);
+  font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+
+/* route split bar */
+.split{display:flex;height:30px;border-radius:var(--radius);overflow:hidden;margin:14px 15px 9px}
+.split div{display:grid;place-items:center;font-size:var(--label);font-weight:700;color:#fff;white-space:nowrap}
+.split .a{background:var(--navy-mid)} .split .b{background:var(--warn)} .split .c{background:var(--danger)}
+.splitkey{display:flex;gap:16px;padding:0 15px 13px;flex-wrap:wrap}
+.splitkey div{font-size:12px;color:var(--muted-dark);display:flex;align-items:center;gap:6px}
+.splitkey i{width:9px;height:9px;border-radius:2px;flex:none}
+.splitkey b{font-variant-numeric:tabular-nums}
+
+/* ── Blind spots ──────────────────────────────────────────────────── */
+.blind{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px 16px}
+.blind p{font-size:12px;color:var(--muted);margin-bottom:10px}
+.blind .items{display:flex;flex-wrap:wrap;gap:6px}
+.bi{font-size:12px;border:1px dashed var(--border-strong);border-radius:999px;padding:3px 11px;
+  color:var(--muted-dark);background:var(--surface2)}
+.foot{margin-top:22px;font-size:var(--label);color:var(--muted-light);line-height:1.7}
+
+/* ── Drawer ───────────────────────────────────────────────────────── */
+#scrim{position:fixed;inset:0;background:transparent;pointer-events:none;z-index:40}
+#scrim.open{pointer-events:auto}
+#dw{position:fixed;inset-block:0;inset-inline-end:0;width:min(450px,100vw);background:var(--surface);
+  border-inline-start:1px solid var(--border-strong);z-index:50;display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .2s ease}
+#dw.open{transform:translateX(0)}
+#dw header{padding:16px 20px 13px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start}
+#dw header .kind{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+#dw header h3{font-size:var(--lead);line-height:1.3}
+.answers{font-size:11px;font-weight:700;color:var(--brand-deep);margin-top:5px}
+.answers:empty{display:none}
+#dw header button{flex:none;width:28px;height:28px;border:1px solid var(--border);background:var(--surface);
+  border-radius:var(--radius);cursor:pointer;font:inherit;font-size:15px;color:var(--muted);line-height:1}
+#dw .scrollbody{overflow-y:auto;padding:16px 20px 28px;flex:1}
+#dw .blk{margin-bottom:18px}
+#dw .blk h4{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+#dw .blk p{font-size:var(--body);line-height:1.6}
+#dw .blk p.soft{color:var(--muted-dark)}
+#dw .ask{border-top:1px solid var(--border);padding:11px 20px;background:var(--surface2);display:flex;gap:7px}
+#dw .ask .btn{flex:1}
+.det{font-size:12px}
+.det .dtitle{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.det .dr{display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid var(--border-hair)}
+.det .dr:last-of-type{border-bottom:0}
+.det .dr .a{flex:1;min-width:0}
+.det .dr .a em{font-style:normal;color:var(--danger-deep);font-size:11px}
+.det .dr .b{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.det .dr .c{color:var(--muted-light);font-size:10.5px;white-space:nowrap;min-width:72px;text-align:end}
+.det .dr .tick{width:14px;text-align:center;font-weight:800;color:var(--ok-deep)}
+.det .dr.bad{background:var(--danger-soft)} .det .dr.bad .tick{color:var(--danger-deep)}
+.det .dr.bad .b{color:var(--danger-deep)}
+.det .dr.win{background:var(--navy);color:#fff;border-radius:4px;border-bottom:0}
+.det .dr.win .a em{color:#ffb4ae}
+.det .dr.mkt{border-top:1px solid var(--border-strong);margin-top:3px}
+.det .bar{flex:none;width:76px;height:12px;position:relative}
+.det .bar::before{content:"";position:absolute;top:5px;left:0;right:0;height:2px;background:var(--surface3)}
+.det .bar i{position:absolute;top:3px;width:6px;height:6px;border-radius:999px;background:var(--navy-mid);margin-inline-start:-3px}
+.det .dr.win .bar::before{background:rgba(255,255,255,.3)}
+.det .dr.win .bar i{background:#fff}
+.det .bar i.m{border-radius:1px;width:2px;height:10px;top:1px;background:var(--brand-deep)}
+.det .dfoot{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5}
+.ex{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;font-size:12px}
+.ex .eh{background:var(--surface2);padding:7px 10px;font-weight:700;border-bottom:1px solid var(--border)}
+.ex .er{display:flex;gap:9px;padding:6px 10px;border-bottom:1px solid var(--border-hair);align-items:baseline}
+.ex .er .a{flex:1;min-width:0}
+.ex .er .b{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.ex .er .c{color:var(--muted);white-space:nowrap;font-size:11px;min-width:58px;text-align:end}
+.ex .er.win{background:var(--danger-soft)} .ex .er.win .c{color:var(--danger-deep);font-weight:700}
+.ex .eo{background:var(--navy);color:#fff;padding:9px 10px;font-weight:600;line-height:1.5}
+ol.chain{list-style:none;counter-reset:s}
+ol.chain li{counter-increment:s;position:relative;padding-inline-start:27px;padding-bottom:12px}
+ol.chain li::before{content:counter(s);position:absolute;inset-inline-start:0;top:0;width:18px;height:18px;
+  border-radius:999px;background:var(--navy);color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center}
+ol.chain li::after{content:"";position:absolute;inset-inline-start:8.5px;top:21px;bottom:1px;width:1px;background:var(--border)}
+ol.chain li:last-child{padding-bottom:0} ol.chain li:last-child::after{display:none}
+ol.chain .m{font-weight:600;font-size:12px}
+ol.chain .d{font-size:12px;color:var(--muted-dark);line-height:1.55}
+ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);border:1px solid var(--border-hair);border-radius:3px;padding:0 4px}
+.fields{display:flex;flex-wrap:wrap;gap:5px}
+.fields span{font-family:var(--mono);font-size:11px;background:var(--navy);color:#fff;border-radius:3px;padding:2px 7px}
+.fields span.no{background:var(--danger-soft);color:var(--danger-deep);border:1px solid var(--danger-border)}
+.state{display:inline-flex;font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:999px;text-transform:uppercase}
+.state.live{background:var(--ok-soft);color:var(--ok-deep);border:1px solid rgba(29,158,85,.3)}
+.state.part{background:var(--warn-soft);color:var(--warn-deep);border:1px solid var(--warn-border)}
+.state.blocked{background:var(--danger-soft);color:var(--danger-deep);border:1px solid var(--danger-border)}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <span class="mark">Moedatech</span>
+  <nav><a href="#">Browse</a><a href="#">Dashboard</a><a href="#">Requests</a><a href="#" class="on">Integrity</a></nav>
+  <span class="who">Al Rajhi Contracting Est. <span class="avatar">YA</span></span>
+</div>
+
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <h1>Procurement integrity</h1>
+      <p>Every award your company made, checked against your own requirements, your own bids and the wider market</p>
+    </div>
+    <div class="acts">
+      <button class="btn">Export</button>
+      <button class="btn primary">Ask about 2 blocking</button>
+    </div>
+  </div>
+
+  <div class="guide">
+    Each row below is one award. <b>Click any cell to open the real numbers behind it</b>: every bid received with
+    its price and arrival time, every requirement with the supplier's answer, and what the machine costs across the
+    marketplace
+  </div>
+
+  <div class="kpis">
+    <div class="kpi" data-x="k-spend">
+      <div class="n">703,300</div>
+      <div class="l">SAR awarded</div>
+      <div class="s">7 requests · 5 suppliers · 1 Aug to 18 Sep</div>
+    </div>
+    <div class="kpi warn" data-x="k-cheapest">
+      <div class="n">5<small> of 7</small></div>
+      <div class="l">took the cheapest bid that met your terms</div>
+      <div class="s"><b>2 did not</b> · one paid the most of three offers</div>
+    </div>
+    <div class="kpi good" data-x="k-save">
+      <div class="n">14,040</div>
+      <div class="l">SAR you could have kept</div>
+      <div class="s">2.0% of spend · same suppliers, same terms</div>
+    </div>
+    <div class="kpi bad" data-x="k-nocomp">
+      <div class="n">147,160</div>
+      <div class="l">SAR spent without competition</div>
+      <div class="s"><b>21% of spend</b> · 2 awards drew fewer than three offers</div>
+    </div>
+  </div>
+
+  <!-- ── The spine: one row per award ──────────────────────────────── -->
+  <section>
+    <div class="sec-head">
+      <h2>Every award, checked</h2>
+      <span class="note">7 requests decided this period · 6 have something worth asking about</span>
+      <div class="tabs">
+        <span class="tab on">All 7</span><span class="tab">Needs an answer 6</span>
+        <span class="tab">Urgent 2</span><span class="tab">Price</span><span class="tab">Papers</span><span class="tab">Timing</span>
+      </div>
+    </div>
+    <div class="card scroll">
+      <table style="min-width:1300px">
+        <thead>
+          <tr>
+            <th data-x="c-request">Request</th>
+            <th data-x="c-reach">Who answered</th>
+            <th data-x="c-winner">Awarded to</th>
+            <th class="r" data-x="c-terms">Your terms met</th>
+            <th class="r" data-x="c-value">Value</th>
+            <th data-x="c-position">What you paid</th>
+            <th data-x="c-findings">What to ask about</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <tr data-row="1042">
+            <td data-x="c-request"><span class="ref">RFQ-1042</span><span class="sub">Crawler Excavator 20 ton · 60 days</span></td>
+            <td data-x="c-reach"><span class="rk ok">4 bids</span><span class="sub">Moedatech</span></td>
+            <td data-x="c-winner">Zahid Tractor<span class="sub">Marketplace · verified · CR</span></td>
+            <td class="r" data-x="c-terms"><span class="rk ok">6 of 6</span></td>
+            <td class="r" data-x="c-value"><span class="money">202,800</span><span class="delta flat">3,900 /day</span></td>
+            <td data-x="c-position"><div class="pos" data-x="c-position">
+              <div class="rail"><i style="left:0%;width:100%"></i><b class="mkt" style="left:21%"></b><b class="awd" style="left:0%"></b></div>
+              <span class="posnote">Cheapest bid · <b class="dn">4% under market</b></span></div></td>
+            <td data-x="c-findings"><span class="none">None</span></td>
+          </tr>
+
+          <tr data-row="1048">
+            <td data-x="c-request"><span class="ref">RFQ-1048</span><span class="sub">Mobile Crane 100 ton · 30 days</span></td>
+            <td data-x="c-reach"><span class="rk ok">3 bids</span><span class="sub">Moedatech</span></td>
+            <td data-x="c-winner">Arabian Cranes Co.<span class="sub">Marketplace · verified · CR</span></td>
+            <td class="r" data-x="c-terms"><span class="rk bad">5 of 6</span></td>
+            <td class="r" data-x="c-value"><span class="money">124,800</span><span class="delta flat">4,800 /day</span></td>
+            <td data-x="c-position"><div class="pos" data-x="c-position">
+              <div class="rail"><i style="left:25%;width:75%"></i><b class="mkt" style="left:0%"></b><b class="awd bad" style="left:100%"></b></div>
+              <span class="posnote">Most expensive · <b class="up">14% over market</b></span></div></td>
+            <td data-x="c-findings"><div class="find"><span class="f block" data-x="f-waived">TÜV waived at award</span><span class="f open" data-x="f-rank">Most expensive of three bids selected</span></div></td>
+          </tr>
+
+          <tr data-row="1061">
+            <td data-x="c-request"><span class="ref">RFQ-1061</span><span class="sub">Boom Lift 45 ft ×3 · 45 days</span></td>
+            <td data-x="c-reach"><span class="rk ok">3 bids</span><span class="sub">Moedatech</span><span class="sub2">3 larger held back</span></td>
+            <td data-x="c-winner">Zahid Tractor<span class="sub">Marketplace · verified · CR</span></td>
+            <td class="r" data-x="c-terms"><span class="rk ok">5 of 5</span></td>
+            <td class="r" data-x="c-value"><span class="money">100,620</span><span class="delta flat">860 /day ×3</span></td>
+            <td data-x="c-position"><div class="pos" data-x="c-position">
+              <div class="rail"><i style="left:0%;width:100%"></i><b class="mkt" style="left:67%"></b><b class="awd" style="left:33%"></b></div>
+              <span class="posnote">2nd cheapest · <b class="dn">4% under market</b></span></div></td>
+            <td data-x="c-findings"><div class="find"><span class="f block" data-x="f-certexp">Safety certificate expired before start</span><span class="f open" data-x="f-earlyaward">Award recorded before bids closed</span><span class="f open" data-x="f-latebid">Winning bid arrived after the deadline</span></div></td>
+          </tr>
+
+          <tr data-row="1051">
+            <td data-x="c-request"><span class="ref">RFQ-1051</span><span class="sub">Telehandler 17 m ×2 · 30 days</span></td>
+            <td data-x="c-reach"><span class="rk warn">2 bids</span><span class="sub">Your shared link</span><span class="sub2">5 firms opened it</span></td>
+            <td data-x="c-winner">Faisal Heavy Equip. Est.<span class="sub bad">Your own link · no CR · not registered</span></td>
+            <td class="r" data-x="c-terms"><span class="rk warn">4 of 6</span></td>
+            <td class="r" data-x="c-value"><span class="money">59,800</span><span class="delta flat">1,150 /day ×2</span></td>
+            <td data-x="c-position"><div class="pos" data-x="c-position">
+              <div class="rail"><i style="left:33%;width:67%"></i><b class="mkt" style="left:0%"></b><b class="awd bad" style="left:33%"></b></div>
+              <span class="posnote">Cheapest bid · <b class="up">6% over market</b></span></div></td>
+            <td data-x="c-findings"><div class="find"><span class="f open" data-x="f-nocr">Supplier has no commercial registration</span><span class="f open" data-x="f-justadded">Added to your list 2 days before the request</span><span class="f open" data-x="f-window">24 hour bid window</span></div></td>
+          </tr>
+
+          <tr data-row="1055">
+            <td data-x="c-request"><span class="ref">RFQ-1055</span><span class="sub">Wheel Loader 966 · 45 days</span></td>
+            <td data-x="c-reach"><span class="rk bad">1 bid</span><span class="sub">Direct to one firm</span><span class="sub2">nobody else could see it</span></td>
+            <td data-x="c-winner">Al Faisal Rentals<span class="sub bad">Direct to one firm · no CR · registered by you</span></td>
+            <td class="r" data-x="c-terms"><span class="rk ok">4 of 4</span></td>
+            <td class="r" data-x="c-value"><span class="money">87,360</span><span class="delta flat">2,240 /day</span></td>
+            <td data-x="c-position"><div class="pos" data-x="c-position">
+              <div class="rail"><i style="left:100%;width:0%"></i><b class="mkt" style="left:0%"></b><b class="awd bad" style="left:100%"></b></div>
+              <span class="posnote">Only bid · <b class="up">21% over market</b></span></div></td>
+            <td data-x="c-findings"><div class="find"><span class="f open" data-x="f-overmarket">21% above the marketplace rate</span><span class="f open" data-x="f-single">Single bid, sent direct to one firm</span><span class="f open" data-x="f-urgent">Marked urgent</span></div></td>
+          </tr>
+
+          <tr data-row="1058">
+            <td data-x="c-request"><span class="ref">RFQ-1058</span><span class="sub">Water Tanker 20 m³ · 60 days</span></td>
+            <td data-x="c-reach"><span class="rk ok">5 bids</span><span class="sub">Moedatech</span></td>
+            <td data-x="c-winner">Nesma Heavy Equipment<span class="sub">Marketplace · verified · CR</span></td>
+            <td class="r" data-x="c-terms"><span class="rk ok">5 of 5</span></td>
+            <td class="r" data-x="c-value"><span class="money">61,360</span><span class="delta flat">1,180 /day</span></td>
+            <td data-x="c-position"><div class="pos" data-x="c-position">
+              <div class="rail"><i style="left:0%;width:100%"></i><b class="mkt" style="left:28%"></b><b class="awd" style="left:0%"></b></div>
+              <span class="posnote">Cheapest bid · <b class="dn">5% under market</b></span></div></td>
+            <td data-x="c-findings"><div class="find"><span class="f open" data-x="f-reneg">Agreed 20% above the winning bid</span><span class="f open" data-x="f-tightgap">Losing bids within 1.4% of the winner</span></div></td>
+          </tr>
+
+          <tr data-row="1064">
+            <td data-x="c-request"><span class="ref">RFQ-1064</span><span class="sub">Forklift 5 ton ×2 · 60 days</span></td>
+            <td data-x="c-reach"><span class="rk ok">4 bids</span><span class="sub">Moedatech</span></td>
+            <td data-x="c-winner"><span style="color:var(--danger-deep);font-weight:600">Two records disagree</span><span class="sub bad">Marketplace · Nesma bid · Al Faisal awarded</span></td>
+            <td class="r" data-x="c-terms"><span class="rk ok">4 of 4</span></td>
+            <td class="r" data-x="c-value"><span class="money">66,560</span><span class="delta flat">640 /day ×2</span></td>
+            <td data-x="c-position"><div class="pos" data-x="c-position">
+              <div class="rail"><i style="left:0%;width:100%"></i><b class="mkt" style="left:29%"></b><b class="awd" style="left:0%"></b></div>
+              <span class="posnote">Cheapest bid · <b class="dn">3% under market</b></span></div></td>
+            <td data-x="c-findings"><div class="find"><span class="f open" data-x="f-mismatch">Award names a different supplier</span><span class="f open" data-x="f-edited">Request edited after bids landed</span></div></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="poskey" data-x="c-position">
+        <span><i class="k1"></i>The bids you received</span>
+        <span><i class="k2"></i>Marketplace rate</span>
+        <span><i class="k3"></i>What you awarded</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Two views the table cannot give ───────────────────────────── -->
+  <section>
+    <div class="two">
+
+      <div>
+        <div class="sec-head"><h2>Where the money went</h2>
+          <span class="note">Totals across the period, which no single row shows</span></div>
+        <div class="card">
+          <div class="split" data-x="p-route">
+            <div class="a" style="width:79%">Open competition 79%</div>
+            <div class="b" style="width:8.5%">Link</div>
+            <div class="c" style="width:12.5%">Direct</div>
+          </div>
+          <div class="splitkey" data-x="p-route">
+            <div><i style="background:var(--navy-mid)"></i>Marketplace, 3 or more bids <b>556,140</b></div>
+            <div><i style="background:var(--warn)"></i>Your own link <b>59,800</b></div>
+            <div><i style="background:var(--danger)"></i>Direct, one firm <b>87,360</b></div>
+          </div>
+          <div class="phead">By supplier</div>
+          <div class="row2" data-x="p-supplier"><div class="g"><div class="t">Zahid Tractor</div>
+            <div class="s">2 awards · Moedatech · verified · CR</div></div>
+            <div class="track"><i style="width:43%"></i></div><div class="pc">43%</div></div>
+          <div class="row2" data-x="p-supplier"><div class="g"><div class="t">Al Faisal Rentals</div>
+            <div class="s">2 awards · your list · no CR · registered by you</div></div>
+            <div class="track"><i class="flag" style="width:22%"></i></div><div class="pc">22%</div></div>
+          <div class="row2" data-x="p-supplier"><div class="g"><div class="t">Arabian Cranes Co.</div>
+            <div class="s">1 award · Moedatech · verified · CR</div></div>
+            <div class="track"><i style="width:18%"></i></div><div class="pc">18%</div></div>
+          <div class="row2" data-x="p-supplier"><div class="g"><div class="t">Nesma Heavy Equipment</div>
+            <div class="s">1 award · Moedatech · verified · CR</div></div>
+            <div class="track"><i style="width:9%"></i></div><div class="pc">9%</div></div>
+          <div class="row2" data-x="p-supplier"><div class="g"><div class="t">Faisal Heavy Equip. Est.</div>
+            <div class="s">1 award · your list · no CR · not registered</div></div>
+            <div class="track"><i class="flag" style="width:8%"></i></div><div class="pc">8%</div></div>
+          <div class="pfoot"><b>One supplier holds 43% of your spend.</b> Two more hold 30% between them and
+            neither has a platform identity</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="sec-head"><h2>Papers running out</h2>
+          <span class="note">On machines you are hiring now · two of these belong to no award above</span></div>
+        <div class="card">
+          <div class="row2" data-x="cert-1"><div class="g"><div class="t">TÜV · Boom Lift 45 ft</div>
+            <div class="s">Zahid Tractor · expired 4 Sep · hire started 12 Sep</div></div><span class="d bad">Expired</span></div>
+          <div class="row2" data-x="cert-2"><div class="g"><div class="t">Commercial registration · Arabian Cranes Co.</div>
+            <div class="s">Expires 2 Oct · crane on site until 30 Oct</div></div><span class="d warn">14 days</span></div>
+          <div class="row2" data-x="cert-3"><div class="g"><div class="t">National address · Nesma Heavy Equipment</div>
+            <div class="s">Expires 28 Sep · no machine depends on it</div></div><span class="d warn">10 days</span></div>
+          <div class="pfoot"><b>One machine is working today on a certificate that had already lapsed when it arrived</b></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="blind">
+      <p style="margin-bottom:10px"><b style="color:var(--navy)">What this page cannot answer.</b>
+        Named so nobody reads a clean row as a clean decision · click any one for what it would take</p>
+      <div class="items">
+        <span class="bi" data-x="b-reach">How many suppliers the marketplace reached</span>
+        <span class="bi" data-x="b-volume">Patterns across many requests</span>
+        <span class="bi" data-x="b-actor">Who raised it, who awarded it</span>
+        <span class="bi" data-x="b-shares">Who the request was sent to</span>
+        <span class="bi" data-x="b-diff">What a post-bid edit changed</span>
+        <span class="bi" data-x="b-case">Case state and the buyer's answer</span>
+        <span class="bi" data-x="b-delivery">What machine actually arrived</span>
+        <span class="bi" data-x="b-money">Invoices and payments</span>
+        <span class="bi" data-x="b-approval">Approval limits</span>
+        <span class="bi" data-x="b-coi">Conflicts of interest</span>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">
+    Findings are indicators, not conclusions. Each one needs an explanation before a case is opened.
+    Every figure comes from your own requests, bids, supplier records, deal rooms and awards, priced through the
+    same calculation the quotation uses, with Fridays excluded.
+  </p>
+</div>
+
+<div id="scrim"></div>
+<aside id="dw" aria-hidden="true">
+  <header>
+    <div style="flex:1;min-width:0"><div class="kind" id="dwKind"></div><h3 id="dwTitle"></h3>
+      <div class="answers" id="dwAns"></div></div>
+    <button id="dwClose" aria-label="Close">✕</button>
+  </header>
+  <div class="scrollbody">
+    <div class="blk" id="dwDetBlk"><h4 id="dwDetH">The numbers behind this row</h4><div class="det" id="dwDet"></div></div>
+    <div class="blk"><h4>What it is</h4><p id="dwWhat"></p></div>
+    <div class="blk"><h4>Why it matters</h4><p class="soft" id="dwWhy"></p></div>
+    <div class="blk" id="dwExBlk"><h4>Worked example</h4><div class="ex" id="dwEx"></div></div>
+    <div class="blk"><h4>Where the data comes from</h4><ol class="chain" id="dwChain"></ol></div>
+    <div class="blk"><h4>Fields read</h4><div class="fields" id="dwFields"></div></div>
+    <div class="blk"><h4>Status</h4><span id="dwState"></span></div>
+  </div>
+  <div class="ask" id="dwAsk">
+    <button class="btn sm">Ask for an explanation</button>
+    <button class="btn sm">Open a case</button>
+    <button class="btn sm">Dismiss</button>
+  </div>
+</aside>
+
+<script>
+const X = {
+
+/* ── The five figures ──────────────────────────────────────────────── */
+"k-spend":{k:"Figure",t:"Where the money went",
+ q:"where our money goes",
+ what:"Everything awarded this period, split by how it was bought and by which firm took it",
+ why:"The split is the answer, not the total. Money that moved through open competition was tested by the market. Money that went direct or through your own link was not",
+ ex:{head:"703,300 SAR, three routes",rows:[
+  ["Marketplace, 3 or more bids","556,140","79%"],
+  ["Your own shared link","59,800","8.5%",1],
+  ["Direct to one named firm","87,360","12.5%",1]],
+  out:"One riyal in five was spent without a competitive field behind it"},
+ chain:[["Each award records its own money","Rate, mobilization, demobilization, units and rental basis, on the project's award book"],
+  ["The hire length comes from the request","End date inclusive, Fridays excluded, the same calculation the quotation prices with"],
+  ["The route comes from the winning bid","A marketplace bid, a submission through your shared link, or a direct request that named one firm"],
+  ["Firms are grouped through bidSupplierKey","Company first, then member, then the raw name, so colleagues of one firm count once"]],
+ f:["Award.rateAmount","Award.units","BidSource","RequestType","bidSupplierKey"],s:"live"},
+
+"k-cheapest":{k:"Figure",t:"Awards that took the cheapest bid meeting your terms",
+ q:"were suppliers awarded the cheapest, and were they compliant",
+ what:"How many awards went to the cheapest bid that met every requirement the request itself stated",
+ why:"The fairest single test of whether you bought well. It never counts a cheaper bid that refused your certificate, because that was never an option you could have taken",
+ ex:{head:"All seven awards",rows:[
+  ["Took the cheapest compliant bid","5 of 7","1042, 1051, 1055, 1058, 1064"],
+  ["RFQ-1048 · most expensive of three","+11,700","refused TÜV",1],
+  ["RFQ-1061 · 2nd cheapest, cheaper compliant bid existed","+2,340","",1]],
+  out:"Two awards did not take the cheapest compliant bid, and together they cost 14,040 SAR"},
+ chain:[["The request states its requirements per machine","Certificate, minimum year, operator certificate, who pays fuel, who moves it"],
+  ["Each bid answers all of them","App bids as t3Declarations, link bids as confirmations, and an uploaded certificate counts as an answer"],
+  ["Bids are filtered to the fully compliant ones","Then normalised to one cycle so a weekly and a daily rate compare"],
+  ["The accepted bid is checked against the cheapest of those","Where no compliant bid exists, the request is excluded rather than guessed at"]],
+ f:["requiredTerms","t3Declarations","confirmations","computeCycleTotals"],s:"live"},
+
+"k-save":{k:"Figure",t:"What it would have saved",
+ q:"how much could we save if the cheapest bids were chosen",
+ what:"The money back if every award had taken the cheapest bid that met your own requirements, with nothing else changed",
+ why:"It turns a list of complaints into a budget line. Same suppliers, same requirements, same machines, only a different choice among bids you already had in hand",
+ ex:{head:"RFQ-1048 replayed",rows:[
+  ["You awarded Arabian Cranes","4,800 /day","refused TÜV",1],
+  ["Cheapest that met TÜV, Nesma","4,350 /day","TÜV yes"],
+  ["Difference across 26 billable days","11,700 SAR",""],
+  ["RFQ-1061, same calculation","2,340 SAR",""]],
+  out:"14,040 SAR, which is 2.0 percent of the 703,300 awarded. At this rate a year of the same buying leaks about 84,000"},
+ chain:[["Every request is replayed","Bids filtered to those answering yes to every required term"],
+  ["The cheapest compliant bid is taken as the counterfactual","Where none exists the request is skipped"],
+  ["The difference is summed","Against what was actually awarded, per cycle, Fridays excluded"]],
+ f:["requiredTerms","Bid.price","computeCycleTotals","billableDays"],s:"live"},
+
+"k-nocomp":{k:"Figure",t:"SAR spent without competition",
+ q:"where our money goes, and was it tested",
+ what:"Money spent on awards that drew fewer than three offers, whatever route they came through",
+ why:"Three bids is the ordinary bar for saying a price was tested. Below it there is no market, only a negotiation, and neither the rank nor the terms on that row can tell you whether the price was right. It is the one measure on this page an auditor will already recognise",
+ ex:{head:"The two awards with a thin field",rows:[
+  ["RFQ-1055 · Wheel Loader · direct to one firm","87,360","1 bid",1],
+  ["RFQ-1051 · Telehandler ×2 · your own link","59,800","2 bids",1],
+  ["The other five awards","556,140","3 to 5 bids each"]],
+  out:"147,160 SAR, 21 percent of the period, was spent with no real field behind it. Both of those requests were routed away from the marketplace"},
+ chain:[["Offers are counted per request","Marketplace bids and shared-link submissions together"],
+  ["Fewer than three is the threshold","Not a rule anyone set, the ordinary procurement bar, and it is adjustable"],
+  ["The award value is attributed to it","Rate plus haulage, times units, times billable days, Fridays excluded"],
+  ["The route is read beside it","Because a thin field on a direct request is a choice, and a thin field on a broadcast is a market signal"]],
+ f:["fetchBids","fetchRequestSubmissions","RequestType","Award.rateAmount"],s:"live"},
+
+"p-route":{k:"Panel",t:"How the money was bought",
+ q:"where our money goes",
+ what:"Spend split by the route the winning offer travelled: the open marketplace, your own shared link, or a direct request naming one firm",
+ why:"Direct and link spending is not wrong, it is untested. Nobody competed for it, so there is no evidence the price was right and no second supplier to fall back on",
+ ex:{head:"Competition behind each riyal",rows:[
+  ["Marketplace with 3 or more bids","556,140","tested"],
+  ["Marketplace with 2 bids","59,800","thin",1],
+  ["One bid only, sent direct","87,360","untested",1]],
+  out:"147,160 SAR, one fifth of the period, was spent with fewer than three offers on the table"},
+ chain:[["A broadcast request reaches every supplier stocking that machine","Dispatch decides, and any of them may bid"],
+  ["A shared link reaches whoever the renter sends it to","Those submissions arrive separately from marketplace bids"],
+  ["A direct request names one firm","And nobody else is notified or can see it"],
+  ["The award is attributed to whichever route its winner came from","And the bid count on that request decides whether it counts as competed"]],
+ f:["BidSource","RequestType","fetchBids","fetchRequestSubmissions"],s:"live"},
+
+"p-supplier":{k:"Panel",t:"Share by supplier",
+ q:"where our money goes",
+ what:"What each firm took as a share of everything awarded, with its identity checks on the same row",
+ why:"Concentration alone is not a finding. Concentration in firms nobody outside your office can confirm exist is the thing to read, which is why the two sit together",
+ ex:{head:"This period against the last",rows:[
+  ["Zahid Tractor","43%","was 26%",1],
+  ["Al Faisal Rentals","22%","was 19%"],
+  ["Arabian Cranes Co.","18%","was 22%"],
+  ["Nesma Heavy Equipment","9%","was 21%"],
+  ["Faisal Heavy Equip. Est.","8%","new"]],
+  out:"One supplier went from a quarter of your spend to nearly half in one period"},
+ chain:[["Each award records a supplier and its money","On the project's award book"],
+  ["Value per award","Rate plus haulage, times units, times billable days, Fridays excluded"],
+  ["Firms are grouped once through bidSupplierKey","Company, then member, then the raw name"],
+  ["The identity checks are read per firm","And a row failing any of them is marked"]],
+ f:["Award.supplierName","Award.rateAmount","bidSupplierKey","crNumber"],s:"live"},
+
+/* ── Q4 panel ──────────────────────────────────────────────────────── */
+"c-request":{k:"Column",t:"Request",
+ what:"The reference, the machine and how long it was hired for",
+ why:"A multi-machine request fans out into one row per machine, so each decision is judged on its own bids rather than averaged with the others",
+ chain:[["The renter describes what he needs","The agent builds a draft with one card per machine"],
+  ["Submit fans it out","One request row per machine line, sharing a group id"],
+  ["Only decided requests appear","One with an accepted bid or a recorded award"]],
+ f:["RequestListItem.ref","requestGroupId","chargedDays"],s:"live"},
+
+"c-reach":{k:"Column",t:"Who answered",
+ q:"how many suppliers received each request",
+ what:"How many offers arrived, through which channel, and what else is known about reach: firms that opened your shared link without bidding, and machines the size filter held back",
+ why:"The denominator behind everything to the right. Cheapest of five is a strong result. Cheapest of one is not a result at all, and the price scale beside it cannot tell you which you are looking at",
+ ex:{head:"Reach across the period",rows:[
+  ["Moedatech marketplace","5 requests","3 to 5 bids each"],
+  ["Your own shared link","1 request","5 opened, 2 bid",1],
+  ["Direct to one named firm","1 request","1 bid possible",1],
+  ["Suppliers the marketplace matched","not stored","see the blind spots",1]],
+  out:"Two of seven requests were answered by fewer than three firms, and both of those were routed away from the marketplace"},
+ chain:[["A broadcast request goes to the marketplace","Dispatch notifies every supplier stocking that machine, and any of them may bid"],
+  ["A shared link goes wherever the renter sends it","By email, WhatsApp or a copied URL. Those submissions arrive separately from marketplace bids, and openedCount records how many looked"],
+  ["A direct request names one firm","Nobody else is notified or can see it, so one bid is the ceiling"],
+  ["Larger machines are held back by default","The backend reports the count it withheld, taken before the filter runs"]],
+ f:["fetchBids","fetchRequestSubmissions","openedCount","RequestType","sizeCounts.larger"],s:"part"},
+
+"c-winner":{k:"Column",t:"Awarded to",
+ q:"was the winner from Moedatech, from my list, or vendor registered",
+ what:"The firm that took the work, how its offer reached you, and how well it is known: a Moedatech account, the platform's verification, and a commercial registration on file",
+ why:"They are three different strengths of evidence and only one of them is yours. An account means a real platform identity with a registered fleet. Verified means the platform reviewed the papers. A CR means it can be tied to a legal entity. Your own vendor tick means none of those, only that somebody here decided to work with them",
+ ex:{head:"The three checks, per supplier",rows:[
+  ["Marketplace · verified · CR","3 firms","70% of spend"],
+  ["Your own link · no CR","Faisal Heavy","8%",1],
+  ["Direct · no CR","Al Faisal","22%",1]],
+  out:"Two of five suppliers hold no platform identity at all. Nobody outside your office has confirmed either of them exists, and they carry 30 percent of your spend"},
+ chain:[["Bidders are resolved to a company","bidSupplierKey folds company, then member, then name, so colleagues count once"],
+  ["The route comes from the winning offer","A marketplace bid, a submission through your own shared link, or a direct request naming one firm"],
+  ["Three identity facts are read","The platform's verification, whether a CR is on file, and your own vendor tick"],
+  ["A row can also say the records disagree","When the accepted bid and the recorded award name different firms"]],
+ f:["bidSupplierKey","BidSource","RequestType","verified","crNumber"],s:"live"},
+
+"c-terms":{k:"Column",t:"Terms",
+ q:"were the suppliers compliant with our requirements",
+ what:"How many of that request's own requirements the winning bid answered yes to, against how many were asked",
+ why:"The requirement side is always yours, so this never judges a supplier against something you did not ask for. A full count on a clean row proves the check ran",
+ ex:{head:"RFQ-1048 · six requirements were set",rows:[
+  ["Operator supplied","yes",""],["Minimum year 2018","yes",""],
+  ["Fuel on supplier","yes",""],["Transport on supplier","yes",""],
+  ["Operator certificate","yes",""],["TÜV certificate","no","5 of 6",1]],
+  out:"One refusal out of six. The count says how many, the chip says which one and what it cost"},
+ chain:[["The request states its terms per machine","Certificate, year, operator, fuel and transport parties"],
+  ["Each bid answers every one","App bids as t3Declarations, link bids as confirmations"],
+  ["An uploaded document counts as an answer","A supplier who attached his certificate and left the term blank is not silent"]],
+ f:["requiredTerms","t3Declarations","confirmations","computeBidQuality"],s:"live"},
+
+"c-value":{k:"Column",t:"Value",
+ what:"What this award is worth over the whole hire, with the rate underneath",
+ why:"Findings are ordered by consequence, not by size, but value is what decides which of two equally serious ones you chase first",
+ chain:[["The award carries its own money","Rate, mobilization, demobilization, units and basis"],
+  ["The hire length comes from the request","End date inclusive, Fridays excluded"],
+  ["Rate plus haulage, times units, times billable days","Nothing is estimated"]],
+ f:["Award.rateAmount","Award.units","billableDays","computeCycleTotals"],s:"live"},
+
+"c-position":{k:"Column",t:"Price position",
+ q:"was the award the cheapest offered, and against the marketplace",
+ what:"One scale per request. The grey bar is the range of bids you received, the tick is the marketplace rate for that machine, and the dot is what you awarded. The line beneath says where the award ranked and how far it sat from the market",
+ why:"The two comparisons only mean something together. Taking the cheapest of three bids is worthless if all three were above the market, and paying above your own bids is fine if the whole field was cheap. Two separate numeric columns made you do that arithmetic in your head",
+ ex:{head:"Four shapes, and what each one means",rows:[
+  ["Dot at the left, tick to the right","RFQ-1058","cheapest bid, under market"],
+  ["Dot at the right, tick to the left","RFQ-1048","most expensive, over market",1],
+  ["Bar collapsed to a point","RFQ-1055","one bid, nothing to rank",1],
+  ["Dot left, tick left of the bar","RFQ-1051","cheapest of 2, still over market",1]],
+  out:"RFQ-1055 is the one the old columns hid. Rank 1 of 1 and terms 4 of 4 both read clean, and the award is a fifth above the market"},
+ chain:[["Every bid on the request is normalised","To one cycle, Fridays excluded, so a weekly and a daily rate sit on the same scale"],
+  ["The bar spans lowest to highest bid received","Collapsing to a point where only one bid arrived"],
+  ["The market tick comes from Moedatech listings","Suppliers list equipment on their stores with a price and a unit. The median is taken across live listings for the same subtype and size, with your own history for that machine added"],
+  ["The dot is what was awarded","Painted red when it sits above the market, or above the cheapest compliant bid"]],
+ f:["Bid.price","rentalBasis","computeCycleTotals","StoreEquipment.price","StoreEquipment.priceUnit"],s:"live"},
+
+"c-findings":{k:"Column",t:"Findings",
+ q:"any suspicious activity worth investigating",
+ what:"Every rule that fired on this award, each one clickable for its own explanation",
+ why:"This is the only place a finding appears on the page. Repeating the same fact in a tile, a case and a table is what made earlier versions hard to read",
+ chain:[["Each rule runs over every decided request","And attaches its finding to the award it came from"],
+  ["Red means blocking","The machine should not be operating today. Amber means it needs an answer this month"],
+  ["The explanation belongs to the finding TYPE","So the same rule reads the same way wherever it appears"]],
+ f:["Bid","Award","OfferedUnitDoc","RenterSupplier"],s:"live"},
+
+/* ── Findings ──────────────────────────────────────────────────────── */
+"f-waived":{k:"Blocking finding",t:"A required certificate was waived at award",
+ what:"The request demanded TÜV. The winning bid answered no and was accepted anyway, while two cheaper bids answered yes",
+ why:"The certificate is what lets that crane onto a site with an inspection regime. Awarding around it moves the risk onto your own project and makes the requirement meaningless for the next request",
+ ex:{head:"RFQ-1048 · the three bids",rows:[
+  ["Nesma Heavy Equipment","4,350 /day","TÜV yes"],
+  ["Zahid Tractor","4,500 /day","TÜV yes"],
+  ["Arabian Cranes Co.","4,800 /day","TÜV no",1]],
+  out:"The only bid that refused your own requirement is the one that won, at 450 SAR per day more than the cheapest that met it"},
+ chain:[["The renter sets the requirement on the machine","It goes into that item's requiredTerms when the request is built"],
+  ["Each supplier answers it","Yes or no, and an uploaded certificate also counts as an answer"],
+  ["The renter accepts a bid","acceptBid, which closes the competition"],
+  ["This page compares the two","The stored requirement against the stored answer, then looks for a cheaper bid that said yes"]],
+ f:["requiredTerms.equipmentCert","t3Declarations","confirmations","Bid.status"],s:"live"},
+
+"f-rank":{k:"Finding",t:"The most expensive of three bids was selected",
+ what:"The winning bid was the most expensive of the three offers received",
+ why:"Rank 2 is a judgement call. Rank 3 of 3 is the whole field rejected in favour of the most expensive offer, which needs a reason recorded somewhere",
+ chain:[["All bids are normalised to one cycle","Rate plus haulage, times units, times billable days"],
+  ["They are ordered by delivered cost","And the accepted bid's position is read off"],
+  ["It is read beside the terms column","Because the most expensive bid meeting every requirement is a different story from this one"]],
+ f:["Bid.price","computeCycleTotals","Bid.status"],s:"live"},
+
+"f-certexp":{k:"Blocking finding",t:"The certificate expired before the hire started",
+ what:"The safety certificate on the offered machine lapsed on 4 September. The hire began on 12 September and the machine is on site now",
+ why:"The most actionable finding on the page because it can still be fixed. An expired inspection certificate is what an insurer points at after an incident",
+ ex:{head:"RFQ-1061 · Boom Lift 45 ft",rows:[
+  ["Certificate expiry","4 Sep",""],
+  ["Hire start","12 Sep","8 days later",1],
+  ["Today","18 Sep","working",1],
+  ["Hire end","27 Oct","39 days left"]],
+  out:"Six days of operation so far on a certificate that had already lapsed when the machine arrived"},
+ chain:[["The supplier uploads a document against the offered unit","Each one carries a type and an expiry date"],
+  ["Both reach the bid","As documents on the offered equipment, with the expiry alongside"],
+  ["The expiry is compared against the hire dates","Not against today, which is what catches a paper already dead at the start"]],
+ f:["OfferedUnitDoc.expiryDate","OfferedUnitDoc.type","Award.mobilizedAt"],s:"live"},
+
+"f-earlyaward":{k:"Finding",t:"The award was recorded before bidding closed",
+ what:"The award carries a timestamp earlier than the deadline it was supposedly judged against",
+ why:"Either the deadline moved, which is not recorded anywhere, or the decision was taken before the field was complete and the paperwork followed it",
+ ex:{head:"RFQ-1061 · the three timestamps",rows:[
+  ["Award recorded","11 Sep 14:40","",1],
+  ["Bidding closed","11 Sep 17:00","2h 20m later"],
+  ["Winning bid arrived","11 Sep 23:20","6h 20m after close",1]],
+  out:"The award was stamped before the close, and the bid that won arrived after it. The system wrote all three times"},
+ chain:[["The renter picks a window at posting","Counted from the request's createdAt"],
+  ["He may set a date on the shared link instead","That date then decides the close"],
+  ["The award is recorded on the project","awardedAt is stamped at that moment"],
+  ["The two are compared","And nothing here is typed by hand"]],
+ f:["Award.awardedAt","requestExpiry","offerDuration","bidDeadline"],s:"live"},
+
+"f-latebid":{k:"Finding",t:"The winning bid arrived after the deadline",
+ what:"Bidding closed at 17:00 and this bid landed at 23:20 the same day, then took the award",
+ why:"A bidder who submits after close has seen a field the others could not. Every rival was judged against a rule this one was not",
+ chain:[["Each bid is stamped as it arrives","submittedAt on an app bid, createdAt on a link submission"],
+  ["The close is resolved once","The link deadline first, the posting window second"],
+  ["The two are compared","For the accepted bid and for every rival"]],
+ f:["Bid.submittedAt","requestExpiry"],s:"live"},
+
+"f-nocr":{k:"Finding",t:"The supplier has no commercial registration",
+ what:"No CR on file, no vendor tick from you, and no Moedatech account",
+ why:"This is about recourse, not suspicion. Nothing says he did anything wrong. It says that if the machine fails or the invoice is wrong, there is no registered entity to go to",
+ chain:[["The supplier is added to your list","vendorRegistered starts off on every route, so a tick is always a decision"],
+  ["Verification is the platform's own review","Never inferred by the web"],
+  ["The CR arrives from the row or the bid form","The public form asks for it, and absent counts as absent"]],
+ f:["crNumber","vendorRegistered","verified"],s:"live"},
+
+"f-justadded":{k:"Finding",t:"The supplier was added days before the request",
+ what:"Typed into your supplier list on 4 September, the request posted on 6 September, awarded on 9 September",
+ why:"Ordinary on its own, and most of the time somebody simply found a new supplier. It earns a question beside a missing registration and a one-day bid window, which is the case here",
+ chain:[["A supplier row records how it was created","Typed, imported from a sheet, picked off Moedatech, or created by a link bid"],
+  ["updatedAt is stamped","The supplier list is already ordered by it"],
+  ["The request carries its own createdAt","And the gap is one subtraction"]],
+ f:["RenterSupplier.updatedAt","RenterSupplier.source","RequestRecord.createdAt"],s:"live"},
+
+"f-window":{k:"Finding",t:"A 24 hour bid window",
+ what:"The shortest window the platform offers, on a 59,800 SAR hire",
+ why:"A day is not long enough for a supplier who was not already expecting the request. It is the quietest way to run a tender only one firm can answer, and it breaks no rule",
+ ex:{head:"Window against the field it drew",rows:[
+  ["1 week · RFQ-1058","5 bids",""],
+  ["72 hours · RFQ-1042","4 bids",""],
+  ["24 hours · RFQ-1051","2 bids","",1],
+  ["24 hours · RFQ-1055","1 bid","",1]],
+  out:"The two shortest windows drew the two thinnest fields. Longer windows brought four and five bidders"},
+ chain:[["The renter chooses a window when he posts","24, 48 or 72 hours, or a week"],
+  ["Or he sets a date on the shared link","Which then decides the close"],
+  ["The window is read against the value awarded","Which is what makes a short one worth asking about"]],
+ f:["offerDuration","bidDeadline","Award.rateAmount"],s:"live"},
+
+"f-overmarket":{k:"Finding",t:"21 percent above the marketplace rate",
+ what:"The awarded rate is well above what the same machine is listed at across Moedatech",
+ why:"The one check a single-bid award can still fail. Rank 1 of 1 tells you nothing, but the market is still there to compare against",
+ ex:{head:"RFQ-1055 · Wheel Loader 966",rows:[
+  ["Awarded rate","2,240 /day","sole bid",1],
+  ["Marketplace median","1,850 /day","11 listings"],
+  ["Difference across 39 billable days","15,210 SAR",""]],
+  out:"A direct request with one bid, priced a fifth above the market. Neither the rank nor the terms column could have caught this"},
+ chain:[["Suppliers list equipment on their Moedatech stores","Each listing carries a price and a unit"],
+  ["Listings are grouped by taxonomy","Same subtype, same size as the awarded machine"],
+  ["The median is taken across live listings","With your own history for that machine added"],
+  ["The awarded rate is priced to the same unit","And compared"]],
+ f:["StoreEquipment.price","StoreEquipment.priceUnit","subcategoryId"],s:"live"},
+
+"f-single":{k:"Finding",t:"A single bid, sent direct to one firm",
+ what:"A direct request is visible to the named supplier alone, so exactly one bid was ever possible",
+ why:"Legitimate for an urgent replacement or a machine only one firm holds. It stops being legitimate as a habit, which is why the rate is what matters",
+ chain:[["A direct request starts from a supplier's store page","Pressing a machine there seeds a request naming that firm"],
+  ["Dispatch skips it","No other supplier is notified or can see it"],
+  ["So the bid count reports the routing, not the market's interest",""]],
+ f:["RequestType","DirectTarget.supplierId"],s:"live"},
+
+"f-urgent":{k:"Finding",t:"Marked urgent",
+ what:"The request carries the ASAP urgency the renter chose when creating it",
+ why:"Urgency is the standard reason for skipping competition, so the rate per period is the thing to read. One urgent request is a Tuesday, a third of them is a process",
+ chain:[["The renter states when he needs the machine","Which becomes an urgency of ASAP, SOON or FAR FUTURE"],
+  ["It is stored on the request","And read back on every projection"],
+  ["The rate matters, not the instance","So it is counted per period and per supplier"]],
+ f:["RequestRecord.urgency"],s:"live"},
+
+"f-reneg":{k:"Finding",t:"Agreed 20 percent above the winning bid",
+ what:"The bid won at 1,180 SAR per day. The deal room closed at 1,420, after the competition was over",
+ why:"Win the tender on a number nobody intends to honour, then move it where the rivals cannot be recalled. The bid that lost at 1,275 would have been cheaper than what you actually agreed",
+ ex:{head:"RFQ-1058 · bid against contract",rows:[
+  ["Winning bid","1,180 /day","accepted"],
+  ["Bid that lost","1,275 /day","8% higher"],
+  ["Deal room closed at","1,420 /day","20.3% above",1],
+  ["Over 52 billable days","+12,480 SAR",""]],
+  out:"You awarded the cheapest bid and paid more than the one you turned down"},
+ chain:[["The supplier's price is stored on the bid at submission","And never changes after that"],
+  ["acceptBid closes the competition","The other four cannot be brought back from here"],
+  ["Either side can move the price in the room","proposeRate writes the proposal, and the term history records what moved, when, and by which side"],
+  ["The room closes","The quotation snapshots the agreed terms and becomes the contract document"]],
+ f:["Bid.price","proposeRate","TermHistoryEntry","QuotationView"],s:"live"},
+
+"f-tightgap":{k:"Finding",t:"The losing bids sat within 1.4 percent of the winner",
+ what:"On a five-bid request the runner-up was 1.4 percent above, and the winning bid was the last to arrive",
+ why:"Real competition produces a scattered spread. A last-arriving bid landing just under the standing price is what a bidder who could see that price would do. An indicator and nothing more",
+ chain:[["Bids are ordered by arrival","submittedAt on app bids, createdAt on link submissions"],
+  ["For each bid the standing lowest is known","Every price that arrived before it"],
+  ["The undercut is computed and compared across requests","No access log is needed, only the order and the prices"]],
+ f:["Bid.submittedAt","Bid.price"],s:"live"},
+
+"f-mismatch":{k:"Finding",t:"The award names a different supplier from the accepted bid",
+ what:"Nesma holds the accepted bid. The award recorded on the project names Al Faisal Rentals",
+ why:"Sometimes legitimate, which is exactly the problem. The two records do not read each other, so a redirected award leaves no trace anyone would notice",
+ chain:[["A bid is accepted","Bid.status becomes ACCEPTED, which is the competitive outcome"],
+  ["An award is recorded separately on the project","With its own supplier, rate, units and dates"],
+  ["The award code says so in its own header","It reads nothing from the deal room and may name a different supplier from whoever won the bid"],
+  ["This page puts them side by side","Which nothing else in the product does"]],
+ f:["Bid.status","Bid.wonViaSurvey","Award.supplierName"],s:"live"},
+
+"f-edited":{k:"Finding",t:"The request was edited after bids landed",
+ what:"The platform records that an edit was made while bids were already on the request. It does not record what changed",
+ why:"Narrowing a requirement to fit one supplier's fleet, or loosening it so the intended winner qualifies, is the classic method. Today it is visible as an event and invisible as an act",
+ ex:{head:"What is known and what is not",rows:[
+  ["An edit was made after bids arrived","Yes","recorded"],
+  ["Which field changed","Unknown","not stored",1],
+  ["Before and after values","Unknown","not stored",1],
+  ["When, and by whom","Unknown","no actor",1]],
+  out:"The flag is honest about its own limit: it can say that it happened, and nothing more"},
+ chain:[["A post-bid edit is allowed once","The backend refuses the second with REQUEST_EDIT_ALREADY_USED"],
+  ["renteeEditUsed is set on the request","And the web reads it, which is why this flag is real"],
+  ["No before or after is kept","So the requirement this page compares against is whatever the request says now"]],
+ f:["renteeEditUsed","Request edit diff"],s:"part"},
+
+/* ── Certificates ──────────────────────────────────────────────────── */
+"cert-1":{k:"Blocking",t:"TÜV expired on a machine on site",
+ what:"The safety certificate for this boom lift expired on 4 September. The hire started on 12 September and runs to 27 October",
+ why:"The only thing on this page you can still fix today. Ask the supplier for the renewed certificate, or take the machine off the site",
+ chain:[["The supplier uploads a document against the offered unit","Type and expiry together"],
+  ["It reaches the bid as an offered-unit document","With the expiry alongside"],
+  ["The expiry is compared against the hire dates","Not against today"]],
+ f:["OfferedUnitDoc.expiryDate"],s:"live"},
+
+"cert-2":{k:"Expiring",t:"A company paper expiring mid-hire",
+ what:"Arabian Cranes Co.'s commercial registration expires on 2 October. Their crane is on your site until 30 October",
+ why:"Not urgent today and awkward on 3 October. A company paper lapsing mid-hire surfaces when somebody else asks for it",
+ chain:[["A supplier's company papers carry expiry dates","CR, national address and the rest"],
+  ["VAT is the exception","Reissued annually rather than dated, and the payload says so"],
+  ["Each expiry is compared against live hires","Rather than against today"]],
+ f:["CompanyDocEntry.expiryDate","CompanyDocEntry.renewsAnnually"],s:"live"},
+
+"cert-3":{k:"Expiring",t:"A paper with no machine behind it",
+ what:"Nesma's national address expires on 28 September. No hire depends on it",
+ why:"Here for completeness and deliberately not urgent. A page that shouts equally about everything gets ignored",
+ chain:[["Company papers are read per supplier","Independently of whether anything is on hire"],
+  ["Machines on hire are read from awards","Marked as arrived and not yet returned"],
+  ["The two are crossed","Which separates an errand from a note"]],
+ f:["CompanyDocEntry.expiryDate","Award.mobilizedAt"],s:"live"},
+
+/* ── Patterns ──────────────────────────────────────────────────────── */
+"b-volume":{k:"Blind spot",t:"Patterns across many requests",
+ what:"Price-follow curves, bid rotation between suppliers, a narrowing gap between winner and runner-up, share drift period to period, Benford on bid values",
+ why:"All of these are real and none of them works on 7 requests. Two hits out of seven is a coincidence, not a pattern, and a page that presents it as analysis teaches people to distrust the rest of it",
+ ex:{head:"What each test needs before it means anything",rows:[
+  ["Price-follow","~200 bids","7 requests today",1],
+  ["Winner to runner-up gap","~150 requests","",1],
+  ["Share drift between periods","2 full periods","only 1 so far",1],
+  ["Benford on bid values","~300 values","28 today",1]],
+  out:"Every per-award finding on this page works at any volume. These do not, so they are off it until the account is bigger"},
+ chain:[["The data is already there","Bid prices, arrival timestamps, supplier keys and award values, all stored"],
+  ["The tests are cheap to write","None of them needs a new field"],
+  ["Volume is the only thing missing","So this is a switch to turn on later, not a feature to build"],
+  ["Per-award findings are different","A certificate that expired, or a bid accepted after close, is true on one request and needs no sample"]],
+ f:["Bid.price","Bid.submittedAt","Award.awardedAt"],s:"part"},
+
+"b-reach":{k:"Blind spot",t:"How many suppliers the marketplace reached",
+ what:"The number of suppliers a broadcast request was dispatched to, which is the denominator for every competition judgement on this page",
+ why:"Four bids from forty matched suppliers is a thin response. Four from five is a strong one. Today the page cannot tell those apart",
+ ex:{head:"The gap, precisely",rows:[
+  ["Returned when a request is created","matchedSupplierCount","per machine line"],
+  ["Used once, then discarded","yes","",1],
+  ["On the request read projection","no","",1]],
+  out:"Two ways to close it: the web stores what it was told at creation, or the backend adds the field to the request read"},
+ chain:[["The create call answers with matchedSupplierCount","One entry per fanned-out machine line"],
+  ["The web uses it to confirm the request reached suppliers","And keeps nothing"],
+  ["Reading the request back later, the number is gone","So no historical view can show it"]],
+ f:["matchedSupplierCount"],s:"blocked"},
+
+"b-actor":{k:"Blind spot",t:"Who raised it, who awarded it",
+ what:"No finding can name a person, because no request and no award stores who created it",
+ why:"The difference between a report and something you can act on. Award rate by buyer, segregation of duties and any mandatory justification all wait on this one field",
+ chain:[["What exists","A project stores ownerUserId and ownerName, and the code states it is displayed and never a permission check"],
+  ["What does not","A request has no creator, an award has no author, an accept has no actor"],
+  ["Why nothing works around it","Every member of the company can create, edit, award and delete"]],
+ f:["RequestRecord.createdBy","Award.createdBy"],s:"blocked"},
+
+"b-shares":{k:"Blind spot",t:"Who the request was sent to",
+ what:"A request quietly shared with one supplier who then wins it is a private tender wearing a public label",
+ why:"One of the most direct forms of steering, and the write already happens. Only the read is missing",
+ chain:[["Sharing a request records it","The share write stores which supplier rows and which channel"],
+  ["An email share returns the recipients","The addresses the message actually left for"],
+  ["There is no endpoint to read it back","And the write swallows its own errors, so a missing record proves nothing either"]],
+ f:["GET /requests/{id}/shares"],s:"blocked"},
+
+"b-diff":{k:"Blind spot",t:"What a post-bid edit changed",
+ what:"The fact of the edit is stored. The before, the after, the field and the time are not",
+ why:"Narrowing a spec to fit one supplier is the classic method, and today the flag can only say that an edit happened",
+ chain:[["renteeEditUsed is set when an edit lands with bids on the request","Which is why the flag exists at all"],
+  ["No diff is kept","So the requirement this page reads is the current one, not the one the bidders answered"]],
+ f:["renteeEditUsed","Request edit diff"],s:"part"},
+
+"b-case":{k:"Blind spot",t:"Case state and the buyer's answer",
+ what:"There is nowhere to store a finding's state, the explanation given, the outcome or the amount recovered",
+ why:"The single feature that decides whether this page survives. Without it nothing can be dismissed, every finding is permanent, and the page becomes noise on its second visit",
+ chain:[["A finding needs a state","Open, asked, explained, substantiated, closed"],
+  ["An explanation needs a field and an author","Which is also the deviation approval a policy will ask for"],
+  ["Dismissals need to feed back","Or the false positives never stop"]],
+ f:["Case store","Justification","Outcome"],s:"blocked"},
+
+"b-delivery":{k:"Blind spot",t:"What machine actually arrived",
+ what:"Serial or plate of the unit delivered against the one bid, its year and model, hours billed against hours worked",
+ why:"Paper fraud and physical fraud are different problems. Everything here audits the paper. A gate scan is what would make compliance a fact about the site",
+ chain:[["The renter can mark a machine as arrived","A date, and nothing about which machine it was"],
+  ["No serial or plate is captured on the renter side","Those live on the supplier's own listing papers"],
+  ["No hours, no telematics and no gate event exist",""]],
+ f:["Gate scan","Unit serial at delivery","Telematics"],s:"blocked"},
+
+"b-money":{k:"Blind spot",t:"Invoices and payments",
+ what:"Duplicate invoices, an invoice against a cancelled request, and a bank account changed days before a payment",
+ why:"Payment diversion is the highest-value single fraud in procurement, and the platform cannot see any of it",
+ chain:[["The platform handles no money","No invoices, no payment records, no bank details"],
+  ["The quotation is as far as it goes","A contract document, not a payment instruction"],
+  ["So realised cost is unknown","Which also blocks savings claimed against savings delivered"]],
+ f:["Invoice records","Supplier IBAN"],s:"blocked"},
+
+"b-approval":{k:"Blind spot",t:"Approval limits",
+ what:"Value bands, a named approver per band, and requests split to sit just under one",
+ why:"Splitting cannot be detected against thresholds that do not exist. It also blocks the preventive half, which is worth more than this whole page: a warning at the moment of award beats a finding next week",
+ chain:[["There is no approval step in the product","Requests post straight out and awards are recorded directly"],
+  ["Every member of the company can award","So there is no matrix to encode"],
+  ["This is a feature before it is a report",""]],
+ f:["Approval matrix","Value bands"],s:"blocked"},
+
+"b-coi":{k:"Blind spot",t:"Conflicts of interest",
+ what:"Matching supplier owners against your own employees, ex-employees, declared interests and family names",
+ why:"Usually where the real money is. Bid manipulation is noisy and visible. A relative's company is silent and looks entirely legal",
+ chain:[["The platform holds no employee records","No HR, no declarations, no ownership identity"],
+  ["A supplier's owner is not captured at all","Only a company name, a CR string and a contact"],
+  ["So there is nothing on either side to match",""]],
+ f:["Employee register","Owner identity","Declared interests"],s:"blocked"}
+};
+
+
+/* The actual numbers behind each row. Clicking a cell opens THIS, not a lesson. */
+const R = {
+"1042":{ref:"RFQ-1042",machine:"Crawler Excavator 20 ton",days:60,fri:8,billable:52,units:1,
+ channel:"Moedatech marketplace",opened:null,held:0,
+ bids:[["Zahid Tractor",3900,"7 Sep 10:20",1,1],["Nesma Heavy Equipment",4100,"7 Sep 14:55",1,0],
+       ["Arabian Cranes Co.",4250,"8 Sep 09:10",1,0],["Durrah Machinery",4600,"8 Sep 17:42",1,0]],
+ market:{med:4050,n:12,lo:3700,hi:4700},
+ terms:[["Operator supplied","Yes",1],["Minimum year 2018","2022",1],["Fuel on supplier","Yes",1],
+        ["Transport on supplier","Yes",1],["Operator certificate","SPSP held",1],["TÜV certificate","Held, valid to 2027",1]],
+ winner:{name:"Zahid Tractor",route:"Marketplace bid",acct:"Yes",ver:"Yes",cr:"1010223344",reg:"Yes"},
+ money:[["Rate per day","3,900"],["Units","×1"],["Calendar days","60"],["Fridays, not billed","−8"],
+        ["Billable days","52"],["Mobilization","0"],["Demobilization","0"]],total:"202,800"},
+
+"1048":{ref:"RFQ-1048",machine:"Mobile Crane 100 ton",days:30,fri:4,billable:26,units:1,
+ channel:"Moedatech marketplace",opened:null,held:0,
+ bids:[["Nesma Heavy Equipment",4350,"8 Sep 09:12",1,0],["Zahid Tractor",4500,"8 Sep 16:40",1,0],
+       ["Arabian Cranes Co.",4800,"9 Sep 11:05",0,1]],
+ market:{med:4200,n:9,lo:3900,hi:4900},
+ terms:[["Operator supplied","Yes",1],["Minimum year 2018","2020",1],["Fuel on supplier","Yes",1],
+        ["Transport on supplier","Yes",1],["Operator certificate","SPSP held",1],["TÜV certificate","Refused",0]],
+ winner:{name:"Arabian Cranes Co.",route:"Marketplace bid",acct:"Yes",ver:"Yes",cr:"1010887766",reg:"Yes"},
+ money:[["Rate per day","4,800"],["Units","×1"],["Calendar days","30"],["Fridays, not billed","−4"],
+        ["Billable days","26"],["Mobilization","0"],["Demobilization","0"]],total:"124,800"},
+
+"1061":{ref:"RFQ-1061",machine:"Boom Lift 45 ft ×3",days:45,fri:6,billable:39,units:3,
+ channel:"Moedatech marketplace",opened:null,held:3,
+ bids:[["Durrah Machinery",840,"9 Sep 11:30",1,0],["Zahid Tractor",860,"11 Sep 23:20",1,1],
+       ["Nesma Heavy Equipment",940,"10 Sep 08:15",1,0]],
+ market:{med:900,n:14,lo:780,hi:1050},
+ terms:[["Operator supplied","Not required",1],["Minimum year 2019","2021",1],["Fuel on renter","Yes",1],
+        ["Transport on supplier","Yes",1],["TÜV certificate","Held, expired 4 Sep",1]],
+ winner:{name:"Zahid Tractor",route:"Marketplace bid",acct:"Yes",ver:"Yes",cr:"1010223344",reg:"Yes"},
+ money:[["Rate per day","860"],["Units","×3"],["Calendar days","45"],["Fridays, not billed","−6"],
+        ["Billable days","39"],["Mobilization","0"],["Demobilization","0"]],total:"100,620"},
+
+"1051":{ref:"RFQ-1051",machine:"Telehandler 17 m ×2",days:30,fri:4,billable:26,units:2,
+ channel:"Your own shared link",opened:5,held:0,
+ bids:[["Faisal Heavy Equip. Est.",1150,"7 Sep 19:04",0,1],["Durrah Machinery",1320,"7 Sep 21:36",0,0]],
+ market:{med:1080,n:7,lo:950,hi:1300},
+ terms:[["Operator supplied","Yes",1],["Minimum year 2018","2019",1],["Fuel on supplier","Yes",1],
+        ["Transport on supplier","Not answered",0],["Operator certificate","Not answered",0],["TÜV certificate","Held",1]],
+ winner:{name:"Faisal Heavy Equip. Est.",route:"Submitted through your shared link",acct:"No",ver:"No",cr:"None on file",reg:"No"},
+ money:[["Rate per day","1,150"],["Units","×2"],["Calendar days","30"],["Fridays, not billed","−4"],
+        ["Billable days","26"],["Mobilization","0"],["Demobilization","0"]],total:"59,800"},
+
+"1055":{ref:"RFQ-1055",machine:"Wheel Loader 966",days:45,fri:6,billable:39,units:1,
+ channel:"Direct to one named firm",opened:null,held:0,
+ bids:[["Al Faisal Rentals",2240,"2 Sep 13:50",1,1]],
+ market:{med:1850,n:11,lo:1600,hi:2150},
+ terms:[["Operator supplied","Yes",1],["Minimum year 2017","2018",1],["Fuel on renter","Yes",1],["Transport on supplier","Yes",1]],
+ winner:{name:"Al Faisal Rentals",route:"Direct request, nobody else could bid",acct:"No",ver:"No",cr:"None on file",reg:"Yes, by you"},
+ money:[["Rate per day","2,240"],["Units","×1"],["Calendar days","45"],["Fridays, not billed","−6"],
+        ["Billable days","39"],["Mobilization","0"],["Demobilization","0"]],total:"87,360"},
+
+"1058":{ref:"RFQ-1058",machine:"Water Tanker 20 m³",days:60,fri:8,billable:52,units:1,
+ channel:"Moedatech marketplace",opened:null,held:0,
+ bids:[["Durrah Machinery",1340,"1 Sep 08:40",1,0],["Arabian Cranes Co.",1285,"1 Sep 15:12",1,0],
+       ["Zahid Tractor",1240,"2 Sep 09:55",1,0],["Al Faisal Rentals",1197,"3 Sep 11:20",1,0],
+       ["Nesma Heavy Equipment",1180,"4 Sep 16:48",1,1]],
+ market:{med:1240,n:15,lo:1100,hi:1420},
+ terms:[["Operator supplied","Yes",1],["Minimum year 2019","2022",1],["Fuel on supplier","Yes",1],
+        ["Transport on supplier","Yes",1],["Operator certificate","SPSP held",1]],
+ winner:{name:"Nesma Heavy Equipment",route:"Marketplace bid",acct:"Yes",ver:"Yes",cr:"1010556677",reg:"Yes"},
+ money:[["Rate per day","1,180"],["Units","×1"],["Calendar days","60"],["Fridays, not billed","−8"],
+        ["Billable days","52"],["Mobilization","0"],["Demobilization","0"]],total:"61,360",
+ note:"The deal room later closed at 1,420 per day, which is 12,480 SAR above this figure"},
+
+"1064":{ref:"RFQ-1064",machine:"Forklift 5 ton ×2",days:60,fri:8,billable:52,units:2,
+ channel:"Moedatech marketplace",opened:null,held:0,
+ bids:[["Nesma Heavy Equipment",640,"5 Sep 10:02",1,1],["Zahid Tractor",654,"5 Sep 14:31",1,0],
+       ["Al Faisal Rentals",690,"6 Sep 09:18",1,0],["Durrah Machinery",710,"6 Sep 12:44",1,0]],
+ market:{med:660,n:18,lo:590,hi:740},
+ terms:[["Operator supplied","Not required",1],["Minimum year 2018","2021",1],["Fuel on renter","Yes",1],["Transport on supplier","Yes",1]],
+ winner:{name:"Records disagree",route:"Nesma holds the accepted bid, the award names Al Faisal Rentals",
+         acct:"Unanswerable",ver:"Unanswerable",cr:"Unanswerable",reg:"Unanswerable"},
+ money:[["Rate per day","640"],["Units","×2"],["Calendar days","60"],["Fridays, not billed","−8"],
+        ["Billable days","52"],["Mobilization","0"],["Demobilization","0"]],total:"66,560"}
+};
+
+const sar = n => n.toLocaleString("en-US");
+
+/* One renderer per column. Each returns the REAL rows for that request. */
+const DETAIL = {
+ "c-position": r => {
+   const lo = Math.min(r.market.lo, ...r.bids.map(b=>b[1]));
+   const hi = Math.max(r.market.hi, ...r.bids.map(b=>b[1]));
+   const at = v => ((v-lo)/(hi-lo)*100).toFixed(1)+"%";
+   const rows = r.bids.slice().sort((a,b)=>a[1]-b[1]).map(b =>
+     `<div class="dr${b[4]?" win":""}"><span class="a">${b[0]}${b[3]?"":' <em>failed a term</em>'}</span>
+      <span class="bar"><i style="left:${at(b[1])}"></i></span>
+      <span class="b">${sar(b[1])}</span></div>`).join("");
+   return `<div class="dtitle">Every bid received, cheapest first</div>${rows}
+     <div class="dr mkt"><span class="a">Marketplace median <em>${r.market.n} live listings</em></span>
+       <span class="bar"><i class="m" style="left:${at(r.market.med)}"></i></span>
+       <span class="b">${sar(r.market.med)}</span></div>
+     <div class="dfoot">Listings for this machine run ${sar(r.market.lo)} to ${sar(r.market.hi)} per day.
+       Prices normalised to one cycle, Fridays excluded</div>`;
+ },
+ "c-terms": r => `<div class="dtitle">What your request asked for, and what the winner answered</div>` +
+   r.terms.map(t=>`<div class="dr${t[2]?"":" bad"}"><span class="a">${t[0]}</span>
+     <span class="b">${t[1]}</span><span class="tick">${t[2]?"✓":"✗"}</span></div>`).join("") +
+   `<div class="dfoot">${r.terms.filter(t=>t[2]).length} of ${r.terms.length} met. A term answered by an
+     uploaded document counts as answered</div>`,
+ "c-reach": r => `<div class="dtitle">Who the request reached, and who answered</div>
+   <div class="dr"><span class="a">Channel</span><span class="b">${r.channel}</span></div>
+   ${r.opened?`<div class="dr"><span class="a">Firms that opened the link</span><span class="b">${r.opened}</span></div>`:""}
+   <div class="dr"><span class="a">Offers received</span><span class="b">${r.bids.length}</span></div>
+   ${r.held?`<div class="dr bad"><span class="a">Larger machines held back, never shown</span><span class="b">${r.held}</span></div>`:""}
+   <div class="dr bad"><span class="a">Suppliers the marketplace matched</span><span class="b">not stored</span></div>
+   <div class="dtitle" style="margin-top:12px">In the order they arrived</div>` +
+   r.bids.slice().sort((a,b)=>a[2]<b[2]?-1:1).map((b,i)=>
+     `<div class="dr${b[4]?" win":""}"><span class="a">${i+1} · ${b[0]}</span>
+      <span class="b">${sar(b[1])}</span><span class="c">${b[2]}</span></div>`).join(""),
+ "c-winner": r => `<div class="dtitle">How well this firm is known</div>
+   <div class="dr"><span class="a">How the offer reached you</span><span class="b">${r.winner.route}</span></div>
+   <div class="dr${r.winner.acct==="Yes"?"":" bad"}"><span class="a">Moedatech account</span><span class="b">${r.winner.acct}</span></div>
+   <div class="dr${r.winner.ver==="Yes"?"":" bad"}"><span class="a">Verified by the platform</span><span class="b">${r.winner.ver}</span></div>
+   <div class="dr${r.winner.cr==="None on file"||r.winner.cr==="Unanswerable"?" bad":""}"><span class="a">Commercial registration</span><span class="b">${r.winner.cr}</span></div>
+   <div class="dr"><span class="a">Registered as your vendor</span><span class="b">${r.winner.reg}</span></div>`,
+ "c-value": r => `<div class="dtitle">How the value is built</div>` +
+   r.money.map(m=>`<div class="dr"><span class="a">${m[0]}</span><span class="b">${m[1]}</span></div>`).join("") +
+   `<div class="dr win"><span class="a">Total for the hire</span><span class="b">${r.total} SAR</span></div>` +
+   (r.note?`<div class="dfoot">${r.note}</div>`:""),
+ "c-request": r => `<div class="dtitle">This request</div>
+   <div class="dr"><span class="a">Machine</span><span class="b">${r.machine}</span></div>
+   <div class="dr"><span class="a">Hire length</span><span class="b">${r.days} days</span></div>
+   <div class="dr"><span class="a">Fridays inside it, not billed</span><span class="b">${r.fri}</span></div>
+   <div class="dr"><span class="a">Billable days</span><span class="b">${r.billable}</span></div>
+   <div class="dr"><span class="a">Units</span><span class="b">×${r.units}</span></div>
+   <div class="dr"><span class="a">Sent as</span><span class="b">${r.channel}</span></div>`,
+ "c-findings": r => `<div class="dtitle">Everything checked on this request</div>
+   <div class="dr"><span class="a">Bids received</span><span class="b">${r.bids.length}</span></div>
+   <div class="dr"><span class="a">Bids meeting every term</span><span class="b">${r.bids.filter(b=>b[3]).length}</span></div>
+   <div class="dr"><span class="a">Your terms met by the winner</span><span class="b">${r.terms.filter(t=>t[2]).length} of ${r.terms.length}</span></div>
+   <div class="dr"><span class="a">Awarded against the market</span><span class="b">${sar(r.bids.find(b=>b[4])[1])} vs ${sar(r.market.med)}</span></div>`
+};
+
+const dw=document.getElementById("dw"), scrim=document.getElementById("scrim"), ask=document.getElementById("dwAsk");
+let lastEl=null;
+const STATE={live:["live","Runs on data you already have"],part:["part","Partly available, one piece missing"],blocked:["blocked","Needs something the platform does not store"]};
+
+function open(key,el){
+  const x=X[key]; if(!x) return;
+  const rowId = el.closest("[data-row]") ? el.closest("[data-row]").dataset.row : null;
+  const r = rowId ? R[rowId] : null;
+  const det = (r && DETAIL[key]) ? DETAIL[key](r) : null;
+  if(lastEl) lastEl.classList.remove("on");
+  lastEl=el; el.classList.add("on");
+  document.getElementById("dwKind").textContent=x.k;
+  document.getElementById("dwTitle").textContent=x.t;
+  document.getElementById("dwAns").textContent = x.q ? ("Answers: " + x.q) : "";
+  document.getElementById("dwWhat").textContent=x.what;
+  document.getElementById("dwWhy").textContent=x.why;
+  const db=document.getElementById("dwDetBlk");
+  if(det){
+    db.style.display="";
+    document.getElementById("dwDetH").textContent = r.ref + " · " + r.machine;
+    document.getElementById("dwDet").innerHTML = det;
+  } else db.style.display="none";
+  const exb=document.getElementById("dwExBlk");
+  if(x.ex && !det){
+    exb.style.display="";
+    document.getElementById("dwEx").innerHTML=
+      `<div class="eh">${x.ex.head}</div>`+
+      x.ex.rows.map(r=>`<div class="er${r[3]?" win":""}"><span class="a">${r[0]}</span><span class="b">${r[1]}</span><span class="c">${r[2]||""}</span></div>`).join("")+
+      `<div class="eo">${x.ex.out}</div>`;
+  } else exb.style.display="none";
+  document.getElementById("dwChain").innerHTML=x.chain.map(([m,d])=>`<li><div class="m">${m}</div><div class="d">${d}</div></li>`).join("");
+  document.getElementById("dwFields").innerHTML=x.f.map(f=>`<span class="${x.s==="live"?"":"no"}">${f}</span>`).join("");
+  const st=document.getElementById("dwState"), c=STATE[x.s]||STATE.live;
+  st.className="state "+c[0]; st.textContent=c[1];
+  ask.style.display=(x.k.indexOf("finding")>-1||x.k==="Blocking"||x.k.indexOf("Pattern")>-1)?"":"none";
+  dw.classList.add("open"); dw.setAttribute("aria-hidden","false"); scrim.classList.add("open");
+  dw.querySelector(".scrollbody").scrollTop=0;
+}
+function close(){
+  dw.classList.remove("open"); dw.setAttribute("aria-hidden","true"); scrim.classList.remove("open");
+  if(lastEl){lastEl.classList.remove("on"); lastEl=null;}
+}
+document.addEventListener("click",(e)=>{
+  const el=e.target.closest("[data-x]");
+  if(el){open(el.dataset.x,el); return;}
+  if(!e.target.closest("#dw")) close();
+});
+document.getElementById("dwClose").addEventListener("click",close);
+scrim.addEventListener("click",close);
+document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
+</script>
+</body>
+</html>

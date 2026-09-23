@@ -1,0 +1,289 @@
+"use client";
+
+/**
+ * The canvas's marks and its field chrome, at the prototype's geometry.
+ *
+ * Two marks that look similar and mean opposite things, so they are defined together to keep them
+ * from drifting into each other:
+ *
+ *  - **the provenance note** — this value was chosen FOR you. Amber, informational, never blocks.
+ *  - **the required dot** — this value is still YOURS to choose, and nothing advances until it is.
+ *
+ * **Placement is load-bearing.** The prototype puts the provenance note UNDER the control and the
+ * required dot inline after the label, as an 8px `●`. Putting the note in the label instead — which
+ * is what the first cut did — makes every marked label wrap onto two lines, so a card with six
+ * marked fields reads as noise and the labels stop being scannable. The note belongs with the value
+ * it describes, not with the name of the field.
+ */
+
+import type { ReactNode } from "react";
+import { useT } from "@/lib/i18n";
+import { isSystemChosen, type FieldSource } from "@/lib/contract";
+
+/**
+ * ~~The amber "AI selected" / "Default" line under a system-chosen control.~~
+ *
+ * Removed (owner, 2026-09-01): **the orange highlight is enough to say a value was chosen for you.**
+ * The ring and the line said the same thing twice, and the line said it in a sentence — so a card
+ * with five prefilled fields carried five amber captions, and the marker that was meant to be quiet
+ * became the loudest thing on the panel.
+ *
+ * The distinction the line drew — agent-read versus site-default — was never one a renter could act
+ * on differently: either way he checks the value and changes it or leaves it. `FieldSource` still
+ * carries it for the code that does care (the ring, and what gets sent), and it is one import away if
+ * it is ever wanted back.
+ */
+
+/**
+ * Why this panel just opened by itself.
+ *
+ * *Review & send* opens a panel the SITE filled and the renter has never looked at, and shakes it.
+ * Nothing in it is missing, which is the point — and which is also why the shake alone reads as the
+ * page misbehaving: a panel appears, wobbles, and demands nothing (owner, 2026-09-02: *"sometimes
+ * when I click review and send, random panels open and there is nothing I can do with them"*).
+ *
+ * So the panel says what it wants: read this, then press again. Brand-coloured rather than red,
+ * because it is not a refusal about a missing answer, it is an ask to look at one that is already
+ * there.
+ */
+export function CheckFromProject() {
+  const t = useT();
+  return (
+    <p className="mb-3 flex items-start gap-2 rounded-sm border border-brand/40 bg-brand-soft px-3.5 py-2.5 text-body font-semibold leading-snug text-navy">
+      <span className="material-icons-outlined mt-px flex-none text-label text-brand">visibility</span>
+      {t.create.checkFromProject}
+    </p>
+  );
+}
+
+/** The blocking dot — the prototype's 8px amber bullet, inline after the label. */
+export function RequiredDot({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    /* `brand-deep`, the same orange its label wears (owner, 2026-09-12: *"use unified font colour
+       for missing fields"*). It was `brand`, so the dot and the word it follows were two different
+       oranges an inch apart. */
+    <span aria-hidden className="text-label leading-none text-brand-deep">
+      ●
+    </span>
+  );
+}
+
+/**
+ * A labelled canvas control at the prototype's field metrics: a 10px uppercase label with 0.05em
+ * tracking and an 8px gap to the control, then the provenance note below.
+ */
+export function CanvasField({
+  label,
+  source = "empty",
+  missing = false,
+  shake = false,
+  required = false,
+  star = false,
+  optional = false,
+  icon,
+  hint,
+  children,
+}: {
+  label: ReactNode;
+  source?: FieldSource;
+  /** True when this field is an unmet requirement — draws the dot and counts toward the pill. */
+  missing?: boolean;
+  /** True for the duration of a refused move: 450ms of movement, and nothing else. */
+  shake?: boolean;
+  /**
+   * The renter has tried to move on and this field is what stopped them.
+   *
+   * Separate from `shake` on purpose (owner, 2026-09-02). The shake says «look here» and then stops
+   * — a renter who glanced away has missed the whole message — so the WORD «* Required» and the red
+   * edge stay until the field is answered. The animation is the attention; this is the answer.
+   */
+  required?: boolean;
+  /**
+   * This field is required, and says so before anybody is refused.
+   *
+   * A red `*` beside the label, from the first render (owner, 2026-09-03): *"at first all these
+   * fields will show a red star so the user knows he must fill them, and if he tries to move on and
+   * one is blocking him then it will shake and show the word Required, not only a star."*
+   *
+   * So the star is the STANDING fact, this answer is owed, and `required` above is the same fact at
+   * the moment it stopped him. Two stages of one mark, never both at once: the word replaces the
+   * star rather than joining it.
+   *
+   * Not every gate gets one. The minimum year and the certificate block the canvas but are not the
+   * REQUEST's own requirements (MREQ-AC-54: the app treats both as optional, and each offers an
+   * explicit «Any year» / «No certificate»), so they shake when unanswered and are never starred.
+   */
+  star?: boolean;
+  optional?: boolean;
+  icon?: ReactNode;
+  /** A quiet line under the control — the prototype's "KSA STANDARD", "Suppliers quote you a …". */
+  hint?: ReactNode;
+  children: ReactNode;
+}) {
+  const t = useT();
+  return (
+    <div className={`min-w-0 ${shake ? "shake-error" : ""}`}>
+      <div
+        /* ── A chosen-for-you field wears its name in ORANGE (owner, 2026-09-08) ───────────
+           Production marks a prefilled field on two edges at once: the label in orange and a thin
+           orange line round the box (his screenshot of «Rental basis», «Hours per day», «Working
+           days per week»). We had the box and not the label, so the mark was quieter here than in
+           the product he is comparing it with.
+
+           `brand-deep` rather than `brand`: orange TEXT on a light ground has to be #c2570f to pass
+           AA, and the brand orange is a FILL colour — the rule the token file states and
+           `palette-drift` enforces.
+
+           ── ONE orange for both orange states (owner, 2026-09-12) ──────────────────────────────
+           *"use unified font colour for missing fields, some have dark orange like return and site
+           and some have orange like size, so unify"*.
+           ~~`missing` drew `text-brand` (#f97316) while a chosen-for-you label drew `brand-deep`
+           (#c2570f).~~ Two oranges a hand's width apart on one card, and the brighter of the two was
+           the one breaking this file's own AA rule — it is a FILL colour being used as 11px text.
+           🔴 The two STATES are still told apart, just not by the label's colour: the ● is drawn for
+           `missing` alone and the ring round the box for `isSystemChosen` alone. Nothing is lost by
+           spelling them in one ink; what was lost before was the reader's ability to tell a shade
+           from a state. */
+        className={`mb-2 flex items-center gap-1.5 text-label font-semibold uppercase leading-tight tracking-[0.05em] ${
+          required ? "text-danger" : missing || isSystemChosen(source) ? "text-brand-deep" : "text-muted"
+        }`}
+      >
+        {icon}
+        {/* ── The demand rides INSIDE the label, and costs it as little as possible ──────────────
+            (owner, 2026-09-12: *"fix the ui when required appear to not change the size of card box
+            and dont affect the text wrapping, put the required text small"*.)
+
+            ~~The word was a flex SIBLING of the label, at the label's own size: 11px, uppercase,
+            extrabold, with the row's 0.05em tracking on it.~~ Three faults from one line. It was a
+            rigid item, so it took its width off the label and pushed «FUEL RESPONSIBILITY» onto two
+            lines, which made that panel taller than the two beside it. It had no `nowrap`, so the
+            string «* Required» split at its own space and left the star stranded at the end of the
+            first line with «REQUIRED» under it. And at the label's weight it read as a second title
+            rather than as a note on the first.
+
+            It is INLINE with the label text now, so it flows with the words instead of competing
+            with them, `normal-case` at `font-semibold` with the tracking cleared — which is roughly
+            half the width it was — and `whitespace-nowrap` so it can never break in half again. */}
+        <span className="min-w-0">
+          {label}
+          {/* The star rides the LABEL, not the row: «TYPE *» is one thing to read, while a star a
+              gap away from the word it qualifies reads as a footnote to the whole field.
+              It is drawn whenever the field is starred, `required` included — it used to be
+              SUPPRESSED then, because the word carried a star of its own; that star is what broke
+              across the line. One star, in one place, in both states. */}
+          {star && <span className="ms-0.5 font-extrabold text-danger">*</span>}
+          {required && (
+            <span className="ms-1 whitespace-nowrap font-semibold normal-case tracking-normal text-danger">
+              {t.create.requiredWord}
+            </span>
+          )}
+        </span>
+        {optional && <span className="font-normal normal-case tracking-normal text-muted/70">{t.create.machineCard.notesOptional}</span>}
+        {/* The dot is the UNTRIED state of the same fact, and never shows beside the word. */}
+        {!required && <RequiredDot show={missing} />}
+      </div>
+      {/**
+        * The amber highlight wraps the CONTROL, not the whole field.
+        *
+        * The prototype tints an entire card amber, which reads as "this group is special" and, being a
+        * box with its own padding, pushed the delivery leg's chips a few pixels below the other two —
+        * three choices that should sit on one line did not. Ringing just the options keeps the marker
+        * on the thing it describes and leaves every leg on the same baseline.
+        */}
+      <div
+        className={
+          required
+            ? "rounded-sm ring-1 ring-danger ring-offset-2 ring-offset-surface2"
+            : isSystemChosen(source)
+              /* ── The prod mark: a line ON the box, in the brand orange (owner, 2026-09-08) ───
+                 ~~`bg-warn/[0.07] ring-warn/45 ring-offset-2`.~~ Two things were wrong with it
+                 against the product: `--warn` in this palette is a MUSTARD (#b98a1d), not an
+                 orange, so the mark read as a different colour from prod’s; and the offset ring
+                 floated two pixels off the control with a tint behind it, where prod draws one thin
+                 line on the edge and nothing else. */
+              ? "rounded-sm ring-1 ring-brand"
+              : undefined
+        }
+      >
+        {children}
+      </div>
+      {hint && <p className="mt-1.5 text-label leading-snug text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+/**
+ * The prototype's `pillFull` — a full-width choice inside a grid, navy when chosen.
+ *
+ * Not the shared `Pchips`: those are rounded-full amber chips that wrap, which is what made the
+ * two-way choices stack vertically and lose the side-by-side reading the prototype relies on.
+ */
+export function ChoiceRow<T extends string>({
+  value,
+  options,
+  onChange,
+  columns = 2,
+}: {
+  value: T | null;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+  columns?: number;
+}) {
+  return (
+    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+      {options.map((o) => {
+        const on = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onChange(o.value)}
+            /** Wraps rather than truncating: a choice whose label is cut off has lost its meaning. */
+            className={`rounded-sm border px-1.5 py-2 text-center text-body leading-tight transition ${
+              on ? "border-navy bg-navy font-semibold text-white" : "border-border bg-surface font-semibold text-navy-mid"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The prototype's `pill` — an inline-width chip for multi-selects (attachments, certificates). */
+export function ChoiceChips<T extends string>({
+  values,
+  options,
+  onToggle,
+}: {
+  values: T[];
+  options: { value: T; label: string }[];
+  onToggle: (v: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {options.map((o) => {
+        const on = values.includes(o.value);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => onToggle(o.value)}
+            className={`rounded-sm border px-4 py-2 text-body transition ${
+              on ? "border-navy bg-navy font-semibold text-white" : "border-border bg-surface font-semibold text-navy-mid"
+            }`}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The green/amber dot on a panel header — green once that panel has no gaps left (MREQ-AC-13). */
+export function PanelDot({ complete }: { complete: boolean }) {
+  return <span aria-hidden className={`inline-block h-2 w-2 flex-none rounded-full ${complete ? "bg-ok" : "bg-brand"}`} />;
+}

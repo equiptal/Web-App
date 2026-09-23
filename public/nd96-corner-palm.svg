@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  One oversized palm, bleeding out of a corner. Used as a MASK, never as a picture: the fill is
+  black because a mask reads alpha, and the colour is a token at the call site - so the same file
+  marks a white card in green and a navy one in white.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 190" width="220" height="190">
+ <path fill="#000000" d="M-3.12 0C-2.8 -24 -0.8 -48 0.6 -70L6.2 -70C6.8 -48 6.2 -24 5.88 0ZM2.2 -71Q-22.91 -67.83 -43.46 -48.51Q-20.17 -62.26 2.2 -71ZM2.2 -71Q-18.25 -79.39 -37.73 -74.69Q-18.87 -72.76 2.2 -71ZM2.2 -71Q-9.29 -86.87 -24.38 -93.84Q-13.96 -81.43 2.2 -71ZM2.2 -71Q-1.9 -87.95 -12.28 -99.39Q-8.76 -84.45 2.2 -71ZM2.2 -71Q6.02 -86.15 1.69 -100Q-2.15 -86.01 2.2 -71ZM2.2 -71Q12.04 -82.89 14 -96.51Q4.63 -86.32 2.2 -71ZM2.2 -71Q16.05 -81.04 23.43 -93.61Q10.43 -86.31 2.2 -71ZM2.2 -71Q20.99 -73.44 37.06 -77.54Q19.67 -80.49 2.2 -71ZM2.2 -71Q22.6 -63.37 44.02 -52.47Q25.3 -69.47 2.2 -71ZM2.2 -71Q22.49 -56.28 45.14 -33.28Q26.58 -60.93 2.2 -71ZM0.1 -67.5a2.1 2.1 0 1 0 4.2 0a2.1 2.1 0 1 0 -4.2 0Z" transform="translate(136.4 193.8) scale(1.62)"/>
+</svg>

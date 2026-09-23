@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<title>Guest Home — Moedatech</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap"
+  rel="stylesheet"
+/>
+
+<!--
+  ═══════════════════════════════════════════════════════════════════════════════
+  Moedatech — GUEST HOME · v3
+
+  TOP BAR is the app's own, not a new one: `src/components/AppShell.tsx`
+    navy #1c3550 · 62px · border-b white/10 · white wordmark at 20px
+    centred pills — active white/navy, resting white/70 (`src/components/AppNav.tsx`)
+    right cluster — locale toggle (h-28 pill, white/25 border), orange Sign-in pill
+  Guest swaps the three signed-in places for the three a visitor has.
+
+  CTA is deliberately SHORT — one band, then the search rail — so the first row of
+  stores is on screen without scrolling.
+
+  Craft borrowed from the marketing site (professionalism, not the palette):
+  generous card radius, product on a plinth, pill filters with a solid active
+  state, mono pagers, tight heading tracking. Palette stays the product's:
+  navy #1c3550, surface #f5f8fc, brand orange #f79009 for actions only,
+  verified green #1daf58, warnings light red #e2564a.
+  ═══════════════════════════════════════════════════════════════════════════════
+-->
+
+<style>
+  :root{
+    color-scheme: light;
+    --navy:#1c3550; --navy-deep:#12263a; --navy-mid:#2a4f72; --muted:#6b8fa8; --faint:#9bb3c8;
+    --brand:#f79009; --brand-deep:#d97706; --brand-dim:#fff4e5; --brand-line:#f7c98b;
+    --ok:#1daf58; --ok-dim:#e7f7ee;
+    --info:#1a7ec8; --info-dim:#e6f2fb;
+    --warn:#e2564a; --warn-dim:#fdecea; --warn-line:#f4c4be;
+    --bg:#f5f8fc; --card:#ffffff; --plinth:#e4edf5; --sunk:#eff4f9;
+    --border:#d4e0ec; --line:#e7eef5;
+    --r-card:20px; --r-md:12px; --r-pill:999px;
+    --ease:cubic-bezier(.32,.72,.24,1);
+    --shadow:0 14px 40px -22px rgba(18,38,58,.5);
+    --shadow-lg:0 40px 90px -40px rgba(18,38,58,.62);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--navy);
+    font-family:"Nunito","Inter",-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  [dir="rtl"]{font-family:"IBM Plex Sans Arabic","Nunito",sans-serif}
+  body.locked{overflow:hidden}
+  button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+  a{color:inherit;text-decoration:none}
+  .icon{font-family:"Material Symbols Rounded";font-weight:normal;line-height:1;display:inline-block;
+    white-space:nowrap;direction:ltr;-webkit-font-feature-settings:"liga";user-select:none;
+    font-variation-settings:"opsz" 24,"wght" 400,"FILL" 0,"GRAD" 0}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+  :focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:6px}
+  h1,h2,h3,h4{margin:0;letter-spacing:-.03em;line-height:1.12;font-weight:800}
+
+  .wrap{max-width:1560px;margin:0 auto;padding:0 28px}
+
+  /* ══ TOP BAR — the app's (AppShell.tsx) ═══════════════════════════════════ */
+  .appbar{position:sticky;top:0;z-index:40;height:62px;background:var(--navy);color:#fff;
+    border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:12px;
+    padding:0 28px;position:sticky}
+  .wordmark{display:flex;align-items:center;gap:8px;flex:none;font-weight:800;font-size:17px;letter-spacing:-.03em;color:#fff}
+  .wordmark .m{width:26px;height:26px;border-radius:8px;background:#fff;color:var(--navy);
+    display:grid;place-items:center;font-size:16px}
+  .navslot{position:absolute;inset-inline:0;display:none;justify-content:center;pointer-events:none}
+  @media (min-width:1024px){ .navslot{display:flex} }
+  .navslot .row{pointer-events:auto;display:flex;align-items:center;gap:4px}
+  .navtab{white-space:nowrap;border-radius:var(--r-pill);padding:6px 16px;font-size:14px;font-weight:600;
+    color:rgba(255,255,255,.7);transition:background .18s,color .18s}
+  .navtab:hover{background:rgba(255,255,255,.1);color:#fff}
+  .navtab.on{background:#fff;color:var(--navy);font-weight:800}
+  .barright{margin-inline-start:auto;display:flex;align-items:center;gap:12px;flex:none;z-index:1}
+  .loc{display:inline-flex;align-items:center;gap:6px;height:28px;border-radius:var(--r-pill);
+    border:1px solid rgba(255,255,255,.25);padding:0 10px;font-size:12.5px;font-weight:600;color:#fff}
+  .loc:hover{background:rgba(255,255,255,.1)}
+  .loc .icon{font-size:15px;color:rgba(255,255,255,.85)}
+  .loc .chev{font-size:14px;color:rgba(255,255,255,.6)}
+  .signin{display:inline-flex;align-items:center;gap:7px;background:var(--brand);color:#fff;
+    border-radius:var(--r-pill);padding:8px 15px;font-size:13px;font-weight:700;transition:filter .18s}
+  .signin:hover{filter:brightness(1.06)}
+  .signin .icon{font-size:16px}
+
+  /* ══ COMPACT CTA BAND ═════════════════════════════════════════════════════ */
+  .cta{background:linear-gradient(120deg,#1c3550 0%,#12263a 62%,#0f1e2e 100%);color:#fff;position:relative;overflow:hidden}
+  .cta::before{content:"";position:absolute;inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+    background-size:64px 64px;
+    -webkit-mask-image:radial-gradient(circle at 78% 30%,#000 20%,transparent 72%);
+    mask-image:radial-gradient(circle at 78% 30%,#000 20%,transparent 72%)}
+  .cta::after{content:"";position:absolute;width:320px;height:320px;border-radius:50%;background:var(--brand);
+    opacity:.16;filter:blur(90px);top:-160px;inset-inline-end:6%}
+  .ctain{position:relative;display:flex;align-items:center;gap:40px;padding:34px 0 52px;flex-wrap:wrap}
+  .ctacopy{flex:1 1 480px;min-width:0}
+  .kick{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;color:rgba(255,255,255,.62)}
+  .kick .live{width:6px;height:6px;border-radius:50%;background:var(--ok);
+    box-shadow:0 0 0 0 rgba(29,175,88,.6);animation:pulse 2.6s var(--ease) infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(29,175,88,.5)}70%{box-shadow:0 0 0 10px rgba(29,175,88,0)}100%{box-shadow:0 0 0 0 rgba(29,175,88,0)}}
+  .cta h1{margin:12px 0 0;font-size:clamp(27px,3vw,38px);font-weight:800;color:#fff;letter-spacing:-.035em}
+  .cta h1 em{font-style:normal;color:rgba(255,255,255,.5)}
+  .cta p{margin:10px 0 0;font-size:14.5px;line-height:1.6;color:rgba(255,255,255,.7);max-width:62ch}
+  .ctastats{flex:none;display:flex;gap:34px;flex-wrap:wrap;padding-inline-start:34px;
+    border-inline-start:1px solid rgba(255,255,255,.14)}
+  .ctastats div{font-size:12px;color:rgba(255,255,255,.6);line-height:1.4}
+  .ctastats b{display:block;font-family:"IBM Plex Mono",monospace;font-size:23px;font-weight:500;
+    color:#fff;letter-spacing:-.03em;margin-bottom:3px}
+
+  /* search rail overlapping the band's seam */
+  .railwrap{position:relative;z-index:5;margin-top:-30px}
+  .rail{background:var(--card);border:1px solid var(--border);border-radius:var(--r-card);box-shadow:var(--shadow);
+    display:flex;align-items:center;padding:8px 8px 8px 10px;flex-wrap:wrap}
+  .rf{flex:1 1 190px;min-width:0;padding:8px 16px;border-radius:14px;cursor:pointer;transition:background .16s}
+  .rf:hover{background:var(--sunk)}
+  .rf .k{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .rf .v{font-size:14px;font-weight:600;color:var(--navy);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rdiv{width:1px;height:32px;background:var(--line);flex:none}
+  .rgo{width:48px;height:48px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;
+    flex:none;margin-inline-start:8px;transition:transform .2s var(--ease),filter .2s}
+  .rgo:hover{transform:scale(1.04);filter:brightness(1.05)}
+  .rgo .icon{font-size:22px}
+  [dir="rtl"] .rgo .icon{transform:scaleX(-1)}
+
+  /* ══ MARKET ═══════════════════════════════════════════════════════════════ */
+  .market{padding:26px 0 0}
+  .cats{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+  .cats::-webkit-scrollbar{display:none}
+  .catpill{flex:none;border-radius:var(--r-pill);padding:8px 15px;font-size:13px;font-weight:700;
+    color:var(--navy-mid);background:var(--card);border:1px solid var(--border);transition:all .18s var(--ease)}
+  .catpill:hover{border-color:var(--navy-mid);transform:translateY(-1px)}
+  .catpill.on{background:var(--navy);border-color:var(--navy);color:#fff}
+
+  .rowhead{display:flex;align-items:flex-end;gap:14px;margin:22px 0 16px;flex-wrap:wrap}
+  .rowhead h2{font-size:24px;font-weight:800;letter-spacing:-.035em}
+  .rowhead .note{color:var(--muted);font-size:13.5px;padding-bottom:2px}
+  .rowhead .spacer{flex:1}
+  .pager{display:flex;align-items:center;gap:12px}
+  .pager .count{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--muted)}
+  .pager button{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--card);
+    display:grid;place-items:center;color:var(--navy);transition:background .18s,border-color .18s}
+  .pager button:hover:not(:disabled){background:var(--sunk);border-color:var(--navy-mid)}
+  .pager button:disabled{opacity:.35;cursor:default}
+  .pager .icon{font-size:18px}
+  [dir="rtl"] .pager .icon{transform:scaleX(-1)}
+
+  .grid6{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:20px 16px}
+  .scard{background:var(--card);border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden;
+    cursor:pointer;transition:transform .28s var(--ease),box-shadow .28s var(--ease),border-color .28s}
+  .scard:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:transparent}
+  .media{position:relative;aspect-ratio:1/.7;background:var(--plinth);display:grid;place-items:center;overflow:hidden}
+  .media .glyph{font-size:60px;color:rgba(28,53,80,.24);transition:transform .45s var(--ease)}
+  .scard:hover .media .glyph{transform:scale(1.07) translateY(-2px)}
+  .media .floor{position:absolute;inset-inline:18%;bottom:15%;height:11px;border-radius:50%;
+    background:radial-gradient(ellipse at center,rgba(28,53,80,.18),transparent 68%)}
+  .media .sheen{position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.5),transparent 48%)}
+  .flag{position:absolute;top:10px;inset-inline-start:10px;background:rgba(255,255,255,.94);
+    border-radius:var(--r-pill);padding:4px 10px;font-size:11px;font-weight:700;color:var(--navy);
+    display:inline-flex;align-items:center;gap:5px}
+  .flag .tick{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+  .flag.new .tick{background:var(--info)}
+  .save{position:absolute;top:7px;inset-inline-end:7px;width:30px;height:30px;border-radius:50%;
+    background:rgba(255,255,255,.9);display:grid;place-items:center;color:var(--navy-mid)}
+  .save .icon{font-size:17px;font-variation-settings:"FILL" 0}
+  .save:hover{background:#fff;color:var(--navy)}
+  .save.on .icon{color:var(--warn);font-variation-settings:"FILL" 1}
+  .sbody{padding:13px 14px 15px}
+  .sbody h3{font-size:14.5px;font-weight:800;letter-spacing:-.025em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sbody .note{color:var(--muted);font-size:12.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sprice{margin-top:11px;padding-top:10px;border-top:1px solid var(--line);display:flex;align-items:baseline;gap:5px}
+  .sprice .from{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .sprice .v{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:600;letter-spacing:-.02em;color:var(--navy)}
+  .sprice .u{font-size:11.5px;color:var(--muted)}
+
+  .marketfoot{display:flex;justify-content:center;gap:10px;padding:28px 0 0;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:var(--r-pill);padding:11px 18px;
+    font-size:13.5px;font-weight:700;transition:transform .18s var(--ease),filter .18s,background .18s}
+  .btn:hover{transform:translateY(-1px)}
+  .btn .icon{font-size:18px}
+  .btn-brand{background:var(--brand);color:#fff}
+  .btn-brand:hover{filter:brightness(1.06)}
+  .btn-navy{background:var(--navy);color:#fff}
+  .btn-navy:hover{background:var(--navy-mid)}
+  .btn-outline{border:1px solid var(--border);background:var(--card);color:var(--navy)}
+  .btn-outline:hover{border-color:var(--navy-mid);background:var(--sunk)}
+
+  /* ══ HOW ══════════════════════════════════════════════════════════════════ */
+  .band{margin-top:56px;background:var(--card);border-top:1px solid var(--line);padding:52px 0 58px}
+  .bandhead{max-width:620px}
+  .bandhead h2{font-size:28px;font-weight:800;letter-spacing:-.035em}
+  .bandhead p{margin:10px 0 0;color:var(--muted);font-size:14.5px;line-height:1.6}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:30px}
+  .step{background:var(--bg);border:1px solid var(--line);border-radius:var(--r-card);padding:22px 20px}
+  .step .n{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.14em;color:var(--brand-deep)}
+  .step h3{margin:12px 0 0;font-size:17px;font-weight:800;letter-spacing:-.028em}
+  .step p{margin:8px 0 0;color:var(--muted);font-size:13.5px;line-height:1.6}
+
+  .foot{padding:26px 0 40px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:12.5px}
+  .foot .spacer{flex:1}
+  .foot .mono{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+
+  /* ══ STORE SHEET ══════════════════════════════════════════════════════════ */
+  .veil{position:fixed;inset:0;background:rgba(18,38,58,.55);backdrop-filter:blur(3px);z-index:60;opacity:0;
+    pointer-events:none;transition:opacity .28s var(--ease)}
+  .veil.on{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;inset:24px;max-width:1240px;margin:0 auto;background:var(--bg);border-radius:24px;
+    z-index:61;overflow:hidden auto;box-shadow:var(--shadow-lg);opacity:0;transform:translateY(20px) scale(.99);
+    pointer-events:none;transition:opacity .28s var(--ease),transform .28s var(--ease)}
+  .sheet.on{opacity:1;transform:none;pointer-events:auto}
+  .sheetbar{position:sticky;top:0;z-index:6;height:56px;background:var(--navy);color:#fff;display:flex;
+    align-items:center;gap:12px;padding:0 18px}
+  .round{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.25);display:grid;
+    place-items:center;color:#fff;flex:none}
+  .round:hover{background:rgba(255,255,255,.1)}
+  .round .icon{font-size:18px}
+  [dir="rtl"] .round.back .icon{transform:scaleX(-1)}
+  .sheetbar .ttl{font-size:14.5px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sheetbar .spacer{flex:1}
+
+  .shead{padding:30px 32px 0;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+  .slogo{width:72px;height:72px;border-radius:18px;background:var(--card);border:1px solid var(--border);
+    display:grid;place-items:center;font-size:26px;font-weight:800;color:var(--navy);flex:none;letter-spacing:-.03em}
+  .shead .who{flex:1 1 300px;min-width:0}
+  .verified{display:inline-flex;align-items:center;gap:6px;background:var(--ok-dim);color:var(--ok);
+    border-radius:var(--r-pill);padding:4px 11px;font-size:11.5px;font-weight:700;margin-bottom:9px}
+  .verified .icon{font-size:14px}
+  .shead h2{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.035em}
+  .shead .meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:11px;color:var(--muted);font-size:13px}
+  .shead .meta span{display:inline-flex;align-items:center;gap:6px}
+  .shead .meta .icon{font-size:16px;color:var(--faint)}
+  .sabout{padding:18px 32px 0;color:var(--navy-mid);font-size:14px;line-height:1.7;max-width:78ch}
+
+  .sheetbody{padding:26px 32px 44px;display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:30px;align-items:start}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+  .chip{border-radius:var(--r-pill);padding:8px 14px;font-size:12.5px;font-weight:700;background:var(--card);
+    border:1px solid var(--border);color:var(--navy-mid);display:inline-flex;align-items:center;gap:7px}
+  .chip:hover{border-color:var(--navy-mid)}
+  .chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .chip .c{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--faint)}
+  .chip.on .c{color:rgba(255,255,255,.6)}
+
+  .eqhead{display:flex;align-items:baseline;gap:11px;margin-bottom:14px;flex-wrap:wrap}
+  .eqhead h3{font-size:21px;font-weight:800;letter-spacing:-.03em}
+  .eqhead .sub{color:var(--muted);font-size:13px}
+  .sizes{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px}
+  .size{border-radius:var(--r-pill);padding:6px 13px;font-size:12.5px;font-weight:700;background:var(--card);
+    border:1px solid var(--border);color:var(--navy-mid)}
+  .size:hover{border-color:var(--navy-mid)}
+  .size.on{background:var(--navy);border-color:var(--navy);color:#fff}
+
+  .eqgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(224px,1fr));gap:16px}
+  .eqcard{background:var(--card);border:1px solid var(--border);border-radius:var(--r-card);overflow:hidden;
+    transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
+  .eqcard:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .eqmedia{aspect-ratio:4/3;background:var(--plinth);display:grid;place-items:center;position:relative}
+  .eqmedia .glyph{font-size:52px;color:rgba(28,53,80,.24)}
+  .eqmedia .floor{position:absolute;inset-inline:18%;bottom:14%;height:10px;border-radius:50%;
+    background:radial-gradient(ellipse at center,rgba(28,53,80,.17),transparent 68%)}
+  .eqmedia .sheen{position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.5),transparent 46%)}
+  .eqmedia .ver{position:absolute;top:9px;inset-inline-start:9px;background:rgba(255,255,255,.94);
+    border-radius:var(--r-pill);padding:3px 9px;font-size:10.5px;font-weight:700;color:var(--ok);
+    display:inline-flex;align-items:center;gap:5px}
+  .eqmedia .ver .icon{font-size:12px}
+  .eqbody{padding:14px 14px 15px}
+  .eqbody h4{font-size:15px;font-weight:800;letter-spacing:-.025em}
+  .eqbody .note{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .eqprice{margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+  .eqprice .v{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;letter-spacing:-.03em}
+  .eqprice .u{font-size:11.5px;color:var(--muted);margin-inline-start:5px}
+  .eqprice .sup{display:block;color:var(--muted);font-size:11.5px;margin-top:6px}
+  .eqprice .sup b{color:var(--navy);font-weight:700}
+  .eqact{margin-top:12px;width:100%;justify-content:center;padding:9px;font-size:12.5px}
+
+  .quote{position:sticky;top:80px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-card);
+    padding:22px;box-shadow:var(--shadow)}
+  .quote h3{font-size:18px;font-weight:800;letter-spacing:-.03em;line-height:1.3}
+  .quote .s{color:var(--muted);font-size:13px;margin-top:9px;line-height:1.6}
+  .qf{border:1px solid var(--border);border-radius:14px;padding:10px 13px;margin-top:10px}
+  .qf .k{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .qf .v{font-size:14px;font-weight:700;color:var(--navy);margin-top:3px}
+  .qrow{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .quote .cta2{width:100%;justify-content:center;margin-top:15px;padding:13px}
+  .quote .fine{text-align:center;color:var(--muted);font-size:11.5px;margin-top:10px;line-height:1.55}
+  .qlist{margin-top:17px;padding-top:15px;border-top:1px solid var(--line);display:grid;gap:11px}
+  .qlist div{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--navy-mid);line-height:1.5}
+  .qlist .icon{font-size:17px;color:var(--ok);flex:none}
+
+  /* ══ GATE ═════════════════════════════════════════════════════════════════ */
+  .gate{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:20px;opacity:0;pointer-events:none;
+    transition:opacity .2s var(--ease)}
+  .gate.on{opacity:1;pointer-events:auto}
+  .gate .bg{position:absolute;inset:0;background:rgba(18,38,58,.6);backdrop-filter:blur(3px)}
+  .gatebox{position:relative;background:var(--card);border-radius:22px;max-width:440px;width:100%;padding:30px 28px 26px;
+    box-shadow:var(--shadow-lg)}
+  .gatebox .tag{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  .gatebox h3{margin:12px 0 0;font-size:23px;font-weight:800;letter-spacing:-.035em;line-height:1.2}
+  .gatebox p{margin:11px 0 0;color:var(--muted);font-size:14px;line-height:1.65}
+  .gatebox .acts{display:grid;gap:9px;margin-top:22px}
+  .gatebox .btn{justify-content:center;padding:13px}
+  .gatebox .kept{margin-top:15px;font-size:11.5px;color:var(--faint);display:flex;align-items:center;gap:7px}
+  .gatebox .kept .icon{font-size:15px}
+
+  @media (max-width:1400px){ .grid6{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  @media (max-width:1180px){ .sheetbody{grid-template-columns:minmax(0,1fr)} .quote{position:static} }
+  @media (max-width:1000px){
+    .grid6{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .steps{grid-template-columns:1fr}
+    .ctastats{border:0;padding:0}
+  }
+  @media (max-width:640px){
+    .wrap,.appbar{padding-inline:14px}
+    .grid6{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 10px}
+    .ctain{padding:22px 0 44px}
+    .rdiv{display:none}
+    .rf{flex:1 1 100%}
+    .rgo{width:100%;border-radius:14px;height:46px;margin:8px 0 0}
+    .loc span:not(.icon){display:none}
+    .sheet{inset:0;border-radius:0}
+    .shead,.sabout,.sheetbody{padding-inline:16px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ APP TOP BAR (guest) ═══════════════════════════════════════════════════ -->
+<header class="appbar">
+  <a class="wordmark" href="#"><span class="m icon">construction</span>moedatech</a>
+
+  <div class="navslot"><div class="row">
+    <a class="navtab on" href="#market" data-en="Equipment" data-ar="المعدّات">Equipment</a>
+    <a class="navtab" href="#market" data-en="Suppliers" data-ar="المؤجّرون">Suppliers</a>
+    <a class="navtab" href="#how" data-en="How it works" data-ar="كيف تعمل">How it works</a>
+  </div></div>
+
+  <div class="barright">
+    <button class="loc" onclick="setLang(lang === 'en' ? 'ar' : 'en')">
+      <span class="icon">language</span><span id="loclabel">English</span><span class="icon chev">expand_more</span>
+    </button>
+    <button class="signin" onclick="gate('signin')">
+      <span class="icon">login</span><span data-en="Sign in" data-ar="تسجيل الدخول">Sign in</span>
+    </button>
+  </div>
+</header>
+
+<!-- ══ COMPACT CTA ═══════════════════════════════════════════════════════════ -->
+<section class="cta">
+  <div class="wrap ctain">
+    <div class="ctacopy">
+      <span class="kick"><span class="live"></span><span data-en="214 verified suppliers · pricing jobs today" data-ar="٢١٤ مؤجّراً موثّقاً · يسعّرون أعمالاً اليوم">214 verified suppliers · pricing jobs today</span></span>
+      <h1 data-en="Every machine your project needs. <em>One request.</em>" data-ar="كل معدّة يحتاجها مشروعك. <em>طلب واحد.</em>">Every machine your project needs. <em>One request.</em></h1>
+      <p data-en="Post the need once and verified suppliers price it against each other — rate, mobilisation, fuel, operator and papers, compared side by side." data-ar="انشر الحاجة مرة واحدة ويتنافس المؤجّرون الموثّقون على تسعيرها — السعر والنقل والوقود والمشغّل والأوراق، مقارنة جنباً إلى جنب.">Post the need once and verified suppliers price it against each other — rate, mobilisation, fuel, operator and papers, compared side by side.</p>
+    </div>
+    <div class="ctastats">
+      <div><b>4,860</b><span data-en="machines listed" data-ar="معدّة معروضة">machines listed</span></div>
+      <div><b>18</b><span data-en="cities" data-ar="مدينة">cities</span></div>
+      <div><b>36h</b><span data-en="to first offer" data-ar="حتى أول عرض">to first offer</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap railwrap">
+  <div class="rail">
+    <div class="rf" onclick="gate('search')">
+      <div class="k" data-en="Equipment" data-ar="المعدّة">Equipment</div>
+      <div class="v" data-en="Excavator, crane, generator…" data-ar="حفّار، رافعة، مولّد…">Excavator, crane, generator…</div>
+    </div>
+    <i class="rdiv"></i>
+    <div class="rf" onclick="gate('search')">
+      <div class="k" data-en="Site" data-ar="الموقع">Site</div>
+      <div class="v" data-en="Riyadh, Jeddah, Dammam…" data-ar="الرياض، جدة، الدمام…">Riyadh, Jeddah, Dammam…</div>
+    </div>
+    <i class="rdiv"></i>
+    <div class="rf" onclick="gate('search')">
+      <div class="k" data-en="Dates" data-ar="التواريخ">Dates</div>
+      <div class="v" data-en="Add your dates" data-ar="أضف التواريخ">Add your dates</div>
+    </div>
+    <i class="rdiv"></i>
+    <div class="rf" onclick="gate('search')">
+      <div class="k" data-en="Duration" data-ar="المدة">Duration</div>
+      <div class="v" data-en="Days, weeks or months" data-ar="أيام أو أسابيع أو أشهر">Days, weeks or months</div>
+    </div>
+    <button class="rgo" onclick="gate('search')" aria-label="search"><span class="icon">arrow_forward</span></button>
+  </div>
+</div>
+
+<!-- ══ MARKET ════════════════════════════════════════════════════════════════ -->
+<main class="wrap market" id="market">
+  <div class="cats" id="cats"></div>
+
+  <div class="rowhead">
+    <h2 id="rowtitle"></h2>
+    <span class="note" id="rownote"></span>
+    <span class="spacer"></span>
+    <div class="pager">
+      <span class="count mono" id="rowcount"></span>
+      <button id="prev" onclick="page(-1)" aria-label="previous"><span class="icon">chevron_left</span></button>
+      <button id="next" onclick="page(1)" aria-label="next"><span class="icon">chevron_right</span></button>
+    </div>
+  </div>
+
+  <div class="grid6" id="grid"></div>
+
+  <div class="marketfoot">
+    <button class="btn btn-outline" onclick="gate('filters')"><span class="icon">tune</span><span data-en="Filter by certificate, city and capacity" data-ar="صفِّ حسب الشهادة والمدينة والسعة">Filter by certificate, city and capacity</span></button>
+    <button class="btn btn-brand" onclick="gate('request')"><span class="icon">add</span><span data-en="Post a request instead" data-ar="أو انشر طلباً">Post a request instead</span></button>
+  </div>
+</main>
+
+<!-- ══ HOW ═══════════════════════════════════════════════════════════════════ -->
+<section class="band" id="how">
+  <div class="wrap">
+    <div class="bandhead">
+      <h2 data-en="Three steps, one afternoon" data-ar="ثلاث خطوات، بعد ظهر واحد">Three steps, one afternoon</h2>
+      <p data-en="What used to take a week of phone calls is now one form and a comparison table." data-ar="ما كان يستغرق أسبوعاً من المكالمات صار نموذجاً واحداً وجدول مقارنة.">What used to take a week of phone calls is now one form and a comparison table.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">01</div>
+        <h3 data-en="Describe the need once" data-ar="صِف الحاجة مرة واحدة">Describe the need once</h3>
+        <p data-en="Paste an email, upload a BOQ, or type it plainly. It comes back as a structured RFQ with every term a supplier needs to price it." data-ar="الصق بريداً، أو ارفع جدول كميات، أو اكتبه ببساطة. يعود طلب تسعير منظّم بكل بند يحتاجه المؤجّر للتسعير.">Paste an email, upload a BOQ, or type it plainly. It comes back as a structured RFQ with every term a supplier needs to price it.</p></div>
+      <div class="step"><div class="n">02</div>
+        <h3 data-en="Suppliers compete on it" data-ar="المؤجّرون يتنافسون عليه">Suppliers compete on it</h3>
+        <p data-en="Only firms holding the certificates your site demands can answer — Aramco pass, third-party inspection, operator licences." data-ar="فقط الشركات الحاملة للشهادات التي يطلبها موقعك يمكنها الردّ — تصريح أرامكو، فحص طرف ثالث، رخص المشغّلين.">Only firms holding the certificates your site demands can answer — Aramco pass, third-party inspection, operator licences.</p></div>
+      <div class="step"><div class="n">03</div>
+        <h3 data-en="Compare, settle, award" data-ar="قارن، احسم، ثم أرسِ">Compare, settle, award</h3>
+        <p data-en="Rates, mobilisation, fuel, operator and papers in one table. Terms are settled in writing in the deal room before a machine moves." data-ar="الأسعار والنقل والوقود والمشغّل والأوراق في جدول واحد. الشروط تُحسم كتابةً في غرفة الصفقة قبل تحرّك أي معدّة.">Rates, mobilisation, fuel, operator and papers in one table. Terms are settled in writing in the deal room before a machine moves.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="foot">
+    <span data-en="Moedatech · equipment rental marketplace · Saudi Arabia" data-ar="معداتك · سوق تأجير المعدات · السعودية">Moedatech · equipment rental marketplace · Saudi Arabia</span>
+    <span class="spacer"></span>
+    <span class="mono">guest home · v3 · prototype</span>
+  </div>
+</div>
+
+<div class="veil" id="veil" onclick="closeStore()"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+
+<div class="gate" id="gate">
+  <div class="bg" onclick="closeGate()"></div>
+  <div class="gatebox">
+    <div class="tag" id="gatetag"></div>
+    <h3 id="gatetitle"></h3>
+    <p id="gatebody"></p>
+    <div class="acts">
+      <button class="btn btn-brand"><span data-en="Create a free account" data-ar="أنشئ حساباً مجانياً">Create a free account</span></button>
+      <button class="btn btn-outline"><span data-en="I already have one" data-ar="لديّ حساب بالفعل">I already have one</span></button>
+    </div>
+    <div class="kept"><span class="icon">bookmark</span><span id="gatekept"></span></div>
+  </div>
+</div>
+
+<script>
+/* taxonomy — src/lib/taxonomy/fixture.ts */
+var CATS = [
+  {k:"top",             en:"Top stores",     ar:"الأبرز",            ic:"grid_view"},
+  {k:"excavators",      en:"Excavators",     ar:"حفّارات",           ic:"agriculture"},
+  {k:"mobile-cranes",   en:"Mobile cranes",  ar:"رافعات متحركة",     ic:"precision_manufacturing"},
+  {k:"telehandlers",    en:"Telehandlers",   ar:"مناولات تلسكوبية",  ic:"forklift"},
+  {k:"forklifts",       en:"Forklifts",      ar:"رافعات شوكية",      ic:"pallet"},
+  {k:"wheel-loaders",   en:"Wheel loaders",  ar:"لوادر",             ic:"snowplow"},
+  {k:"bulldozers",      en:"Bulldozers",     ar:"بلدوزرات",          ic:"dozer"},
+  {k:"generators",      en:"Generators",     ar:"مولّدات",           ic:"bolt"},
+  {k:"compressors",     en:"Compressors",    ar:"ضواغط",             ic:"air"},
+  {k:"light-towers",    en:"Light towers",   ar:"أبراج إنارة",       ic:"flashlight_on"},
+  {k:"boom-lifts",      en:"Boom lifts",     ar:"مناولات أفراد",     ic:"elevator"},
+  {k:"scissor-lifts",   en:"Scissor lifts",  ar:"مقصّات رفع",        ic:"stairs"},
+  {k:"tippers",         en:"Tippers",        ar:"قلّابات",           ic:"local_shipping"},
+  {k:"water-trucks",    en:"Water trucks",   ar:"صهاريج ماء",        ic:"water_drop"},
+  {k:"trailers",        en:"Trailers",       ar:"مقطورات",           ic:"rv_hookup"},
+  {k:"concrete-pumps",  en:"Concrete pumps", ar:"مضخات خرسانة",      ic:"foundation"},
+  {k:"concrete-mixers", en:"Mixers",         ar:"خلّاطات",           ic:"cyclone"}
+];
+var SIZES = {
+  excavators:["1.5–3 t","5–8 t","13–15 t","20 t","30 t"],
+  "mobile-cranes":["25 t","50 t","100 t","200 t"],
+  telehandlers:["6 m · 2.5 t","14 m · 3.5 t","17 m · 4 t"],
+  forklifts:["3 t","5 t","10 t"],
+  "wheel-loaders":["1.5 m³","3 m³","5 m³"],
+  bulldozers:["D6 class","D8 class"],
+  generators:["10–30 kVA","50–60 kVA","100 kVA +","250 kVA","500 kVA"],
+  compressors:["185 cfm","375 cfm","750 cfm"],
+  "light-towers":["4×1000 W"],
+  "boom-lifts":["16 m","28 m"],
+  "scissor-lifts":["8 m","12 m"],
+  tippers:["20 t payload","30 t payload"],
+  "water-trucks":["10,000 L","20,000 L"],
+  trailers:["12 m flatbed","Low-bed"],
+  "concrete-pumps":["36 m boom","Truck-mounted"],
+  "concrete-mixers":["6 m³ drum","10 m³ drum"]
+};
+var NOTES = {
+  excavators:{en:"Trenching & bulk earthworks", ar:"حفر الخنادق والأعمال الترابية"},
+  "mobile-cranes":{en:"Lifting with plan & rigging", ar:"رفع مع خطة وتجهيز"},
+  telehandlers:{en:"Lifting to height on site", ar:"رفع إلى ارتفاع في الموقع"},
+  forklifts:{en:"Yard & warehouse handling", ar:"مناولة في الساحات والمستودعات"},
+  "wheel-loaders":{en:"Loading & stockpiling", ar:"تحميل وتكديس"},
+  bulldozers:{en:"Bulk push & grading", ar:"دفع وتسوية"},
+  generators:{en:"Standby & prime power", ar:"طاقة احتياطية ورئيسية"},
+  compressors:{en:"Air for breakers & tools", ar:"هواء للكسّارات والعدد"},
+  "light-towers":{en:"Night-shift lighting", ar:"إنارة الورديات الليلية"},
+  "boom-lifts":{en:"Access at height", ar:"وصول على ارتفاع"},
+  "scissor-lifts":{en:"Indoor vertical access", ar:"وصول رأسي داخلي"},
+  tippers:{en:"Haulage & spoil removal", ar:"نقل وإزالة مخلّفات"},
+  "water-trucks":{en:"Dust control & compaction", ar:"كبح الغبار والدمك"},
+  trailers:{en:"Plant moves & project cargo", ar:"نقل المعدات وشحن المشاريع"},
+  "concrete-pumps":{en:"Placing on pour day", ar:"الصبّ يوم الخرسانة"},
+  "concrete-mixers":{en:"Transit mixing to site", ar:"خلط ونقل إلى الموقع"}
+};
+var icOf = function(k){ var c = CATS.filter(function(x){ return x.k === k; })[0]; return c ? c.ic : "construction"; };
+var catName = function(k){ var c = CATS.filter(function(x){ return x.k === k; })[0]; return c ? L(c.en, c.ar) : k; };
+var noteOf = function(k){ var n = NOTES[k]; return n ? L(n.en, n.ar) : ""; };
+
+var STORES = [
+  {n:"Zahid Tractor", nAr:"زاهد تراكتور", city:"Riyadh", cityAr:"الرياض", ver:true, eq:210, views:8420, since:1979,
+   dEn:"Caterpillar's dealer in the Kingdom since 1979. Earthmoving and lifting fleet with in-house maintenance and certified operators on the payroll.",
+   dAr:"وكيل كاتربيلر في المملكة منذ ١٩٧٩. أسطول حفر ورفع مع صيانة داخلية ومشغّلين معتمدين على كشوف الرواتب.",
+   cats:{excavators:{n:48,p:8400},"wheel-loaders":{n:31,p:6900},bulldozers:{n:18,p:12400},telehandlers:{n:22,p:5600},generators:{n:26,p:3900},tippers:{n:35,p:4200}}},
+  {n:"Al-Rajhi Equipment Rental", nAr:"الراجحي لتأجير المعدات", city:"Riyadh", cityAr:"الرياض", ver:true, eq:128, views:6110, since:1994,
+   dEn:"Access and lifting specialist covering Riyadh and Qassim. Every platform carries a current third-party inspection certificate.",
+   dAr:"متخصّص في معدات الوصول والرفع يغطي الرياض والقصيم. كل منصّة تحمل شهادة فحص طرف ثالث سارية.",
+   cats:{"boom-lifts":{n:34,p:3400},"scissor-lifts":{n:29,p:2600},telehandlers:{n:19,p:5900},forklifts:{n:24,p:2900},generators:{n:22,p:4100}}},
+  {n:"United Rentals KSA", nAr:"يونايتد رنتلز السعودية", city:"Dammam", cityAr:"الدمام", ver:true, eq:96, views:4980, since:2008,
+   dEn:"Eastern Province fleet built for plant shutdowns — approved crews and 24-hour breakdown response.",
+   dAr:"أسطول المنطقة الشرقية مُعدّ لأعمال الإيقاف — طواقم معتمدة واستجابة أعطال خلال ٢٤ ساعة.",
+   cats:{generators:{n:31,p:3600},compressors:{n:24,p:2200},"light-towers":{n:18,p:900},"boom-lifts":{n:23,p:3800}}},
+  {n:"Bin Quraya", nAr:"بن قريّة", city:"Dhahran", cityAr:"الظهران", ver:true, eq:143, views:7240, since:1985,
+   dEn:"Heavy lifting and power across the Eastern Province. Mobile cranes to 200 ton with lift-plan engineering included.",
+   dAr:"رفع ثقيل وطاقة في المنطقة الشرقية. رافعات متحركة حتى ٢٠٠ طن مع هندسة خطة الرفع.",
+   cats:{"mobile-cranes":{n:26,p:38000},generators:{n:44,p:3400},"water-trucks":{n:21,p:5200},tippers:{n:29,p:4400},trailers:{n:23,p:3100}}},
+  {n:"Almajdouie Equipment", nAr:"المجدوعي للمعدات", city:"Jeddah", cityAr:"جدة", ver:true, eq:87, views:5320, since:1965,
+   dEn:"Crane and transport house on the western coast. Project cargo, plant relocation and long-term crane hire.",
+   dAr:"بيت رافعات ونقل على الساحل الغربي. شحن المشاريع ونقل المصانع وتأجير الرافعات طويل الأمد.",
+   cats:{"mobile-cranes":{n:22,p:41000},trailers:{n:26,p:3400},tippers:{n:19,p:4600},telehandlers:{n:14,p:6200}}},
+  {n:"Saudi Diesel Equipment", nAr:"الديزل السعودية للمعدات", city:"Dammam", cityAr:"الدمام", ver:true, eq:174, views:9010, since:1976,
+   dEn:"Power and compressed air at scale — synchronised generator sets, load banks and site distribution.",
+   dAr:"طاقة وهواء مضغوط بحجم كبير — مولّدات متزامنة وبنوك أحمال وتوزيع للموقع.",
+   cats:{generators:{n:68,p:3200},compressors:{n:41,p:2100},"light-towers":{n:33,p:850},"water-trucks":{n:16,p:5750}}},
+  {n:"Nesma Rental", nAr:"نسما للتأجير", city:"Jeddah", cityAr:"جدة", ver:true, eq:118, views:4410, since:1979,
+   dEn:"Earthmoving fleet for infrastructure packages, with operators employed rather than subcontracted.",
+   dAr:"أسطول حفر لأعمال البنية التحتية، بمشغّلين موظّفين لا من الباطن.",
+   cats:{excavators:{n:39,p:8900},"wheel-loaders":{n:24,p:7200},bulldozers:{n:16,p:13100},tippers:{n:22,p:4300}}},
+  {n:"Arabian Machinery", nAr:"الآلات العربية", city:"Riyadh", cityAr:"الرياض", ver:true, eq:73, views:3120, since:2011,
+   dEn:"Compact plant for city sites — small excavators, mixers and pumps that fit a tight footprint.",
+   dAr:"معدات صغيرة لمواقع المدن — حفّارات صغيرة وخلّاطات ومضخات تناسب المساحات الضيّقة.",
+   cats:{excavators:{n:21,p:4200},"concrete-mixers":{n:18,p:5400},"concrete-pumps":{n:12,p:14800},generators:{n:14,p:3800}}},
+  {n:"Tawazun Heavy Equipment", nAr:"توازن للمعدات الثقيلة", city:"Riyadh", cityAr:"الرياض", ver:true, eq:88, views:2870, since:2016,
+   dEn:"Access and material handling for fit-out and maintenance contractors. Built for short hires.",
+   dAr:"معدات وصول ومناولة لمقاولي التشطيب والصيانة. مصمّمة للإيجار القصير.",
+   cats:{"scissor-lifts":{n:26,p:2400},"boom-lifts":{n:19,p:3600},forklifts:{n:28,p:2700},telehandlers:{n:15,p:5800}}},
+  {n:"Rawabi Rentals", nAr:"روابي للتأجير", city:"Riyadh", cityAr:"الرياض", ver:false, eq:52, views:1240, since:2023,
+   dEn:"New on the platform. Access platforms and light power for interior contractors in Riyadh.",
+   dAr:"جديد على المنصّة. منصّات وصول وطاقة خفيفة لمقاولي التشطيبات الداخلية في الرياض.",
+   cats:{"scissor-lifts":{n:18,p:2300},"boom-lifts":{n:14,p:3300},"light-towers":{n:12,p:800},generators:{n:8,p:4300}}},
+  {n:"Gulf Lifting Co.", nAr:"الخليج للرفع", city:"Dammam", cityAr:"الدمام", ver:false, eq:41, views:980, since:2022,
+   dEn:"Lifting only — mobile cranes and telehandlers with certified riggers on call.",
+   dAr:"رفع فقط — رافعات متحركة ومناولات تلسكوبية مع رافعين معتمدين تحت الطلب.",
+   cats:{"mobile-cranes":{n:14,p:36500},telehandlers:{n:16,p:5400},forklifts:{n:11,p:3100}}},
+  {n:"Al Sulaiman Equipment", nAr:"السليمان للمعدات", city:"Riyadh", cityAr:"الرياض", ver:false, eq:64, views:1460, since:2021,
+   dEn:"Haulage and water supply for earthworks packages across the central region.",
+   dAr:"نقل وإمداد مياه لأعمال الحفر في المنطقة الوسطى.",
+   cats:{"water-trucks":{n:22,p:5100},tippers:{n:26,p:4100},trailers:{n:16,p:3000}}},
+  {n:"Riyadh Plant Services", nAr:"خدمات معدات الرياض", city:"Riyadh", cityAr:"الرياض", ver:true, eq:69, views:2210, since:2014,
+   dEn:"Concrete package specialist — line pumps, boom pumps and transit mixers with pour-day support.",
+   dAr:"متخصّص في أعمال الخرسانة — مضخات خطية وذراعية وخلّاطات نقل مع دعم يوم الصبّ.",
+   cats:{"concrete-pumps":{n:19,p:15600},"concrete-mixers":{n:27,p:5200},generators:{n:12,p:4000}}},
+  {n:"Hejaz Earthmovers", nAr:"معدات الحجاز", city:"Jeddah", cityAr:"جدة", ver:true, eq:102, views:3340, since:2003,
+   dEn:"Bulk earthworks fleet on the west coast — dozers, loaders and 30-ton tippers by the month.",
+   dAr:"أسطول حفريات ضخمة على الساحل الغربي — بلدوزرات ولوادر وقلّابات ٣٠ طناً شهرياً.",
+   cats:{bulldozers:{n:21,p:12800},"wheel-loaders":{n:28,p:7100},excavators:{n:33,p:8700},tippers:{n:20,p:4500}}},
+  {n:"Qassim Equipment House", nAr:"بيت معدات القصيم", city:"Buraydah", cityAr:"بريدة", ver:false, eq:47, views:760, since:2020,
+   dEn:"Regional fleet serving Qassim's agricultural and industrial projects.",
+   dAr:"أسطول إقليمي يخدم مشاريع القصيم الزراعية والصناعية.",
+   cats:{excavators:{n:14,p:7800},"wheel-loaders":{n:12,p:6400},generators:{n:11,p:3700},"water-trucks":{n:10,p:4900}}},
+  {n:"Yanbu Industrial Rentals", nAr:"ينبع الصناعية للتأجير", city:"Yanbu", cityAr:"ينبع", ver:true, eq:81, views:1890, since:2012,
+   dEn:"Refinery-grade plant on the Red Sea — hot-work compliant compressors, gensets and access equipment.",
+   dAr:"معدات بمواصفات المصافي على البحر الأحمر — ضواغط ومولّدات ومعدات وصول مطابقة لأعمال الحرارة.",
+   cats:{compressors:{n:26,p:2300},generators:{n:29,p:3500},"boom-lifts":{n:15,p:3900},"light-towers":{n:11,p:880}}},
+  {n:"Madinah Access Co.", nAr:"المدينة لمعدات الوصول", city:"Madinah", cityAr:"المدينة", ver:true, eq:58, views:1120, since:2018,
+   dEn:"Access and light lifting for religious-site projects, with night-shift crews.",
+   dAr:"معدات وصول ورفع خفيف لمشاريع المواقع الدينية، مع طواقم ورديات ليلية.",
+   cats:{"scissor-lifts":{n:21,p:2500},"boom-lifts":{n:17,p:3500},"light-towers":{n:14,p:870},forklifts:{n:12,p:2800}}},
+  {n:"Neom Plant Partners", nAr:"شركاء معدات نيوم", city:"Tabuk", cityAr:"تبوك", ver:true, eq:134, views:4020, since:2019,
+   dEn:"Remote-site fleet for the north-west — self-contained power, water and earthmoving packages.",
+   dAr:"أسطول للمواقع النائية في الشمال الغربي — حزم طاقة ومياه وحفر مكتفية ذاتياً.",
+   cats:{excavators:{n:30,p:9200},generators:{n:38,p:3800},"water-trucks":{n:24,p:5400},tippers:{n:27,p:4700}}}
+];
+
+var MAKES = {
+  excavators:[["Caterpillar","320D"],["Komatsu","PC210"],["Hitachi","ZX350"],["Volvo","EC300"],["Caterpillar","308"],["JCB","JS205"]],
+  "mobile-cranes":[["Liebherr","LTM 1100"],["Grove","GMK4100"],["Tadano","GT-550"],["XCMG","QY25K"],["Liebherr","LTM 1200"]],
+  telehandlers:[["JCB","540-170"],["Manitou","MT 1440"],["Genie","GTH-1256"],["JLG","4017RS"]],
+  forklifts:[["Toyota","8FD30"],["Hyster","H5.0FT"],["Komatsu","FD100"],["Linde","H35D"]],
+  "wheel-loaders":[["Caterpillar","950 GC"],["Volvo","L120H"],["Komatsu","WA470"],["SDLG","L956F"]],
+  bulldozers:[["Caterpillar","D6"],["Komatsu","D85"],["Caterpillar","D8T"]],
+  generators:[["Caterpillar","C15"],["FG Wilson","P250"],["Perkins","2506"],["Cummins","C1000"],["FG Wilson","P110"]],
+  compressors:[["Atlas Copco","XAS 186"],["Ingersoll Rand","P375"],["Atlas Copco","XATS 750"]],
+  "light-towers":[["Generac","V20"],["Atlas Copco","HiLight V5"],["Wacker Neuson","LTV6"]],
+  "boom-lifts":[["Genie","Z-45"],["JLG","800AJ"],["Haulotte","HA16"],["Genie","S-85"]],
+  "scissor-lifts":[["Genie","GS-2632"],["JLG","4045R"],["Skyjack","SJ3219"]],
+  tippers:[["Mercedes-Benz","Actros 3341"],["MAN","TGS 33.400"],["Isuzu","FVZ"]],
+  "water-trucks":[["Mercedes-Benz","Actros 2640"],["Isuzu","FVM"],["HOWO","ZZ1257"]],
+  trailers:[["Faymonville","Low-bed"],["Goldhofer","STZ-L"],["Local build","Flatbed"]],
+  "concrete-pumps":[["Putzmeister","M36-4"],["Schwing","S 36 X"],["Sany","SYG5230"]],
+  "concrete-mixers":[["Mercedes-Benz","Arocs 3336"],["MAN","TGS 41.400"],["HOWO","ZZ5257"]]
+};
+
+var lang = "en", cat = "top", pageIndex = 0, PER = 12, openStore = null, sheetCat = null, sheetSize = 0, saved = {};
+function L(en, ar){ return lang === "ar" ? ar : en; }
+function money(n){ return n.toLocaleString("en-US"); }
+
+function renderCats(){
+  document.getElementById("cats").innerHTML = CATS.map(function(c){
+    return '<button class="catpill' + (cat === c.k ? " on" : "") + '" onclick="pickCat(\'' + c.k + '\')">' + L(c.en, c.ar) + '</button>';
+  }).join("");
+}
+function pickCat(k){ cat = k; pageIndex = 0; renderCats(); renderGrid(); }
+
+function storesFor(k){
+  if (k === "top") return STORES.slice();
+  return STORES.filter(function(s){ return s.cats[k]; })
+               .sort(function(a, b){ return b.cats[k].n - a.cats[k].n; });
+}
+function cheapestOf(s){
+  var keys = Object.keys(s.cats);
+  return keys.reduce(function(m, x){ return s.cats[x].p < s.cats[m].p ? x : m; }, keys[0]);
+}
+
+function storeCard(s){
+  var k = cat === "top" ? null : cat;
+  var note = k
+    ? s.cats[k].n + " " + catName(k).toLowerCase() + " · " + L(s.city, s.cityAr)
+    : s.eq + " " + L("machines", "معدّة") + " · " + L(s.city, s.cityAr);
+  var price = k ? s.cats[k].p : s.cats[cheapestOf(s)].p;
+  var flag = s.ver
+    ? '<span class="flag"><span class="tick"></span>' + L("Verified", "موثّق") + '</span>'
+    : '<span class="flag new"><span class="tick"></span>' + L("New here", "جديد هنا") + '</span>';
+
+  return '<article class="scard" onclick="showStore(' + STORES.indexOf(s) + ')">'
+    + '<div class="media"><span class="glyph icon">' + icOf(k || cheapestOf(s)) + '</span>'
+    +   '<span class="floor"></span><span class="sheen"></span>' + flag
+    +   '<button class="save' + (saved[s.n] ? " on" : "") + '" aria-label="save" '
+    +     'onclick="event.stopPropagation();like(this,\'' + s.n.replace(/'/g, "\\'") + '\')">'
+    +     '<span class="icon">favorite</span></button></div>'
+    + '<div class="sbody"><h3>' + L(s.n, s.nAr) + '</h3>'
+    +   '<div class="note">' + note + '</div>'
+    +   '<div class="sprice"><span class="from">' + L("from", "من") + '</span>'
+    +     '<span class="v">' + money(price) + '</span><span class="u">SAR / ' + L("mo", "شهر") + '</span></div>'
+    + '</div></article>';
+}
+
+function renderGrid(){
+  var list = storesFor(cat);
+  var pages = Math.max(1, Math.ceil(list.length / PER));
+  if (pageIndex >= pages) pageIndex = 0;
+  var from = pageIndex * PER;
+
+  document.getElementById("grid").innerHTML = list.slice(from, from + PER).map(storeCard).join("");
+  document.getElementById("rowtitle").textContent = cat === "top"
+    ? L("Top stores", "المتاجر الأبرز")
+    : L(catName(cat) + " suppliers", "مؤجّرو " + catName(cat));
+  document.getElementById("rownote").textContent = cat === "top"
+    ? L("ranked by fleet size and activity", "مرتّبة حسب حجم الأسطول والنشاط")
+    : noteOf(cat);
+  document.getElementById("rowcount").textContent =
+    (from + 1) + "–" + Math.min(from + PER, list.length) + " " + L("of", "من") + " " + list.length;
+  document.getElementById("prev").disabled = pageIndex === 0;
+  document.getElementById("next").disabled = pageIndex >= pages - 1;
+}
+
+function page(d){
+  var pages = Math.max(1, Math.ceil(storesFor(cat).length / PER));
+  pageIndex = Math.min(Math.max(0, pageIndex + d), pages - 1);
+  renderGrid();
+  document.getElementById("market").scrollIntoView({ behavior:"smooth", block:"start" });
+}
+
+function like(el, name){ saved[name] = !saved[name]; el.classList.toggle("on", !!saved[name]); if (saved[name]) gate("save"); }
+
+/* ── store sheet ─────────────────────────────────────────────────────────── */
+function fleetOf(s, k){
+  var pool = MAKES[k] || [["Generic","Unit"]], sizes = SIZES[k] || ["Standard"];
+  var rows = [], count = Math.min(s.cats[k].n, 6);
+  for (var i = 0; i < count; i++){
+    var m = pool[i % pool.length], lo = Math.round(s.cats[k].p * (1 + (i % 3) * 0.09));
+    rows.push({ make:m[0], model:m[1], size:sizes[i % sizes.length], year:2019 + (i % 6),
+                lo:lo, hi:Math.round(lo * 1.3), ver:s.ver && i % 5 !== 3 });
+  }
+  return rows;
+}
+
+function showStore(i){
+  openStore = i; sheetSize = 0;
+  var s = STORES[i];
+  sheetCat = (cat !== "top" && s.cats[cat]) ? cat : Object.keys(s.cats)[0];
+  renderSheet();
+  document.getElementById("veil").classList.add("on");
+  document.getElementById("sheet").classList.add("on");
+  document.body.classList.add("locked");
+}
+function closeStore(){
+  openStore = null;
+  document.getElementById("veil").classList.remove("on");
+  document.getElementById("sheet").classList.remove("on");
+  document.body.classList.remove("locked");
+}
+function pickSheetCat(k){ sheetCat = k; sheetSize = 0; renderSheet(); }
+function pickSize(i){ sheetSize = i; renderSheet(); }
+
+function renderSheet(){
+  if (openStore === null) return;
+  var s = STORES[openStore], k = sheetCat, sizes = SIZES[k] || ["Standard"];
+
+  var chips = Object.keys(s.cats).map(function(x){
+    return '<button class="chip' + (x === k ? " on" : "") + '" onclick="pickSheetCat(\'' + x + '\')">'
+      + catName(x) + '<span class="c">' + s.cats[x].n + '</span></button>';
+  }).join("");
+
+  var sizeRow = sizes.map(function(z, i){
+    return '<button class="size' + (i === sheetSize ? " on" : "") + '" onclick="pickSize(' + i + ')">' + z + '</button>';
+  }).join("");
+
+  var cards = fleetOf(s, k).map(function(m){
+    return '<article class="eqcard">'
+      + '<div class="eqmedia"><span class="glyph icon">' + icOf(k) + '</span>'
+      +   '<span class="floor"></span><span class="sheen"></span>'
+      +   (m.ver ? '<span class="ver"><span class="icon">verified</span>' + L("Verified", "موثّقة") + '</span>' : '')
+      + '</div>'
+      + '<div class="eqbody"><h4>' + m.make + ' ' + m.model + '</h4>'
+      +   '<div class="note">' + m.size + ' · ' + m.year + '</div>'
+      +   '<div class="eqprice"><span class="v">' + money(m.lo) + ' – ' + money(m.hi) + '</span>'
+      +     '<span class="u">SAR / ' + L("month", "شهر") + '</span>'
+      +     '<span class="sup">' + L("Also held by", "يملكها أيضاً") + ' <b>' + storesFor(k).length + '</b> '
+      +       L("suppliers", "مؤجّراً") + '</span></div>'
+      +   '<button class="btn btn-brand eqact" onclick="gate(\'request\')">' + L("Request this", "اطلبها") + '</button>'
+      + '</div></article>';
+  }).join("");
+
+  document.getElementById("sheet").innerHTML =
+      '<div class="sheetbar">'
+    +   '<button class="round back" onclick="closeStore()" aria-label="back"><span class="icon">arrow_back</span></button>'
+    +   '<span class="ttl">' + L(s.n, s.nAr) + '</span><span class="spacer"></span>'
+    +   '<button class="round" onclick="gate(\'save\')" aria-label="save"><span class="icon">favorite</span></button>'
+    +   '<button class="round" onclick="closeStore()" aria-label="close"><span class="icon">close</span></button>'
+    + '</div>'
+
+    + '<div class="shead"><span class="slogo">' + L(s.n, s.nAr).trim().charAt(0) + '</span>'
+    +   '<div class="who">'
+    +     (s.ver ? '<span class="verified"><span class="icon">verified</span>' + L("Verified supplier", "مؤجّر موثّق") + '</span>' : '')
+    +     '<h2>' + L(s.n, s.nAr) + '</h2>'
+    +     '<div class="meta">'
+    +       '<span><span class="icon">location_on</span>' + L(s.city, s.cityAr) + '</span>'
+    +       '<span><span class="icon">inventory_2</span>' + s.eq + ' ' + L("machines listed", "معدّة معروضة") + '</span>'
+    +       '<span><span class="icon">visibility</span>' + money(s.views) + ' ' + L("views", "مشاهدة") + '</span>'
+    +       '<span><span class="icon">history</span>' + L("on the market since", "في السوق منذ") + ' ' + s.since + '</span>'
+    +     '</div></div></div>'
+
+    + '<p class="sabout">' + L(s.dEn, s.dAr) + '</p>'
+
+    + '<div class="sheetbody"><div>'
+    +   '<div class="chips">' + chips + '</div>'
+    +   '<div class="eqhead"><h3>' + catName(k) + '</h3><span class="sub">' + noteOf(k) + ' · '
+    +     L(s.cats[k].n + " in this fleet", s.cats[k].n + " في هذا الأسطول") + '</span></div>'
+    +   '<div class="sizes">' + sizeRow + '</div>'
+    +   '<div class="eqgrid">' + cards + '</div>'
+    + '</div>'
+
+    + '<aside class="quote">'
+    +   '<h3>' + L("Ask this supplier to price your job", "اطلب من هذا المؤجّر تسعير عملك") + '</h3>'
+    +   '<p class="s">' + L("Your request also reaches every other verified supplier who holds it — you get a market, not a single quote.",
+                            "يصل طلبك أيضاً إلى كل مؤجّر موثّق آخر يملكها — فتحصل على سوق لا على عرض واحد.") + '</p>'
+    +   '<div class="qf"><div class="k">' + L("Equipment", "المعدّة") + '</div><div class="v">' + catName(k) + ' · ' + sizes[sheetSize] + '</div></div>'
+    +   '<div class="qrow"><div class="qf"><div class="k">' + L("Units", "الوحدات") + '</div><div class="v">1</div></div>'
+    +     '<div class="qf"><div class="k">' + L("Duration", "المدة") + '</div><div class="v">' + L("3 months", "٣ أشهر") + '</div></div></div>'
+    +   '<div class="qf"><div class="k">' + L("Site", "الموقع") + '</div><div class="v">' + L(s.city, s.cityAr) + '</div></div>'
+    +   '<button class="btn btn-brand cta2" onclick="gate(\'request\')">' + L("Request a quote", "اطلب عرض سعر") + '</button>'
+    +   '<div class="fine">' + L("Free. No card. You see the offers before anyone sees your name.",
+                                 "مجاناً. بدون بطاقة. ترى العروض قبل أن يرى أحد اسمك.") + '</div>'
+    +   '<div class="qlist">'
+    +     '<div><span class="icon">verified_user</span>' + L("Papers checked before the machine ships", "الأوراق تُفحص قبل شحن المعدّة") + '</div>'
+    +     '<div><span class="icon">forum</span>' + L("Terms settled in writing, in the deal room", "الشروط تُحسم كتابةً في غرفة الصفقة") + '</div>'
+    +     '<div><span class="icon">receipt_long</span>' + L("One rate card — mobilisation and fuel spelled out", "بطاقة سعر واحدة — النقل والوقود موضّحان") + '</div>'
+    +   '</div></aside></div>';
+}
+
+/* ── gate ────────────────────────────────────────────────────────────────── */
+var GATES = {
+  request:{tagEn:"One step left", tagAr:"خطوة واحدة",
+    tEn:"Create an account to send this request", tAr:"أنشئ حساباً لإرسال هذا الطلب",
+    bEn:"Suppliers price a named site, not an anonymous one. A phone number and a minute is all it takes — your draft is waiting on the other side.",
+    bAr:"المؤجّرون يسعّرون موقعاً معروفاً لا مجهولاً. رقم جوال ودقيقة يكفيان — ومسوّدتك بانتظارك بعدها."},
+  save:{tagEn:"Shortlist", tagAr:"القائمة المختصرة",
+    tEn:"Keep the suppliers you like", tAr:"احتفظ بالمؤجّرين الذين أعجبوك",
+    bEn:"A free account holds your shortlist, your requests and every offer you receive in one place.",
+    bAr:"الحساب المجاني يحفظ قائمتك وطلباتك وكل عرض يصلك في مكان واحد."},
+  search:{tagEn:"Search", tagAr:"البحث",
+    tEn:"Search the whole market", tAr:"ابحث في السوق كاملاً",
+    bEn:"Browsing is open to everyone. Searching by dates, and getting real prices back, needs an account.",
+    bAr:"التصفّح متاح للجميع. البحث بالتواريخ والحصول على أسعار حقيقية يحتاج حساباً."},
+  filters:{tagEn:"Filters", tagAr:"التصفية",
+    tEn:"Filter by certificate, city and capacity", tAr:"صفِّ حسب الشهادة والمدينة والسعة",
+    bEn:"Aramco pass, third-party inspection, operator supply, capacity range — the filters that decide a shortlist open with an account.",
+    bAr:"تصريح أرامكو، فحص طرف ثالث، توفير مشغّل، مدى السعة — التصفية التي تحسم القائمة تُفتح بالحساب."},
+  signin:{tagEn:"Welcome back", tagAr:"أهلاً بعودتك",
+    tEn:"Sign in with your phone", tAr:"سجّل الدخول برقم جوالك",
+    bEn:"A code arrives by SMS. No password to remember, no card to enter.",
+    bAr:"يصلك رمز عبر رسالة نصية. لا كلمة مرور تتذكّرها، ولا بطاقة تُدخلها."}
+};
+
+function gate(kind){
+  var g = GATES[kind] || GATES.request;
+  document.getElementById("gatetag").textContent = L(g.tagEn, g.tagAr);
+  document.getElementById("gatetitle").textContent = L(g.tEn, g.tAr);
+  document.getElementById("gatebody").textContent = L(g.bEn, g.bAr);
+  document.getElementById("gatekept").textContent = L("Nothing you opened is lost — you come back to this page.",
+                                                      "لا يضيع شيء ممّا فتحته — تعود إلى هذه الصفحة.");
+  document.getElementById("gate").classList.add("on");
+  document.body.classList.add("locked");
+}
+function closeGate(){
+  document.getElementById("gate").classList.remove("on");
+  if (openStore === null) document.body.classList.remove("locked");
+}
+document.addEventListener("keydown", function(e){
+  if (e.key !== "Escape") return;
+  if (document.getElementById("gate").classList.contains("on")) closeGate();
+  else if (openStore !== null) closeStore();
+});
+
+function setLang(l){
+  lang = l;
+  var root = document.documentElement;
+  root.setAttribute("lang", l);
+  root.setAttribute("dir", l === "ar" ? "rtl" : "ltr");
+  var nodes = document.querySelectorAll("[data-en]");
+  for (var i = 0; i < nodes.length; i++){
+    var v = nodes[i].getAttribute(l === "ar" ? "data-ar" : "data-en");
+    if (v != null) nodes[i].innerHTML = v;
+  }
+  document.getElementById("loclabel").textContent = l === "ar" ? "العربية" : "English";
+  renderCats(); renderGrid(); if (openStore !== null) renderSheet();
+}
+
+renderCats();
+renderGrid();
+</script>
+</body>
+</html>

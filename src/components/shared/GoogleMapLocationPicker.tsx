@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Search, MapPin, Loader2, Navigation } from "lucide-react";
 import { parseCoordinatesFromInput } from "@/lib/parseMapUrl";
 import { useT } from "@/lib/i18n";
+import { btn } from "@/lib/ds";
 
 const KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 const RIYADH = { lat: 24.7136, lng: 46.6753 };
@@ -48,9 +49,31 @@ interface MapLocationPickerProps {
   label?: string | null;
   onChange: (lat: number, lng: number, address: string) => void;
   height?: string;
+  /**
+   * Suppress the resolved-address line under the map.
+   *
+   * For a caller that needs the address on ONE row with a control of its own beside it. The line is
+   * not moved into a slot here on purpose: this component is `next/dynamic` and renders as nothing until
+   * it loads (and as nothing at all under jsdom), so anything gating a step must not live inside it.
+   */
+  hideAddress?: boolean;
+  /**
+   * Resolve `label` into a point, once, when there is no pin.
+   *
+   * For a site that was saved as a typed ADDRESS with no pin: the caller has a place to show and no
+   * coordinates to show it at, and everything downstream of the map needs a point. Rather than
+   * asking the renter to retype what is already on screen, the geocoder is asked the same question
+   * the search box would ask, with the label as the query.
+   *
+   * Only the POINT is handed back, and deliberately not the address the geocoder echoed: the caller
+   * owns the label, and Google's wording of the same place is not the caller's. On no result the
+   * label is dropped into the search box instead, so the renter's next step is one press rather than
+   * a retype.
+   */
+  onResolveLabel?: (lat: number, lng: number) => void;
 }
 
-export default function GoogleMapLocationPicker({ value, label, onChange, height = "300px" }: MapLocationPickerProps) {
+export default function GoogleMapLocationPicker({ value, label, onChange, height = "300px", hideAddress, onResolveLabel }: MapLocationPickerProps) {
   const t = useT();
   const mp = t.step1.location.mapPicker;
 
@@ -172,6 +195,33 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
     map.current.panTo(value);
   }, [ready, value, placeMarker]);
 
+  /* ── The site's own address, geocoded once ─────────────────────────────────────────────────────
+     See `onResolveLabel`. Guarded on `value` being absent so it never fires over a pin, and on the
+     ref so a re-render with the same empty value cannot ask twice. */
+  const resolvedLabelFor = useRef<string | null>(null);
+  useEffect(() => {
+    const q = (label ?? "").trim();
+    if (!ready || value || !q || !onResolveLabel || resolvedLabelFor.current === q) return;
+    resolvedLabelFor.current = q;
+    let alive = true;
+    void geocodeSearch(q).then((results) => {
+      if (!alive) return;
+      const hit = results[0];
+      if (!hit) {
+        // Nothing matched: hand the renter the query rather than an empty box.
+        setSearchInput(q);
+        return;
+      }
+      placeMarker(hit.lat, hit.lng);
+      map.current?.panTo({ lat: hit.lat, lng: hit.lng });
+      map.current?.setZoom(15);
+      onResolveLabel(hit.lat, hit.lng);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [ready, value, label, onResolveLabel, geocodeSearch, placeMarker]);
+
   // Reverse-geocode the current coords so the displayed address matches the exact pin.
   useEffect(() => {
     if (!ready || !value) {
@@ -246,7 +296,7 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
           <Search className="absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input
             type="text"
-            className="w-full rounded-lg border border-border bg-surface ps-8 pe-8 py-2 text-sm outline-none focus:border-brand"
+            className="w-full rounded-sm border border-border bg-surface ps-8 pe-8 py-2 text-body outline-none focus:border-brand"
             placeholder={mp.searchPlaceholder}
             aria-label={mp.searchPlaceholder}
             value={searchInput}
@@ -264,18 +314,18 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
           {searching && <Loader2 className="absolute end-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted" />}
 
           {open && suggestions.length > 0 && (
-            <ul className="absolute z-[1000] mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-surface py-1 shadow-lg">
+            <ul className="absolute z-[1000] mt-1 max-h-64 w-full overflow-auto rounded-sm border border-border bg-surface py-1">
               {suggestions.map((s, i) => (
                 <li key={`${s.lat},${s.lng},${i}`}>
                   <button
                     type="button"
                     onClick={() => select(s.lat, s.lng, s.display)}
-                    className="flex w-full items-start gap-2 px-3 py-2 text-start text-sm hover:bg-surface2"
+                    className="flex w-full items-start gap-2 px-3 py-2 text-start text-body hover:bg-surface2"
                   >
                     <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-brand" />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">{s.primary}</span>
-                      <span className="block truncate text-xs text-muted">{s.display}</span>
+                      <span className="block truncate text-label text-muted">{s.display}</span>
                     </span>
                   </button>
                 </li>
@@ -288,15 +338,15 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
           onClick={handleMyLocation}
           title={mp.useMyLocation}
           aria-label={mp.useMyLocation}
-          className="flex items-center rounded-lg border border-border px-2.5 py-2 text-xs hover:bg-background"
+          className={btn("secondary", "md", { className: "flex" })}
         >
           <Navigation className="h-3.5 w-3.5 text-muted" />
         </button>
       </div>
 
-      <div style={{ height }} className="overflow-hidden rounded-lg border border-border">
+      <div style={{ height }} className="overflow-hidden rounded-sm border border-border">
         {error ? (
-          <div className="flex h-full items-center justify-center p-4 text-center text-xs text-danger">
+          <div className="flex h-full items-center justify-center p-4 text-center text-label text-danger">
             Google Maps failed to load (check the API key / enabled APIs).
           </div>
         ) : (
@@ -304,14 +354,14 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
         )}
       </div>
 
-      {value && (
-        <div className="flex items-start gap-1.5 rounded-lg border border-border bg-surface2 px-3 py-2">
+      {value && !hideAddress && (
+        <div className="flex items-start gap-1.5 rounded-sm border border-border bg-surface2 px-3 py-2">
           <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-brand" />
-          <div className="min-w-0 text-sm">
+          <div className="min-w-0 flex-1 text-body">
             <div className="font-semibold leading-tight">
               {resolved || (resolving ? mp.locating : label?.trim() || mp.pinnedNoAddress)}
             </div>
-            <div className="text-[11px] text-muted">
+            <div className="text-label text-muted">
               {value.lat.toFixed(6)}, {value.lng.toFixed(6)}
             </div>
           </div>

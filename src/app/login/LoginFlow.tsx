@@ -32,7 +32,7 @@ export function LoginFlow({ next }: { next: string }) {
       {/* Brand mark on the form side (desktop only — mobile shows the white mark above the card) */}
       <div className="mb-9 hidden items-center gap-2 lg:flex">
         <span className="h-2.5 w-2.5 flex-none rounded-full bg-brand" />
-        <span className="text-[15px] font-bold tracking-tight text-navy">Moedatech</span>
+        <span className="text-subhead font-extrabold tracking-tight text-navy">Moedatech</span>
       </div>
       {phone === null ? (
         <PhoneEntry onCodeSent={onCodeSent} />

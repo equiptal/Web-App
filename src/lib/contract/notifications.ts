@@ -63,33 +63,164 @@ export function mapNotificationList(raw: unknown): NotificationList {
 }
 
 /**
- * Web route a notification should open, derived from its `type` + `data` (app parity, renter-only —
- * `roleContext` is ignored because the web is the rentee surface). `null` → display-only (no target),
- * the bell just marks it read on click.
+ * ── What the home page's bubble may show (owner, 2026-09-05) ─────────────────────────────────────
+ * *"I want these to have the home page bubble."*
+ *
+ * Six types, and the rule behind the six is that each one means **a supplier just moved on your
+ * money**: an offer arrived, its price changed, it was edited, a counter was answered, a rate was
+ * proposed or answered. Everything else a renter receives — a term edited inside a room he is
+ * already reading, a company roster change, a referral reward — stays in the bell, where it still
+ * gets an exact link.
+ *
+ * The bubble reads UNREAD only, so a renter who has opened the bell is not told twice.
+ */
+export const HOME_BUBBLE_TYPES: readonly string[] = [
+  "bid.received",
+  "bid.price_changed",
+  "bid.updated",
+  "bid.countered",
+  "deal.rate_proposed",
+  "deal.rate_response",
+];
+
+/** Is this row one the home bubble may raise? Unread is the caller's filter, not this one's. */
+export function isBubbleWorthy(n: NotificationItem): boolean {
+  return HOME_BUBBLE_TYPES.includes(n.type);
+}
+
+/**
+ * Web route a notification should open, derived from its `type` + `data`. `null` → nothing to open,
+ * and the bell only marks it read.
+ *
+ * ── Rewritten 2026-09-05, because almost nothing was wired ────────────────────────────────────────
+ * *"Notifications are view-only and not wired to anything. Each bid must go directly to the exact
+ * request, and every other notification must be wired to where it belongs too."*
+ *
+ * Two faults, and they compounded:
+ *
+ *  1. **Six types were handled and the rest fell through to `null`** — a renter's whole bid
+ *     lifecycle (`bid.updated`, `bid.price_changed`, `bid.countered`, `bid.expired`) and every
+ *     `deal.*` past the prefix test were inert rows.
+ *  2. **The links that did exist pointed at retired routes.** `/requests/<id>` and `/compare` were
+ *     replaced by the one workspace on 2026-08-25, and `middleware.ts` 308s them to `/requests`
+ *     WITH THE ID AND THE QUERY DROPPED. So «a supplier bid on your request» landed on whichever
+ *     request the workspace happened to resolve — the exact complaint.
+ *
+ * The workspace takes `?r=<requestId>` and resolves the group and the item from it
+ * (`RequestsWorkspace.tsx`), so that is the shape every request-scoped link uses now.
+ *
+ * ── Audited again 2026-09-12, against every `type:` the three backends emit ──────────────────────
+ *
+ * Owner: *"make sure all notifications are wired to their exact place."* Three were not, and all
+ * three carried the id they needed:
+ *
+ *  · `request.closed_owner` — the renter's OWN request closing. `roleContext: 'rentee'`, and the
+ *    backend comments the id as being there *"so the renter's tap opens THEIR request"*.
+ *  · `request.closed_unfilled` — the same event told to a supplier who bid on it.
+ *  · `bid.quotation_viewed` / `bid.quotation_downloaded` — a supplier's own live-status pill.
+ *
+ * 🔴 **Three more look like gaps and are NOT notifications.** `bid_withdrawn`, `deal_closed` and
+ * `request_summary` are Stream CHAT system-message metadata (`postSystemMessage(..., { type })`) and
+ * never reach the bell; `referral_reward` is a COUPON type. Adding cases for them would be four dead
+ * branches that a reader would later trust. The underscore is the tell: every real notification type
+ * in this product is dotted.
+ *
+ * **Half the old map was for the wrong audience.** `request.broadcast`, `request.direct`,
+ * `bid.accepted`, `RFQ_CLOSED_FOMO`, `verification.*` and `equipment.*` are all emitted with
+ * `roleContext: 'supplier'` — a renter never receives one. They are kept, deliberately: the same
+ * account can hold both roles, and a supplier row landing somewhere sane costs one line.
  */
 export function notificationHref(n: NotificationItem): string | null {
   const d = n.data ?? {};
   const requestId = str(d.requestId);
-  const dealRoomId = str(d.dealRoomId);
+  const dealRoomId = str(d.dealRoomId) ?? str(d.conversationId);
+  const bidId = str(d.bidId);
+
+  /** The one request, in the workspace that replaced the per-request pages. */
+  const request = requestId ? `/requests?r=${encodeURIComponent(requestId)}` : null;
+  /** The conversation. It lives in the MAP's dock (owner, 2026-08-26: the deal room is no longer
+   *  somewhere a renter is sent to talk), so a bid id is what opens it.
+   *
+   *  ⚠️ A room id alone no longer routes anywhere of its own: the room view was retired on
+   *  2026-09-07 and `/deal-room/[id]` with no act forwards to this same chat. Sending a renter
+   *  through that forward would show him a blank frame first, so a row carrying only a room id goes
+   *  to his offers instead — which is where a notification about one belongs. */
+  const chat = bidId ? `/bids/${encodeURIComponent(bidId)}/equipment?chat=1` : dealRoomId ? "/requests" : null;
+  /** The three-styles negotiation sheet, which is what `?act=counter` opens. */
+  const sheet = dealRoomId ? `/deal-room/${encodeURIComponent(dealRoomId)}?act=counter` : null;
+  /** The room, for the two rows that are ABOUT the settled document. The sheet-bearing acts keep
+   *  the route; a bare room id does not (see `chat` above). */
+  const room = dealRoomId ? `/deal-room/${encodeURIComponent(dealRoomId)}?act=accept` : null;
+
   switch (n.type) {
+    /* ── The bid lifecycle · every one of these is ABOUT a request, so it opens that request ───── */
+    case "bid.received":
+    case "bid.updated":
+    case "bid.price_changed":
+    case "bid.expired":
+    case "bid.withdrawn":
+      return request;
+
+    /* The supplier answered a counter. That is a move on the sheet, not news about the request, so
+       it opens the sheet — and falls back to the request when the row predates `dealRoomId`. */
+    case "bid.countered":
+      return sheet ?? request;
+
+    /* ── The negotiation ─────────────────────────────────────────────────────────────────────── */
+    case "deal.rate_proposed":
+    case "deal.rate_response":
+    case "deal.renegotiation_requested":
+      return sheet ?? room;
+    case "deal.created":
+    case "deal.message":
+    case "deal.term_updated":
+    case "deal.abandoned":
+    case "deal.released":
+      return chat;
+    /* The quotation is a view INSIDE the room, not a route — so the room is the deepest link there
+       is, and it opens on the document it just closed. */
+    case "deal.closed":
+    case "deal.awaiting_confirmation":
+    case "deal.acceptance_withdrawn":
+      return room ?? "/inbox";
+
+    /* The renter's own request closed, by him or for want of a bid. Both carry `requestId`, and the
+       backend's own comment on the first says why: *"The renter's tap opens THEIR request, so the id
+       has to be here."* It arrived, and this file dropped it on the floor. */
+    case "request.closed_owner":
+      return request;
+
+    /* ── Supplier-side rows, kept for a dual-role account ─────────────────────────────────────── */
     case "request.broadcast":
     case "request.direct":
-      return requestId ? `/requests/${requestId}` : null;
-    case "bid.received":
+    case "request.details_changed":
+    case "request.fully_covered":
+    case "request.closed_unfilled":
     case "bid.accepted":
-      return requestId ? `/requests/${requestId}?view=bids` : null;
+      return request;
+
+    /* The renter opened or downloaded his quotation. `roleContext: 'supplier'`, and it carries BOTH
+       ids — the bid is the one that matters, because a supplier holding several bids on one request
+       needs the one that was read. */
+    case "bid.quotation_viewed":
+    case "bid.quotation_downloaded":
+      return chat ?? request;
     case "RFQ_CLOSED_FOMO":
-      return "/compare";
+      return "/browse";
+
     default:
       break;
   }
-  if (n.type.startsWith("deal.")) return dealRoomId ? `/deal-room/${dealRoomId}` : "/inbox";
+
+  // Anything else in the deal family — the backend adds to it faster than this file learns the
+  // names, and every one of them carries `dealRoomId`.
+  if (n.type.startsWith("deal.")) return chat ?? "/inbox";
   if (n.type.startsWith("verification.")) return "/verify";
-  // company.join_requested / join_approved / member_left / removed / promoted / demoted / dissolved.
-  // All open the hub — including `removed`/`dissolved`, where it correctly shows the join form and so
-  // explains why the firm's shared requests and equipment just vanished. Without this the owner's
-  // "New join request" would be a dead, unclickable row with no route to the Approve button.
-  if (n.type.startsWith("company.")) return "/company";
-  // equipment.* / job.* / support.reply / admin.* / message.new / referral.* → display-only.
+  // The firm's papers and its roster are a block on the profile since 2026-09-04; `/company` is
+  // retired and 308s there, so linking to it would be one redirect for nothing.
+  if (n.type.startsWith("company.")) return "/profile";
+  if (n.type.startsWith("referral.")) return "/profile";
+  // `post_deal_review_prompt` (jobs are off on the web), `equipment.*`, `admin.*`, `support.reply`,
+  // `message.new`, `submission.rejected` → nothing on this product to open.
   return null;
 }

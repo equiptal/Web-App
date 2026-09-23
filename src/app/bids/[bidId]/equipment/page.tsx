@@ -21,30 +21,50 @@
  */
 
 import { Suspense, use, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { AppShell } from "@/components/AppShell";
+import { AppShell, PageBack, useBackBarSlot } from "@/components/AppShell";
 import { useAuthGate } from "@/components/auth/AuthGate";
 import { BidMapWorkspace } from "@/components/map/BidMapWorkspace";
+import { OtherOffers } from "@/components/map/OtherOffers";
 import { Icon } from "@/components/ui";
-import { fetchBidDetail } from "@/lib/api/client";
+import { fetchBidDetail, fetchReceivedBids } from "@/lib/api/client";
 import { isOffPlatformBid, isOffPlatformBidId } from "@/lib/contract/bid-equipment-access";
+import { otherOffers, type OtherOffer } from "@/lib/contract/other-offers";
 import type { BidCard } from "@/lib/contract/bids";
 import type { RequestRecord } from "@/lib/contract/requests";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
+import { btn } from "@/lib/ds";
 
 export default function BidEquipmentPage({ params }: { params: Promise<{ bidId: string }> }) {
   const { bidId } = use(params);
   const t = useT();
+  /* ── Back lands on the REQUEST, not on the list of them (owner, 2026-09-08) ────────────────────
+     *"It must be back to the request they were on, not the general requests page — it must be on the
+     exact request."*
+
+     The trail already returns him to `/requests?r=…` when that is where he came from
+     (`back-nav.ts`), so what was wrong is the FALLBACK: every other way in — a notification, the
+     dashboard's bid rail, the inbox, a deep link — fell through to the bare `/requests`, which opens
+     whichever request the workspace picks by default. The bid knows its request, so the fallback can
+     name it: `?r=<requestId>` is the workspace's own parameter, the same one it writes when the
+     renter picks a request there.
+
+     Held HERE and not registered by the surface below, because `usePageBack` allows exactly one
+     registration: two of them and the parent's effect (which runs last) wins, which is the bug
+     `create-back` records. So the id travels up and the one control follows it. */
+  const [requestId, setRequestId] = useState<string | null>(null);
   return (
     // `fullBleed` — the map fills the shell below the header. Without it the surface renders inside
     // the standard `max-w-[1440px]` page gutter, which drew it as a card floating in the middle of a
     // desktop viewport with the map squeezed into what was left.
     <AppShell fullBleed title={t.bidMap.surfaceTitle}>
+      <PageBack fallback={requestId ? `/requests?r=${encodeURIComponent(requestId)}` : "/requests"} />
       {/* Suspense boundary: the surface below reads `useSearchParams` for `?company=1`, which needs one. */}
       <Suspense fallback={null}>
-        <BidEquipmentGate bidId={decodeURIComponent(bidId)} />
+        <BidEquipmentGate bidId={decodeURIComponent(bidId)} onRequestId={setRequestId} />
       </Suspense>
     </AppShell>
   );
@@ -52,7 +72,7 @@ export default function BidEquipmentPage({ params }: { params: Promise<{ bidId: 
 
 /** Public web has no route gate, but one bid's equipment needs a session — so a signed-out visitor
  *  gets the auth modal opened in place, with a sign-in prompt behind it (the deal room's pattern). */
-function BidEquipmentGate({ bidId }: { bidId: string }) {
+function BidEquipmentGate({ bidId, onRequestId }: { bidId: string; onRequestId: (id: string | null) => void }) {
   const { status } = useSession();
   const { openAuth } = useAuthGate();
   const t = useT();
@@ -66,10 +86,10 @@ function BidEquipmentGate({ bidId }: { bidId: string }) {
       <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-20 text-center">
         <span className="grid h-14 w-14 place-items-center rounded-full bg-surface2 text-navy-mid"><Icon name="lock" size={26} /></span>
         <div>
-          <h2 className="text-[17px] font-extrabold text-navy">{t.bidMap.signInTitle}</h2>
-          <p className="mt-1 text-[13px] text-muted">{t.bidMap.signInBody}</p>
+          <h2 className="text-title font-extrabold text-navy">{t.bidMap.signInTitle}</h2>
+          <p className="mt-1 text-body text-muted">{t.bidMap.signInBody}</p>
         </div>
-        <button onClick={() => openAuth()} className="rounded-full bg-brand px-5 py-2 text-[13px] font-bold text-white">{t.bidMap.signIn}</button>
+        <button onClick={() => openAuth()} className={btn("primary", "md", { pill: true })}>{t.bidMap.signIn}</button>
       </div>
     );
   }
@@ -82,7 +102,7 @@ function BidEquipmentGate({ bidId }: { bidId: string }) {
   // exist; it simply lives somewhere else. Refusing on the id says so, and issues no request at all.
   if (isOffPlatformBidId(bidId)) return <OffPlatformState />;
 
-  return <BidEquipment bidId={bidId} />;
+  return <BidEquipment bidId={bidId} onRequestId={onRequestId} />;
 }
 
 /**
@@ -93,13 +113,21 @@ function BidEquipmentGate({ bidId }: { bidId: string }) {
  * a 15s staleness window so a burst of focus events (alt-tab, devtools, a modal closing) does not fire
  * a request each. Nothing here claims recency, and no copy on the surface implies live updating.
  */
-function BidEquipment({ bidId }: { bidId: string }) {
+function BidEquipment({ bidId, onRequestId }: { bidId: string; onRequestId: (id: string | null) => void }) {
   const t = useT();
   /** `?company=1` — see the note at the workspace below. Read once, as an INITIAL state rather than a
    *  live one: the renter closing the panel must not have it reopened by a URL that has not changed. */
   const openCompanyDocs = useSearchParams().get("company") === "1";
+  /** `?chat=1` — the renter pressed the chat icon somewhere else (a bid card, the inbox) and arrives
+   *  wanting the conversation, not the map. Read ONCE, as an initial state: closing the dock must not
+   *  be undone by a URL that has not changed. */
+  const openChat = useSearchParams().get("chat") === "1";
   const [bid, setBid] = useState<BidCard | null>(null);
   const [request, setRequest] = useState<RequestRecord | null>(null);
+  /** The other suppliers on this request — the back header's strip (owner, 2026-09-04). */
+  const [siblings, setSiblings] = useState<OtherOffer[]>([]);
+  /** The bar the shell draws around Back, so the strip can render in it (owner, 2026-09-07). */
+  const backSlot = useBackBarSlot();
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const lastFetchRef = useRef(0);
@@ -138,6 +166,45 @@ function BidEquipment({ bidId }: { bidId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bidId]);
 
+  /**
+   * The other SUPPLIERS who bid on this request, for the back header's strip.
+   *
+   * **Read off the inbox, not off a new endpoint.** `GET /api/me/received-bids` already answers every
+   * bid offered to this renter with the request it belongs to on each one, so these are a filter over
+   * a list the app fetches anyway — no backend work, and no second definition of "the offers on this
+   * request".
+   *
+   * One chip per COUNTERPARTY, and which bid each one travels to: `otherOffers` holds that rule and
+   * the owner's correction behind it (2026-09-07).
+   *
+   * It runs ONCE per bid and never blocks the map: a failure leaves the strip empty, which is a bar
+   * with no strip, and the surface behind it is untouched. Ordered by price, cheapest first, because
+   * a row a renter travels along is easier to keep his place in when it has an order at all; offers
+   * with no price sit at the end rather than at an invented zero.
+   */
+  useEffect(() => {
+    let live = true;
+    const rid = request?.id ?? null;
+    if (!rid) return;
+    void (async () => {
+      try {
+        const r = await fetchReceivedBids();
+        if (!live) return;
+        setSiblings(otherOffers(r.bids, rid, bidId));
+      } catch {
+        // No strip, and nothing said about it: the map is what the renter came for.
+      }
+    })();
+    return () => { live = false; };
+  }, [bidId, request?.id]);
+
+  /* The request this offer answers, handed to the page so Back can point at it (owner, 2026-09-08).
+     In an effect rather than during render: it sets state on an ancestor, and doing that while
+     rendering is a React error rather than a shortcut. */
+  useEffect(() => {
+    onRequestId(request?.id ?? null);
+  }, [request?.id, onRequestId]);
+
   // Focus — the renter comes back from the supplier's reply and expects to see it.
   useEffect(() => {
     const onFocus = () => { void load(false); };
@@ -151,7 +218,7 @@ function BidEquipment({ bidId }: { bidId: string }) {
     );
   }
   if (!bid) {
-    return <div className="py-20 text-center text-[13px] font-bold text-muted">{t.bidMap.loadingBid}</div>;
+    return <div className="py-20 text-center text-body font-semibold text-muted">{t.bidMap.loadingBid}</div>;
   }
   // RM3-AC-25, second line of defence. The id check above is the one that fires today; this catches a
   // bid that arrives flagged off-platform from a mapper that does not exist yet. Both read the same
@@ -159,6 +226,10 @@ function BidEquipment({ bidId }: { bidId: string }) {
   if (isOffPlatformBid(bid)) return <OffPlatformState />;
 
   return (
+    <>
+      {/* The strip lives in the page's BACK HEADER (owner, 2026-09-07), which the shell draws — so it
+          goes in through the bar's own trailing slot. `OtherOffers` renders nothing below two. */}
+      {backSlot && createPortal(<OtherOffers offers={siblings} currentBidId={bid.id} />, backSlot)}
     <BidMapWorkspace
       bid={bid}
       request={request}
@@ -168,11 +239,15 @@ function BidEquipment({ bidId }: { bidId: string }) {
       // documents modal is withdrawn, so the one surface for a company's papers is V9's panel here.
       // Any other value is simply not the flag; a hand-edited URL opens the map as it always does.
       openCompanyDocs={openCompanyDocs}
+      // `?chat=1` — the chat icon on a bid card lands here now: the conversation lives in this dock,
+      // and the deal room is no longer somewhere a renter is sent to talk (owner, 2026-08-26).
+      openChat={openChat}
       // The surface owns its own writes now (V11/V12): the four requests, the chat dock's first
       // message and the footer's hand-off each create the deal room themselves, and none of them
       // needs a handler from here. V9's company panel still lands with the ticket that owns it, so
       // its entry stays visible and inert rather than pretending a panel opened.
     />
+    </>
   );
 }
 
@@ -202,9 +277,9 @@ function OffPlatformState() {
 function StatePanel({ title, body, back }: { title: string; body: string; back: string }) {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-3 py-20 text-center">
-      <h2 className="text-[17px] font-extrabold text-navy">{title}</h2>
-      <p className="text-[13px] leading-relaxed text-muted">{body}</p>
-      <Link href="/requests" className="rounded-full border border-border px-5 py-2 text-[13px] font-bold text-navy">{back}</Link>
+      <h2 className="text-title font-extrabold text-navy">{title}</h2>
+      <p className="text-body leading-relaxed text-muted">{body}</p>
+      <Link href="/requests" className="rounded-full border border-border px-5 py-2 text-body font-semibold text-navy">{back}</Link>
     </div>
   );
 }

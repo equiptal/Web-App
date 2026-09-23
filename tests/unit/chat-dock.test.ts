@@ -49,6 +49,7 @@ const row = (over: Partial<InboxBid> = {}): InboxBid => ({
   equipmentName: null,
   request: { id: "r1", displayId: null, shortCode: null, equipmentSummary: null, groupId: "g1", location: null },
   equipmentType: { id: "t1", name: "Excavator" },
+  equipment: { subtype: "Crawler excavator", subtypeAr: null, size: "20 ton", sizeAr: null },
   createdAt: null,
   supplierStarted: false,
   ...over,
@@ -65,15 +66,48 @@ const anchor = (over: Partial<DockAnchor> = {}): DockAnchor => ({
   ...over,
 });
 
+/** A sibling ITEM of the same RFQ: its own fanned-out request, its own machine. */
+const item = (bidId: string, requestId: string, subtype: string, size: string, over: Partial<InboxBid> = {}) =>
+  row({
+    bidId,
+    request: { ...row().request, id: requestId },
+    equipment: { subtype, subtypeAr: null, size, sizeAr: null },
+    ...over,
+  });
+
 describe("dockTabs — a tab per ITEM, for ONE counterparty (RM3-AC-43/44/45)", () => {
-  it("gives a tab to every bid this supplier holds in the RFQ group", () => {
+  it("gives a tab to every ITEM this supplier bid on in the RFQ group, named machine · size", () => {
     const tabs = dockTabs(anchor(), [
-      row({ bidId: "b1" }),
-      row({ bidId: "b2", equipmentType: { id: "t2", name: "Loader" } }),
-      row({ bidId: "b3", equipmentType: { id: "t3", name: "Crane" } }),
+      item("b1", "r1", "Crawler excavator", "20 ton"),
+      item("b2", "r2", "Wheel loader", "3 m³"),
+      item("b3", "r3", "Mobile crane", "50 ton"),
     ]);
     expect(tabs.map((t) => t.bidId)).toEqual(["b1", "b2", "b3"]);
-    expect(tabs.map((t) => t.label)).toEqual(["Excavator", "Loader", "Crane"]);
+    /* The SIZE is half the name (owner, 2026-09-08). Two lines of one subtype are the case the strip
+       exists for, and «Crawler Excavator» twice tells the renter nothing about which is which. */
+    expect(tabs.map((t) => t.label)).toEqual(["Crawler excavator · 20 ton", "Wheel loader · 3 m³", "Mobile crane · 50 ton"]);
+  });
+
+  /**
+   * ⚠️ The owner's report, 2026-09-08: *"how are 2 equipments shown in the chat while the request is
+   * one item?"* — a supplier holding two bids against the SAME item (a re-bid, or two colleagues of
+   * one firm, which this dock already treats as ONE counterparty) drew two identical tabs for one
+   * conversation. The item is the fanned-out request, so the request id is what a tab is keyed on.
+   */
+  it("gives ONE tab when the same supplier holds two bids on the SAME item", () => {
+    const tabs = dockTabs(anchor(), [
+      item("b1", "r1", "Crawler excavator", "20 ton", { unreadCount: 2 }),
+      item("b2", "r1", "Crawler excavator", "20 ton", { unreadCount: 3, supplierId: "u2", supplierName: "Omar" }),
+    ]);
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0].bidId).toBe("b1"); // the anchor's own bid keeps the slot
+    // One conversation, so what arrived on either bid is one badge.
+    expect(tabs[0].unreadCount).toBe(5);
+  });
+
+  it("names a tab by its machine even where the projection carries no size", () => {
+    const tabs = dockTabs(anchor(), [item("b1", "r1", "Crawler excavator", "")]);
+    expect(tabs[0].label).toBe("Crawler excavator");
   });
 
   it("gives a single-bid supplier ONE tab, so the caller renders no strip (RM3-AC-44)", () => {
@@ -82,9 +116,10 @@ describe("dockTabs — a tab per ITEM, for ONE counterparty (RM3-AC-43/44/45)", 
 
   it("treats two MEMBERS of one firm as ONE counterparty (RM3-AC-45)", () => {
     // Same `supplierCompanyId`, different people — the backend already puts both in one channel.
+    // Different ITEMS, so two tabs: one firm, two machines.
     const tabs = dockTabs(anchor(), [
-      row({ bidId: "b1", supplierId: "u1", supplierName: "Ali" }),
-      row({ bidId: "b2", supplierId: "u2", supplierName: "Omar", equipmentType: { id: "t2", name: "Loader" } }),
+      item("b1", "r1", "Crawler excavator", "20 ton"),
+      item("b2", "r2", "Wheel loader", "3 m³", { supplierId: "u2", supplierName: "Omar" }),
     ]);
     expect(tabs.map((t) => t.bidId)).toEqual(["b1", "b2"]);
   });
@@ -103,19 +138,19 @@ describe("dockTabs — a tab per ITEM, for ONE counterparty (RM3-AC-43/44/45)", 
     // Paging, or a feed failure. A dock that could not open the conversation for the bid on screen
     // would be a worse failure than a one-tab strip.
     const tabs = dockTabs(anchor({ dealRoomId: "dr-1" }), []);
-    expect(tabs).toEqual([{ bidId: "b1", dealRoomId: "dr-1", label: "Excavator", unreadCount: 0, current: true }]);
+    expect(tabs).toEqual([{ itemKey: "b1", bidId: "b1", dealRoomId: "dr-1", label: "Excavator", unreadCount: 0, current: true }]);
   });
 
   it("carries each tab's own room — null means COMPOSE-ONLY, never a room to create on open", () => {
     const tabs = dockTabs(anchor(), [
-      row({ bidId: "b1", dealRoomId: "dr-1" }),
-      row({ bidId: "b2", dealRoomId: null, equipmentType: { id: "t2", name: "Loader" } }),
+      item("b1", "r1", "Crawler excavator", "20 ton", { dealRoomId: "dr-1" }),
+      item("b2", "r2", "Wheel loader", "3 m³", { dealRoomId: null }),
     ]);
     expect(tabs.map((t) => t.dealRoomId)).toEqual(["dr-1", null]);
   });
 
   it("marks exactly one tab current, so no other surface has to work out which bid is on screen", () => {
-    const tabs = dockTabs(anchor(), [row({ bidId: "b1" }), row({ bidId: "b2" })]);
+    const tabs = dockTabs(anchor(), [item("b1", "r1", "Crawler excavator", "20 ton"), item("b2", "r2", "Wheel loader", "3 m³")]);
     expect(tabs.filter((t) => t.current).map((t) => t.bidId)).toEqual(["b1"]);
   });
 
@@ -131,8 +166,8 @@ describe("dockTabs — a tab per ITEM, for ONE counterparty (RM3-AC-43/44/45)", 
 describe("dockUnreadTotal — the badge on the control (RM3-AC-46)", () => {
   it("sums every tab, so the closed dock states what the open one would show", () => {
     const tabs = dockTabs(anchor(), [
-      row({ bidId: "b1", unreadCount: 2 }),
-      row({ bidId: "b2", unreadCount: 3 }),
+      item("b1", "r1", "Crawler excavator", "20 ton", { unreadCount: 2 }),
+      item("b2", "r2", "Wheel loader", "3 m³", { unreadCount: 3 }),
     ]);
     expect(tabs.map((t) => t.unreadCount)).toEqual([2, 3]);
     expect(dockUnreadTotal(tabs)).toBe(5);
@@ -146,8 +181,8 @@ describe("dockUnreadTotal — the badge on the control (RM3-AC-46)", () => {
 describe("arrivalNotice — refresh-timed, and silent on what is being read (RM3-AC-62/63)", () => {
   const tabs = () =>
     dockTabs(anchor(), [
-      row({ bidId: "b1", unreadCount: 0 }),
-      row({ bidId: "b2", unreadCount: 1, equipmentType: { id: "t2", name: "Loader" } }),
+      item("b1", "r1", "Crawler excavator", "20 ton", { unreadCount: 0 }),
+      item("b2", "r2", "Wheel loader", "3 m³", { unreadCount: 1 }),
     ]);
 
   it("carries the request reference and the machine's serial, taken from the ASK", () => {
@@ -322,14 +357,19 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     expect(beforeSending).not.toMatch(/\bsend\(\)/);
   });
 
-  it("invokes `send()` from exactly two places, both of them the renter pressing send", () => {
+  /* The rule is unchanged — every invocation is a RENTER PRESS and none is a lifecycle hook — but
+     the shape moved: the composer's two presses now go through `sendTyped`, the contact guard's
+     wrapper, and the guard's own «Share anyway» calls `send` directly (`contactWarned` is read off
+     the closure, so coming back through the wrapper would re-ask the question it just answered). */
+  it("invokes the text sender from presses only, never from a hook", () => {
     const callSites = dockSrc
       .split("\n")
-      .filter((line) => /\bvoid send\(\)/.test(line));
-    expect(callSites).toHaveLength(2);
-    // The Enter key and the send button. Neither is a lifecycle hook, and no third caller exists.
+      .filter((line) => /\bvoid (send|sendTyped)\(\)/.test(line));
+    expect(callSites).toHaveLength(3);
+    // The Enter key, the send button, and the contact guard's way through. All three are handlers.
     expect(callSites.filter((l) => /onKeyDown=/.test(l))).toHaveLength(1);
-    expect(callSites.filter((l) => /onClick=/.test(l))).toHaveLength(1);
+    expect(callSites.filter((l) => /onClick=/.test(l))).toHaveLength(2);
+    expect(callSites.every((l) => /onKeyDown=|onClick=/.test(l))).toBe(true);
   });
 
   it("switches tab by setting state and nothing else (the press an unlocked offer cannot survive)", () => {
@@ -345,9 +385,14 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     // *"While the conversation is open it IS the affordance — a button under it would be a second
     // one."* The prototype returns null; ours must not render the FAB under its own drawer, where it
     // would be a second control claiming to toggle one state.
-    expect(dockSrc).toMatch(/\{!open && \(\s*<button type="button" className="bm-dock"/);
-    // …and the drawer's ✕ is then the only way back, so it must still exist.
-    expect(dockSrc).toContain('className="bm-chat-x" onClick={() => setOpen(false)}');
+    // ⚠️ `!embedded` joined the condition on 2026-09-22: the inbox stands this component IN a
+    // column, where a floating control over the conversation is the same second affordance this
+    // rule forbids. The rule is unchanged; it now has two reasons.
+    expect(dockSrc).toMatch(/\{!open && !embedded && \(\s*<button type="button" className="bm-dock"/);
+    // …and the drawer's ✕ is then the only way back, so it must still exist. Floating, it closes
+    // the drawer; embedded, the PAGE says what closing means — `setOpen(false)` would leave an empty
+    // column with no control anywhere to fill it again.
+    expect(dockSrc).toContain("onClick={() => (embedded ? onClose?.() : setOpen(false))}");
   });
 
   it("docks the conversation beside the panel rather than floating it (`rDrawer`, prototype 1573–1580)", () => {
@@ -383,9 +428,13 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
   it("moves the conversation with ONE control, and that control moves nothing else", () => {
     // A view preference: it may not touch the selection, the map, the active tab or the channel.
     expect(dockSrc).toContain('onClick={() => setPlace((p) => (p === "fill" ? "mirror" : "fill"))}');
-    const place = dockSrc.slice(
-      dockSrc.indexOf('className="bm-chat-place"'),
-      dockSrc.indexOf('className="bm-chat-x"'),
+    /* 🔴 COMMENTS STRIPPED FIRST, for the eighth time in this repo: the note beside the ✕
+       explains that `setOpen(false)` is the wrong close for an embedded dock, so the sweep below
+       failed on its own explanation rather than on any code. */
+    const noComments = dockSrc.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+    const place = noComments.slice(
+      noComments.indexOf('className="bm-chat-place"'),
+      noComments.indexOf('className="bm-chat-x"'),
     );
     expect(place.length).toBeGreaterThan(120); // positive control on the slice
     for (const forbidden of ["setActiveBidId", "setOpen", "refresh(", "ensureDealRoom", "onOpenMachine"]) {
@@ -408,22 +457,22 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
 
        So the head is WHITE with dark ink and a hairline divider, and everything else that ruling
        brought stays — each of these is a thing he can see:
-         · the stream's ground is `#E9EEF3`, the prototype's tint;
-         · BOTH bubbles carry `0 1px 2px rgba(0,0,0,.08)` and neither carries an outline (05:29,
+         · the stream's ground is `#e9eef3`, the prototype's tint;
+         · BOTH bubbles carry no shadow at all — this app has none and neither carries an outline (05:29,
            05:143) — the border on incoming made every one of the supplier's remarks a boxed notice. */
     const head = cssBlockOf(cssSrc, ".bidmap .bm-chat-head {");
-    expect(head.toLowerCase()).toMatch(/background:\s*#fff\b/);
-    expect(head.toLowerCase()).not.toContain("#2563eb");
+    expect(head.toLowerCase()).toMatch(/background:\s*var\(--surface\)/);
+    expect(head.toLowerCase()).not.toContain("var(--action)");
     // A hairline the eye can find: a translucent-white rule, which is what it carried against blue,
     // is no divider at all on white.
-    expect(head).toMatch(/border-bottom:\s*1px solid #e1e9f1/);
+    expect(head.toLowerCase()).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
     expect(head).toMatch(/height:\s*64px/); // still on the panel's own line
     // The name has to be legible on it — white ink on a white band was the way this would break.
     expect(cssSrc).toContain(".bidmap .bm-chat-who");
-    expect(/\.bidmap \.bm-chat-who \{[^}]*color: #0f2238/.test(cssSrc)).toBe(true);
+    expect(/\.bidmap \.bm-chat-who \{[^}]*color: var\(--navy-deep\)/i.test(cssSrc)).toBe(true);
     // The avatar the band is built around — the prototype's 42px circle of initials.
     expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-av {")).toMatch(/width:\s*42px/);
-    expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-body {").toLowerCase()).toContain("#e9eef3");
+    expect(cssBlockOf(cssSrc, ".bidmap .bm-chat-body {").toLowerCase()).toContain("var(--surface2)");
     /* ── The bubbles now live in the BASE, and BOTH routes wear them (owner, 2026-08-19) ──────────
        *"we have now 2 chats style… i want both to be the same, the style i want is the one in the
        map."* This block used to be `.bidmap .bm-chat .msg.*` — an override that let the deal room
@@ -432,14 +481,17 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
        surfaces one style and leaves nothing to drift. */
     const dealCss = readFileSync(resolve(process.cwd(), "src/components/deal-room/deal-room-proto.css"), "utf8");
     const them = cssBlockOf(dealCss, ".dlproto .msg.them {");
-    expect(them).toContain("box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08)");
+    // ~~Both bubbles carried `0 1px 2px rgba(0,0,0,.08)`.~~ This app has no shadows (owner,
+    // 2026-08-26). What the AC was actually about survives and is asserted below: the two routes
+    // wear ONE style, and neither bubble is a boxed notice.
+    expect(them).not.toContain("box-shadow");
     expect(them).toMatch(/border:\s*0/);
     // Outgoing is the PALE fill with dark ink, not a brand colour with white text — the single change
     // a reader of the deal room actually sees, and the one most likely to be "fixed" back.
     const mine = cssBlockOf(dealCss, ".dlproto .msg.mine {");
-    expect(mine.toLowerCase()).toContain("#d9eeff");
-    expect(mine.toLowerCase()).toContain("#16304f");
-    expect(mine).not.toContain("var(--rentee)");
+    expect(mine.toLowerCase()).toContain("color-mix(in srgb, var(--action) 12%, white)");
+    expect(mine.toLowerCase()).toContain("var(--navy)");
+    expect(mine).not.toContain("var(--rentee)"); // the blue fill it used to carry
     // And the fork is GONE, not merely equal. Two blocks holding the same values is how they came to
     // hold different ones.
     expect(cssSrc).not.toContain(".bidmap .bm-chat .msg");
@@ -653,13 +705,15 @@ describe("one counterparty key across both projections (I1, AC-70)", () => {
   });
 
   /** The received-bids shape: the same firm, same nesting, no flat `supplierCompanyId` at all. */
-  const rawInboxRow = (id: string, memberId: string, name: string) => ({
+  /** One row of the received-bids feed. `requestId` is the ITEM: the fan-out gives each machine its
+   *  own request, and the dock keys a tab on it, so two siblings must not share one. */
+  const rawInboxRow = (id: string, memberId: string, name: string, requestId = `r-${id}`) => ({
     id,
     status: "PENDING",
     dealRoomId: `dr-${id}`,
     unreadCount: 0,
     supplier: { id: memberId, name: "Ali", company: { id: 77, name: "Al-Faris Rentals", isVerified: true } },
-    request: { id: "r1", requestGroupId: "g1", equipmentItems: [{ subtypeId: "t1", subtypeName: name }] },
+    request: { id: requestId, requestGroupId: "g1", equipmentItems: [{ subtypeId: "t1", subtypeName: name }] },
   });
 
   it("resolves the same key from a nested company id on both sides", () => {
@@ -721,7 +775,6 @@ describe("one counterparty key across both projections (I1, AC-70)", () => {
  * it is the classification BOTH surfaces use, which is what stops them drifting apart again.
  */
 describe("dockMessageView — nothing the deal room renders is invisible in the dock (I2)", () => {
-  const dealRoomSrc = readFileSync(resolve(process.cwd(), "src/components/deal-room/DealRoom.tsx"), "utf8");
 
   it("keeps an attachment-only image message, with its thumb", () => {
     const view = dockMessageView({
@@ -798,12 +851,14 @@ describe("dockMessageView — nothing the deal room renders is invisible in the 
     expect(dockSrc).toContain("msg-att-file");
   });
 
-  it("covers every attachment kind the deal room has a branch for", () => {
-    // Read off the shipped surface rather than restated: if staging widens the deal room again, this
-    // is the assertion that notices the dock has not followed.
-    expect(dealRoomSrc).toContain('a.type === "image"');
-    expect(dealRoomSrc).toContain('(a.mime_type || "").startsWith("audio/")');
-    expect(dealRoomSrc).toContain('custom.kind === "location"');
+  /**
+   * Every attachment kind Stream can hand this surface.
+   *
+   * It used to enumerate them by reading the DEAL ROOM's branches and checking the dock had kept up —
+   * a good invariant while both surfaces rendered messages. The deal room renders none now (owner,
+   * 2026-08-26), so the list is stated here instead of being read off a surface that no longer has it.
+   */
+  it("covers every attachment kind Stream can hand it", () => {
     const kinds = new Set(
       [
         dockMessageView({ attachments: [{ type: "image", image_url: "u" }] }),
@@ -838,8 +893,12 @@ describe("dockMessageView — nothing the deal room renders is invisible in the 
    ══════════════════════════════════════════════════════════════════════════════════════════════════ */
 
 describe("the dock's composer sends what the deal room sends, the way the deal room sends it", () => {
+  /* Found by the CLASS, not by the whole opening tag: the tag grew a `{...pin("chat-dock-composer")}`
+     on 2026-09-09 and the old marker — `<div className="bm-chat-compose">` — stopped matching, which
+     silently sliced an EMPTY region and turned three assertions below into vacuous passes (the
+     length check is what caught it). The class is the stable half. */
   const composerSrc = dockSrc.slice(
-    dockSrc.indexOf('<div className="bm-chat-compose">'),
+    dockSrc.indexOf('className="bm-chat-compose"'),
     dockSrc.indexOf("</section>"),
   );
   const dealRoomSrc = readFileSync(resolve(process.cwd(), "src/components/deal-room/DealRoom.tsx"), "utf8");
@@ -869,18 +928,71 @@ describe("the dock's composer sends what the deal room sends, the way the deal r
     }
   });
 
-  it("disables EVERY control in the row while a send is in flight", () => {
-    // Four controls, four gates, and each one names both flight states: `busy` (the seam, which
-    // spans the room create) and `uploading` (the file on the wire). A control that named neither
-    // would still be pressable during the create it is racing.
+  it("disables every ACT in the row while a send is in flight, and the FIELD is not one", () => {
+    /**
+     * 🔴 **~~Four controls, four gates.~~ Three acts and a text field** (owner, 2026-09-21, on a
+     * renter's complaint: *"he should press on the text panel every time he wants to send a
+     * message"*).
+     *
+     * A disabled control cannot hold focus, so gating the INPUT on `busy` made the browser blur it
+     * on every send — for as long as the round trip took, and `deliver` can create the deal room
+     * inside it. It came back enabled and empty with the caret nowhere, so the next message needed
+     * a click. The reasoning this replaces («a control that named neither would still be pressable
+     * during the create it is racing») is still right about the three that ACT, and was never
+     * about the one that only accepts typing.
+     */
     const gates = [...composerSrc.matchAll(/disabled=\{([^}]*)\}/g)].map((m) => m[1]);
     expect(gates).toHaveLength(4); // attach · recorder · input · send
-    for (const gate of gates) {
+    const acts = gates.filter((g) => g.trim() !== "!active");
+    expect(acts).toHaveLength(3);
+    for (const gate of acts) {
       expect(gate, gate).toMatch(/\bbusy\b/);
       expect(gate, gate).toMatch(/\buploading\b/);
     }
     // …and the send button is additionally gated on there being something to send.
     expect(gates.filter((g) => /text\.trim\(\)/.test(g))).toHaveLength(1);
+    /* ⚠️ The FIELD keeps `!active` and nothing else: that is «there is no conversation here»,
+       not a flight, and nothing typed into it could go anywhere. */
+    const input = composerSrc.slice(composerSrc.indexOf('className="bm-chat-input"'));
+    expect(input.slice(0, input.indexOf("/>"))).toContain("disabled={!active}");
+  });
+
+  it("but the ENTER key still asks the flight question, so nothing is sent twice", () => {
+    // The gate moved off the field and onto the key: with the input live, two fast presses would
+    // otherwise be two sends of the same line.
+    // `sendTyped`, not `send`: staging's contact guard sits in front of the send on this key.
+    expect(composerSrc).toContain('if (!busy && !uploading) void sendTyped();');
+  });
+
+  it("puts the caret BACK in the composer after a send", () => {
+    /**
+     * 🔴 The other half of the same complaint, and it survives the fix above: pressing SEND moves
+     * focus to the send button, which then disables itself the instant the text is cleared — so
+     * focus lands on `<body>` and the next message needs a click anyway.
+     *
+     * ⚠️ Guarded on the element still being focusable: a send can resolve after the dock is closed
+     * or the room goes inactive, and focusing a disabled or detached input scrolls the page to it.
+     */
+    expect(dockSrc).toContain("function focusComposer()");
+    expect(dockSrc).toContain("if (el && !el.disabled && el.isConnected) el.focus();");
+    expect(composerSrc).toContain("ref={composerRef}");
+    // Both doors out of the composer: the typed line, and the attachment whose caption it wrote.
+    const send = dockSrc.slice(dockSrc.indexOf("async function send()"), dockSrc.indexOf("async function sendFiles"));
+    expect(send).toContain("focusComposer();");
+    const files = dockSrc.slice(dockSrc.indexOf("async function sendFiles"), dockSrc.indexOf("async function sendVoiceNote"));
+    expect(files).toContain("focusComposer();");
+  });
+
+  it("clears only the line that actually went", () => {
+    /**
+     * ⚠️ The field is LIVE during the flight now, so a renter may type while the message before it
+     * is still on the wire. ~~`setText("")`~~ would wipe those keystrokes as the answer to an
+     * earlier message — a bug the old `disabled` was accidentally hiding by making it impossible.
+     */
+    const send = dockSrc.slice(dockSrc.indexOf("async function send()"), dockSrc.indexOf("async function sendFiles"));
+    expect(send).toContain('setText((prev) => (prev.trim() === body ? "" : prev));');
+    const files = dockSrc.slice(dockSrc.indexOf("async function sendFiles"), dockSrc.indexOf("async function sendVoiceNote"));
+    expect(files).toContain('setText((prev) => (prev === caption ? "" : prev));');
   });
 
   it("hands the recorder the SHARED cap, and its errors to the composer's own error row", () => {
@@ -910,17 +1022,19 @@ describe("the dock's composer sends what the deal room sends, the way the deal r
   });
 
   it("draws the prototype's composer geometry (05-chat-and-requests.js:42–45)", () => {
-    // 40px round send; input r20 · `10px 14px` · 12.5px on `#F8FAFC` inside `#C8D8E8`. Ours ran a
-    // size under all of it (32px · r18 · `8px 12px` · 11.5px · white on `#E1E9F1`).
+    // 40px round send; input r20 · `10px 14px` · 12.5px on `var(--surface)` inside `var(--border-strong)`. Ours ran a
+    // size under all of it (32px · r18 · `8px 12px` · 11.5px · white on the prototype's tint).
     const send = cssBlockOf(cssSrc, ".bidmap .bm-chat-send {");
     expect(send).toMatch(/width:\s*40px/);
     expect(send).toMatch(/height:\s*40px/);
     const input = cssBlockOf(cssSrc, ".bidmap .bm-chat-input {");
-    expect(input).toMatch(/border-radius:\s*20px/);
+    // A capsule, and it stays one: the radius scale sharpened on 2026-08-28 and this control is
+    // round by SHAPE rather than by a step on that scale.
+    expect(input).toMatch(/border-radius:\s*999px/);
     expect(input).toMatch(/padding:\s*10px 14px/);
     expect(input).toMatch(/font-size:\s*12\.5px/);
-    expect(input.toLowerCase()).toContain("#f8fafc");
-    expect(input.toLowerCase()).toContain("#c8d8e8");
+    expect(input.toLowerCase()).toContain("var(--surface2)");
+    expect(input.toLowerCase()).toContain("var(--border-strong)");
     // The recorder renders `.ib`, and the deal room styles that under `.composer` — a selector that
     // does not reach this surface. Without a rule here the two new controls would be unstyled
     // buttons, which is the one way "reuse the component" quietly fails to look reused.
@@ -998,8 +1112,8 @@ describe("an ask sent, the page reloaded — the control stays blocked", () => {
     expect(dockTabsWithKnownRooms(known, { anchorBidId: "b1", surfaceRoomId: "dr-stale" })[0].dealRoomId).toBe("dr-feed");
     // A sibling bid is a different room; the surface's id belongs to the anchor alone.
     const two = dockTabs(anchor({ dealRoomId: null }), [
-      row({ bidId: "b1", dealRoomId: null }),
-      row({ bidId: "b2", dealRoomId: null, equipmentType: { id: "t2", name: "Loader" } }),
+      item("b1", "r1", "Crawler excavator", "20 ton", { dealRoomId: null }),
+      item("b2", "r2", "Wheel loader", "3 m³", { dealRoomId: null }),
     ]);
     const merged = dockTabsWithKnownRooms(two, { anchorBidId: "b1", surfaceRoomId: "dr-1" });
     expect(merged.find((tb) => tb.bidId === "b1")?.dealRoomId).toBe("dr-1");

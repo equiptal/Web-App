@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Dropdown } from "@/components/Dropdown";
 import { postAuth, type AuthKind, type OtpChannel } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
+import { authField, authFoot, authLabel, authSub, authSubmit, authTitle, type AuthTone } from "@/components/auth/AuthPanel";
 
 export const SAUDI_DIAL = "+966";
 
@@ -38,12 +40,16 @@ export function PhoneEntry({
   onUseEmail,
   title,
   subtitle,
+  tone = "light",
 }: {
   onCodeSent: (phone: string, channel: OtpChannel) => void;
   /** Non-Saudi → offer to switch Modal 1 to the Email tab (SMS can't reach them). */
   onUseEmail?: () => void;
   title?: string;
   subtitle?: string;
+  /** `dark` is the auth modal's navy panel (owner's comp, 2026-08-30). Everything else — the login
+   *  page, the inline verify inside Modal 2 — stays `light` and is untouched. */
+  tone?: AuthTone;
 }) {
   const t = useT();
   const a = t.auth;
@@ -54,6 +60,9 @@ export function PhoneEntry({
 
   const isSaudi = dial === SAUDI_DIAL;
   const smsBlocked = PUBLIC_WEB_ENABLED && !isSaudi; // non-Saudi can't SMS → use Email tab
+  /* App parity: the mobile login enables Send at exactly 9 digits (`login_page.dart` `_canSubmit`).
+     Before this, any keystroke lit the button orange and the backend was left to refuse a short number. */
+  const phoneValid = digits.replace(/\D/g, "").length === 9;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -69,29 +78,32 @@ export function PhoneEntry({
 
   return (
     <form onSubmit={submit} noValidate>
-      <h2 className="mb-[6px] text-center text-[26px] font-extrabold tracking-[-.5px] text-navy">{title ?? a.signInTitle}</h2>
-      <p className="mb-[24px] text-center text-[14px] leading-[1.55] text-muted">{subtitle ?? a.signInSub}</p>
+      <h2 className={authTitle(tone)}>{title ?? a.signInTitle}</h2>
+      <p className={authSub(tone)}>{subtitle ?? a.signInSub}</p>
 
-      <label className="mb-[8px] block text-[12.5px] font-bold text-navy-mid">{a.phoneLabel}</label>
-      <div className="flex gap-[10px]" dir="ltr">
+      <label className={authLabel(tone)}>{a.phoneLabel}</label>
+      <div className="flex gap-3" dir="ltr">
         {PUBLIC_WEB_ENABLED ? (
-          <select
-            aria-label={a.countryLabel}
+          /* The house dropdown, wearing the auth field's skin (owner, 2026-08-31: one dropdown
+             across the product). ~~`[&>option]:text-navy`~~ went with the native popup it patched:
+             the browser's own list inherited this control's white-on-navy and rendered white text
+             on a white ground. The app's list is the app's list wherever it opens, so the class of
+             bug is gone rather than corrected. */
+          <Dropdown
+            label={a.countryLabel}
+            placeholder="—"
             value={dial}
-            onChange={(e) => setDial(e.target.value)}
-            className="h-[50px] rounded-[10px] border border-border bg-surface px-[10px] text-[14.5px] font-bold text-navy outline-0 focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]"
-          >
-            {COUNTRY_CODES.map((c) => (
-              <option key={c.dial} value={c.dial}>{c.flag} {c.dial}</option>
-            ))}
-          </select>
+            onChange={setDial}
+            triggerClass={`${authField(tone)} flex-none font-extrabold`}
+            options={COUNTRY_CODES.map((c) => ({ value: c.dial, label: `${c.flag} ${c.dial}` }))}
+          />
         ) : (
-          <div className="flex h-[50px] items-center gap-[6px] whitespace-nowrap rounded-[10px] border border-border bg-surface px-[14px] text-[14.5px] font-bold text-navy">
-            <span className="text-[17px]">🇸🇦</span> +966
+          <div className={`${authField(tone)} flex flex-none items-center gap-2 whitespace-nowrap font-extrabold`}>
+            <span className="text-title">🇸🇦</span> +966
           </div>
         )}
         <input
-          className="h-[50px] min-w-0 flex-1 rounded-[10px] border border-border bg-surface px-[14px] text-[15px] font-semibold text-navy outline-0 placeholder:font-medium placeholder:text-[#9BB3C8] focus:border-brand focus:shadow-[0_0_0_3px_rgba(247,144,9,.12)]"
+          className={`${authField(tone)} min-w-0 flex-1`}
           type="tel"
           inputMode="numeric"
           autoComplete="tel-national"
@@ -104,28 +116,30 @@ export function PhoneEntry({
 
       {/* Non-Saudi: SMS can't reach them → nudge to the Email tab. */}
       {smsBlocked && (
-        <div className="mt-[14px] rounded-[10px] border border-warn/30 bg-warn-soft px-[12px] py-[10px]">
-          <p className="text-[12.5px] leading-[1.5] text-warn">{a.smsSaudiOnly}</p>
+        <div className="mt-4 rounded-sm border border-warn/30 bg-warn-soft px-3 py-3">
+          <p className="text-meta leading-[1.5] text-warn">{a.smsSaudiOnly}</p>
           {onUseEmail && (
-            <button type="button" onClick={onUseEmail} className="mt-[6px] inline-flex items-center gap-1.5 text-[13px] font-bold text-info">
+            <button type="button" onClick={onUseEmail} className="mt-2 inline-flex items-center gap-1.5 text-body font-semibold text-info">
               <Icon name="mail" size={16} /> {a.withEmail}
             </button>
           )}
         </div>
       )}
 
-      {err && <p className="mt-[10px] text-[13px] font-semibold text-danger">{a.errors[err]}</p>}
+      {err && <p className="mt-3 text-body font-semibold text-danger">{a.errors[err]}</p>}
 
       <button
         type="submit"
-        disabled={busy || !digits.trim() || smsBlocked}
-        className="mt-[24px] flex w-full items-center justify-center gap-[7px] rounded-[10px] border border-brand bg-brand px-[24px] py-[13px] text-[14.5px] font-bold text-white transition hover:brightness-[1.04] disabled:opacity-50"
+        disabled={busy || !phoneValid || smsBlocked}
+        /* One call for both grounds: `authSubmit` returns the app's primary button either way, and
+           only its disabled skin differs — see the note on it. */
+        className={authSubmit(tone)}
       >
         <span>{busy ? a.sending : a.sendCode}</span>
         {!busy && <Icon name="arrow_forward" size={18} className="rtl:scale-x-[-1]" />}
       </button>
 
-      <div className="mt-[22px] text-center text-[13px] leading-[1.55] text-muted">{a.signInFoot}</div>
+      <div className={authFoot(tone)}>{a.signInFoot}</div>
     </form>
   );
 }

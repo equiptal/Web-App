@@ -12,6 +12,7 @@
  */
 
 import { useState } from "react";
+import { Dialog, DialogButton } from "@/components/Dialog";
 
 const CANCEL_REASONS: ReadonlyArray<{ en: string; ar: string }> = [
   { en: "Found a better offer", ar: "وجدت عرضاً أفضل" },
@@ -44,12 +45,26 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
   const canSubmit = !busy && reason.length > 0;
 
   return (
-    <div dir={ar ? "rtl" : "ltr"} onClick={busy ? undefined : onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, maxHeight: "90vh", overflowY: "auto", background: "#fff", borderRadius: 20, boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "26px 22px 22px", textAlign: "center" }}>
-        <span style={{ display: "inline-flex", width: 44, height: 44, borderRadius: "50%", background: "var(--danger-bg, #fdeceb)", color: "var(--danger, #d9362a)", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
+    <Dialog
+      open
+      onClose={onClose}
+      size="sm"
+      padded={false}
+      dismissible={!busy}
+      footer={
+        <>
+          <DialogButton tone="ghost" full disabled={busy} onClick={onClose}>{L("Back", "رجوع")}</DialogButton>
+          <DialogButton tone="danger" full disabled={!canSubmit} onClick={() => onSubmit(reason)}>
+            {busy ? L("Cancelling…", "جارٍ الإلغاء…") : L("Confirm Cancellation", "تأكيد الإلغاء")}
+          </DialogButton>
+        </>
+      }
+    >
+      <div dir={ar ? "rtl" : "ltr"} style={{ padding: "26px 22px 22px", textAlign: "center" }}>
+        <span style={{ display: "inline-flex", width: 44, height: 44, borderRadius: "50%", background: "var(--danger-bg, var(--danger-soft))", color: "var(--danger, var(--danger))", alignItems: "center", justifyContent: "center", marginBottom: 14 }}>
           <span className="material-icons-outlined" style={{ fontSize: 22 }}>cancel</span>
         </span>
-        <h3 style={{ fontSize: 16, fontWeight: 900, color: "#1c3550", margin: "0 0 14px" }}>{L("Cancellation Reason", "سبب الإلغاء")}</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 900, color: "var(--navy)", margin: "0 0 14px" }}>{L("Cancellation Reason", "سبب الإلغاء")}</h3>
 
         <div style={{ display: "grid", gap: 8, textAlign: ar ? "right" : "left" }}>
           {CANCEL_REASONS.map((r, i) => {
@@ -64,13 +79,13 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
                 onClick={() => setPicked(i)}
                 style={{
                   display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "inherit",
-                  padding: "12px 12px", borderRadius: 12, cursor: busy ? "default" : "pointer",
-                  background: on ? "rgba(217,54,42,.06)" : "#f4f7fa",
-                  border: `${on ? 1.5 : 1}px solid ${on ? "rgba(217,54,42,.4)" : "rgba(203,216,227,.5)"}`,
+                  padding: "12px 12px", borderRadius: "var(--radius-md)", cursor: busy ? "default" : "pointer",
+                  background: on ? "color-mix(in srgb, var(--danger) 6%, transparent)" : "var(--background)",
+                  border: `${on ? 1.5 : 1}px solid ${on ? "color-mix(in srgb, var(--danger) 40%, transparent)" : "color-mix(in srgb, var(--border-strong) 50%, transparent)"}`,
                 }}
               >
-                <span style={{ width: 20, height: 20, borderRadius: "50%", flex: "0 0 auto", border: `${on ? 6 : 2}px solid ${on ? "var(--danger, #d9362a)" : "#6b8fa8"}` }} />
-                <span style={{ fontSize: 13, fontWeight: on ? 700 : 600, color: "#1c3550" }}>{L(r.en, r.ar)}</span>
+                <span style={{ width: 20, height: 20, borderRadius: "50%", flex: "0 0 auto", border: `${on ? 6 : 2}px solid ${on ? "var(--danger, var(--danger))" : "var(--muted)"}` }} />
+                <span style={{ fontSize: 13, fontWeight: on ? 700 : 600, color: "var(--navy)" }}>{L(r.en, r.ar)}</span>
               </button>
             );
           })}
@@ -83,20 +98,13 @@ export function CancelReasonsModal({ ar, L, busy, error, onSubmit, onClose }: {
             disabled={busy}
             onChange={(e) => setOther(e.target.value)}
             placeholder={L("Write the reason...", "اكتب السبب...")}
-            style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: 12, background: "#f4f7fa", border: "1px solid rgba(203,216,227,.5)", fontSize: 14, color: "#1c3550", resize: "vertical" }}
+            style={{ width: "100%", marginTop: 10, padding: 12, borderRadius: "var(--radius-md)", background: "var(--background)", border: "1px solid color-mix(in srgb, var(--border-strong) 50%, transparent)", fontSize: 14, color: "var(--navy)", resize: "vertical" }}
           />
         )}
 
-        {error && <p className="dl-err" style={{ marginTop: 12 }}>{error}</p>}
-
-        <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-          <button type="button" className="dl-mbtn" style={{ flex: 1 }} disabled={busy} onClick={onClose}>{L("Back", "رجوع")}</button>
-          <button type="button" className="dl-mbtn danger" style={{ flex: 1 }} disabled={!canSubmit} onClick={() => onSubmit(reason)}>
-            {busy ? L("Cancelling…", "جارٍ الإلغاء…") : L("Confirm Cancellation", "تأكيد الإلغاء")}
-          </button>
-        </div>
+        {error && <p className="mt-3 text-meta font-semibold text-danger">{error}</p>}
       </div>
-    </div>
+    </Dialog>
   );
 }
 

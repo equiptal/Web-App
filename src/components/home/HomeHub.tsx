@@ -1,202 +1,256 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { HomeNotificationBubble } from "@/components/home/HomeNotificationBubble";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useT, useLocale } from "@/lib/i18n";
-import { Icon } from "@/components/ui";
-import { BrowseSurface } from "@/components/stores/BrowseSurface";
-import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
-import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
-import { useStartRequestGate } from "@/lib/access/start-request-gate";
+import { useSession } from "@/lib/session";
+import { useT } from "@/lib/i18n";
+import { cx } from "@/lib/ds";
+import { GuestDashboardPreview, GuestWall } from "@/components/common/GuestWall";
+import { previousPath } from "@/lib/nav-trail";
+import { CtaBanner } from "@/components/home/CtaBanner";
+import { HomeRequests } from "@/components/home/HomeRequests";
+import { ProjectsSurface } from "@/components/projects/ProjectsSurface";
+import { SuppliersPage } from "@/components/suppliers/SuppliersPage";
+import { pin } from "@/lib/uiPins";
+import { Icon } from "@/components/Icon";
+
+/** The three things the dashboard holds, one at a time (owner, 2026-09-16). */
+type View = "requests" | "suppliers" | "projects";
+const VIEWS: View[] = ["requests", "suppliers", "projects"];
+
+const VIEW_ICON = { requests: "assignment", suppliers: "groups", projects: "place" } as const;
 
 /**
- * mobile/016 — once-per-tab guard for the AUTOMATIC first-request pop-up, mirroring the app's
- * `TrialColdStartGuard`: it self-raises on the renter's first landing on home, and a client-side
- * re-render or an in-tab return to home doesn't re-raise it. Dismissing leaves the server-side slot
- * open, so it returns on the next visit (fresh tab / reload) — app parity (AC-20). Tapping
- * **Create request** is a separate, explicit trigger and is NOT subject to this guard.
+ * The tab row.
+ *
+ * Exported for `dev/preview` — the dashboard itself needs a signed-in renter with requests,
+ * suppliers and sites on a deployed backend, so this row could not otherwise be looked at while it
+ * was being built. It takes the whole of its state as props for that reason, and holds none.
+ *
+ * ── A boxed tab with a glyph, a count and an orange foot (owner, 2026-09-18) ────────────────
+ * On a screenshot of another product's tab strip: *"use like these tabs design in the dashboard"*.
+ * So: a bordered box per tab, the section's glyph before its name, the count in a small pill after
+ * it, and the open tab filled NAVY with a brand-orange rule along its foot.
+ *
+ * ~~The header's lozenge, inverted~~ — which is what this row wore for a day (2026-09-17, *"the tabs
+ * doesnt feel ui consistency with the header tabs"*). That ruling is overturned on his own
+ * reference, and the reason it was made is worth keeping in view: `AppNav`'s note warns that *"a row
+ * of four icon-plus-label pairs reads as a toolbar rather than as the top of a site"*. It is
+ * affordable here because this row is NOT the top of the site — the navy bar two bands above it is,
+ * and it still wears the plain lozenges. A page-level tab strip is allowed to look like a control.
+ *
+ * ⚠ The foot rule is drawn on EVERY tab, orange when open and the ordinary border when not, so the
+ * row does not shift by a pixel when the open tab changes. That is the rule the header's pill was
+ * written to keep and the one device of it that survives here.
+ *
+ * ⚠ The foot is `border-b-[3px] border-b-brand` OVER the shorthand `border border-navy`, and the
+ * side wins in the compiled sheet — MEASURED in a browser (3px, #f97316) rather than assumed, since
+ * this is the shorthand-versus-side family that has bitten this repo three times.
+ * ⚠ It was measured TWICE, because the first reading was a lie told by a stale `.next`: a dev
+ * server that had been running across the edit went on serving a `layout.css` with none of the new
+ * utilities in it at all, so the foot read 1px navy and the obvious conclusion — "the shorthand
+ * beats the side" — was wrong. A new utility that appears to do NOTHING is a build that has not
+ * re-scanned the file; delete `.next` and look again before rewriting the markup around it.
+ * ⚠ The count is a PILL again, and it is NOT the reference's red: red is `--danger` in this
+ * palette, and a count of the renter's own sites is not an alarm. It takes the page's own grey, and
+ * on the navy tab that same grey inverted.
  */
-const POPUP_SHOWN_KEY = "start-request-popup-shown";
-
-/** Gradient that darkens to the corner — shared by the hero and the store-card banners. */
-export const DARK_GRADIENT = "bg-gradient-to-br from-[#1e3a5f] to-[#0f1e2e]";
-
-/** Subtle grid overlay with a radial mask — the "blended light" look from the login page. */
-const GRID_STYLE: React.CSSProperties = {
-  backgroundImage:
-    "linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px)",
-  backgroundSize: "46px 46px",
-  maskImage: "radial-gradient(circle at 75% 40%,#000 34%,transparent 82%)",
-  WebkitMaskImage: "radial-gradient(circle at 75% 40%,#000 34%,transparent 82%)",
-};
-
+export function DashboardTabs({
+  view,
+  counts,
+  onPick,
+}: {
+  view: View;
+  counts: Record<View, number | null>;
+  onPick: (v: View) => void;
+}) {
+  const t = useT();
+  return (
+    <div {...pin("home-tabs")} className="flex flex-wrap items-center gap-2">
+      {VIEWS.map((k) => {
+        const on = view === k;
+        const n = counts[k];
+        return (
+          <button
+            key={k}
+            type="button"
+            onClick={() => onPick(k)}
+            aria-current={on ? "page" : undefined}
+            className={cx(
+              "inline-flex items-center gap-2 whitespace-nowrap rounded-md border border-b-[3px] px-3.5 py-2 text-meta font-semibold transition",
+              on
+                ? "border-navy border-b-brand bg-navy text-surface"
+                : "border-border bg-surface text-navy-mid hover:border-border-strong hover:text-navy",
+            )}
+          >
+            <Icon name={VIEW_ICON[k]} size={18} className={on ? "text-surface" : "text-muted-dark"} />
+            {k === "requests" ? t.home.yourRequests : k === "suppliers" ? t.suppliers.title : t.projects.surface.heading}
+            {/* A dash while the block has not answered yet: «0 suppliers» on a list still loading is
+                a wrong statement, not a pending one. */}
+            <span
+              className={cx(
+                "rounded-full px-1.5 py-0.5 text-label font-extrabold tabular-nums",
+                on ? "bg-surface/20 text-surface" : "bg-surface2 text-navy-mid",
+              )}
+            >
+              {n ?? "–"}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 /**
  * Renter web home hub (web-app/004, AC-04/05/07/10/25). A gradient-to-dark hero (pitch left, Create-
- * request + Upload-RFQ buttons right), a row of activity cards (Your Requests / Price Bids /
- * Completed Deals — no web data/pages yet, coming-soon), then the suggested-suppliers surface.
+ * request + Upload-RFQ buttons right), then the requests-and-bids block and the suggested suppliers.
+ *
+ * ── Two blocks removed (owner, 2026-08-30) ──────────────────────────────────────────────────────
+ * The **activity tiles** (Your Requests / Price Bids / Completed Deals) and the **new-bids banner**
+ * are gone. Both counted the same things `HomeRequests` states directly one block below — the tiles
+ * as three numbers behind three links, all of which went to `/requests`, and the banner as a fourth
+ * copy of the bid count that went there too. A page that says the same number four times and offers
+ * the same door each time is not four features.
+ *
+ * `activity` is still fetched: `useStartRequestGate` reads `openRequests` from it.
  */
 export function HomeHub() {
-  const t = useT();
-  const { locale } = useLocale();
-  const ar = locale === "ar";
   const router = useRouter();
-  const [activity, setActivity] = useState<ActivityCounts | null>(null);
-  const [startPopup, setStartPopup] = useState(false);
-  // Reuses the activity count this screen already loads, so the gate costs one extra /api/me read.
-  const offerStartChoice = useStartRequestGate(activity?.openRequests ?? null);
+  const { status } = useSession();
+  const t = useT();
 
+  /* ── A guest LANDS on Browse, but is not held off the dashboard (owner, 2026-08-30 · 2026-09-04)
+     The dashboard answers "what is mine and where does it stand", and a visitor arriving cold has no
+     answer to that — he was landing on a hero and four empty states. Browse answers "who is out
+     there", which is the question he actually has, so a cold entry still goes there.
+
+     ~~And so did every other arrival.~~ *"In guest mode it will land to browse not dashboard, but
+     note in guest the dashboard will show sign in CTA same one as all other pages."* A guest who
+     PRESSES Dashboard has asked for this page, and bouncing him off a tab he can see is the one
+     thing worse than an empty state: the tab appeared to do nothing. So the redirect is now the
+     cold-entry case only, told apart by the nav trail — no previous in-app page means he arrived
+     here rather than navigated here.
+
+     `replace`, not `push`: a page he never chose must not sit in his history for Back to return him
+     to. And only once `status` has settled — acting while it still reads "loading" would bounce
+     every signed-in renter through Browse on a cold load, which is the flash this exists to avoid. */
+  const [landed, setLanded] = useState(false);
+  const decided = useRef(false);
   useEffect(() => {
-    let active = true;
-    fetchActivity()
-      .then((a) => active && setActivity(a))
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
+    if (status !== "anon" || decided.current) return;
+    decided.current = true;
+    if (previousPath()) setLanded(true);
+    else router.replace("/browse");
+  }, [status, router]);
+
+  /* ── One block at a time (owner, 2026-09-16) ─────────────────────────────────────────────────
+     *"for dashboard can we have subtabs to show requests-suppliers-projects … without scrolling in
+     one page"*. The page grew past two screens because both embedded blocks render their WHOLE
+     surface — every supplier row, every site — and neither caps itself. A tab row is the owner's
+     call over the alternative on the table (the two reference blocks side by side, each capped at a
+     few rows with a «See all» door), and its cost is stated: two of the three states are behind a
+     press, which is the thing a dashboard exists not to do. */
+  const [view, setView] = useState<View>("requests");
+  /* Which block is open is IN THE URL, so a reload, a Back from a supplier profile and a link a
+     renter pastes all land on the same tab — the workspace's own ruling (2026-09-06).
+     `replaceState`, never push: switching tabs is not a navigation, and pushing would make the
+     browser's Back walk the three tabs instead of leaving the page. */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const want = new URL(window.location.href).searchParams.get("view");
+    if (want === "suppliers" || want === "projects" || want === "requests") setView(want);
   }, []);
-
-  // mobile/016 (AC-01/22/23) — self-raise the pop-up once per tab on landing, mirroring the app's
-  // cold-start trigger. The explicit "Create request" path below doesn't depend on this.
   useEffect(() => {
-    if (offerStartChoice !== true) return;
-    try {
-      if (window.sessionStorage.getItem(POPUP_SHOWN_KEY) === "1") return;
-      window.sessionStorage.setItem(POPUP_SHOWN_KEY, "1");
-    } catch {
-      /* storage blocked → still show it, just without the once-per-tab guard */
-    }
-    setStartPopup(true);
-  }, [offerStartChoice]);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const before = url.search;
+    if (view !== "requests") url.searchParams.set("view", view);
+    else url.searchParams.delete("view");
+    if (url.search !== before) window.history.replaceState(window.history.state, "", url.toString());
+  }, [view]);
 
-  // "Create request": when the renter has nothing live, ask Trial-or-Real FIRST instead of dropping
-  // straight into the form. Otherwise (they already have active requests) go straight to /create as
-  // before. `offerStartChoice` is null while unknown → never blocks the button.
-  const onCreateRequest = () => {
-    if (offerStartChoice === true) {
-      setStartPopup(true);
-      return;
-    }
-    router.push("/create");
-  };
+  /* The counts on the tabs. Each block owns its own read, so it REPORTS what it found rather than
+     this page fetching the same three lists a second time. `null` is "not answered yet" and draws a
+     dash — a 0 while a list is still loading is a wrong statement, not a pending one. */
+  const [counts, setCounts] = useState<Record<View, number | null>>({ requests: null, suppliers: null, projects: null });
+  const countRequests = useCallback((n: number) => setCounts((c) => (c.requests === n ? c : { ...c, requests: n })), []);
+  const countSuppliers = useCallback((n: number) => setCounts((c) => (c.suppliers === n ? c : { ...c, suppliers: n })), []);
+  const countProjects = useCallback((n: number) => setCounts((c) => (c.projects === n ? c : { ...c, projects: n })), []);
 
-  // Both choices go through the normal RFQ flow ("Write your RFQ"); `mode` only tells the flow whether
-  // the eventual submit is a trial. Dismissing does nothing — the slot stays open (AC-20).
-  const onChooseStart = (choice: StartRequestChoice) => {
-    setStartPopup(false);
-    router.push(`/create?mode=${choice}`);
-  };
+  /* The same prompt the inbox, the profile and the workspace give a guest — one component, one
+     shape, one door (`SignInPrompt` opens the auth modal; there is no /login page). Drawn only once
+     the redirect has been ruled out, so a cold arrival never flashes it on the way to Browse. */
+  /* ── The page behind the glass, and the card over it (owner, 2026-09-06) ──────────────────────
+     ~~A bordered `SignInPrompt` alone in a column.~~ It told a guest the page needed an account and
+     showed him nothing of what the account was for. The dashboard's own shape, blurred, with the
+     card centred on it says both — the Supplier OS pattern, in this app's own modal. */
+  if (status === "anon") {
+    return landed ? (
+      <GuestWall title={t.guestWall.dashboardTitle} body={t.guestWall.dashboardBody} preview={<GuestDashboardPreview />} />
+    ) : null;
+  }
 
-  const newBids = activity?.newBids ?? 0;
+  // Nothing is drawn while the session is still resolving: half a dashboard appearing first would be
+  // a page nobody asked for, flashing past.
+  if (status !== "authed") return null;
 
   return (
-    <div className="flex flex-col gap-7">
-      {/* Hero */}
-      <div className={`relative overflow-hidden rounded-[20px] px-8 py-9 sm:px-10 ${DARK_GRADIENT}`}>
-        <div className="pointer-events-none absolute inset-0" style={GRID_STYLE} />
-        <span className="pointer-events-none absolute -top-[60px] end-[-40px] h-[260px] w-[260px] rounded-full bg-brand opacity-[0.20] blur-[80px]" />
-        <span className="pointer-events-none absolute -bottom-[90px] end-[120px] h-[280px] w-[280px] rounded-full opacity-20 blur-[80px]" style={{ background: "#2563EB" }} />
+    /* ONE gap between every block (`gap-7`), and the bottom room belongs here rather than to
+       whichever block happens to be last — the chat dock floats over that corner and a page ending on
+       its final row reads as truncated (owner, 2026-08-31 · 2026-09-05). */
+    <div {...pin("home-hub")} className="flex flex-col gap-7 pb-24">
+      {/* Under the bell, not in this column: it hangs off the header and points at the control it is
+          speaking for (owner, 2026-09-05). Rendered HERE because it belongs to the dashboard alone —
+          a renter deep in the create flow must not be tapped on the shoulder. */}
+      <HomeNotificationBubble />
 
-        <div className="relative z-10 flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex-1">
-            <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-brand/20 px-3 py-1 text-[12px] font-semibold uppercase tracking-wide text-[#FB923C]">
-              <Icon name="bolt" size={13} /> {t.home.eyebrow}
-            </span>
-            <h1 className="text-[26px] font-bold leading-tight text-white sm:text-[29px]">{t.home.bannerTitle}</h1>
-            <p className="mt-2.5 max-w-[520px] text-[13.5px] leading-relaxed text-white/65">{t.home.bannerSubtitle}</p>
-          </div>
+      <CtaBanner />
 
-          {/* Single entry into the RFQ input flow (web-app/002). */}
-          <div className="flex flex-none flex-col gap-3 sm:flex-row lg:flex-col lg:items-stretch">
-            <button
-              onClick={onCreateRequest}
-              className="inline-flex items-center justify-center gap-2 rounded-[12px] bg-brand px-6 py-3 text-[14px] font-semibold text-brand-fg transition hover:brightness-[1.04]"
-            >
-              <Icon name="add" size={16} /> {t.home.createRequest}
-            </button>
-          </div>
-        </div>
+      {/* ── The three tabs (owner, 2026-09-16) ────────────────────────────────────────────────────
+          They ARE the section headings: each carries the plate glyph, the name and the count that
+          the block's own header used to draw, and the blocks drop that header (`hideHeading`) so the
+          dashboard does not say «My Suppliers · 42» twice, a tab apart. */}
+      <DashboardTabs view={view} counts={counts} onPick={setView} />
+
+      {/* Every block stays MOUNTED and the two that are closed are hidden (`display:none`), which is
+          three deliberate consequences: the counts on the tabs are real for all three rather than
+          only for the open one; the three reads happen exactly as they did before this change; and a
+          renter's search box, his filters and his half-made group survive a trip to another tab. */}
+      <div className={cx("flex flex-col gap-3", view !== "requests" && "hidden")}>
+        {/* ── The requests, and the bids beside them (owner, 2026-08-29) ──────────────────────────
+            What is out to the market, how long each one still takes bids, and what has come back —
+            the two halves of one question, on one row. */}
+        <HomeRequests hideHeading onCount={countRequests} />
+        {/* It renders NOTHING when there are no requests, which behind a tab is a blank pane rather
+            than a block that simply is not there. The line names the door that is already on screen
+            above it rather than adding a second one. */}
+        {counts.requests === 0 && (
+          <p className="rounded-sm border border-dashed border-border bg-surface2 px-3 py-4 text-body text-muted">
+            {t.home.noRequestsYet}
+          </p>
+        )}
       </div>
 
-      {/* New-bids banner — mirrors the app's HomeNewBidsCard; shown only when unread bids exist. */}
-      {newBids > 0 && (
-        <button
-          type="button"
-          onClick={() => router.push("/requests?tab=bids")}
-          className="flex items-center gap-3 rounded-[14px] border border-[#f59e0b]/30 bg-[#f59e0b]/[0.06] p-3.5 text-start transition hover:bg-[#f59e0b]/[0.10]"
-        >
-          <span className="relative grid h-9 w-9 flex-none place-items-center rounded-[10px] bg-[#f59e0b]/[0.14]">
-            <Icon name="gavel" size={20} className="text-[#d97706]" />
-            <span className="absolute -end-1.5 -top-1.5 grid min-w-[18px] place-items-center rounded-full bg-[#d97706] px-1 text-[10px] font-bold leading-[18px] text-white">{newBids}</span>
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[14px] font-bold text-navy">
-              {ar ? `${newBids} ${newBids === 1 ? "عرض جديد" : "عروض جديدة"} على طلباتك` : `${newBids} new ${newBids === 1 ? "bid" : "bids"} on your requests`}
-            </span>
-            <span className="block text-[13px] font-semibold text-[#d97706]">{ar ? "عرض العروض" : "View bids"}</span>
-          </span>
-          <Icon name="chevron_right" size={20} className="flex-none text-[#d97706] rtl:scale-x-[-1]" />
-        </button>
-      )}
-
-      {/* Activity cards — wired to the renter's requests/bids/deals screens. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <ActivityCard accent="brand" icon="assignment" title={t.home.yourRequests} sub={t.home.reqSub} href="/requests" count={activity?.openRequests} />
-        <ActivityCard accent="info" icon="gavel" title={t.home.priceBids} sub={t.home.bidsSub} href="/requests?tab=bids" count={newBids} />
-        <ActivityCard accent="ok" icon="handshake" title={t.home.completedDeals} sub={t.home.dealsSub} href="/requests?tab=deals" count={activity?.completedDeals} />
+      {/* ── My Suppliers, BEFORE the sites (owner, 2026-09-04) ────────────────────────────────────
+          The suppliers are the list he acts on from this page (he sends a request to them), and the
+          sites are reference. The one he acts on comes first. */}
+      <div className={cx(view !== "suppliers" && "hidden")}>
+        <SuppliersPage embedded hideHeading onCount={countSuppliers} />
       </div>
 
-      {/* Suggested suppliers — filter bar always shown; View all only adds cards (AC-05/10/11/12/13) */}
-      <BrowseSurface title={t.home.suppliersTitle} previewCount={8} />
+      {/* ── The sites (owner, 2026-08-30 · reordered 2026-09-04) ──────────────────────────────────
+          A renter's sites are part of the picture the dashboard draws — what is out to the market,
+          what came back, and what is standing on the ground. */}
+      <div className={cx(view !== "projects" && "hidden")}>
+        <ProjectsSurface embedded hideHeading onCount={countProjects} />
+      </div>
 
-      {/* mobile/016 — first-request choice: Trial or Real, both into /create. */}
-      <StartYourRequestModal open={startPopup} onClose={() => setStartPopup(false)} onChoose={onChooseStart} />
+      {/* ~~Suggested suppliers.~~ They are the whole of BROWSE now (owner, 2026-08-30). The
+          dashboard answers "what is mine and where does it stand"; a supplier directory answers
+          "who else is out there", which is a different question and now has a tab of its own — the
+          one a guest lands on, since a visitor with no requests has nothing else to read. */}
     </div>
   );
 }
 
-const ACCENT: Record<string, { iconBg: string; iconText: string; bar: string }> = {
-  brand: { iconBg: "bg-brand-soft", iconText: "text-brand", bar: "bg-brand" },
-  info: { iconBg: "bg-info-soft", iconText: "text-info", bar: "bg-info" },
-  ok: { iconBg: "bg-ok-soft", iconText: "text-ok", bar: "bg-ok" },
-};
-
-function ActivityCard({
-  accent,
-  icon,
-  title,
-  sub,
-  href,
-  count,
-}: {
-  accent: "brand" | "info" | "ok";
-  icon: string;
-  title: string;
-  sub: string;
-  href?: string;
-  count?: number;
-}) {
-  const router = useRouter();
-  const c = ACCENT[accent];
-  return (
-    <button
-      type="button"
-      onClick={() => href && router.push(href)}
-      className="group relative flex cursor-pointer flex-col gap-3.5 overflow-hidden rounded-[16px] border border-border bg-surface p-5 text-start transition hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(0,0,0,.09)]"
-    >
-      <div className="flex items-start justify-between">
-        <span className={`relative grid h-11 w-11 place-items-center rounded-[12px] ${c.iconBg}`}>
-          <Icon name={icon} size={22} className={c.iconText} />
-          {count != null && count > 0 && (
-            <span className={`absolute -end-1.5 -top-1.5 grid min-w-[19px] place-items-center rounded-full px-1 text-[10px] font-bold leading-[19px] text-white ${c.bar}`}>{count}</span>
-          )}
-        </span>
-        <Icon name="chevron_right" size={20} className="text-muted/60 rtl:scale-x-[-1]" />
-      </div>
-      <div>
-        <div className="text-[15px] font-bold text-navy">{title}</div>
-        <div className="mt-0.5 text-[12px] text-muted">{sub}</div>
-      </div>
-      <div className={`absolute inset-x-0 bottom-0 h-[3px] opacity-0 transition group-hover:opacity-100 ${c.bar}`} />
-    </button>
-  );
-}

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import {
   AgentDraft,
   Certificates,
+  DirectTarget,
   EquipmentItem,
   OperatorDetails,
   Preferences,
@@ -19,12 +20,34 @@ import {
   newManualItem,
   postableItems,
 } from "@/lib/contract";
-import { ApiError, ApiErrorKind, fetchTaxonomy, postRfqCorrection, processRfq, submitRequest } from "@/lib/api/client";
+import {
+  ApiError,
+  ApiErrorKind,
+  fetchTaxonomy,
+  postRfqCorrection,
+  processRfq,
+  processQuick,
+  ingestClientMatch,
+  submitRequest,
+} from "@/lib/api/client";
+import { decideTier } from "@/lib/agent/tier";
+import { quickResultToDraft, quickItemsToDraft } from "@/lib/agent/quick-draft";
+import type { SiteLocation, ProjectDefaults, ProjectSummary } from "@/lib/contract/project";
+import type { PaymentTerm } from "@/lib/contract/options";
+import { projectTitle, filingFor } from "@/lib/contract/project";
+import { applyProjectDefaults, applyMachineTerms, machineTermsOf } from "@/lib/contract/project-apply";
+import { blankTerms, type MachineTerms } from "@/lib/contract/work-order";
 import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
+import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
-export type Step = 1 | 2 | 3 | 4;
+
+/**
+ * Which canvas panel is open (MREQ-AC-01). Replaces the four-step `Step`: the canvas has no steps,
+ * only three accordion panels and a review screen, and `null` means every panel is collapsed.
+ */
+export type Section = "equipment" | "where" | "when";
 
 /**
  * localStorage key for the persisted RFQ draft (web-app/002 save-on-reload).
@@ -40,6 +63,35 @@ const LEGACY_DRAFT_STORAGE_KEYS = ["rfq-draft-v1"];
  * (and the agent actually supplied one). Drives the orange "AI" marker; returns false once the
  * renter edits the value (so the mark clears), or when the agent left the field empty.
  */
+/**
+ * How long the processing screen stays up at minimum.
+ *
+ * Long enough to register as a step that happened rather than a flicker; short enough that nobody
+ * reads it as slow. Tier 0 answers in ~50 ms, so on that path this is almost the whole visible
+ * duration — see `holdProcessing`.
+ */
+const FLOOR_MS = 700;
+
+/**
+ * Waits out whatever is LEFT of the processing floor, and nothing more.
+ *
+ * ⚠️ Tier 0 resolves with no `await` in it — a string match against a taxonomy the browser already
+ * holds — so `PROCESS_START` and `PROCESS_SUCCESS` land in the same React batch and the screen never
+ * paints. The parse worked; the renter saw a flicker and a filled form, which reads like a form that
+ * was always filled (owner, 2026-08-31: *"even if agent is too fast i still want to show the agent
+ * processing screen, just for the user to feel there is real agent"*).
+ *
+ * Not decoration: this product's claim is that something READ what they wrote, and this screen is
+ * the only moment that claim is visible.
+ *
+ * A floor rather than a delay, so a path that already spent longer waits for nothing — Tier 2 takes
+ * four seconds and needs no help feeling real. Nobody waits for the sake of waiting.
+ */
+async function holdProcessing(startedAt: number): Promise<void> {
+  const left = FLOOR_MS - (Date.now() - startedAt);
+  if (left > 0) await new Promise((r) => setTimeout(r, left));
+}
+
 export function agentMatches(current: unknown, original: unknown): boolean {
   if (original == null || original === "" || (Array.isArray(original) && original.length === 0)) return false;
   return JSON.stringify(current) === JSON.stringify(original);
@@ -47,7 +99,27 @@ export function agentMatches(current: unknown, original: unknown): boolean {
 
 export interface RfqState {
   phase: Phase;
-  step: Step;
+  /** The open canvas panel; `null` when all three are collapsed. */
+  activeSection: Section | null;
+  /** Which equipment item the canvas is showing (0-based index into the live items). */
+  itemIndex: number;
+  /**
+   * MREQ-AC-05 — the renter has read and accepted how many days suppliers will actually price.
+   * Gates *When it runs*, and with it the review screen. Deliberately NOT part of the draft: it is
+   * an acknowledgement of a figure, and a figure that changes (new dates, new billing basis) has
+   * not been acknowledged yet.
+   */
+  chargedDaysUnderstood: boolean;
+  /** MREQ-AC-42 — the read-only Ready-to-send screen is showing instead of the canvas. */
+  readyToSend: boolean;
+  /**
+   * Is the post-and-share dialog open?
+   *
+   * On the STORE rather than on the screen that opens it, because posting flips the phase and
+   * unmounts that screen — a `useState` there would take the dialog with it, halfway through the one
+   * press it exists to serve.
+   */
+  shareOnPost: boolean;
   taxonomy: Taxonomy;
   draft: RfqDraft | null;
   // intake inputs (preserved across errors — AC-10)
@@ -58,7 +130,14 @@ export interface RfqState {
   busy: boolean;
   error: ApiErrorKind | null;
   /** The real backend reason behind a submit failure, surfaced in the UI for diagnosis. */
-  errorDetail: { detail?: string; backendCode?: string; backendStatus?: number; status?: number } | null;
+  /** ⚠️ `details` carries the backend's field errors on a 422 — see `contract/submit-error.ts`. */
+  errorDetail: {
+    detail?: string;
+    backendCode?: string;
+    backendStatus?: number;
+    status?: number;
+    details?: unknown;
+  } | null;
   requestId: string | null;
   /** Every short code from the fan-out (one per equipment item); requestId is the first. */
   requestIds: string[];
@@ -83,12 +162,89 @@ export interface RfqState {
   isTrial: boolean;
   /** The trial's 60-min expiry, echoed by the backend on submit (null for a real request). */
   trialExpiresAt: string | null;
+  /**
+   * The store this request was started from, when it was — it submits as DIRECT to that supplier
+   * alone (app parity, Epic 008) instead of broadcasting to everyone who matches.
+   *
+   * Set from `/create?supplierId=…`, and it rides with the draft so a reload mid-flow cannot quietly
+   * turn one supplier's request into a broadcast. A direct run also starts from a CLEAN draft: the
+   * mobile flow refuses to restore a stored draft into a direct request for the same reason — a
+   * broadcast the renter wrote for the whole market must not be re-addressed to one firm behind his
+   * back. The stored draft is left in place, unread, and is still there for his next broadcast.
+   */
+  direct: DirectTarget | null;
+
+  /* ── PROJ: the site this request is being written for ─────────────────────────────────── */
+
+  /**
+   * The site picked on the intake screen, held as a **request-local COPY**, never a reference.
+   *
+   * A copy because the pills edit it and the project must not move: change *hrs/day* to 12 here and
+   * Qiddiya still says 10. It is also what makes the feature safe to reason about — nothing flows
+   * back, and nothing flows down again once the copy is taken.
+   *
+   * Chosen BEFORE the agent runs, applied AFTER it returns. The agent is never sent one of these
+   * values and never returns one, so a site's terms cannot come back altered by a model that never
+   * saw them.
+   */
+  project: { id: string; title: string; location: SiteLocation; defaults: ProjectDefaults } | null;
+  /**
+   * The line a TEMPLATE typed into the intake box, verbatim.
+   *
+   * Held so the box can colour it: the renter needs to see which words are theirs and which arrived
+   * from the site they picked (owner, 2026-08-31). Stored as the STRING rather than as character
+   * offsets, which makes it self-healing — the moment the renter edits those words the string stops
+   * matching, the colour goes, and the text is simply theirs. Offsets would have to be tracked
+   * through every keystroke and would eventually point at somebody else's sentence.
+   */
+  projectTypedLine: string | null;
+  /**
+   * True while the agent is WRITING that line into the box, a character at a time.
+   *
+   * It exists so the intake can draw Mansour over the box while it happens (owner, 2026-09-13:
+   * *"make it like this mansour is writing it"*) - the typewriter lives in `ProjectChips`, on the
+   * box's floor, and the perch belongs on the box itself, which is a different component. Two
+   * components, one fact, so it is state rather than a prop threaded through the screen.
+   *
+   * ⚠️ NOT persisted and not restored: it describes something happening right now, and a reload
+   * mid-write must not come back with a man standing on an empty box.
+   */
+  agentTyping: boolean;
+  /**
+   * Which pills the renter changed on this request. They render as changed, and the fields they
+   * cover read `renter` rather than `project` once the draft exists — once someone has answered a
+   * question, it stops being the site's answer.
+   */
+  projectDirty: string[];
+  /** Provenance only — the work order a template was copied from (W-T9). Changes no rendering. */
+  workOrderGroupId: string | null;
+  /**
+   * When the current parse started, or null when nothing is running (W-T23).
+   *
+   * The intake screen keeps the renter in place while a parse is quick and hands over to the
+   * processing screen only when it is not. A full-screen takeover for something that finishes in
+   * 400 ms is a flash of a page nobody had time to read; a spinner in a corner for eleven seconds
+   * is a page that looks broken. The timestamp is what lets one surface decide between them.
+   */
+  processingSince: number | null;
+  /**
+   * The machine terms lifted off a template, waiting for the agent to return.
+   *
+   * Held rather than applied, because at intake there are no draft lines to apply them to. A ONE-TIME
+   * copy: the source is never read again, so deleting that work order next month changes nothing
+   * about this request.
+   */
+  templateTerms: MachineTerms | null;
 }
 
 /** Exported alongside {@link reducer} so tests start from the real initial state. */
 export const initialState: RfqState = {
   phase: "intake",
-  step: 1,
+  activeSection: "equipment",
+  itemIndex: 0,
+  chargedDaysUnderstood: false,
+  readyToSend: false,
+  shareOnPost: false,
   taxonomy: [],
   draft: null,
   text: "",
@@ -107,6 +263,14 @@ export const initialState: RfqState = {
   guestLimit: false,
   isTrial: false,
   trialExpiresAt: null,
+  direct: null,
+  project: null,
+  projectDirty: [],
+  projectTypedLine: null,
+  agentTyping: false,
+  workOrderGroupId: null,
+  templateTerms: null,
+  processingSince: null,
 };
 
 type Action =
@@ -116,6 +280,7 @@ type Action =
   | { t: "REMOVE_FILE"; index: number }
   | { t: "SET_SIMULATE_ERROR"; value: boolean }
   | { t: "PROCESS_START" }
+  | { t: "ESCALATE_PROCESSING" }
   | { t: "PROCESS_SUCCESS"; draft: AgentDraft }
   | { t: "PROCESS_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "GUEST_LIMIT" }
@@ -123,8 +288,15 @@ type Action =
   | { t: "RESUME_WIZARD" }
   | { t: "GO_INTAKE" }
   | { t: "RESUME_DRAFT" }
-  | { t: "GO_STEP"; step: Step }
+  | { t: "OPEN_SECTION"; section: Section | null }
+  | { t: "GO_ITEM"; index: number }
+  | { t: "SET_CHARGED_DAYS_UNDERSTOOD"; value: boolean }
+  | { t: "SET_READY_TO_SEND"; value: boolean }
+  | { t: "SET_SHARE_ON_POST"; value: boolean }
+  | { t: "TOUCH_FIELD"; key: string }
   | { t: "PATCH_LOCATION"; patch: Partial<ProjectDetails["location"]> }
+  /** The site's own address, geocoded into a point — see the reducer for why it is not a patch. */
+  | { t: "PIN_PROJECT_LOCATION"; lat: number; lng: number }
   | { t: "CONFIRM_LOCATION" }
   | { t: "RESOLVE_LOCATION_CONFLICT"; source: "text" | "file" }
   | { t: "DISMISS_MULTILOCATION" }
@@ -136,6 +308,8 @@ type Action =
   | { t: "PATCH_ITEM_OPERATOR"; id: string; patch: Partial<OperatorDetails> }
   | { t: "SET_ITEM_CATEGORY"; id: string; categoryId: string }
   | { t: "SET_ITEM_SUBCATEGORY"; id: string; subcategoryId: string }
+  /** The renter searched the TYPE list, found nothing, and named the machine himself. */
+  | { t: "SET_ITEM_OFF_CATALOGUE"; id: string; name: string }
   | { t: "SET_ITEM_MEASUREMENT"; id: string; measurementId: string }
   | { t: "APPROVE_ITEM"; id: string }
   | { t: "APPROVE_SUGGESTION"; id: string }
@@ -144,10 +318,24 @@ type Action =
   | { t: "REQUEST_SOURCING"; id: string }
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
   | { t: "SET_TRIAL"; isTrial: boolean }
+  | { t: "SET_DIRECT"; direct: DirectTarget | null }
+  | { t: "GO_BROADCAST" }
+  | { t: "SELECT_PROJECT"; project: ProjectSummary }
+  | { t: "PROJECT_TYPED"; line: string | null }
+  | { t: "AGENT_TYPING"; on: boolean }
+  | { t: "CLEAR_PROJECT" }
+  | { t: "PATCH_PROJECT_DEFAULTS"; patch: Partial<TimingHours>; keys: string[] }
+  | { t: "PATCH_PROJECT_TERMS"; paymentTerms: PaymentTerm | null }
+  | { t: "PATCH_PROJECT_SITE"; location: SiteLocation }
+  | { t: "SET_WORK_ORDER_SOURCE"; groupId: string | null }
+  | { t: "USE_TEMPLATE"; terms: MachineTerms | null; groupId: string | null; when: { startDate: string | null; endDate: string | null } | null }
+  /** Change one of the copied terms on THIS request. Marks the fields so the pill shows as changed. */
+  | { t: "PATCH_TEMPLATE_TERMS"; patch: Partial<MachineTerms>; keys: string[] }
   | { t: "SUBMIT_START" }
   | { t: "SUBMIT_SUCCESS"; requestId: string; requestIds: string[]; requestUuids: string[]; trialExpiresAt?: string | null }
   | { t: "SUBMIT_ERROR"; kind: ApiErrorKind; detail?: RfqState["errorDetail"] }
   | { t: "HYDRATE"; saved: Partial<RfqState> }
+  | { t: "RESUME_DIRECT"; saved: Partial<RfqState> }
   | { t: "RESET" };
 
 interface DeepPrefPatch {
@@ -197,8 +385,25 @@ export function reducer(state: RfqState, a: Action): RfqState {
       return { ...state, files: state.files.filter((_, i) => i !== a.index) };
     case "SET_SIMULATE_ERROR":
       return { ...state, simulateError: a.value };
+    /**
+     * A parse begins, and the renter STAYS on the intake screen (W-T23).
+     *
+     * Taking the whole page for something that finishes in 400 ms is a flash of a screen nobody had
+     * time to read. `processingSince` is stamped so the surface can hand over to the processing
+     * screen if it turns out to be slow after all — see ESCALATE_PROCESSING.
+     */
     case "PROCESS_START":
-      return { ...state, phase: "processing", busy: true, error: null, errorDetail: null, guestLimit: false };
+      return {
+        ...state,
+        busy: true,
+        processingSince: Date.now(),
+        error: null,
+        errorDetail: null,
+        guestLimit: false,
+      };
+    /** It was not quick. Hand over, rather than leaving a spinner in a corner for eleven seconds. */
+    case "ESCALATE_PROCESSING":
+      return state.busy && state.phase === "intake" ? { ...state, phase: "processing" } : state;
     case "GUEST_LIMIT":
       // Signed-out visitor hit the server parse cap → back to intake with the flag set; Intake opens the
       // account modal (same UX as the client-side localStorage nudge), never an error screen.
@@ -208,38 +413,182 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // actually named and nothing more — an item the text said nothing about reaches Step 2 blank,
       // which is now also true of one created by hand.
       const seededItems = a.draft.items;
+      // Snapshot the agent's values (refs are safe — all edits are immutable copies). The SEEDED
+      // items are snapshotted, not the raw ones: the cert seed is our default, not a renter edit, so
+      // comparing against the raw items would mark every draft "edited" and fire a spurious
+      // web_review correction on every submit.
+      const origin = { project: a.draft.project, items: seededItems };
+
+      const parsed: RfqDraft = {
+        rfqId: a.draft.rfqId ?? null, // A5: anchor for the web_review correction fired at submit
+        project: a.draft.project,
+        items: seededItems,
+        preferences: a.draft.preferences ?? defaultPreferences(), // agent-inferred Step-3 prefs when present
+        detectedLocations: a.draft.detectedLocations,
+        summary: a.draft.summary,
+        justifications: a.draft.justifications ?? [],
+        fieldNotes: a.draft.fieldNotes ?? {},
+        // MREQ-AC-59 — a freshly parsed draft has been touched by nobody. Every value on it came
+        // from the agent or from our own seeds, and the canvas says so on each control.
+        touchedFields: [],
+      };
+
+      /* PROJ — the merge happens HERE: in the browser, after the parse, never before it.
+         `applyProjectDefaults` leaves alone every field the agent filled, so a renter who wrote
+         "from Oct 1" keeps October even though the site says 1 September. A pill they already
+         changed carries into `touchedFields`, so it reads as theirs and not as the site's. */
+      const withProject: RfqDraft = state.project
+        ? (() => {
+            const applied = applyProjectDefaults(parsed, state.project.defaults, state.project.location, origin);
+            return {
+              ...applied.draft,
+              projectId: state.project.id,
+              workOrderGroupId: state.workOrderGroupId,
+              projectFields: applied.filled,
+              touchedFields: state.projectDirty,
+            };
+          })()
+        : parsed;
+
+      /* The template, after the project and under the same rule: a line whose text said "with
+         operator" keeps what the agent read. It copies terms only — never the equipment, which
+         always comes from what the renter typed. */
+      const draft: RfqDraft = state.templateTerms
+        ? { ...applyMachineTerms(withProject, state.templateTerms, origin).draft, projectId: withProject.projectId, workOrderGroupId: withProject.workOrderGroupId, projectFields: withProject.projectFields, touchedFields: withProject.touchedFields }
+        : withProject;
+
       return {
         ...state,
         busy: false,
+        processingSince: null,
         error: null,
-        draft: {
-          rfqId: a.draft.rfqId ?? null, // A5: anchor for the web_review correction fired at submit
-          project: a.draft.project,
-          items: seededItems,
-          preferences: a.draft.preferences ?? defaultPreferences(), // agent-inferred Step-3 prefs when present
-          detectedLocations: a.draft.detectedLocations,
-          summary: a.draft.summary,
-          justifications: a.draft.justifications ?? [],
-          fieldNotes: a.draft.fieldNotes ?? {},
-        },
-        // Snapshot the agent's values (refs are safe — all edits are immutable copies). The SEEDED
-        // items are snapshotted, not the raw ones: the cert seed is our default, not a renter edit, so
-        // comparing against the raw items would mark every draft "edited" and fire a spurious
-        // web_review correction on every submit.
-        agentOrigin: { project: a.draft.project, items: seededItems },
+        draft,
+        agentOrigin: origin,
         multiLocationDismissed: false,
+        // Never escalated — so there is no processing screen to hand off from, and the canvas is
+        // where the renter is going. Escalated runs keep today's path: Processing calls enterWizard.
+        ...(state.phase === "intake" ? { phase: "wizard" as const, activeSection: "equipment" as const, itemIndex: 0 } : {}),
+      };
+    }
+    /* ── PROJ ───────────────────────────────────────────────────────────────────
+       Selecting COPIES the site's values in; it never holds a reference. The pills edit that copy,
+       so changing hrs/day here cannot move the project.
+
+       Deselecting drops the copy WHOLE (PROJ-AC-26). There is no half state in which some prefills
+       outlive a project the renter has removed - which is the failure a partial reset would
+       produce, and the renter would have no way to see it. */
+    case "SELECT_PROJECT":
+      return {
+        ...state,
+        project: {
+          id: a.project.id,
+          title: projectTitle(a.project),
+          location: { ...a.project.location },
+          defaults: { timing: { ...a.project.defaults.timing }, paymentTerms: a.project.defaults.paymentTerms },
+        },
+        projectDirty: [],
+      };
+    case "PROJECT_TYPED":
+      return { ...state, projectTypedLine: a.line };
+    case "AGENT_TYPING":
+      return { ...state, agentTyping: a.on };
+    case "CLEAR_PROJECT":
+      // The template goes with the site. It was a thing INSIDE that project, so leaving its terms
+      // behind would carry values from a site the renter just removed, with nothing on screen
+      // saying where they came from.
+      // The typed line goes too: the words stay in the box (the renter may want them) but nothing
+      // colours them as the site's any more, because there is no site.
+      return { ...state, project: null, projectDirty: [], workOrderGroupId: null, templateTerms: null, projectTypedLine: null };
+    /* A pill edit. `keys` are the dotted paths it covers, recorded so the field reads `renter` on
+       the canvas afterwards rather than `project` - once someone answers a question it stops being
+       the site's answer. */
+    case "PATCH_PROJECT_DEFAULTS":
+      if (!state.project) return state;
+      return {
+        ...state,
+        project: {
+          ...state.project,
+          defaults: { ...state.project.defaults, timing: { ...state.project.defaults.timing, ...a.patch } },
+        },
+        projectDirty: [...new Set([...state.projectDirty, ...a.keys])],
+      };
+    /* The one commercial term, edited from the same strip and under the same rule. Its dirty key is
+       the draft path `applyProjectDefaults` fills, not a defaults path, because that is what
+       `touchedFields` is compared against on the canvas. */
+    case "PATCH_PROJECT_TERMS":
+      if (!state.project) return state;
+      return {
+        ...state,
+        project: { ...state.project, defaults: { ...state.project.defaults, paymentTerms: a.paymentTerms } },
+        projectDirty: [...new Set([...state.projectDirty, "preferences.payment_terms"])],
+      };
+    case "PATCH_PROJECT_SITE":
+      if (!state.project) return state;
+      return {
+        ...state,
+        project: { ...state.project, location: a.location },
+        projectDirty: [...new Set([...state.projectDirty, "location.label"])],
+      };
+    case "SET_WORK_ORDER_SOURCE":
+      return { ...state, workOrderGroupId: a.groupId };
+    /* Start from. The terms wait for the agent; the source's OWN period lands on the project copy
+       now, so the pills show what this request will actually run to. It is not marked dirty — the
+       value still came from inside the site, not from the renter answering a question. */
+    case "USE_TEMPLATE": {
+      const when = a.when;
+      const project =
+        state.project && when
+          ? {
+              ...state.project,
+              defaults: {
+                ...state.project.defaults,
+                timing: {
+                  ...state.project.defaults.timing,
+                  startDate: when.startDate ?? state.project.defaults.timing.startDate,
+                  endDate: when.endDate ?? state.project.defaults.timing.endDate,
+                },
+              },
+            }
+          : state.project;
+      return { ...state, templateTerms: a.terms, workOrderGroupId: a.groupId, project };
+    }
+
+    /**
+     * Edit a term the template copied.
+     *
+     * Changes THIS request and nothing else (PROJ-AC-25). `templateTerms` is what gets applied to
+     * every line at submit, so editing it here is editing the answer that will be sent — the machine
+     * it was copied from is untouched, and so is the site.
+     *
+     * The touched keys ride along, because a value the renter changed has to stop reading *from your
+     * project* and start reading as theirs.
+     */
+    case "PATCH_TEMPLATE_TERMS": {
+      /**
+       * ⚠️ It used to `return state` when there was no template, which meant a renter who picked a
+       * SITE and nothing else could not answer delivery, return or fuel at all — the pills took his
+       * press and did nothing (owner, 2026-09-01).
+       *
+       * A blank set is started instead. Those three are required, and a request that cannot state
+       * them is a request every supplier has to ask about before he can price it.
+       */
+      return {
+        ...state,
+        templateTerms: { ...(state.templateTerms ?? blankTerms()), ...a.patch },
+        projectDirty: [...new Set([...state.projectDirty, ...a.keys])],
       };
     }
     case "PROCESS_ERROR":
-      return { ...state, busy: false, error: a.kind, errorDetail: a.detail ?? null };
+      // Back to intake with the text intact (AC-10), wherever the failure happened.
+      return { ...state, busy: false, processingSince: null, phase: "intake", error: a.kind, errorDetail: a.detail ?? null };
     case "ENTER_WIZARD":
-      return { ...state, phase: "wizard", step: 1 };
+      return { ...state, phase: "wizard", activeSection: "equipment", itemIndex: 0, readyToSend: false };
     case "RESUME_WIZARD":
       // Return to the wizard at the SAME step (e.g. from the "Your request" input step) — no re-parse.
       return { ...state, phase: "wizard", error: null };
     case "GO_INTAKE":
-      // Return to intake preserving text/files (AC-10: input preserved). Keeps `step` so the renter
-      // can jump back to the wizard where they were ("Your request" step → back to review).
+      // Return to intake preserving text/files (AC-10: input preserved). Keeps `activeSection` and
+      // `itemIndex` so returning to the canvas lands where the renter left it.
       return { ...state, phase: "intake", error: null };
     case "RESUME_DRAFT":
       // "Continue draft": dismiss the prompt and drop the renter back INTO the review wizard at the
@@ -247,15 +596,68 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // primary action is "Re-analyze" and would discard their edits. A rehydrated draft has always
       // already been processed (the prompt only shows when a saved draft exists).
       return { ...state, draftPrompt: false, phase: "wizard", error: null };
-    case "GO_STEP":
-      return { ...state, step: a.step };
+    case "OPEN_SECTION":
+      return { ...state, activeSection: a.section };
+    case "GO_ITEM":
+      // The canvas always opens a new item on its equipment panel — the site and schedule are
+      // request-wide, so there is nothing item-specific behind the other two.
+      return { ...state, itemIndex: Math.max(0, a.index), activeSection: "equipment" };
+    case "SET_CHARGED_DAYS_UNDERSTOOD":
+      return { ...state, chargedDaysUnderstood: a.value };
+    case "SET_READY_TO_SEND":
+      return { ...state, readyToSend: a.value, activeSection: a.value ? null : "equipment" };
+    case "SET_SHARE_ON_POST":
+      return { ...state, shareOnPost: a.value };
+    case "TOUCH_FIELD":
+      // Idempotent: the renter answering the same control twice is still one answer.
+      return withDraft(state, (d) =>
+        (d.touchedFields ?? []).includes(a.key) ? d : { ...d, touchedFields: [...(d.touchedFields ?? []), a.key] },
+      );
     case "PATCH_LOCATION":
       // AC-16: changing the location (map/search/GPS) invalidates a prior confirmation — require a
       // fresh confirm. The patch can still set `confirmed` explicitly (e.g. the "Change" button).
+      //
+      // It also RECORDS the field as the renter's (owner, 2026-08-31: *"if a user changes the
+      // location it no longer shows the 'from your project' label"*). Provenance reads
+      // `touchedFields`, so without this the panel went on crediting the site for a pin the renter
+      // had just dragged somewhere else — the one case where the label is actively wrong.
       return withDraft(state, (d) => ({
         ...d,
         project: { ...d.project, location: { ...d.project.location, ...a.patch, confirmed: a.patch.confirmed ?? false } },
+        touchedFields: (d.touchedFields ?? []).includes("location.label")
+          ? d.touchedFields
+          : [...(d.touchedFields ?? []), "location.label"],
       }));
+    /**
+     * The project's ADDRESS, resolved to a point.
+     *
+     * A project can be saved with a typed address and no pin — `ProjectForm` requires the label and
+     * nothing else — so a request from that site arrived with a label, no coordinates, and therefore
+     * a dead end: `gateWhere` wants a point, so *This is the right spot* was disabled and the only
+     * way on was to type the address again into the picker's search box (owner, 2026-09-02: *"the
+     * location is from the project so it must be shown fully with the confirm option, now I can't
+     * confirm anything, I have to retype it to continue"*).
+     *
+     * So the map resolves the site's own address once and hands back the point. NOT `PATCH_LOCATION`,
+     * for two reasons, and both are the whole point of a separate action:
+     *
+     *  · that action records `location.label` as TOUCHED, which is how the panel knows the renter
+     *    moved the pin himself — and this pin is the site's address, not a move. Marked, the «from
+     *    your project» ring would vanish from a value the renter never edited.
+     *  · the LABEL is kept exactly as the project stores it. Google's formatted address for the same
+     *    point is worded differently often enough that replacing it would make `leftTheSite` compare
+     *    two spellings of one place and unfile the request from its own site.
+     *
+     * `confirmed` is deliberately untouched: it stays false, the renter presses the button, and the
+     * confirmation still means a person looked at the pin. Ignored when a point already exists, so a
+     * slow geocode answering after the renter has dragged the marker cannot pull him back.
+     */
+    case "PIN_PROJECT_LOCATION":
+      return withDraft(state, (d) => {
+        const loc = d.project.location;
+        if (loc.lat != null || loc.lng != null || !(loc.label ?? "").trim()) return d;
+        return { ...d, project: { ...d.project, location: { ...loc, lat: a.lat, lng: a.lng } } };
+      });
     case "CONFIRM_LOCATION":
       return withDraft(state, (d) => ({ ...d, project: { ...d.project, location: { ...d.project.location, confirmed: true } } }));
     case "RESOLVE_LOCATION_CONFLICT":
@@ -273,8 +675,19 @@ export function reducer(state: RfqState, a: Action): RfqState {
       });
     case "DISMISS_MULTILOCATION":
       return { ...state, multiLocationDismissed: true };
-    case "PATCH_TIMING":
-      return withDraft(state, (d) => ({ ...d, project: { ...d.project, timing: { ...d.project.timing, ...a.patch } } }));
+    case "PATCH_TIMING": {
+      // MREQ-AC-05 — the charged-day acknowledgement is about a specific number. Changing a date,
+      // the billing basis or the hours changes that number, so the previous acceptance no longer
+      // refers to anything and the renter is asked again. Silently keeping the tick would let a
+      // request go out against a figure nobody ever saw.
+      const changesFigure =
+        a.patch.startDate !== undefined ||
+        a.patch.endDate !== undefined ||
+        a.patch.rentalBasis !== undefined ||
+        a.patch.hoursPerDay !== undefined;
+      const next = withDraft(state, (d) => ({ ...d, project: { ...d.project, timing: { ...d.project.timing, ...a.patch } } }));
+      return changesFigure ? { ...next, chargedDaysUnderstood: false } : next;
+    }
     case "PATCH_ADVANCED":
       return withDraft(state, (d) => {
         const advanced = { ...d.project.advanced, ...a.patch };
@@ -375,6 +788,23 @@ export function reducer(state: RfqState, a: Action): RfqState {
             ref: { ...i.ref, subcategoryId: a.subcategoryId, measurementId: null },
             operatorNeeded,
             resolved: false,
+            /* ── A picked subtype ENDS the off-catalogue state — but NOT his words ───────────────
+             *
+             * 🔴 ~~The name is cleared with the state it belonged to.~~ Reversed 2026-09-12, when the
+             * field stopped meaning «off-catalogue» and started meaning «what the renter calls this
+             * machine». Picking a type does not make his words untrue: he typed «water tanker», the
+             * agent missed, he found «Water truck» himself, and both are true. The taxonomy wins for
+             * READING; his words are kept and sent as our reference.
+             *
+             * ⚠️ And the VERDICT has to move with it. It did not, and the row vanished under the
+             * renter's own hand (owner, 2026-09-06: *"when i try to click a subtype from existing
+             * taxonomy it is vanished"*): the pick cleared `isCustomLine` (which reads the subtype)
+             * while `verdict` stayed `no-match`, so the card swapped the taxonomy trio back for the
+             * red «not available» panel — hiding the very control he had just used — and
+             * `postableItems` still dropped the line. `needs-validation` is what the app calls a
+             * line whose machine is known and whose size is not, which is exactly what he now has.
+             */
+            verdict: i.verdict === "no-match" ? ("needs-validation" as const) : i.verdict,
           };
           // No cert seeding here either. This used to "rescue" an uncertified line by stamping the
           // category default once the subcategory refined the lifting test (`_onEquipmentVariantPicked`)
@@ -386,6 +816,37 @@ export function reducer(state: RfqState, a: Action): RfqState {
           // no operator cert is seeded alongside it.
           return next;
         }),
+      );
+    /* ── The OTHER direction: the catalogue does not have it (owner, 2026-09-09) ─────────────────
+     * *"Maybe if he searched in the type and didnt find it we show for him something here that will
+     * open the field of custom type and the alert."*
+     *
+     * Until now the canvas could only ARRIVE off-catalogue — the agent read a machine it could not
+     * place (`deriveVerdict` → `no-match`) — and a renter who wanted to name one himself, or who had
+     * picked the wrong type and then found the catalogue had nothing for him, had no way in. His only
+     * route was back to the intake to retype the whole request.
+     *
+     * The exact mirror of `SET_ITEM_SUBCATEGORY` above, and all THREE things that say «off-catalogue»
+     * move together (the 2026-09-06 trap): the verdict, the ids `isCustomLine` reads, and the typed
+     * name. The size goes with the subtype, because a size is a size OF something.
+     *
+     * `name` is whatever the card already held for him — what he typed in the box, else the words his
+     * RFQ used. Empty is allowed: the gate (`customEquipmentMissing`) then asks for it, in a box that
+     * is on the card either way since 2026-09-12.
+     *
+     * ⚠️ It never SEEDS from a taxonomy name. The card's box falls back to the pick for display, but
+     * writing that into state here would make «Water truck 20,000 L» his answer for a machine he has
+     * just said is not the one he meant.
+     */
+    case "SET_ITEM_OFF_CATALOGUE":
+      return withDraft(state, (d) =>
+        mapItem(d, a.id, (i) => ({
+          ...i,
+          ref: { ...i.ref, categoryId: null, subcategoryId: null, measurementId: null },
+          verdict: "no-match" as const,
+          resolved: false,
+          customEquipment: a.name,
+        })),
       );
     case "SET_ITEM_MEASUREMENT":
       return withDraft(state, (d) =>
@@ -412,7 +873,32 @@ export function reducer(state: RfqState, a: Action): RfqState {
         // app's `_withGlobalEquipmentDefaults` stamps SPSP right here, which is why every request built
         // by adding lines came out demanding it. The EQUIPMENT cert lands on the first category pick
         // (SET_ITEM_CATEGORY) — there's no category to classify yet.
-        const items = [...d.items, newManualItem(`m${state.seq}`)];
+        const fresh = newManualItem(`m${state.seq}`);
+
+        /* ── A second machine inherits the FIRST one's terms (owner, 2026-08-31) ─────────────────
+         *
+         * *"The first item values selected in the request are number 1 priority to be passed to the
+         * next item terms — and in case of conflict with the project or the text, priority to what
+         * he selected in the request."*
+         *
+         * ⚠️ It did not happen at all here. The work-order form has done this since it was built
+         * (`blankMachine(seed)`), and the REQUEST added a blank line — so a renter who set delivery,
+         * fuel, operator and a certificate on machine 1 answered all four again on machine 2, on a
+         * screen that had just shown them the answers.
+         *
+         * Item 1 wins over the project and over the text, and that ordering is the renter's own
+         * instruction rather than an accident of when things run: the project and the agent both
+         * spoke at parse time, before this line existed, and item 1 is the most recent statement
+         * about how THIS request works. Nothing re-applies over it afterwards.
+         *
+         * The equipment itself is never copied — only the commercial terms. A second machine is a
+         * different machine; that is why it is being added. */
+        const first = d.items[0];
+        const seeded = first
+          ? ({ ...fresh, ...machineTermsOf(first), operator: { ...first.operator } } as EquipmentItem)
+          : fresh;
+
+        const items = [...d.items, seeded];
         return { ...d, items, summary: computeSummary(items) };
       });
     case "REMOVE_ITEM":
@@ -440,6 +926,36 @@ export function reducer(state: RfqState, a: Action): RfqState {
       return { ...state, busy: true, error: null, errorDetail: null };
     case "SET_TRIAL":
       return { ...state, isTrial: a.isTrial };
+    case "SET_DIRECT": {
+      // Same target as the draft already carries → nothing to do (a re-render, a Back, a reload).
+      if ((state.direct?.supplierId ?? null) === (a.direct?.supplierId ?? null)) return { ...state, direct: a.direct };
+      // A different target (or none) → the draft in hand belongs to the other request. Drop it rather
+      // than re-address it; localStorage is untouched, so a broadcast draft survives for its own flow.
+      return {
+        ...state,
+        direct: a.direct,
+        draft: null,
+        agentOrigin: null,
+        draftPrompt: false,
+        phase: "intake",
+        readyToSend: false,
+        activeSection: null,
+        itemIndex: 0,
+      };
+    }
+    /**
+     * The renter answered the confirmation with «Broadcast instead» (app parity, and the app's own
+     * rule: the switch is ONE-WAY, `supplierId` and `supplierName` are nulled and nothing re-attaches
+     * a supplier to a switched request).
+     *
+     * 🔴 **It is NOT `SET_DIRECT` with null, and that is the whole reason it exists.** That case drops
+     * the draft on purpose - a request written for one firm must not be re-addressed behind the
+     * renter's back - and here the draft is exactly what he is keeping: same machine, same site, same
+     * dates, one recipient fewer. Reaching for `setDirect(null)` would wipe the request he is standing
+     * on, one press before it posts.
+     */
+    case "GO_BROADCAST":
+      return state.direct ? { ...state, direct: null } : state;
     case "SUBMIT_SUCCESS":
       return {
         ...state,
@@ -465,6 +981,21 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // `_withGlobalEquipmentDefaults` is reachable from `_onDraftLoaded`/`_onStashRestored`).
       return { ...state, ...a.saved, taxonomy: state.taxonomy, draftPrompt: true };
     }
+    /**
+     * Come back from the supplier's store with the draft he left here (app parity, Epic 008).
+     *
+     * Like `HYDRATE` in every way but the PROMPT. A reload is ambiguous — «is this still the request
+     * you meant?» — so that one raises continue/start-over. This is not: he pressed the ✕ or the +
+     * thirty seconds ago, went to pick a machine, and picked one. Asking him whether he meant to
+     * resume the request he never left would be a question about his own last two presses.
+     *
+     * Not `PROCESS_SUCCESS` either, which is the OTHER door into a direct draft. That one is for a
+     * draft nobody has answered yet: it re-applies the project's defaults and the template's terms
+     * over the whole thing and resets `touchedFields`, which here would forget which answers were
+     * HIS — and «no certificate» is stored as absent, so the gate would ask for it again.
+     */
+    case "RESUME_DIRECT":
+      return { ...state, ...a.saved, taxonomy: state.taxonomy };
     default:
       return state;
   }
@@ -482,30 +1013,123 @@ const RfqContext = createContext<RfqContextValue | null>(null);
 function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState) {
   return {
     setText: (text: string) => dispatch({ t: "SET_TEXT", text }),
+
+    /**
+     * Open the flow on a draft nobody parsed — the machine the renter tapped in a store.
+     *
+     * The same door `PROCESS_SUCCESS` opens for a parsed draft, deliberately: the project's
+     * defaults, the template's terms, the origin snapshot and the empty `touchedFields` all have to
+     * behave identically, and a second reducer branch for "the same thing but without the model"
+     * would drift from this one within a month. See `direct-draft.ts` for what the store fills.
+     */
+    seedDraft: (draft: AgentDraft) => dispatch({ t: "PROCESS_SUCCESS", draft }),
+    /** Restore the draft stashed for a trip to the supplier's store — see `RESUME_DIRECT`. */
+    resumeDirect: (saved: Partial<RfqState>) => dispatch({ t: "RESUME_DIRECT", saved }),
+    /** Mark (or unmark) the line a template typed, so the box can colour it. */
+    markProjectTyped: (line: string | null) => dispatch({ t: "PROJECT_TYPED", line }),
+    setAgentTyping: (on: boolean) => dispatch({ t: "AGENT_TYPING", on }),
     addFiles: (files: { name: string; type: string; data?: string }[]) => dispatch({ t: "ADD_FILES", files }),
     removeFile: (index: number) => dispatch({ t: "REMOVE_FILE", index }),
     setSimulateError: (value: boolean) => dispatch({ t: "SET_SIMULATE_ERROR", value }),
 
+    /* PROJ — picking a site, and editing its values FOR THIS REQUEST ONLY. Nothing here writes to
+       the project: every one of these lands on a copy the intake screen holds. */
+    selectProject: (project: ProjectSummary) => dispatch({ t: "SELECT_PROJECT", project }),
+    clearProject: () => dispatch({ t: "CLEAR_PROJECT" }),
+    patchProjectDefaults: (patch: Partial<TimingHours>, keys: string[]) =>
+      dispatch({ t: "PATCH_PROJECT_DEFAULTS", patch, keys }),
+    patchProjectTerms: (paymentTerms: PaymentTerm | null) => dispatch({ t: "PATCH_PROJECT_TERMS", paymentTerms }),
+    patchProjectSite: (location: SiteLocation) => dispatch({ t: "PATCH_PROJECT_SITE", location }),
+    pinProjectLocation: (lat: number, lng: number) => dispatch({ t: "PIN_PROJECT_LOCATION", lat, lng }),
+    setWorkOrderSource: (groupId: string | null) => dispatch({ t: "SET_WORK_ORDER_SOURCE", groupId }),
+    useTemplate: (
+      terms: MachineTerms | null,
+      groupId: string | null,
+      when: { startDate: string | null; endDate: string | null } | null,
+    ) => dispatch({ t: "USE_TEMPLATE", terms, groupId, when }),
+    patchTerms: (patch: Partial<MachineTerms>, keys: string[] = []) =>
+      dispatch({ t: "PATCH_TEMPLATE_TERMS", patch, keys }),
+
+    /**
+     * Parse the renter's text.
+     *
+     * Three paths, chosen by the SHAPE of what they typed — not by whether they have a project. A
+     * project does not make a parse cheaper; it makes short text the common case, and short text is
+     * what the fast paths are for.
+     *
+     * Every fast path falls back rather than failing. A renter must never lose their request
+     * because an optimisation was unavailable: the worst outcome is the speed we already have.
+     */
     async process() {
       const s = getState();
       dispatch({ t: "PROCESS_START" });
+      const startedAt = Date.now();
+
+      const decision = decideTier({
+        text: s.text,
+        hasProject: !!s.project,
+        hasFiles: s.files.length > 0,
+        taxonomy: s.taxonomy,
+      });
+
       try {
+        /* ── Tier 0 — no network at all ──
+           The taxonomy is already loaded for the dropdowns, so this is a string match against data
+           the browser is holding. It still reaches the corpus (fire-and-forget) or half the traffic
+           would stop teaching the learned rules. */
+        if (decision.tier === 0 && decision.match?.matched) {
+          const draft = quickResultToDraft(decision.match.item, s.taxonomy, s.text);
+          ingestClientMatch(s.text, draft.items.map((i) => ({
+            input_equipment: i.rawLabel ?? "",
+            category_id: i.ref.categoryId,
+            subtype_id: i.ref.subcategoryId,
+            capacity_id: i.ref.measurementId,
+            quantity: i.quantity,
+          })));
+          await holdProcessing(startedAt);
+          dispatch({ t: "PROCESS_SUCCESS", draft });
+          return;
+        }
+
+        /* ── Tier 1 — one synchronous call, no job row, no poll ── */
+        if (decision.tier === 1) {
+          const quick = await processQuick({ text: s.text });
+          if (!quick.fallback && quick.line_items?.length) {
+            await holdProcessing(startedAt);
+            dispatch({ t: "PROCESS_SUCCESS", draft: quickItemsToDraft(quick, s.taxonomy, s.text) });
+            return;
+          }
+          // Fell back: straight on to the job path below, with nothing shown to the renter. They
+          // asked for a parse, not for a report on which of our paths answered.
+        }
+
         const draft = await processRfq({ text: s.text, files: s.files, simulateError: s.simulateError });
+        // Almost always a no-op here: this path has spent seconds already.
+        await holdProcessing(startedAt);
         dispatch({ t: "PROCESS_SUCCESS", draft });
       } catch (e) {
+        // Floored too: a failure that flashes past is a failure the renter cannot read.
+        await holdProcessing(startedAt);
         if (e instanceof ApiError && e.kind === "guest_limit") { dispatch({ t: "GUEST_LIMIT" }); return; }
         const detail =
           e instanceof ApiError
-            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
+            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status, details: e.details }
             : null;
         dispatch({ t: "PROCESS_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
       }
     },
     enterWizard: () => dispatch({ t: "ENTER_WIZARD" }),
+    escalateProcessing: () => dispatch({ t: "ESCALATE_PROCESSING" }),
     resumeWizard: () => dispatch({ t: "RESUME_WIZARD" }),
     goIntake: () => dispatch({ t: "GO_INTAKE" }),
     resumeDraft: () => dispatch({ t: "RESUME_DRAFT" }),
-    goStep: (step: Step) => dispatch({ t: "GO_STEP", step }),
+    openSection: (section: Section | null) => dispatch({ t: "OPEN_SECTION", section }),
+    goItem: (index: number) => dispatch({ t: "GO_ITEM", index }),
+    setChargedDaysUnderstood: (value: boolean) => dispatch({ t: "SET_CHARGED_DAYS_UNDERSTOOD", value }),
+    setReadyToSend: (value: boolean) => dispatch({ t: "SET_READY_TO_SEND", value }),
+    setShareOnPost: (value: boolean) => dispatch({ t: "SET_SHARE_ON_POST", value }),
+    /** MREQ-AC-59 — record that the renter personally answered this control. */
+    touchField: (key: string) => dispatch({ t: "TOUCH_FIELD", key }),
 
     patchLocation: (patch: Partial<ProjectDetails["location"]>) => dispatch({ t: "PATCH_LOCATION", patch }),
     confirmLocation: () => dispatch({ t: "CONFIRM_LOCATION" }),
@@ -521,6 +1145,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     patchItemOperator: (id: string, patch: Partial<OperatorDetails>) => dispatch({ t: "PATCH_ITEM_OPERATOR", id, patch }),
     setItemCategory: (id: string, categoryId: string) => dispatch({ t: "SET_ITEM_CATEGORY", id, categoryId }),
     setItemSubcategory: (id: string, subcategoryId: string) => dispatch({ t: "SET_ITEM_SUBCATEGORY", id, subcategoryId }),
+    setItemOffCatalogue: (id: string, name: string) => dispatch({ t: "SET_ITEM_OFF_CATALOGUE", id, name }),
     setItemMeasurement: (id: string, measurementId: string) => dispatch({ t: "SET_ITEM_MEASUREMENT", id, measurementId }),
     approveItem: (id: string) => dispatch({ t: "APPROVE_ITEM", id }),
     approveSuggestion: (id: string) => dispatch({ t: "APPROVE_SUGGESTION", id }),
@@ -532,10 +1157,36 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
 
     /** mobile/016 — enter/leave trial mode for this run (set from `/create?mode=trial`). */
     setTrial: (isTrial: boolean) => dispatch({ t: "SET_TRIAL", isTrial }),
+    setDirect: (direct: DirectTarget | null) => dispatch({ t: "SET_DIRECT", direct }),
+    /** «Broadcast instead» on the send confirmation: drop the one recipient, KEEP the request. */
+    goBroadcast: () => dispatch({ t: "GO_BROADCAST" }),
 
-    async submit() {
+    /**
+     * Post the request.
+     *
+     * **Returns the ids it created**, which it previously kept to itself. A caller that needs to do
+     * something with the request the moment it exists — post, then share the link it mints, in one
+     * press — cannot read them off the state it dispatched into: `SUBMIT_SUCCESS` flips the phase, so
+     * the screen that pressed the button is unmounted before the next line runs. Returning them is a
+     * pure addition; nothing about what gets created changed (owner, 2026-09-02).
+     *
+     * `null` on failure, so a caller can tell "nothing was posted" from "posted with no uuid".
+     *
+     * `asBroadcast` is the confirmation's «Broadcast instead» (app parity): post this DIRECT request
+     * to the whole market instead of to the one firm it was started from.
+     *
+     * ⚠️ **The flag is passed IN rather than read back off the store, and it has to be.** `getState`
+     * answers `stateRef.current`, which is written during RENDER - so a caller that dispatched
+     * `GO_BROADCAST` and called `submit()` in the same handler would still read the old `direct` and
+     * post the request to the supplier the renter had just declined. The dispatch below is for the
+     * SCREEN (the ribbon, the confirmation's own blocks); this argument is what the wire reads.
+     */
+    async submit(opts?: { asBroadcast?: boolean }): Promise<{ requestId: string; requestUuids: string[] } | null> {
       const s = getState();
-      if (!s.draft) return;
+      if (!s.draft) return null;
+      /* One-way, as in the app: there is no affordance that re-attaches the supplier afterwards. */
+      if (opts?.asBroadcast && s.direct) dispatch({ t: "GO_BROADCAST" });
+      const direct = opts?.asBroadcast ? null : s.direct;
       dispatch({ t: "SUBMIT_START" });
       // A5: did the renter edit the agent's original draft? Compared here (before submit) against the
       // agentOrigin snapshot; the correction is fired AFTER a successful create — fire-and-forget, so it
@@ -546,13 +1197,44 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         !!origin &&
         JSON.stringify([s.draft.project, finalItems]) !== JSON.stringify([origin.project, postableItems(origin.items)]);
       try {
+        /* ── The filing labels, which were never sent ──────────────────────────────────────────
+         *
+         * ⚠️ `projectId` and `workOrderGroupId` reach the DRAFT (see the merge above), ride through
+         * `draftToCreateRequest`, and are accepted and stored by the backend — and this call never
+         * put them in the payload. So **every** request created from a site was filed nowhere. Not
+         * only the ones whose location moved: all of them, silently, since the feature shipped.
+         *
+         * It was invisible from every side. The chart simply did not show a row that had never been
+         * filed, the draft carried the id so the confirmation screen said the right thing, and
+         * `project-intake.test.ts` asserted the id reaches `draft.projectId` — one step short of the
+         * wire, which is exactly where the fault was.
+         *
+         * Reported as *"i created a request from a project but changed the location, it is silently
+         * dropped from the project"* (owner, 2026-08-31). The location was a red herring; the id was
+         * never sent with or without one.
+         *
+         * ── And the location DOES decide, now that the id is sent ──────────────────────────────
+         *
+         * A site is a place. Every other value a project supplies is a default a request may
+         * legitimately differ on, and the chart shows the difference — but a request for Riyadh drawn
+         * on the Qiddiya timeline says a machine is going somewhere it is not. So a moved location
+         * unfiles it, and the intake says so twice before this point: in the location section and
+         * beside the send button. Nothing here is a surprise by the time it runs. */
+        const filing = filingFor(s.project, s.draft);
+
         const { requestId, requestIds, requestUuids, trialExpiresAt } = await submitRequest({
           project: s.draft.project,
           items: finalItems,
           preferences: s.draft.preferences,
+          ...filing,
           simulateError: s.simulateError,
-          // mobile/016 — sent only for a trial run; a real request's payload is unchanged.
-          ...(s.isTrial ? { isTrial: true } : {}),
+          // mobile/016 — sent only for a trial run; a real request's payload is unchanged. The flag
+          // is the belt to the URL's braces: with trial hidden, a persisted draft carrying `isTrial`
+          // from before must not quietly post a trial nobody can see they asked for.
+          ...(TRIAL_REQUESTS_ENABLED && s.isTrial ? { isTrial: true } : {}),
+          // Started from a store → DIRECT to that supplier (app parity). Absent for a broadcast, so a
+          // normal request's payload is byte-identical to before.
+          ...(direct ? { direct } : {}),
         });
         dispatch({
           t: "SUBMIT_SUCCESS",
@@ -561,6 +1243,8 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           requestUuids: requestUuids ?? [],
           trialExpiresAt,
         });
+        const posted = { requestId, requestUuids: requestUuids ?? [] };
+
         if (s.draft.rfqId && editedFromDraft) {
           const patch = draftToRfqCorrection(
             { project: s.draft.project, items: finalItems, preferences: s.draft.preferences },
@@ -568,12 +1252,14 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           );
           void postRfqCorrection(s.draft.rfqId, patch);
         }
+        return posted;
       } catch (e) {
         const detail =
           e instanceof ApiError
-            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status }
+            ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status, details: e.details }
             : null;
         dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
+        return null;
       }
     },
     reset: () => {
@@ -615,6 +1301,25 @@ export function RfqProvider({ children }: { children: ReactNode }) {
         window.history.replaceState(null, "", window.location.pathname);
         return;
       }
+      /**
+        * ── A DIRECT request never rehydrates a stored draft (owner, 2026-09-10) ─────────────────
+        * *"we have an issue in direct request, why does it take him to the intake UI"*.
+        *
+        * This is the rule `RfqState.direct` has always DESCRIBED — *"a direct run also starts from a
+        * CLEAN draft: the mobile flow refuses to restore a stored draft into a direct request"* — and
+        * the code did not obey it. `HYDRATE` runs from the provider, and a child's effect runs before
+        * its parent's, so the create page's seed landed first and this overwrote it a tick later:
+        * the URL named the 100-ton crane the renter had just tapped and the canvas showed the 500-ton
+        * one from the press before, or the stored INTAKE phase, which is the screen he reported.
+        * Reproduced against staging on a local build, then fixed here and re-verified.
+        *
+        * ⚠️ The stored draft is left in storage rather than dropped, so a renter who abandons the
+        * direct request still has his broadcast. It is NOT protected from the persist effect below
+        * once he starts answering the direct one — the same key holds one draft — so the promise in
+        * that comment is only true until this request is edited.
+        */
+      if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("supplierId")) return;
+
       const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
       if (!raw) return;
       const saved = JSON.parse(raw) as Partial<RfqState> & { userId?: number | null };
@@ -641,7 +1346,7 @@ export function RfqProvider({ children }: { children: ReactNode }) {
 
   // Persist the editable draft + position whenever they change (skip processing/confirmation phases).
   // Stamp the owning user id so a later session can tell whose draft this is.
-  const { phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial } = state;
+  const { phase, activeSection, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, direct, readyToSend } = state;
   useEffect(() => {
     try {
       if (draft && (phase === "intake" || phase === "wizard")) {
@@ -649,7 +1354,29 @@ export function RfqProvider({ children }: { children: ReactNode }) {
           DRAFT_STORAGE_KEY,
           // mobile/016 — `isTrial` rides along so a reload mid-flow resumes as a trial. Without it a
           // rehydrated draft would submit as a REAL (dispatched) request the renter never asked for.
-          JSON.stringify({ phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, userId: user?.id ?? null }),
+          //
+          // `chargedDaysUnderstood` is deliberately NOT persisted: it acknowledges a figure, and the
+          // renter should meet that figure again on a fresh visit rather than find it pre-accepted.
+          // `touchedFields` rides inside `draft` (MREQ-AC-56/60).
+          JSON.stringify({
+            phase,
+            activeSection,
+            // The review screen is a POSITION in the flow, not a transient mode: a renter who
+            // reloads on «Review & send» must come back to it, not to the canvas he already
+            // finished (owner, 2026-09-03: a refresh there "must just refresh it").
+            readyToSend,
+            itemIndex,
+            draft,
+            text,
+            multiLocationDismissed,
+            seq,
+            agentOrigin,
+            isTrial,
+            // The recipient rides with the draft: a reload mid-flow must not turn a request written
+            // for one supplier into a broadcast to the whole market.
+            direct,
+            userId: user?.id ?? null,
+          }),
         );
       } else if (phase === "confirmation") {
         window.localStorage.removeItem(DRAFT_STORAGE_KEY); // request sent → clear the saved draft
@@ -657,28 +1384,43 @@ export function RfqProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore quota/availability errors */
     }
-  }, [phase, step, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, user]);
+  }, [phase, activeSection, readyToSend, itemIndex, draft, text, multiLocationDismissed, seq, agentOrigin, isTrial, direct, user]);
 
-  // ---- Browser history ⇄ wizard position. The browser Back/Forward buttons step through the wizard
-  // like the in-app Back/Next: each forward step pushes a history entry; Back/Forward fire popstate,
-  // which moves the store to that step. Backward in-app nav (Back button / step chips / "Your request")
-  // routes through window.history too (see Wizard), so both stay in sync. ----
+  // ---- Browser history ⇄ canvas position (MREQ-AC-06/07).
+  //
+  // The wizard mapped one history entry per step, so Back walked 4 → 3 → 2 → 1 → intake. The canvas
+  // has no steps to walk. Panels are accordions, not pages: opening one is not somewhere the renter
+  // navigated TO, and pushing an entry for it would make Back close a panel instead of leaving —
+  // which is worse still under the gating, since Back could land on a panel that Forward can't
+  // reopen.
+  //
+  // So the chain is exactly three stops: intake (0) → canvas (1) → ready-to-send (2). ----
   const poppingRef = useRef(false);
   const lastOrdRef = useRef(0);
   useEffect(() => {
     // Baseline entry for the create flow, so the first Back returns here rather than straight off-page.
+    //
+    // A RELOAD keeps its own `rfqOrd` (browsers carry `history.state` across a refresh), so the
+    // baseline adopts it instead of stamping 0 over it. Zeroing it made a refresh on the review
+    // screen look like a fresh arrival at the intake: the restored draft put the canvas back at ord
+    // 2 while history said 0, the push effect fired another entry, and Back no longer walked the
+    // chain the renter had actually taken.
+    let ord0 = 0;
     try {
-      window.history.replaceState({ ...(window.history.state ?? {}), rfqOrd: 0 }, "");
+      const prior = (window.history.state as { rfqOrd?: unknown } | null)?.rfqOrd;
+      if (typeof prior === "number") ord0 = prior;
+      window.history.replaceState({ ...(window.history.state ?? {}), rfqOrd: ord0 }, "");
     } catch {
       /* history unavailable */
     }
+    lastOrdRef.current = ord0;
     const onPop = (e: PopStateEvent) => {
       const target = e.state && typeof (e.state as { rfqOrd?: unknown }).rfqOrd === "number" ? ((e.state as { rfqOrd: number }).rfqOrd) : 0;
       poppingRef.current = true;
       const s = stateRef.current;
       if (target >= 1 && s.draft) {
         dispatch({ t: "RESUME_WIZARD" });
-        dispatch({ t: "GO_STEP", step: Math.min(Math.max(target, 1), 4) as Step });
+        dispatch({ t: "SET_READY_TO_SEND", value: target >= 2 });
       } else {
         dispatch({ t: "GO_INTAKE" }); // baseline / no draft → the input screen ("Your request")
       }
@@ -687,10 +1429,10 @@ export function RfqProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // Push a history entry whenever the renter moves FORWARD (intake→step, step→next) so each is a
-  // Back-stop. Backward moves arrive via popstate (poppingRef) and must not re-push.
+  // Push an entry only on a genuine forward move. Backward moves arrive via popstate (poppingRef)
+  // and must not re-push.
   useEffect(() => {
-    const ord = phase === "wizard" ? step : phase === "intake" ? 0 : -1;
+    const ord = phase === "wizard" ? (readyToSend ? 2 : 1) : phase === "intake" ? 0 : -1;
     if (ord < 0) return; // processing / confirmation aren't part of the back/forward chain
     if (poppingRef.current) {
       poppingRef.current = false;
@@ -705,7 +1447,7 @@ export function RfqProvider({ children }: { children: ReactNode }) {
       }
     }
     lastOrdRef.current = ord;
-  }, [phase, step]);
+  }, [phase, readyToSend]);
 
   // Load the taxonomy once.
   useEffect(() => {

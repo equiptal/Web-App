@@ -23,18 +23,46 @@
 .bm-rq {
   /* The card's own hue, set by its state below. Everything that follows reads it, so a new state is
      one variable rather than a sweep through the file. */
-  --rq-accent: #e8890c;
-  --rq-tint: #fef8f0;
+  --rq-accent: var(--brand-hover);
+  /* ── ONE background for every ask (owner, 2026-09-05) ──────────────────────────────────────
+     *"I want all cards of the 3 requests in the equipment map chat to be in the same card
+     background colour: light grey and white."*
+
+     ~~A tint per state: cream while open, green once answered, red once refused — the app's
+     `alphaBlend(accent @ 6%, white)`, and the owner's own 2026-08-17 ruling that an open ask must
+     not be the palest card on the screen.~~ Withdrawn. Three asks sitting in one thread read as
+     three different KINDS of object when each carries its own fill, and the thread they sit in is
+     white: the card has to be a card first and a verdict second.
+
+     So the fill is white and the identity strip is grey, on every card. The state is not lost — it
+     is in the frame, in the ask's name and in the status row's dot, all of which still move with
+     `--rq-accent`. */
+  --rq-tint: var(--surface);
   /* 55%, the app's tinted value; its untinted 35% disappeared against a filled card. Spelled as a
      literal per state rather than mixed from `--rq-accent`: this is the card's FRAME, and a browser
      that cannot parse the mix drops the whole declaration and renders a frameless card. */
-  --rq-edge: rgba(232, 137, 12, 0.55);
-  --rq-rule: rgba(232, 137, 12, 0.22);
+  --rq-edge: color-mix(in srgb, var(--brand) 55%, transparent);
+  --rq-rule: color-mix(in srgb, var(--brand) 22%, transparent);
   background: var(--rq-tint);
   border: 1.5px solid var(--rq-edge);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  /* ── HORIZONTAL (owner, 2026-09-08: *"the card is tall, I want it more horizontal"*) ────────────
+     ~~Three stacked blocks: the identity strip, the ask, then the two buttons.~~ On a dock that fills
+     the surface beside the panel, that spent 200px of height on two short lines and left the width
+     empty. The strip is a COLUMN of the card now — the counterparty and what the ask is about on the
+     leading edge, the ask itself beside it — so the card is wider than it is tall and a thread of
+     three of them can be read without scrolling.
+
+     `wrap` is the phone: below ~360px of card the strip takes its own line back rather than
+     squeezing the ask into 90px. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  /* A CONTAINER, so the wrap below is decided by the card's own width and not by the viewport's: this
+     card lives in a dock that can be 300px wide on a 1600px screen, and a media query would have
+     kept two columns exactly where they do not fit. */
+  container-type: inline-size;
 }
 
 /* ── The card wears its state (app parity: `rentee_request_card.dart`) ────────────────────────────
@@ -48,12 +76,12 @@
    to no fill at all, where a border that fails the same way merely renders untinted. 6% is the app's
    measured value — enough to name the outcome down a scrolling thread, not enough to fight the navy
    text on top of it. */
-.bm-rq.is-open { --rq-accent: #e8890c; --rq-tint: #fef8f0; --rq-edge: rgba(232, 137, 12, 0.55); --rq-rule: rgba(232, 137, 12, 0.22); }
-.bm-rq.is-done { --rq-accent: #1daf58; --rq-tint: #f1faf5; --rq-edge: rgba(29, 175, 88, 0.55); --rq-rule: rgba(29, 175, 88, 0.22); }
-.bm-rq.is-refused { --rq-accent: #d9362a; --rq-tint: #fdf3f2; --rq-edge: rgba(217, 54, 42, 0.55); --rq-rule: rgba(217, 54, 42, 0.22); }
+.bm-rq.is-open { --rq-accent: var(--brand-hover); --rq-edge: color-mix(in srgb, var(--brand) 55%, transparent); --rq-rule: color-mix(in srgb, var(--brand) 22%, transparent); }
+.bm-rq.is-done { --rq-accent: var(--ok); --rq-edge: color-mix(in srgb, var(--ok) 55%, transparent); --rq-rule: color-mix(in srgb, var(--ok) 22%, transparent); }
+.bm-rq.is-refused { --rq-accent: var(--danger); --rq-edge: color-mix(in srgb, var(--danger) 55%, transparent); --rq-rule: color-mix(in srgb, var(--danger) 22%, transparent); }
 /* The DRAFT is the same card, in blue and lifted — the prototype's only two differences besides the
    buttons. It has to read as "not yet in the conversation" at a glance, from the frame alone. */
-.bm-rq.is-draft { border-color: #2563eb; box-shadow: 0 6px 18px rgba(37, 99, 235, 0.16); }
+.bm-rq.is-draft { border-color: var(--action); }
 
 /* ── V12c · the answer's arrival cue (owner, 2026-08-11) ─────────────────────────────────────────
    *"light plumbing or something to show the answer when opening the chat"*.
@@ -70,9 +98,9 @@
    (green, amber) is the status row's job and stays where the reader will re-read it. */
 .bm-rq.is-cued { animation: bmRqAnswer 1.6s ease-out 3 both; }
 @keyframes bmRqAnswer {
-  0% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 0 rgba(37, 99, 235, 0.3); }
-  70% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 9px rgba(37, 99, 235, 0); }
-  100% { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 0 rgba(37, 99, 235, 0); }
+  0% { }
+  70% { outline: 9px solid color-mix(in srgb, var(--info) 0%, transparent); outline-offset: 0; }
+  100% { }
 }
 /* A renter who has asked for no motion still has to be able to FIND the answer, so the cue becomes a
    still ring rather than nothing at all — it appears and leaves with the class, on the surface's own
@@ -80,7 +108,7 @@
 @media (prefers-reduced-motion: reduce) {
   .bm-rq.is-cued {
     animation: none;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(37, 99, 235, 0.24);
+    outline: 3px solid color-mix(in srgb, var(--info) 24%, transparent); outline-offset: 0;
   }
 }
 /* The identity strip — tinted, with a bottom border, and the WHOLE of the press target when the card
@@ -89,15 +117,30 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  width: 100%;
-  padding: 9px 11px;
-  /* Translucent, so it reads as a band ON the tinted card rather than as a white strip fighting it.
-     A fixed #f8fafc looked right only while every card was white. */
-  background: rgba(255, 255, 255, 0.55);
+  /* The leading COLUMN, not a banner across the top. `flex-basis` rather than a fixed width so it
+     gives way on a narrow card, and `border-inline-end` so the divider mirrors with the script. */
+  flex: 1 1 168px;
+  min-width: 168px;
+  max-width: 240px;
+  padding: 10px 11px;
+  /* LIGHT GREY on a white card (owner, 2026-09-05) — the two tones the card is now made of, and the
+     band is the grey one so the machine it names is told apart from the ask below it.
+     ~~`rgba(255,255,255,0.55)`~~: translucent white was how a band stayed visible on a card whose
+     fill moved with its state. Nothing moves now, so the band can state its own colour. */
+  background: var(--surface2);
   border: 0;
-  border-bottom: 1px solid var(--rq-rule);
+  border-inline-end: 1px solid var(--rq-rule);
   font: inherit;
   text-align: start;
+}
+/* Wrapped — a card too narrow for two columns — and the divider goes back under the strip, where the
+   stack needs it. */
+@container (max-width: 430px) {
+  .bm-rq-id {
+    max-width: none;
+    border-inline-end: 0;
+    border-bottom: 1px solid var(--rq-rule);
+  }
 }
 /* Pressable, and it says so before it is pressed — the affordance the owner asked for. A card with no
    machine (`scope: "company"`) never gets this class and stays a plain strip. */
@@ -115,37 +158,61 @@
   flex-shrink: 0;
   width: 40px;
   height: 40px;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #f1f6fb;
-  border: 1px solid #e4edf5;
+  background: var(--surface2);
+  border: 1px solid var(--surface3);
   box-sizing: border-box;
-  color: #1e4a7a;
+  color: var(--navy-mid);
 }
 /* A real photograph fills the frame — no border under it, and nothing of the tile showing through. */
-.bm-rq-tile.has-photo { background: #e9eef3; border-color: transparent; }
+.bm-rq-tile.has-photo { background: var(--surface2); border-color: transparent; }
 /* The firm, not a machine — the prototype's second gradient, so the two scopes are told apart before
    the title is read. A company card names no equipment, so there is no picture to show instead. */
-.bm-rq-tile.is-co { background: linear-gradient(135deg, #1e4a7a, #2563eb); border-color: transparent; color: #fff; }
+/* Two blues, dark into bright — the prototype ran var(--navy-mid) into var(--action), and the direction is the
+   point: the tile lifts toward the light rather than sinking. */
+/* ── The firm's mark is the app's, not this card's (owner, 2026-09-08) ───────────────────────────
+   ~~Two blues, dark into bright — the prototype's second gradient.~~ Withdrawn: *"change the company
+   icon to use the real company icons and colours used in other places"*. Everywhere else a
+   counterparty is drawn — the chat dock's header (`.bm-chat-av`), the company panel's masthead — it
+   is his initials on `var(--ok)`, so this is that, at this card's own 40px. */
+.bm-rq-tile.is-co { background: var(--ok); border-color: transparent; color: var(--surface); border-radius: 50%; }
+.bm-rq-initials { font-size: 13px; font-weight: 800; letter-spacing: 0.02em; }
 .bm-rq-tile img { width: 100%; height: 100%; object-fit: cover; }
 .bm-rq-tile .material-icons-outlined { font-size: 22px; }
 .bm-rq-who { flex: 1; min-width: 0; display: block; }
+/* 🔴 **TWO LINES, not one cut mid-word** (owner, 2026-09-22, on a card reading
+   «Case PC · Crawler Exc…»: *"the card must be clean and organized"*).
+
+   The title is the MAKE and the MACHINE in one run — «Case PC · Crawler Excavator 20 ton» — inside a
+   240px column that also holds a 40px tile, a gap and a chevron. On one `nowrap` line that leaves
+   about 130px, so the machine was clipped to three letters and the card named a make with no
+   machine after it, which is the one thing this strip exists to say.
+
+   ⚠️ Clamped at TWO, never uncapped: the column sits beside the ask's own sentence and the
+   card's height is the taller of the two, so a third line would push a two-line ask into three for
+   the sake of a title nobody needs in full. The whole string stays on `title`.
+
+   ⚠️ `-webkit-line-clamp` needs all three of `display: -webkit-box`, `-webkit-box-orient` and
+   `overflow: hidden` — it is inert without any one of them, and inert here means an unclamped title
+   growing the card, which is worse than the clip it replaces. */
 .bm-rq-t {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   font-size: 11.5px;
   font-weight: 800;
-  color: #0f2238;
+  line-height: 1.3;
+  color: var(--navy-deep);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .bm-rq-serial, .bm-rq-ref {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono-data);
   font-weight: 700;
-  color: #6b8fa8;
+  color: var(--muted);
   text-align: start;
 }
 .bm-rq-serial { display: block; margin-top: 1px; font-size: 9.5px; }
@@ -156,32 +223,42 @@
    the row rather than hiding: a code that appears only sometimes is one the reader
    has to hunt for on the one occasion he needs it. Dropped from the notification
    body entirely, where there is no such occasion. */
-.bm-rq-ref { flex-shrink: 0; font-size: 8px; font-weight: 600; color: #a9bccc; letter-spacing: 0.02em; }
-.bm-rq-go { flex-shrink: 0; font-size: 16px; color: #c8d8e8; }
+.bm-rq-ref { flex-shrink: 0; font-size: 8px; font-weight: 600; color: var(--muted-light); letter-spacing: 0.02em; }
+/* ⚠️ Pinned to the column's TRAILING EDGE, not left to sit wherever the title stops. It
+   chased the ellipsis, so it read as part of the truncated word rather than as the way into the
+   machine — and it is the same chevron `.bm-docsentry` puts at the end of its own row. `align-self`
+   keeps it on the first line of a title that now takes two. */
+.bm-rq-go { flex-shrink: 0; margin-inline-start: auto; align-self: flex-start; padding-top: 1px; font-size: 16px; color: var(--border-strong); }
 [dir="rtl"] .bm-rq-go { transform: scaleX(-1); }
-.bm-rq-body { padding: 10px 11px; }
+.bm-rq-body { flex: 1 1 200px; min-width: 0; padding: 10px 12px; }
 /* The ask's NAME, in the card's own colour and at the size the app sets (12/900).
    ~~10px, weight 800, fixed blue.~~ Two problems: it sat below the chips beneath it in the reading
    order, and a fixed blue said nothing once the card had moved to green or red. The accent is what
    separates the ask's name from the ask's SENTENCE directly under it — rendered in one colour the
    two ran together as a single dark paragraph. */
-.bm-rq-kind { font-size: 12px; font-weight: 900; color: var(--rq-accent); margin-bottom: 3px; }
+/* The ask's NAME — the card's title, and the ONE heavy line on it (owner, 2026-09-08: *"make the
+   text not bold except the title"*). */
+.bm-rq-kind { font-size: 12px; font-weight: 800; color: var(--rq-accent); margin-bottom: 3px; }
 .bm-rq-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
 .bm-rq-chip {
   font-size: 9.5px;
-  font-weight: 700;
-  color: #1c3550;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(107, 143, 168, 0.22);
+  font-weight: 600;
+  color: var(--navy);
+  /* Grey, for the same reason the strip is: translucent white on a white card is no chip at all. */
+  background: var(--surface2);
+  border: 1px solid color-mix(in srgb, var(--muted) 22%, transparent);
   /* r12 and 8/3 — the app's doc-chip geometry. */
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 3px 8px;
 }
 /* **The sentence IS the ask** (app, owner 2026-08-15) — navy and heavy, the weightiest line on the
    card after the machine's name.
    ~~11.5px at weight 600.~~ That set the instruction lighter than the chips beneath it, so the eye
    landed on «TÜV certificate» and had to climb back up to learn what to do with it. */
-.bm-rq-ask { font-size: 12px; font-weight: 800; color: #1c3550; line-height: 1.45; margin: 0 0 7px; }
+/* ~~Navy and heavy, the weightiest line on the card after the machine's name.~~ Normal weight
+   (owner, 2026-09-08): the title above it is the heavy line, and two bold blocks in a 60px body read
+   as one. The sentence is still navy, which is what separates it from the chips. */
+.bm-rq-ask { font-size: 12px; font-weight: 500; color: var(--navy); line-height: 1.5; margin: 0 0 7px; }
 /* The live status row. Dashed divider above it, because the verdict is not part of the ask — it is
    what the ask reads as RIGHT NOW, and it changes under a card that never moves. */
 .bm-rq-state {
@@ -189,35 +266,38 @@
   align-items: center;
   gap: 7px;
   padding-top: 8px;
-  border-top: 1px dashed #e4edf5;
+  border-top: 1px dashed var(--surface3);
   font-size: 10.5px;
-  font-weight: 800;
-  color: #6b8fa8;
+  font-weight: 600;
+  color: var(--muted);
 }
 .bm-rq-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: currentcolor; }
-.bm-rq-state.is-answered { color: #16a34a; }
+.bm-rq-state.is-answered { color: var(--ok); }
 /* Amber, not red: red on this surface means "not available" on a machine, and a supplier's «no» to a
    question is not that (the same rule the arrival bubble's warm fill follows). */
-.bm-rq-state.is-refused { color: #d4780a; }
+.bm-rq-state.is-refused { color: var(--warn); }
 /* `partial` — "Amber. Not 'provided', not 'declined'." (owner ruling, 2026-08-11, §8). He sent
    something other than what was asked for: never the green of an answer, and never the tone of a
    refusal he did not make. Its own amber rather than `is-refused`'s — one step deeper — so the two
    verdicts can be told apart at a glance and either can be restyled without moving the other. */
-.bm-rq-state.is-partial { color: #b45309; }
-.bm-rq-state.is-draft { color: #2563eb; }
+.bm-rq-state.is-partial { color: var(--brand-deep); }
+/* ~~`.bm-rq-state.is-draft`.~~ Gone with «Not sent yet — review it, then send» (owner, 2026-09-08):
+   a draft's row is absent now, because the two buttons under the card already say it is unsent. */
 /* Every card in a conversation carries its time (AC-16), including this one. Quiet and at the
    trailing edge — the card's subject is the ask, not the minute it was made in. */
-.bm-rq-at { margin-top: 7px; text-align: end; font-size: 9px; font-weight: 700; color: #6b8fa8; }
-.bm-rq-acts { display: flex; gap: 8px; padding: 0 11px 11px; }
+.bm-rq-at { margin-top: 7px; text-align: end; font-size: 9px; font-weight: 500; color: var(--muted); }
+/* The draft's two buttons: a row of their own at the FOOT of the whole card (it is the one thing
+   that spans both columns), which is why `flex-basis: 100%`. */
+.bm-rq-acts { flex: 0 0 100%; display: flex; gap: 8px; padding: 0 12px 11px; }
 .bm-rq-btn {
-  border-radius: 10px;
-  padding: 9px;
+  border-radius: var(--radius-md);
+  padding: 8px;
   font: inherit;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 .bm-rq-btn:disabled { opacity: 0.55; cursor: default; }
-.bm-rq-btn.ghost { flex: 1; background: #fff; border: 1.5px solid #c8d8e8; color: #1c3550; }
+.bm-rq-btn.ghost { flex: 1; background: var(--surface); border: 1.5px solid var(--border-strong); color: var(--navy); }
 /* `flex: 2` — the prototype's own weighting. The send is the action; the cancel is the way out. */
-.bm-rq-btn.go { flex: 2; background: #2563eb; border: 0; color: #fff; }
+.bm-rq-btn.go { flex: 2; background: var(--action); border: 0; color: var(--surface); }

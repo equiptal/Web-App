@@ -6,12 +6,10 @@ import {
   defaultProjectDetails,
   defaultPreferences,
   defaultOperatorDetails,
-  defaultOperatorNeeded,
   computeSummary,
   SAFETY_CERTIFICATES,
   splitSafetyCerts,
   PAYMENT_TERMS,
-  PAYMENT_METHODS,
   MAINTENANCE_RESPONSIBILITIES,
   BID_WINDOWS,
   type FuelType,
@@ -23,7 +21,6 @@ import {
   type OperatorCertificate,
   type OtherCertificate,
   type PaymentTerm,
-  type PaymentMethod,
   type MaintenanceResponsibility,
   type MaintenanceSla,
   type BidWindow,
@@ -157,6 +154,50 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
     const cap = mrf.find((m) => m?.field === `line_items[${idx}].capacity`);
     if (cap?.question_for_customer) it.sizeNote = cap.question_for_customer;
   });
+  // Field-keyed agent notes (dotted path → note) for inline rendering beside each field.
+  const fieldNotes: Record<string, string> = {};
+  for (const fn of out.field_notes ?? []) {
+    if (fn?.field && typeof fn.note === "string" && fn.note.trim()) fieldNotes[fn.field] = fn.note.trim();
+  }
+
+  /**
+   * ── The operator opens only where the RFQ actually asked for one (owner, 2026-08-26) ────────────
+   *
+   * `toItem` already reads `operator_included: null` as «no». What it could not see is the agent
+   * ASSUMING one: «4 forklifts» came back with `operator_included: true`, F.A.T sides filled and both
+   * marked «AI selected», so the panel opened on a priced term the renter had never mentioned.
+   *
+   * The agent says so itself, though — in its own two channels for «I decided this, you did not»:
+   * a `field_notes` entry on the field, or a `missing_required_fields` entry raising it as a question.
+   * Either mark means the RFQ was silent, so the line goes back to operator OFF and the F.A.T sides it
+   * dragged along are cleared: an unasked-for operator is money on a bid nobody wanted to spend.
+   *
+   * What is NOT a guess, and stays: an operator the RFQ evidenced some other way — a certificate it
+   * named, a nationality, a head count, a night shift. Those cannot be inferred from an equipment
+   * line, so their presence IS the mention.
+   */
+  const mentionedOperator = (li: RFQLineItem, it: EquipmentItem): boolean =>
+    it.operator.certificate.length > 0 ||
+    (it.operator.certificateOther ?? "").trim() !== "" ||
+    li.operator_nationality != null ||
+    li.number_of_operators != null ||
+    li.night_shift_required != null;
+  const agentGuessedOperator = (idx: number): boolean => {
+    const fields = [
+      `line_items[${idx}].operator_included`,
+      `line_items[${idx}].operator`,
+      `line_items[${idx}].fat_required`,
+    ];
+    return fields.some((f) => fieldNotes[f] != null) || mrf.some((m) => fields.includes(m?.field ?? ""));
+  };
+  (out.line_items ?? []).forEach((li, idx) => {
+    const it = items[idx];
+    if (!it || it.operatorNeeded !== "yes") return;
+    if (mentionedOperator(li, it) || !agentGuessedOperator(idx)) return;
+    it.operatorNeeded = "no";
+    it.operator = { ...it.operator, fatRequired: null, fatFood: null, fatAccommodationTransport: null };
+  });
+
   const project = toProject(out.rfq_header ?? {});
   // AC-25/26: reconcile the agent's per-item mob/demob/fuel-responsibility with the request-wide
   // "Settings for all items": all items same → lift to request-wide + clear the per-item overrides;
@@ -188,13 +229,53 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   } else if (!allSameSafety) {
     project.certificates.safety = []; // items differ → no request-wide default; per-item overrides kept
   }
-  // Field-keyed agent notes (dotted path → note) for inline rendering beside each field.
-  const fieldNotes: Record<string, string> = {};
-  for (const fn of out.field_notes ?? []) {
-    if (fn?.field && typeof fn.note === "string" && fn.note.trim()) fieldNotes[fn.field] = fn.note.trim();
-  }
+  /**
+   * ── Which of these values the agent GUESSED (owner, 2026-08-31) ──────────────────────────────
+   *
+   * *"The agent only reads the text… he will not send values other than the ones in the text."*
+   *
+   * It does send them, by instruction: *"try to fill EVERY field; null is the last resort"*. So a
+   * line that says nothing about haulage still returns `mobilization_by_rentee: true`, and the draft
+   * cannot tell that from a renter who wrote *"we'll collect it ourselves"*. `provenance.ts` then
+   * ranks it `agent`, which sits ABOVE the renter's own site — so a guess quietly beat a term they
+   * had actually stated, once, for every request on that job.
+   *
+   * The agent marks its own decisions in the two channels it already has: a `field_notes` entry on
+   * the field, or a `missing_required_fields` entry raising it as a question. The operator revert
+   * above has trusted exactly those two marks since 2026-08-26; this generalises it rather than
+   * inventing a second rule.
+   *
+   * `fuel_type_match: "defaulted"` is a third, stronger mark — the agent's own word for *"I filled
+   * this from the default map"* — and it is read here for the same reason.
+   *
+   * The VALUE is left alone. Clearing it would leave a required field unanswered, which is worse
+   * than a marked guess. Only the OWNERSHIP moves.
+   */
+  const assumedFields: string[] = [];
+  const guessed = (idx: number, field: string) =>
+    fieldNotes[`line_items[${idx}].${field}`] != null || mrf.some((m) => m?.field === `line_items[${idx}].${field}`);
+
+  (out.line_items ?? []).forEach((li, idx) => {
+    const it = items[idx];
+    if (!it) return;
+    /* Both keys per field: the request-wide one and the item's own. `reconcileRequestWide` above
+       lifts a uniform value to the request and clears the per-item override, so which key holds the
+       guess depends on whether the lines agreed — and marking a key that holds nothing costs
+       nothing, while missing the one that does costs the whole point of this. */
+    if (guessed(idx, "mobilization_by_rentee")) assumedFields.push("preferences.delivery", `line_items[${it.id}].delivery`);
+    if (guessed(idx, "demobilization_by_rentee")) assumedFields.push("preferences.return", `line_items[${it.id}].return`);
+    if (guessed(idx, "diesel_included")) assumedFields.push("preferences.fuel", `line_items[${it.id}].fuel`);
+    if (guessed(idx, "fuel_type_preference") || li.fuel_type_match === "defaulted") {
+      assumedFields.push(`line_items[${it.id}].fuel_type`);
+    }
+    if (guessed(idx, "max_equipment_age") || guessed(idx, "minimum_equipment_year")) {
+      assumedFields.push("advanced.equipment_year", `line_items[${it.id}].equipment_year`);
+    }
+  });
+
   return {
     rfqId: out.rfq_id ?? null, // A5: anchor for the web_review correction fired at submit
+    assumedFields: [...new Set(assumedFields)],
     project,
     items,
     preferences: toPreferences(out.rfq_header ?? {}), // AC-36/37/39/40: prefill Step-3 from the agent
@@ -336,7 +417,26 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     subcategoryId: li.subtype_id ?? null,
     measurementId: li.capacity_id ?? null,
   };
-  const operatorNeeded = li.operator_included == null ? defaultOperatorNeeded(ref.subcategoryId) : li.operator_included ? "yes" : "no";
+  /**
+   * The agent's silence is an answer, and it is not "yes".
+   *
+   * `defaultOperatorNeeded` is the APP's default for a line a human adds by hand — operator on for
+   * everything except generators / compressors / light towers (AC-24). Applying it to an
+   * agent-parsed line overwrote a considered non-answer: the normalization agent returns
+   * `operator_included: null` on purpose and says why — "never auto-fill — operator demand is a
+   * commercial choice, unlike fuel" — and raises a missing_required_fields entry with a suggestion
+   * instead. We were turning that into a demand for an operator on almost every item, which is a
+   * priced line the renter never asked for, and it opened the operator rail as though they had.
+   *
+   * So an agent line with nothing stated starts with the operator OFF. That is still a default, and
+   * neither side of this is truly neutral — off claims the renter drives the machine themselves. It
+   * is the cheaper wrong answer of the two, it is visible (the rail is collapsed, not quietly
+   * populated), and it carries its provenance mark like any other value we chose.
+   *
+   * The app's default still applies where it belongs: {@link newManualItem} and SET_ITEM_SUBCATEGORY,
+   * i.e. lines the renter built themselves.
+   */
+  const operatorNeeded = li.operator_included == null ? "no" : li.operator_included ? "yes" : "no";
   const safety = safetySplit(li.safety_certifications); // chips + free-text "Other" (app parity)
   const agentCert = toOperatorCert(li); // AC-50: operator cert(s) the agent set from the RFQ (empty if none)
   return {
@@ -426,7 +526,10 @@ function toProject(h: RFQHeader): ProjectDetails {
 function toPreferences(h: RFQHeader): Preferences {
   const p = defaultPreferences();
   p.payment.terms = (pick(h.payment_terms, PAYMENT_TERMS) as PaymentTerm | undefined) ?? null;
-  p.payment.method = (pick(h.payment_method, PAYMENT_METHODS) as PaymentMethod | undefined) ?? null;
+  // MREQ-AC-44 — the agent's `payment_method` inference is deliberately NOT read. The canvas offers
+  // no control for it, so reading it would submit a payment method (cash, say) that the renter never
+  // chose and cannot see anywhere in the flow. `app-adapters.ts` maps a null method to `undefined`,
+  // which the request path already accepts, so the field simply stops being sent from the web.
   p.maintenance.responsibility =
     (pick(h.maintenance_responsibility, MAINTENANCE_RESPONSIBILITIES) as MaintenanceResponsibility | undefined) ?? "supplier";
   p.maintenance.sla = h.breakdown_response_sla ? SLA_IN[h.breakdown_response_sla] ?? null : null;
@@ -500,7 +603,9 @@ export function draftToRfqCorrection(
     const licenseLevels = it.operator.certificate.map((c) => CERT_OUT[c]).filter((c): c is AgentOperatorLicenseLevel => !!c);
     const safety = (it.safetyCertsOverride ?? project.certificates.safety).map((c) => SAFETY_CERT_OUT[c]).filter(Boolean) as string[];
     return {
-      input_equipment: it.rawLabel ?? names.category ?? "",
+      // The renter's own name for an off-catalogue machine comes first: on a line the agent could not
+      // place, it is the only description anybody wrote on purpose.
+      input_equipment: it.customEquipment?.trim() || it.rawLabel || names.category || "",
       category: names.category || it.agentNames?.category || "",
       subtype: names.subtype || it.agentNames?.subtype || "",
       capacity: names.capacity || it.agentNames?.capacity || it.rawSize || "",

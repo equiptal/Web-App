@@ -28,9 +28,23 @@ export interface ProjectLocation {
   label: string | null;
   lat?: number;
   lng?: number;
-  /** AC-16: always starts unconfirmed, even when extracted; renter must confirm to advance. */
+  /**
+   * AC-16: always starts unconfirmed, even when extracted; the renter must confirm to advance.
+   *
+   * ⚠️ **One exception, ruled by the owner 2026-08-31: a location that came from a project arrives
+   * confirmed.** The renter already dropped that pin and saved it, on the project, deliberately.
+   * Asking them to confirm it again on every request for that site is asking them to re-answer a
+   * question they answered once — which is the entire thing projects exist to stop.
+   */
   confirmed: boolean;
-  source?: "agent" | "gps" | "manual" | "map";
+  /**
+   * Where the value came from, and therefore what label sits under it.
+   *
+   * `project` is not a synonym for `manual`: `Provenance` renders *From your project* for it and
+   * nothing for a manual entry, because one is worth explaining and the other is the renter looking
+   * at what they just typed.
+   */
+  source?: "agent" | "gps" | "manual" | "map" | "project";
   /** AC-47: text↔file disagreement on the location, if any. */
   conflict?: ValueConflict<string>;
 }
@@ -146,6 +160,21 @@ export interface EquipmentItem {
    * no-match item regardless (AC-33), and `itemBlocksAdvance` lets it through.
    */
   sourcingRequested?: boolean;
+  /**
+   * The renter's OWN name for a machine the catalogue cannot place (off-catalogue equipment).
+   *
+   * Set only on a `no-match` line, and the one thing that makes such a line postable: with it the
+   * request goes out carrying `customEquipmentName` and NO taxonomy ids; without it the line is
+   * dropped exactly as before (`postableItems`).
+   *
+   * ⚠️ Not `rawLabel`. That is the AGENT's echo of the words in the RFQ, a display aid we may
+   * re-derive at any time; this is the renter's answer, typed and owned by him. The box is prefilled
+   * from `rawLabel` at render time so the ordinary case costs one glance, but the prefill is never
+   * written into state — a value nobody looked at must not reach a supplier.
+   *
+   * Cleared when the renter picks a subtype: the line is no longer off-catalogue, and the ids win.
+   */
+  customEquipment?: string | null;
 
   // Per-item options:
   quantity: number; // AC-55 default 1, min 1
@@ -208,6 +237,36 @@ export interface AgentDraft {
   /** Mansour's stored RFQ id (when parsed by the real agent) — anchors the web_review correction fired
    *  at submit if the renter edited the draft. null for the mock/manual flow. */
   rfqId?: string | null;
+  /**
+   * The paths the AGENT filled from its own judgement rather than from the renter's text.
+   *
+   * ── Why this exists ─────────────────────────────────────────────────────────────────────────────
+   *
+   * `provenance.ts` states the rule: **renter > agent > project > default**, and it names delivery and
+   * return as `default` values — *"both seed to «me», which assigns the renter both transport legs"*.
+   *
+   * The agent breaks that ordering from underneath. Its own instructions tell it to fill EVERY field
+   * — *"null is the last resort"* — so a line that says nothing about haulage still comes back with
+   * `mobilization_by_rentee: true`, and the draft cannot tell that from a renter who wrote *"we'll
+   * collect it ourselves"*. A guess then reads as `agent`, which outranks the renter's own SITE.
+   *
+   * That is the wrong way round (owner, 2026-08-31): *"the agent only reads the text… he will not
+   * send values other than the ones in the text"*. A project's standing answer must beat a guess.
+   *
+   * ── How the agent tells us ──────────────────────────────────────────────────────────────────────
+   *
+   * It says so itself, in the two channels it already has for *«I decided this, you did not»*: a
+   * `field_notes` entry on the field, or a `missing_required_fields` entry raising it as a question.
+   * `agent-adapters` already trusts exactly those two marks to un-assume an operator; this is the
+   * same rule, written down once and applied to every field that has a project-supplied counterpart.
+   *
+   * The VALUE stays — clearing it would leave a required field unanswered, which is a worse answer
+   * than a marked guess. What changes is who owns it: not the agent, so the project and the template
+   * can fill over it, and the badge stops crediting the renter's own words for something they never
+   * said.
+   */
+  assumedFields?: string[];
+
   project: ProjectDetails;
   items: EquipmentItem[];
   /** Step-3 preferences the agent inferred (payment/maintenance/budget/filters). Renter edits in Step 3. */
@@ -233,6 +292,9 @@ export interface RfqDraft {
   /** Mansour's stored RFQ id — see {@link AgentDraft.rfqId}. Persisted with the draft so a correction
    *  can be fired at submit even after a reload. */
   rfqId?: string | null;
+  /** See {@link AgentDraft.assumedFields}. Persisted with the draft. */
+  assumedFields?: string[];
+
   project: ProjectDetails;
   items: EquipmentItem[];
   preferences: Preferences;
@@ -242,14 +304,85 @@ export interface RfqDraft {
   justifications?: string[];
   /** Field-keyed agent notes (dotted path → note), rendered inline beside each field. */
   fieldNotes?: Record<string, string>;
+  /**
+   * MREQ-AC-56/59/60 — dotted paths the renter has personally edited, in the same key vocabulary as
+   * {@link AgentDraft.fieldNotes} (e.g. `line_items[m101].equipment_year`).
+   *
+   * **Web-only. Never sent to either backend.** It exists because three provenances collapse to the
+   * same stored value: a field the agent filled, a field we defaulted, and a field the renter
+   * deliberately set to the same thing are indistinguishable by value alone. `agentMatches` separates
+   * agent from non-agent; this separates our default from the renter's own choice, which is what the
+   * "Default" badge and the year/certificate gates both hang on.
+   *
+   * Persisted with the draft, so a control the renter already answered does not demand attention
+   * again after a reload.
+   */
+  touchedFields?: string[];
+
+  /**
+   * PROJ - the dotted paths a PROJECT filled, so the canvas can say where a value came from.
+   *
+   * A fourth thing that is invisible in the value alone. `touchedFields` separates the renter from
+   * us and `agentMatches` separates the agent from us; this separates a value the SITE supplied from
+   * one we simply defaulted, which is the difference between *"Qiddiya runs 10-hour days"* and
+   * *"we guessed 10"*. A renter who cannot tell those apart cannot know which one is worth checking.
+   *
+   * Written once by `applyProjectDefaults`, from the `filled` list it returns. Persisted with the
+   * draft, and never read back by the project: the copy stands alone from the moment it is made.
+   */
+  projectFields?: string[];
+
+  /**
+   * PROJ - the site this draft is filed under, and the work order it was started from.
+   *
+   * Both are LABELS. Every value the site supplied was already copied into the fields above, so the
+   * draft never reads its project again and a site edited next month cannot reach a request written
+   * today. They ride to the backend on submit unchanged.
+   */
+  projectId?: string | null;
+  workOrderGroupId?: string | null;
+  /** Set when the flow was opened from a store — submits as DIRECT to that supplier alone. */
+  direct?: DirectTarget | null;
 }
 
 /** Posted to /api/requests (AC-42/43). Mirrors the shared app request shape. */
+/**
+ * The single supplier a request is addressed to, when it was started from a store.
+ *
+ * The app has had this since Epic 008: opening the create flow from a store carries the supplier, and
+ * the request is filed as DIRECT rather than broadcast — same form, same endpoint, one recipient. The
+ * web now enters through the same door, so `supplierId` here is the app's integer user id, carried as
+ * a string only because that is what the store payloads speak.
+ */
+export interface DirectTarget {
+  supplierId: string;
+  supplierName: string | null;
+  /** The store the renter came from — provenance, and where «back to the store» returns to. */
+  storeId: string | null;
+}
+
 export interface RfqRequestPayload {
   project: ProjectDetails;
   /** Excludes items flagged not-available / removed (AC-33/34). */
   items: EquipmentItem[];
   preferences: Preferences;
+  /**
+   * PROJ — the site this was filed under.
+   *
+   * A LABEL, nothing more. Every value above was already copied into this payload, so the request
+   * never reads its project again and a project edit cannot reach it silently.
+   *
+   * There is no `projectVersion`: the copies ARE the record of what the site's terms were at submit,
+   * held in full rather than by reference, so a version number would be a weaker second answer to a
+   * question already answered here.
+   *
+   * `workOrderGroupId` is provenance only — set when the renter started from one — and changes no
+   * rendering: a work order also posted as a request is deliberately two rows on the chart.
+   */
+  projectId?: string | null;
+  workOrderGroupId?: string | null;
+  /** Present when the flow was opened from a store — the adapter files it as DIRECT to this supplier. */
+  direct?: DirectTarget | null;
 }
 
 /* ----------------------------- Defaults / factories ----------------------------- */
@@ -264,9 +397,22 @@ export function defaultProjectDetails(): ProjectDetails {
       equipmentYear: null,
     },
     certificates: { safety: [], safetyOther: "", other: [] },
-    deliveryToSite: "me",
-    returnFromSite: "me",
-    fuelResponsibility: "me",
+    /* ── UNANSWERED, not «me» (owner, 2026-09-08) ─────────────────────────────────────────────────
+     *
+     * ~~All three seeded to «me».~~ The agent now returns `null` for anything the RFQ did not state,
+     * and these three seeds turned that silence into a definite answer: the renter collects the
+     * machine, returns it, and pays for the fuel. Three priced commitments nobody made, and the gates
+     * that exist for them (`gate.deliveryMissing`, `gate.returnMissing`, `gate.fuelPartyMissing`)
+     * could never fire, because the fields were full from the first render.
+     *
+     * Null now, so the controls read empty, the panel dot stays amber, and a refused advance marks
+     * each one «* Required» in red — which is the renter answering rather than us guessing on his
+     * behalf. `applyProjectDefaults` still fills them from the renter's OWN site, which is his answer
+     * given once, and an agent line that stated a side still arrives with it.
+     */
+    deliveryToSite: null,
+    returnFromSite: null,
+    fuelResponsibility: null,
   };
 }
 

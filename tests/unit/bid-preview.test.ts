@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { extractBidToken, buildBidMetadata, type BidPreview } from "@/lib/api/bidPreview";
+import { extractBidToken, buildBidMetadata, OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH, type BidPreview } from "@/lib/api/bidPreview";
 
 /**
  * Link-preview (Open Graph) metadata for `/bid/{slug}-{groupId}`.
@@ -50,6 +50,33 @@ describe("extractBidToken", () => {
   });
 });
 
+describe("the card every client reads", () => {
+  it("Given any request, Then the image declares its size and type", () => {
+    /**
+     * ── ONE preview, for every channel that draws one (owner, 2026-09-02) ────────────────────────
+     *
+     * The card is not an e-mail feature or a WhatsApp feature: it is Open Graph, and WhatsApp,
+     * Telegram, Slack, iMessage, LinkedIn and **Outlook.com** all read the same tags. Declaring the
+     * width, height and type is what lets a client lay it out before the picture arrives, and what
+     * makes it pick the LARGE card over a thumbnail — an unfurler that has to fetch the image just
+     * to measure it will sometimes time out and draw text only.
+     */
+    const og = buildBidMetadata({
+      preview: null,
+      slug: "abc",
+      lang: "en",
+      origin: "https://webstaging.moedatech.net",
+    }).openGraph as { images: { url: string; width: number; height: number; type: string; secureUrl?: string }[] };
+
+    const img = og.images[0];
+    expect(img.width).toBe(OG_IMAGE_WIDTH);
+    expect(img.height).toBe(OG_IMAGE_HEIGHT);
+    expect(img.type).toBe("image/png");
+    // Absolute and https, or the older clients that read only `secure_url` draw nothing.
+    expect(img.secureUrl).toBe("https://webstaging.moedatech.net/bid/abc/og");
+  });
+});
+
 describe("buildBidMetadata", () => {
   it("Given a preview, When building metadata, Then og:* carry the backend's copy", () => {
     const m = buildBidMetadata({ preview, slug: "excavator-riyadh-11111111-2222-3333-4444-555555555555", lang: "en" , origin: STAGING });
@@ -57,9 +84,17 @@ describe("buildBidMetadata", () => {
     expect(m.title).toBe(EN.title);
     expect(m.openGraph?.title).toBe(EN.title);
     expect(m.openGraph?.description).toBe(EN.description);
-    // The backend's image, honoured as sent — it resolves to the same asset the emailed card uses, so
-    // a supplier meeting this link twice sees one picture.
-    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(preview.imageUrl);
+    /**
+     * OUR card, even though the preview named one.
+     *
+     * ⚠️ `preview.imageUrl` is not a rendering of the request. `previewImageUrl()` in the agents
+     * backend is a CONSTANT — `${WEB_APP_URL}/og-bid.png`, the same 19 KB file for every request ever
+     * shared (verified against the live endpoint, 2026-09-01). It is always set, so preferring it
+     * meant our own per-request card was never reached and every link carried a picture of nothing.
+     */
+    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(
+      `${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555/og`,
+    );
     // The shared URL, not the extracted token — clients relabel the card if the canonical disagrees.
     expect(m.openGraph?.url).toBe(`${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555`);
     expect(m.alternates?.canonical).toBe(`${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555`);
@@ -78,9 +113,39 @@ describe("buildBidMetadata", () => {
 
     expect(m.title).toBe("Bid request");
     expect(m.description).toBe("Submit a bid on an equipment request — no account needed.");
-    // Branding survives an unreachable backend — and the fallback image is made absolute from the
-    // request host too, so it can never point at prod from a staging page.
-    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(`${STAGING}/og-bid.png`);
+    /**
+     * ~~The generic file.~~ Even with no preview, THIS app's `og` route is the better picture: it
+     * draws the same card and re-fetches the preview itself, so a backend that answered late still
+     * produces a real card. It is absolute from the request host, so it can never point at prod from
+     * a staging page — which is what this test was written for.
+     */
+    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(
+      `${STAGING}/bid/11111111-2222-3333-4444-555555555555/og`,
+    );
+  });
+
+  it("Given the backend's generic file, When building metadata, Then our own card is used instead", () => {
+    /**
+     * SUP-T02, found against the owner's own production token. The generic file is what the backend
+     * always sends, so this is the ordinary case rather than an edge one — and the same assertion
+     * holds whether `imageUrl` is the constant or empty.
+     */
+    const m = buildBidMetadata({
+      preview: { ...preview, imageUrl: `${STAGING}/og-bid.png` },
+      slug: "excavator-riyadh-11111111-2222-3333-4444-555555555555",
+      lang: "en",
+      origin: STAGING,
+    });
+    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(
+      `${STAGING}/bid/excavator-riyadh-11111111-2222-3333-4444-555555555555/og`,
+    );
+  });
+
+  it("Given Arabic, When falling back to our own card, Then the card is asked for in Arabic too", () => {
+    const m = buildBidMetadata({ preview: null, slug: "abc-11111111-2222-3333-4444-555555555555", lang: "ar", origin: STAGING });
+    expect((m.openGraph as { images?: { url: string }[] }).images?.[0].url).toBe(
+      `${STAGING}/bid/abc-11111111-2222-3333-4444-555555555555/og?lang=ar`,
+    );
   });
 
   it("Given a staging host, When building metadata, Then no URL points at production", () => {

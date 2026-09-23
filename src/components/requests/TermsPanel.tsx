@@ -1,4 +1,5 @@
 import type { TermRow } from "@/lib/contract/bids";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Per-term status inside the inline Terms dropdown. `agreed`/`negotiating` are the live deal-room
@@ -52,7 +53,7 @@ export function TermsPanel({
     );
 
   return (
-    <div className="terms-panel row-sep">
+    <div {...pin("terms-panel")} className="terms-panel row-sep">
       {bucket(L("Equipment terms", "شروط المعدة"), terms.equipment)}
       {bucket(L("Project terms", "شروط المشروع"), terms.contract)}
       {bucket(L("Documents", "المستندات"), terms.supplier)}

@@ -171,11 +171,15 @@ export interface RenteeAsk {
  * request names a machine, and both are company papers the panel merely displays. They stay in this
  * note because a listing can still carry a `saso`-stemmed type of its own — see the warning below.
  *
- * ⚠️ **No alias is added for any SASO spelling, and that is the point.** `saso` (the firm's
- * registration), `saso_registration` and `saso_inspection` (a machine's papers) and the bare `saso` a
- * listing can carry for its safety cert are FOUR different things sharing a stem. Folding any of them
- * together would have the supplier upload the wrong paper — so each is left exactly as written, and
- * only the machine's own `documentKeys` ever answer an ask.
+ * ⚠️ **The SASO CERTIFICATE folds; the SASO REGISTRATION never does** (owner, 2026-09-05, and the
+ * backend has said the same since 2026-08-12). `saso_registration` is a PROOF OF OWNERSHIP and
+ * `saso` / `saso_inspection` / `saso_technical_inspection` are one safety certificate under three
+ * spellings — a machine files a fresh one as `saso_technical_inspection`, a legacy request asks for
+ * bare `saso`. Leaving all four apart, as this table used to, meant an ask for the certificate could
+ * never be answered by the certificate: the renter read «waiting» over a paper sitting on the file.
+ * The three certificate spellings are folded to one below, exactly as `apps/backend/src/services/
+ * utils/document-type.ts` folds them, and the registration is absent so an ownership paper can never
+ * close an ask for a safety certificate.
  */
 const DOC_TYPE_ALIASES: Record<string, string> = {
   // The four photo slots §6.6 shows, as the wire stores them.
@@ -212,6 +216,10 @@ const DOC_TYPE_ALIASES: Record<string, string> = {
   customs: "custom_card",
   tuv: "tuv_cert",
   spsp: "spsp_cert",
+  // The safety certificate, under every spelling the platform writes it in. NOT `saso_registration`.
+  saso_cert: "saso",
+  saso_inspection: "saso",
+  saso_technical_inspection: "saso",
 };
 
 /** One surface name → the key the backend will accept.

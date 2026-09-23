@@ -1,0 +1,601 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { Icon } from "@/components/ui";
+import { btn, cx } from "@/lib/ds";
+import { fmt, useT } from "@/lib/i18n";
+import { addRenterSuppliersBulk, type BulkResult } from "@/lib/api/client";
+import {
+  SHEET_MAX_ROWS,
+  contactable,
+  guessField,
+  mapRows,
+  parseSheet,
+  type MappedRow,
+  type SheetField,
+  type SheetTable,
+} from "@/lib/contract/sheet-paste";
+import { normalizePhone, phoneE164, type PhoneProblem } from "@/lib/contract/phone-normalize";
+import { readXlsxSheet } from "@/lib/contract/xlsx-sheet";
+
+/**
+ * SUP-T23 — importing a supplier list, INSIDE the add dialog rather than beside it.
+ *
+ * ── Not a second button (owner, 2026-09-01) ─────────────────────────────────────────────────────
+ *
+ * *Add* and *Import* were two controls in the page header for one intention: put my suppliers in. A
+ * renter with a file had to guess which door was his before he could see what either one asked for.
+ * So there is one door, and the choice between typing and uploading is made inside it, where both
+ * options are visible at once.
+ *
+ * ── A file, not a paste (owner, 2026-09-01) ─────────────────────────────────────────────────────
+ *
+ * The paste box is gone. It read as the primary route — a large textarea above a small button — and
+ * it asked the renter to do something he does not think of doing: select rows in Excel and copy
+ * them. Choosing a file is the thing he already knows how to do.
+ *
+ * ── The rows come first, and they can be corrected in place (owner, 2026-09-02) ─────────────────
+ *
+ * The mapping led and the rows followed, which put the abstract half first: a renter opening this has
+ * a file in his head, not a set of column assignments, and the first thing he wants is to see his own
+ * data. So the preview leads and the mapping sits under it, as the thing you adjust when a column
+ * came out wrong.
+ *
+ * And every cell is editable. A sheet is somebody's working document — a phone typed as *call the
+ * office*, a name left blank on one line — and the alternative to fixing it here was to close the
+ * dialog, open Excel, fix it there, save, and start again. The edits apply to this import only; the
+ * file on disk is never touched.
+ *
+ * ── The rule is stated, not discovered ──────────────────────────────────────────────────────────
+ *
+ * **A supplier needs a company name, and an e-mail or a phone.** That is `importable`, and it used to
+ * be invisible until a row was refused for breaking it. It is said at the top now, and every skipped
+ * row says which half it is missing.
+ *
+ * ── The mapping is shown, not assumed ───────────────────────────────────────────────────────────
+ *
+ * Headers are guessed, and every guess is a dropdown he can change before anything is written.
+ * Guessing saves clicks; guessing silently would put a phone number in the wrong column of forty
+ * suppliers and nobody would find out until a match failed.
+ *
+ * ── The backend decides, and says so before it writes ───────────────────────────────────────────
+ *
+ * `dryRun: true` runs the whole decision and writes nothing, so the renter reads what WILL happen —
+ * which rows are refused, which will merge into a supplier he already has, which came in mangled —
+ * while he can still fix the file. Guessing that here would mean two implementations of one rule and
+ * one of them wrong.
+ *
+ * **A merge fills blanks only and never overwrites**, so re-importing a corrected sheet does not
+ * update anything: a phone he fixed in the app stays fixed, and a phone he fixed in the sheet does
+ * not arrive. Said on the screen, because the alternative is a renter who believes he has updated
+ * forty suppliers and has not.
+ *
+ * ── Excel itself, and the numbers in it (owner, 2026-09-08) ────────────────────────
+ *
+ * *"Can't we add xlsx?"* and *"normalize the numbers"* — one change, because they are one problem.
+ *
+ * The import took CSV only, so a renter had to save his workbook as CSV first, and that step is what
+ * broke the phone column: Excel stores `966503372850` as a NUMBER, shows it as `9.66503E+11`, and
+ * writes the displayed text into the CSV. The digits are gone by the time we read the file, and the
+ * screen showed the mangled text without comment while the backend quietly stored NULL for it.
+ *
+ * So: `.xlsx` is read directly (`xlsx-sheet.ts`, no dependency — a zip and four XML tags), and every
+ * phone is normalised to E.164 IN THE PREVIEW (`phone-normalize.ts`), which means the renter reads
+ * the number that will actually be saved. A cell Excel already truncated says so and names the cure,
+ * because 9.66503×10¹¹ cannot be turned back into a phone number by anybody.
+ *
+ * ── Nothing in the file is lost ─────────────────────────────────────────────
+ *
+ * Four fields are ours. Every other column rides along under `extra` with its own header — payment
+ * terms, account manager, whatever the firm keeps. A supplier list is somebody working document,
+ * and an import that quietly drops half of it is not an import.
+ */
+export function SupplierImportPanel({ onDone, onCancel }: { onDone: (msg: string) => void; onCancel: () => void }) {
+  const t = useT();
+  const c = t.suppliers;
+
+  /** The sheet as READ — by the CSV parser or the workbook reader. Corrections live in `edits`. */
+  const [parsed, setParsed] = useState<SheetTable | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [mapping, setMapping] = useState<SheetField[]>([]);
+  const [vendor, setVendor] = useState<boolean[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  /** What the backend says it would do. Null until the file is read, then re-run on every remap. */
+  const [plan, setPlan] = useState<BulkResult | null>(null);
+  const [planning, setPlanning] = useState(false);
+
+  /** Cell corrections, keyed `row:column`. This import only — the file on disk is never touched. */
+  const [edits, setEdits] = useState<Record<string, string>>({});
+
+  /** The sheet as the renter has corrected it. Everything below reads this, never the raw parse. */
+  const table: SheetTable | null = useMemo(() => {
+    if (!parsed) return null;
+    if (!Object.keys(edits).length) return parsed;
+    return {
+      ...parsed,
+      rows: parsed.rows.map((cells, r) => cells.map((v, i) => edits[`${r}:${i}`] ?? v)),
+    };
+  }, [parsed, edits]);
+
+  /** Which columns hold a phone. Recomputed with the mapping, since the renter can change it. */
+  const phoneCols = useMemo(() => mapping.flatMap((f, i) => (f === "phone" ? [i] : [])), [mapping]);
+
+  /**
+   * The sheet as it will be SAVED: every phone in E.164 (owner, 2026-09-08: *"normalize the
+   * numbers"*).
+   *
+   * Normalising for the eye and again for the wire would be two answers to one question, so there is
+   * one table and both the preview and the payload read it. A cell that cannot be normalised keeps
+   * the renter's own text — it is his to correct, and replacing it with an empty box would hide what
+   * the file said.
+   */
+  const view: SheetTable | null = useMemo(() => {
+    if (!table || phoneCols.length === 0) return table;
+    return {
+      ...table,
+      rows: table.rows.map((cells) =>
+        cells.map((v, i) => {
+          if (!phoneCols.includes(i)) return v;
+          const out = normalizePhone(v);
+          return out && "e164" in out ? out.e164 : v;
+        }),
+      ),
+    };
+  }, [table, phoneCols]);
+
+  const rows = view ? mapRows(view, mapping) : [];
+
+  /** The add rule, shared with the typed form — `contactable` in `sheet-paste.ts` says why. */
+  const ready0 = (r: MappedRow): boolean => contactable(r, (v) => phoneE164(v) != null);
+
+  const ready = rows.filter(ready0);
+  const skipped = rows.length - ready.length;
+
+  /** What is wrong with a row's phone, if anything — a warning even on a row that has an e-mail. */
+  const phoneTrouble = (r: MappedRow): PhoneProblem | null => {
+    const out = normalizePhone(r.phone);
+    return out && "problem" in out ? out.problem : null;
+  };
+
+  /** One payload, used for the preview and for the write — so the two cannot describe different rows. */
+  const payload = () =>
+    rows
+      .map((r, i) => ({ r, v: vendor[i] !== false }))
+      .filter(({ r }) => ready0(r))
+      .map(({ r, v }) => ({
+        name: r.name.trim(),
+        contactName: r.contactName.trim() || null,
+        email: r.email.trim() || null,
+        phone: r.phone.trim() || null,
+        extra: r.extra,
+        vendorRegistered: v,
+      }));
+
+  /**
+   * Ask the backend what it would do. Writes nothing.
+   *
+   * ⚠️ It was a button — *Check the file first* — and it should never have been (owner, 2026-09-02).
+   * The renter has to press it to learn the two things only the backend knows: which rows would MERGE
+   * into a supplier he already has, and which are duplicates of each other. Those are not optional
+   * details he might want; they are the difference between "8 new suppliers" and "6 new and 2
+   * updated". A fact that changes what the button means cannot sit behind a second button.
+   *
+   * So it runs itself, on every change to the sheet, the mapping or a cell. `key` is what stops it
+   * re-running for a change that cannot alter the answer.
+   */
+  const key = table ? JSON.stringify([mapping, table.rows]) : "";
+
+  useEffect(() => {
+    if (!table || !ready.length) {
+      setPlan(null);
+      return;
+    }
+    let live = true;
+    setPlanning(true);
+    const id = setTimeout(async () => {
+      try {
+        const result = await addRenterSuppliersBulk(payload(), true);
+        if (live) setPlan(result);
+      } catch {
+        // A failed check must not block the import: the write reports the same three arrays.
+        if (live) setPlan(null);
+      }
+      if (live) setPlanning(false);
+    }, 400);
+    return () => {
+      live = false;
+      clearTimeout(id);
+    };
+    // `payload` closes over the current rows and vendor flags; `key` is what actually changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  const reset = () => {
+    setPlan(null);
+    setEdits({});
+    setParsed(null);
+    setFileName(null);
+    setMapping([]);
+    setVendor([]);
+    setError(null);
+    setSaving(false);
+  };
+
+  const onFile = async (file: File) => {
+    setError(null);
+    /* 2 MB, before anything is read: the cap is about the renter's file, not about our parser, and
+       telling him after a slow read would be telling him late. */
+    if (file.size > 2 * 1024 * 1024) {
+      setError(c.importTooBig);
+      return;
+    }
+
+    const name = file.name.toLowerCase();
+
+    /* ── A workbook is read as a workbook (owner, 2026-09-08) ────────────────────────
+       It used to be refused with "save it as CSV first", which is a chore AND a trap: the CSV is
+       where a 12-digit phone becomes `9.66503E+11`. `.xlsm` is the same OOXML container with macros
+       we never execute — we read four XML parts out of a zip. */
+    if (/\.(xlsx|xlsm)$/.test(name)) {
+      const out = await readXlsxSheet(await file.arrayBuffer());
+      if (typeof out === "string") {
+        setError(out === "not-a-workbook" ? c.xlsxUnreadable : c.importUnreadable);
+        return;
+      }
+      setParsed(out);
+      setEdits({});
+      setFileName(file.name);
+      setMapping(out.headers.map(guessField));
+      /* 🔴 **Off, like the typed form** (owner, 2026-09-08). A spreadsheet of contacts is not a
+       list of approved vendors, and a column of green ticks nobody set is the fastest way to make
+       the flag worthless. He marks the ones that are. */
+    setVendor(out.rows.map(() => false));
+      setPlan(null);
+      return;
+    }
+
+    /* `.xls` is OLE2 and `.numbers` / `.ods` are other containers entirely — three formats, one
+       sentence, and it names the two ways out rather than just saying no. */
+    if (/\.(xls|numbers|ods)$/.test(name)) {
+      setError(c.xlsxNotRead);
+      return;
+    }
+
+    const raw = await file.text();
+    const table = parseSheet(raw);
+    setParsed(table);
+    setEdits({});
+    setFileName(file.name);
+    setError(table ? null : c.importUnreadable);
+    setMapping(table ? table.headers.map(guessField) : []);
+    setVendor(table ? table.rows.map(() => true) : []);
+    setPlan(null);
+  };
+
+  const save = async () => {
+    if (!ready.length || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await addRenterSuppliersBulk(payload());
+      // Partial success is the normal outcome, so the message counts all three rather than claiming
+      // everything landed.
+      const created = result?.created?.length ?? ready.length;
+      const merged = result?.merged?.length ?? 0;
+      const rejected = result?.rejected?.length ?? 0;
+      onDone(
+        rejected || merged ? fmt(c.importedMixed, { n: created, merged, rejected }) : fmt(c.imported, { n: created }),
+      );
+      reset();
+    } catch {
+      setError(c.importFailed);
+      setSaving(false);
+    }
+  };
+
+  /** Which half of the rule this row breaks — the renter's words, not the backend's code. */
+  const whySkipped = (r: (typeof rows)[number]): string => {
+    if (!r.name.trim()) return c.rMissingName;
+    // A row whose phone was TYPED but could not be read is a different mistake from a row with no
+    // contact at all, and only one of the two is fixed by typing a number in.
+    const trouble = phoneTrouble(r);
+    if (trouble) return trouble === "truncated" ? c.rPhoneTruncated : c.rPhoneUnreadable;
+    return c.rMissingContact;
+  };
+
+  const FIELDS: SheetField[] = ["name", "contactName", "email", "phone", "extra", "skip"];
+  const fieldLabel: Record<SheetField, string> = {
+    name: c.fName,
+    contactName: c.fContact,
+    email: c.fEmail,
+    phone: c.fPhone,
+    // Still in the parser's union so an old mapping deserialises, but never offered: a renter does not
+    // hold his suppliers' commercial registrations, and a column of half-remembered ones is worse than
+    // no column (owner, 2026-09-01). A file that carries one keeps it as an extra.
+    crNumber: c.keepAsExtra,
+    extra: c.keepAsExtra,
+    skip: c.ignoreColumn,
+  };
+
+  if (!table) {
+    return (
+      <div className="grid gap-3">
+        <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface2 px-4 py-8 text-center transition hover:border-brand hover:bg-brand-soft">
+          <Icon name="upload_file" size={26} className="text-muted" />
+          <b className="text-body font-extrabold text-navy">{c.chooseCsv}</b>
+          <span className="text-meta text-muted">{c.importHint}</span>
+          <input
+            type="file"
+            accept=".xlsx,.xlsm,.csv,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
+          />
+        </label>
+        {error && <p className="text-meta font-extrabold text-danger-deep">{error}</p>}
+        <div className="flex justify-end">
+          <button type="button" onClick={onCancel} className={btn("ghost", "md")}>
+            {t.common.cancel}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex items-center gap-2.5 rounded-md border border-border-strong bg-surface2 px-3 py-2.5">
+        <span className="grid h-8 w-8 flex-none place-items-center rounded-sm bg-navy text-surface">
+          <Icon name="table_view" size={16} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <b className="block text-body font-extrabold text-navy">{fileName}</b>
+          <span className="block text-meta text-muted">
+            {fmt(c.rowsColumns, { rows: table.rows.length, cols: table.headers.length })}
+            {table.rows.length === SHEET_MAX_ROWS && <> · {c.cappedAt}</>}
+          </span>
+        </span>
+        {/* Where starting over lives now: on the file, which is the thing being replaced. */}
+        <button
+          type="button"
+          onClick={reset}
+          title={c.chooseAnother}
+          aria-label={c.chooseAnother}
+          className="grid h-7 w-7 flex-none place-items-center rounded-sm text-muted transition hover:bg-surface3 hover:text-navy"
+        >
+          <Icon name="close" size={14} />
+        </button>
+      </div>
+
+      {/* ── The rows, first (owner, 2026-09-02) ──────────────────────────────────────────────────
+          The mapping used to lead, which put the abstract half first: a renter opening this has a
+          file in his head, not a set of column assignments. His own data leads now, and the mapping
+          under it is what he adjusts when a column came out wrong. */}
+      <div className="grid gap-1.5">
+        <span className="flex items-center gap-2 text-label font-extrabold uppercase tracking-wide text-muted">
+          {c.preview}
+          {/* The rule, said rather than discovered when a row is refused for breaking it. */}
+          <span className="font-semibold normal-case tracking-normal text-muted">{c.importRule}</span>
+        </span>
+        <div className="max-h-[260px] overflow-auto rounded-md border border-border">
+          <table className="w-full border-collapse text-meta">
+            <thead>
+              <tr>
+                <th className="border-b border-border bg-surface2 px-2.5 py-1.5 text-start text-label font-extrabold uppercase text-muted">
+                  {c.colVendor}
+                </th>
+                {table.headers.map((h, i) => (
+                  <th
+                    key={i}
+                    className="whitespace-nowrap border-b border-border bg-surface2 px-2.5 py-1.5 text-start text-label font-extrabold uppercase text-muted"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(view ?? table).rows.map((cells, r) => {
+                const ok = ready0(rows[r]);
+                return (
+                  <tr key={r} className={cx("border-b border-border last:border-b-0", !ok && "bg-danger-soft/40")}>
+                    <td className="px-2.5 py-1.5 align-top">
+                      {/* Per row, because a batch always has an exception. */}
+                      <input
+                        type="checkbox"
+                        disabled={!ok}
+                        checked={ok && vendor[r] !== false}
+                        onChange={(e) => setVendor((v) => v.map((x, n) => (n === r ? e.target.checked : x)))}
+                        className="mt-1 h-3.5 w-3.5 accent-ok"
+                      />
+                    </td>
+                    {cells.map((v, i) => (
+                      <td key={i} className="px-1 py-1 align-top">
+                        {/* ── Editable, in place ───────────────────────────────────────────────
+                            A sheet is somebody's working document: a phone typed as «call the
+                            office», a name left off one line. The alternative was to close this,
+                            open Excel, fix it, save, and start again. This import only — the file
+                            on disk is never touched. */}
+                        <input
+                          value={v}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setEdits((m) => ({ ...m, [`${r}:${i}`]: next }));
+                            // The plan described the sheet before this edit.
+                            setPlan(null);
+                          }}
+                          className={cx(
+                            "w-full min-w-[110px] rounded-sm border border-transparent bg-transparent px-1.5 py-0.5 outline-none focus:border-brand focus:bg-surface",
+                            ok ? "text-navy" : "text-muted-dark",
+                          )}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* The phones were rewritten on the way in, so the screen says so once rather than leaving the
+            renter to wonder why his sheet's `0503372850` now reads `+966503372850`. */}
+        {phoneCols.length > 0 && <span className="text-meta text-muted">{c.phonesNormalized}</span>}
+
+        {/* A phone the file lost. Its own line, not a rejection reason: the row may still be
+            importable on its e-mail, and the cure is the workbook rather than a correction here. */}
+        {rows.some((r) => phoneTrouble(r) === "truncated") && (
+          <div className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-meta text-warn-deep">
+            <Icon name="error_outline" size={14} className="mt-px flex-none" />
+            <span>{c.phoneTruncated}</span>
+          </div>
+        )}
+
+        {/* Which rows, and which half of the rule each one breaks — not a count at the bottom. */}
+        {skipped > 0 && (
+          <div className="grid gap-1 rounded-md bg-danger-soft/50 px-3 py-2 text-meta text-danger-deep">
+            {rows.map((r, i) =>
+              ready0(r) ? null : (
+                <span key={i} className="flex items-start gap-2">
+                  <Icon name="error_outline" size={14} className="mt-px flex-none" />
+                  {fmt(c.planRejected, { row: i + 1, reason: whySkipped(r) })}
+                </span>
+              ),
+            )}
+            <span className="text-muted-dark">{c.fixHere}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-1.5">
+        <span className="flex items-center gap-2 text-label font-extrabold uppercase tracking-wide text-muted">
+          {c.matchColumns}
+          {/* ⚠️ The middle column shows the FIRST ROW's value, and said so nowhere — so a renter read
+              «Zahid Tractor» beside a dropdown and reasonably asked how to change the mapping for the
+              other rows. One dropdown maps a WHOLE column; the value is only an example of what is
+              in it (owner, 2026-09-02). */}
+          <span className="font-semibold normal-case tracking-normal text-muted">{c.mappingIsPerColumn}</span>
+        </span>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-meta">
+            <thead>
+              <tr className="text-label uppercase tracking-wide text-muted">
+                <th className="py-1 pe-3 text-start font-semibold">{c.yourColumn}</th>
+                <th className="py-1 pe-3 text-start font-semibold">{c.exampleFromRow1}</th>
+                <th className="py-1 text-start font-semibold">{c.mapsTo}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {table.headers.map((h, i) => (
+                <tr key={i} className="border-b border-border last:border-b-0">
+                  <td className="py-1.5 pe-3 font-extrabold text-navy">{h || fmt(c.columnN, { n: i + 1 })}</td>
+                  <td className="py-1.5 pe-3 text-muted">{(view ?? table).rows[0]?.[i] || "—"}</td>
+                  <td className="py-1.5">
+                    <select
+                      value={mapping[i]}
+                      onChange={(e) => {
+                        setMapping((m) => m.map((f, n) => (n === i ? (e.target.value as SheetField) : f)));
+                        // The old preview described a different mapping; drop it rather than show it.
+                        setPlan(null);
+                      }}
+                      className="h-[30px] rounded-md border border-border-strong bg-surface px-2 text-meta font-semibold text-navy"
+                    >
+                      {FIELDS.map((f) => (
+                        <option key={f} value={f}>
+                          {fieldLabel[f]}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5 text-meta text-ok-deep">
+        <input
+          type="checkbox"
+          /* The master follows the rows: it is on only when every row is, and off is now the
+             state they all start in. */
+          checked={vendor.length > 0 && vendor.every((v) => v === true)}
+          onChange={(e) => setVendor((v) => v.map(() => e.target.checked))}
+          className="mt-0.5 h-4 w-4 flex-none accent-ok"
+        />
+        <span>
+          <b className="block font-extrabold">{c.markAll}</b>
+          <span className="block text-muted-dark">{c.markAllPreviewHint}</span>
+        </span>
+      </label>
+
+      {/* What the backend says it would do, before it does any of it — asked automatically. */}
+      {planning && !plan && (
+        <span className="text-meta text-muted">{c.planning}</span>
+      )}
+      {plan && (
+        <div className="grid gap-1.5 rounded-md border border-border-strong bg-surface2 px-3 py-2.5 text-meta text-navy">
+          <b className="font-extrabold">
+            {fmt(c.planLine, {
+              created: plan.created.length,
+              merged: plan.merged.length,
+              rejected: plan.rejected.length,
+            })}
+          </b>
+          {/* A merge fills blanks only — so a renter re-importing a corrected sheet learns HERE that
+              his correction will not land, rather than after forty rows quietly did not change. */}
+          {plan.merged.length > 0 && <span className="text-muted-dark">{c.mergeFillsBlanks}</span>}
+          {plan.rejected.map((r) => (
+            <span key={`r${r.row}`} className="text-danger-deep">
+              {fmt(c.planRejected, { row: r.row + 1, reason: reasonText(r.reason, c) })}
+            </span>
+          ))}
+          {(plan.warnings ?? []).map((w, i) => (
+            <span key={`w${i}`} className="text-warn-deep">
+              {fmt(c.planWarning, { row: w.row + 1, field: w.field, reason: reasonText(w.reason, c) })}
+              {w.value ? ` — “${w.value}”` : ""}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <span className="text-meta text-muted">
+          {skipped > 0 ? fmt(c.importCountSkipped, { n: ready.length, skipped }) : fmt(c.importCount, { n: ready.length })}
+        </span>
+        {error && <span className="text-meta font-extrabold text-danger-deep">{error}</span>}
+        {/* ~~«Start over» and «Check the file first».~~ Both gone (owner, 2026-09-02). The check
+            runs itself, because what it answers changes what Import means; and starting over is
+            swapping the file, which now happens on the file's own chip where the file is. One
+            button, and it says exactly how many rows it will write. */}
+        <span className="ms-auto flex items-center gap-2">
+          <button type="button" onClick={save} disabled={!ready.length || saving} className={btn("primary", "md")}>
+            {ready.length ? fmt(c.importN, { n: ready.length }) : c.importNone}
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A backend reason code as a sentence.
+ *
+ * An unknown code renders as itself: a new code the web has not learned about is still more useful
+ * to a renter (and to whoever he forwards it to) than the word "error".
+ */
+function reasonText(code: string, c: ReturnType<typeof useT>["suppliers"]): string {
+  const map: Record<string, string> = {
+    MISSING_CONTACT: c.rMissingContact,
+    MISSING_NAME: c.rMissingName,
+    INVALID_PHONE: c.rInvalidPhone,
+    INVALID_EMAIL: c.rInvalidEmail,
+    TRUNCATED: c.rTruncated,
+    TOO_LONG: c.rTooLong,
+    SAME_NAME_DIFFERENT_CONTACT: c.rSameName,
+  };
+  if (map[code]) return map[code];
+  // `DUPLICATE_OF_ROW_7` names a row of the renter's own file, so the number is worth keeping.
+  const dup = code.match(/^DUPLICATE_OF_ROW_(\d+)$/);
+  return dup ? fmt(c.rDuplicateOf, { row: Number(dup[1]) + 1 }) : code;
+}

@@ -71,7 +71,7 @@ export interface LinkBidItem {
   requestId?: string | null;
   label?: string | null;
   numberOfUnits?: number;
-  /** Units the supplier offered on this line (partial bid) — ≤ numberOfUnits. Backend (PR #465) falls back
+  /** Units the supplier offered on this line (partial bid) — ≤ numberOfUnits. Backend (PR var(--ok-deep)) falls back
    *  to the requested count; on staging it's absent, so the mapper falls back to numberOfUnits. */
   offeredUnits?: number;
   /** Rental basis carried from the request (PER_DAY/PER_WEEK/PER_MONTH/PER_JOB) so totals normalize. */
@@ -106,6 +106,15 @@ export interface LinkBidSubmission {
   vatNumber?: string | null;
   nationalAddress?: string | null;
   contactInfo?: string | null;
+  /**
+   * The supplier's e-mail, as they typed it on the bid form.
+   *
+   * **SUP-BE-9's third matching key** (owner, 2026-08-31): a link submission is attached to a row in
+   * My Suppliers by phone, then by this. It is also the only way the renter can e-mail them
+   * afterwards — *Send to my suppliers* skips a row with no address, and a supplier who bid and left
+   * no e-mail is one the renter cannot include in the next request.
+   */
+  contactEmail?: string | null;
   /** Supplier's city — captured on the form; feeds the account the admin creates on convert. */
   city?: string | null;
   /** Rentee's pre-conversion "Negotiate" messages (append-only `{ text, at }`) — rendered as a chat
@@ -131,9 +140,20 @@ export interface BidFormItem {
   sizeAr?: string | null;
   numberOfUnits: number;
   /** Units still open for a shared-link supplier to offer = numberOfUnits − units already held by other
-   *  suppliers' accepted (AWAITING) + confirmed (CLOSED) deals, clamped ≥ 0. Backend (PR #484) sends it
+   *  suppliers' accepted (AWAITING) + confirmed (CLOSED) deals, clamped ≥ 0. Backend (PR var(--ok-deep)) sends it
    *  per item; OPTIONAL — when absent (pre-deploy backend) the form falls back to numberOfUnits. */
   remainingUnits?: number;
+  /**
+   * The catalogue could not place this machine, so the renter named it himself.
+   *
+   * ⚠️ **DERIVED by the backend on every read, never stored** (`docs/plans/custom-equipment-
+   * request/web-app-changes.md`). Branch on this, never on «are the taxonomy ids empty».
+   *
+   * ⚠️ What it costs a request is the whole marketplace: an off-catalogue line reaches NO supplier
+   * by broadcast, so the share link is the only route to one. Surfaces that announce a post to
+   * Moedatech read this and say the opposite instead.
+   */
+  isUndefined?: boolean | null;
   /** Taxonomy image — same source the in-app bid/request cards render via EquipImg. Optional: the public
    *  bid-form endpoint doesn't send it yet (backend gap), so the item falls back to the name-derived glyph. */
   imageUrl?: string | null;
@@ -156,6 +176,19 @@ export interface BidFormProjectTerms {
   endDate: string | null;
   hoursPerDay: number | null;
   workingDaysPerWeek: number | null;
+  /**
+   * May the hire run on past the end date?
+   *
+   * ⚠️ **Three states, not two.** `true` = the renter said it may; `false` = he said it may not;
+   * `null` = he was never asked, which is every request made before the field existed. Coalescing
+   * null to false would print "not extendable" as a fact nobody stated, and a supplier prices a flat
+   * month against a hire that was always meant to run on.
+   *
+   * ⚠️ The backend has sent this since 2026-09-01 and this app was dropping it on the floor — the
+   * mapper never read the key, so the bid form the supplier fills in never showed it and neither did
+   * the card. Read the word only for `true`; say nothing for the other two.
+   */
+  extendable: boolean | null;
 }
 export interface BidFormData {
   token: string;
@@ -168,7 +201,11 @@ export interface BidFormData {
   renter: { name: string | null; contactName: string | null; city: string | null; verified: boolean; logoUrl: string | null };
   /** Read-only project terms + contract terms (for-all-items), from the request. */
   projectTerms: BidFormProjectTerms | null;
-  contractTerms: { key: string; label: string; value: string }[];
+  /** ⚠️ `labelAr` / `valueAr` are the backend's own Arabic, added 2026-09-02 (`c304828a`). Before
+   *  them this payload carried ENGLISH ONLY, so an Arabic-speaking off-platform supplier read every
+   *  other line of the card in Arabic and these in English. Optional: an older backend sends neither,
+   *  and the English falls through. */
+  contractTerms: { key: string; label: string; labelAr: string | null; value: string; valueAr: string | null }[];
   /** The renter's free-text notes for the whole request (read-only). */
   notes: string | null;
   items: BidFormItem[];
@@ -183,6 +220,18 @@ export interface SubmitBidFormPayload {
   /** Supplier phone — the account key. Stored normalized (E.164) in the existing `contact_info`
    *  column on the backend; the form collects it via a structured phone input. */
   contactInfo: string;
+  /**
+   * The supplier's e-mail. Optional, and the backend takes it as `contactEmail`.
+   *
+   * Asked for because of what it unlocks after the bid, not for the bid itself: it is the second key
+   * a link submission is matched to a My Suppliers row on (phone first), and it is the address the
+   * renter's next request is sent to. A supplier who bids and leaves it blank is one the renter
+   * cannot include next time — so the field says that, rather than sitting there unexplained.
+   *
+   * Not required: a bid is the thing this form exists to collect, and refusing one over an address
+   * would trade the whole point of the page for a nicety.
+   */
+  contactEmail?: string;
   /** Supplier's city — optional. */
   city?: string;
   notes?: string;
@@ -239,6 +288,7 @@ export function mapLinkSubmissions(raw: unknown): LinkBidSubmission[] {
       vatNumber: s(o.vatNumber),
       nationalAddress: s(o.nationalAddress),
       contactInfo: s(o.contactInfo),
+      contactEmail: s(o.contactEmail),
       city: s(o.city),
       renteeMessages: (Array.isArray(o.renteeMessages) ? (o.renteeMessages as Record<string, unknown>[]) : [])
         .map((m) => ({ text: s(m?.text) ?? "", at: s(m?.at) ?? "" }))
@@ -290,10 +340,28 @@ export function mapBidFormData(raw: unknown): BidFormData {
     deadline: s(r.deadline),
     renter: { name: s(renter.name), contactName: s(renter.contactName), city: s(renter.city), verified: renter.verified === true, logoUrl: s(renter.logoUrl) },
     projectTerms: pt
-      ? { location: s(pt.location), lat: n(pt.lat), lng: n(pt.lng), rentalBasis: s(pt.rentalBasis), startDate: s(pt.startDate), endDate: s(pt.endDate), hoursPerDay: n(pt.hoursPerDay), workingDaysPerWeek: n(pt.workingDaysPerWeek) }
+      ? {
+          location: s(pt.location),
+          lat: n(pt.lat),
+          lng: n(pt.lng),
+          rentalBasis: s(pt.rentalBasis),
+          startDate: s(pt.startDate),
+          endDate: s(pt.endDate),
+          hoursPerDay: n(pt.hoursPerDay),
+          workingDaysPerWeek: n(pt.workingDaysPerWeek),
+          //三states preserved: only a real boolean becomes one, anything else stays null.
+          extendable: typeof pt.extendable === "boolean" ? pt.extendable : null,
+        }
       : null,
     // Exclude `maintenance` (not a supplier-confirmed term here) + `overtime` when it's effectively none (0).
-    contractTerms: ct.map((c) => ({ key: s(c.key) ?? "", label: s(c.label) ?? "", value: s(c.value) ?? "" }))
+    contractTerms: ct
+      .map((c) => ({
+        key: s(c.key) ?? "",
+        label: s(c.label) ?? "",
+        labelAr: s(c.labelAr),
+        value: s(c.value) ?? "",
+        valueAr: s(c.valueAr),
+      }))
       .filter((c) => c.key && c.value && c.key !== "maintenance" && !(c.key === "overtime" && ["0", "0×", "none", "without"].includes(c.value.toLowerCase()))),
     notes: s(r.notes),
     items: items.map((i) => {
@@ -307,6 +375,9 @@ export function mapBidFormData(raw: unknown): BidFormData {
         numberOfUnits: n(i.numberOfUnits) ?? 1,
         remainingUnits: n(i.remainingUnits) ?? undefined, // absent → page falls back to numberOfUnits
         imageUrl: s(i.imageUrl),
+        // ⚠️ Only a real `true` counts. An older backend omits the key, and an absent flag is «in
+        // the catalogue», which is the ordinary case and the safe one to assume.
+        isUndefined: i.isUndefined === true,
         priceUnit: s(i.priceUnit),
         deliveryBy: s(i.deliveryBy),
         returnBy: s(i.returnBy),
@@ -323,12 +394,37 @@ const termRow = (key: string, en: string, ar: string, ok?: boolean, reqVal?: str
   labelAr: ar,
   // Yes → matches the request, No → conflict, undefined (not asked) → grey.
   state: (ok == null ? "grey" : ok ? "matched" : "conflict") as TermState,
+  /**
+   * ── The ANSWER is the value, not the word «Yes» (owner, 2026-09-06) ──────────────────────────
+   * *"Why are the values «No» and «Yes»?"*
+   *
+   * The public bid form asks these as confirmations — the renter's requirement is printed and the
+   * supplier presses Yes or No — so a Yes is not the answer, it is the supplier ADOPTING the answer
+   * the renter wrote. Carrying his own word through meant the comparison read «Operator: Yes ·
+   * Equipment year: Yes · Certificate: Yes» down a column, which says nothing about what he offered
+   * and cannot be compared with an in-app bid, where the same facts arrive as values («2019»,
+   * «TÜV», «On supplier»).
+   *
+   * So a confirmed term carries the REQUESTED VALUE as its own, and a refused one says it was not
+   * confirmed. `reqVal` is missing on the two CR/VAT rows, which are held/not-held rather than
+   * values — those keep Yes/No, which is exactly what they mean.
+   */
+  value: ok == null ? null : ok ? (reqVal || YES_NO(true).en) : null,
   // What the renter required vs what the supplier answered (shown on conflicts in the terms panel).
   detail:
     ok == null
       ? undefined
-      : { en: `Renter: ${reqVal || "—"} · Supplier: ${ok ? "Yes" : "No"}`, ar: `المستأجر: ${reqVal || "—"} · المؤجّر: ${ok ? "نعم" : "لا"}` },
+      : {
+          en: `Renter: ${reqVal || "—"} · Supplier: ${ok ? reqVal || YES_NO(true).en : NOT_CONFIRMED.en}`,
+          ar: `المستأجر: ${reqVal || "—"} · المؤجّر: ${ok ? reqVal || YES_NO(true).ar : NOT_CONFIRMED.ar}`,
+        },
 });
+
+/** The bare confirmation, for the rows that ARE a yes/no (a CR on file, a VAT number). */
+const YES_NO = (v: boolean) => (v ? { en: "Yes", ar: "نعم" } : { en: "No", ar: "لا" });
+/** A term the supplier declined to confirm. Never «No»: the question was "can you meet this?", and
+ *  the answer is about the requirement, not about a yes/no fact of his own. */
+const NOT_CONFIRMED = { en: "Not confirmed", ar: "غير مؤكد" };
 
 /**
  * Map a submission (optionally scoped to one request item for the per-item comparison) into a
@@ -397,6 +493,19 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     // same firm look like one counterparty with one chat, which off-platform offers do not have.
     supplierCompanyId: null,
     supplierName: sub.companyName || "Supplier",
+    // An off-platform submission was typed into the renter’s own supplier list, so there is no
+    // account behind it and therefore no store mark. The app draws nothing for such a party.
+    supplierLogoUrl: null,
+    /**
+     * The number the supplier typed into the form's «The supplier's details» step.
+     *
+     * It was never mapped, so `BidCards`'s «Invite to Moedatech» was permanently disabled with
+     * "we hold no number for this supplier" — on the one kind of bid the control exists for. The
+     * field is `contactInfo` on a link submission (the backend stores the phone in that column,
+     * normalised to E.164) and `supplierPhone` on a bid card; the two names are why nobody noticed.
+     */
+    supplierPhone: sub.contactInfo ?? null,
+    supplierEmail: sub.contactEmail ?? null,
     verified: false,
     rating: null,
     distanceKm: null, // the form captures no supplier location
@@ -426,6 +535,8 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     matchCount: 0,
     conflictCount: 0,
     dealRoomId: null,
+    // An off-platform submission has no deal room at all, so no status either.
+    dealRoomStatus: null,
     expired: false,
     note: sub.notes ?? null,
     requiredCerts: reqEqCertCodes,
@@ -452,11 +563,22 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
       ].filter(Boolean) as TermRow[],
       contract: [
         c.operator != null && termRow("operator_included", "Operator", "المشغّل", c.operator, rt.operator),
-        c.nationality != null && termRow("nationality", "Operator nationality", "جنسية المشغّل", c.nationality, rt.nationality),
+        /* 🔴 ~~The nationality row.~~ hidden on every surface (see `term-visibility.ts`). Dropped at the PARSE,
+           as the app drops its own deviations, so no reader downstream has to remember. The
+           confirmation is still carried on `LinkBidConfirmations` — an older submission that
+           answered it keeps its answer, which is simply no longer drawn. */
         c.fatFood != null && termRow("fat_food", "Food (F.A.T)", "الطعام", c.fatFood, rt.fatFood),
         c.fatTransport != null && termRow("fat_transport", "Accommodation & transport", "السكن والمواصلات", c.fatTransport, rt.fatTransport),
         c.fuel != null && termRow("fuel_responsibility", "Fuel responsibility", "مسؤولية الوقود", c.fuel, rt.fuel),
-        c.fuelType != null && termRow("fuel_type", "Fuel type", "نوع الوقود", c.fuelType, rt.fuelType),
+        /* ~~`fuel_type` — «Fuel type · Diesel», answered Yes or No.~~ Removed 2026-09-05.
+           The bid form stopped ASKING it on 2026-09-04 (app parity, `f48793ec`): fuel type is the
+           renter's own `fuelTypePreference`, prefilled by the system, so a supplier confirming it
+           settled nothing. `SharedBidSubmissionModal` dropped it from the review list the same day —
+           but this mapper kept emitting the row, and off-platform cards count EVERY answered term
+           (`bucketBidTerms`, `all: true`). So a submission carrying a stale `fuelType: false` drew a
+           RED conflict on the card over a question the supplier was never shown, and pressing «View
+           quote» showed no such conflict, because the viewer had already stopped listing it.
+           One list, one count. */
         c.operatorCert != null && termRow("operator_cert", "Operator certificate", "شهادة المشغّل", c.operatorCert, up(rt.operatorCert)),
         c.payment != null && termRow("payment", "Payment type", "نوع الدفع", c.payment, rt.payment),
         c.overtime != null && termRow("overtime", "Overtime rate", "أجر العمل الإضافي", c.overtime, rt.overtime),

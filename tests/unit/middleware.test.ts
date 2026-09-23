@@ -16,7 +16,7 @@ describe("public-web ON — no route gate at all", () => {
   afterEach(() => { delete process.env[FLAG]; });
 
   it("unauthenticated → EVERY page passes through (incl. former gated /deal-room, /dashboard)", () => {
-    for (const p of ["/", "/create", "/stores/42", "/compare", "/requests", "/inbox", "/profile", "/deal-room/abc", "/dashboard"]) {
+    for (const p of ["/", "/create", "/stores/42", "/requests", "/inbox", "/profile", "/deal-room/abc", "/dashboard"]) {
       expect(isNext(middleware(req(p))), p).toBe(true);
     }
   });
@@ -39,7 +39,7 @@ describe("public-web OFF — legacy auth-required gating", () => {
   afterEach(() => { delete process.env[FLAG]; });
 
   it("unauthenticated → home + every app page redirects to /login", () => {
-    for (const p of ["/", "/create", "/stores/42", "/compare", "/requests", "/inbox", "/profile", "/deal-room/abc", "/dashboard"]) {
+    for (const p of ["/", "/create", "/stores/42", "/requests", "/inbox", "/profile", "/deal-room/abc", "/dashboard"]) {
       const res = middleware(req(p));
       expect(res.status, p).toBeGreaterThanOrEqual(300);
       expect(res.headers.get("location") ?? "", p).toContain("/login");
@@ -51,7 +51,7 @@ describe("public-web OFF — legacy auth-required gating", () => {
   });
 
   it("authenticated → app pages pass through", () => {
-    for (const p of ["/", "/requests", "/compare", "/profile"]) {
+    for (const p of ["/", "/requests", "/profile"]) {
       expect(isNext(middleware(req(p, AUTHED))), p).toBe(true);
     }
   });
@@ -74,6 +74,59 @@ describe("login + handoff (flag-independent)", () => {
     const res = middleware(req("/login", AUTHED));
     const loc = new URL(res.headers.get("location") ?? "http://localhost/x");
     expect(loc.pathname).toBe("/");
+  });
+});
+
+/* ── Retired surfaces (docs/requests-workspace-disabled.md) ──
+   The requests list, both request-detail pages and the comparison workspace are one page now, so
+   their old routes send the renter to it — at the edge, before any gate and before React.
+
+   This lives in middleware because `redirect()` in a page does NOT work here: the thrown
+   NEXT_REDIRECT is caught by a client error boundary in the provider tree and rendered as an error
+   page, so the route answered 200 with a stack trace in its body. Found by curling the running dev
+   server; these assertions are what stop it coming back. */
+describe("retired requests routes redirect to the workspace", () => {
+  beforeEach(() => { delete process.env[FLAG]; });
+  afterEach(() => { delete process.env[FLAG]; });
+
+  const retired = ["/compare", "/requests/abc123", "/requests/group/RFQ-00067", "/requests/abc/anything"];
+
+  it("redirects permanently, and to the workspace", () => {
+    for (const p of retired) {
+      const res = middleware(req(p));
+      // 308, not 307: these moved permanently. A 302 would let a browser keep asking.
+      expect(res.status, p).toBe(308);
+      expect(res.headers.get("location"), p).toBe("http://localhost/requests");
+    }
+  });
+
+  it("drops the id rather than carrying it — the workspace resolves its own selection", () => {
+    const res = middleware(req("/requests/abc123?view=bids"));
+    expect(res.headers.get("location")).toBe("http://localhost/requests");
+  });
+
+  it("redirects whether or not there is a session — it is not a gate", () => {
+    for (const p of retired) {
+      expect(middleware(req(p, AUTHED)).status, p).toBe(308);
+    }
+  });
+
+  it("still redirects under the legacy kill-switch, instead of bouncing to /login", () => {
+    process.env[FLAG] = "0";
+    const res = middleware(req("/compare"));
+    expect(res.status).toBe(308);
+    expect(res.headers.get("location")).toBe("http://localhost/requests");
+  });
+
+  it("leaves the workspace itself alone", () => {
+    // The match is on what is BELOW /requests/, so the page it redirects to cannot redirect to itself.
+    expect(isNext(middleware(req("/requests")))).toBe(true);
+  });
+
+  it("leaves every other surface alone", () => {
+    for (const p of ["/", "/create", "/inbox", "/profile", "/dashboard", "/deal-room/abc", "/bids/x/equipment"]) {
+      expect(isNext(middleware(req(p))), p).toBe(true);
+    }
   });
 });
 
@@ -110,5 +163,53 @@ describe("unfurl crawlers on a shared bid link", () => {
       new NextRequest(new URL("http://localhost/requests"), { headers: { "user-agent": "WhatsApp/2.23.20.0" } }),
     );
     expect(res.headers.get("cache-control")).toBeNull();
+  });
+});
+
+/* ── A locale-prefixed URL (owner, 2026-09-08: "fix the /en 404") ─────────────────────────────── */
+
+/**
+ * `/en` and `/ar` were a 404 on every environment — beta, staging and production all answered 404
+ * before this, because the language in this app is a stored choice and the routes are bare. They are
+ * asked for anyway: Supplier OS puts the locale in the path, so that shape gets copied here.
+ *
+ * The prefix is now stripped and the language it names rides on as `?lang=`, which the locale
+ * provider consumes once and persists.
+ */
+describe("the locale prefix", () => {
+  beforeEach(() => { delete process.env[FLAG]; });
+  afterEach(() => { delete process.env[FLAG]; });
+
+  const location = (path: string) => middleware(req(path)).headers.get("location") ?? "";
+
+  it("takes /en and /ar to the page itself, naming the language", () => {
+    expect(location("/en")).toBe("http://localhost/?lang=en");
+    expect(location("/ar")).toBe("http://localhost/?lang=ar");
+  });
+
+  it("keeps the rest of the path", () => {
+    expect(location("/en/requests")).toBe("http://localhost/requests?lang=en");
+    expect(location("/ar/bids/42/equipment")).toBe("http://localhost/bids/42/equipment?lang=ar");
+  });
+
+  it("keeps the query a shared link carries", () => {
+    // `?r=` and `?tab=` are how the workspace names the request being read; dropping them would land
+    // a colleague on a different request from the one he was sent.
+    expect(location("/en/requests?r=abc&tab=compare")).toBe("http://localhost/requests?r=abc&tab=compare&lang=en");
+  });
+
+  it("is a permanent redirect", () => {
+    expect(middleware(req("/en/requests")).status).toBe(308);
+  });
+
+  it("does NOT touch a route that merely begins with those letters", () => {
+    // `startsWith("/en")` would swallow every one of these, which is why the test is a whole segment.
+    for (const p of ["/enterprise", "/en-gb", "/arabia", "/archive"]) {
+      expect(isNext(middleware(req(p))), p).toBe(true);
+    }
+  });
+
+  it("leaves an unknown language alone — it is a 404, not a language", () => {
+    expect(isNext(middleware(req("/fr/requests")))).toBe(true);
   });
 });

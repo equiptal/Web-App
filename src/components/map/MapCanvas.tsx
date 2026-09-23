@@ -46,6 +46,8 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
 // which is the shape the dependency should have — the map has no business knowing how a card is made.
 import type { EquipmentCardModel } from "@/components/map/equipment-card-model";
 import { useLocale, useT } from "@/lib/i18n";
+import { COLORS } from "@/lib/ds-colors";
+import { PIN_REGISTRY, pin } from "@/lib/uiPins";
 
 export interface SitePoint {
   lat: number;
@@ -103,6 +105,11 @@ export interface MachinePin extends MapPoint {
 const FALLBACK_CENTRE: [number, number] = [24.0, 45.0];
 const FALLBACK_ZOOM = 5;
 const SITE_ZOOM = 11;
+/** How close the opening fit may get when it frames the project AND its machines (owner, 2026-09-23:
+ *  *"more zoomed in to be close to the equipment and the project"*). ~~`SITE_ZOOM`, 11~~, which is the
+ *  right view of a SITE alone and framed a machine 7.5 km away in a whole-city view. 15 still keeps a
+ *  machine 60 km out in frame: `fitBounds` only zooms in as far as every point allows. */
+const FIT_MAX_ZOOM = 15;
 
 /**
  * Where the camera lands when a card is pressed (app parity, `kFocusZoom`).
@@ -172,13 +179,13 @@ function FitView({ site, points }: { site: SitePoint | null; points: MachinePin[
     if (points.length && site) {
       map.fitBounds(L.latLngBounds([[site.lat, site.lng], ...points.map((p) => [p.lat, p.lng] as [number, number])]), {
         padding: [80, 80],
-        maxZoom: SITE_ZOOM,
+        maxZoom: FIT_MAX_ZOOM,
         animate: false,
       });
       return;
     }
     if (points.length) {
-      map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number])), { padding: [80, 80], maxZoom: SITE_ZOOM, animate: false });
+      map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number])), { padding: [80, 80], maxZoom: FIT_MAX_ZOOM, animate: false });
       return;
     }
     if (site) map.setView([site.lat, site.lng], SITE_ZOOM, { animate: false });
@@ -206,18 +213,26 @@ const PIN_STAGE_W = 96;
 const PIN_STAGE_H = 78;
 
 /**
- * How wide the availability label actually draws — **the number the old 74 px gap ignored**.
+ * How wide the marker's label actually draws — **the number the old 74 px gap ignored**.
  *
- * `.bm-pin-chip` is `white-space: nowrap` at 10 px / 800 with 10 px of padding a side, and the widest
- * string either locale puts in it is «Availability not confirmed yet» / «لم يؤكد توفرها بعد». It
- * therefore OVERFLOWS the 132 px box by design (it always has), which is why the marker's drawn width
+ * `.bm-pin-chip` is `white-space: nowrap` at 11 px / 800 with 10 px of padding a side. Since
+ * 2026-08-28 it carries the DISTANCE rather than the availability wording, and on a machine whose
+ * yard is out of city it carries the «· Outside the city» capsule beside it — which is the widest
+ * thing either locale puts here now that «Availability not confirmed yet» has gone.
+ *
+ * It still OVERFLOWS the 132 px box by design (it always has), which is why the marker's drawn width
  * is not `PIN_W` and why two markers separated by the box's width still overlapped where it counts.
+ *
+ * ~~156, sized for «Availability not confirmed yet».~~ 180: a four-digit distance and the out-of-city
+ * capsule together run past the old bound, and the fan has to clear the label it can actually draw.
+ * Erring wide costs a little extra separation between machines in one yard; erring narrow puts one
+ * label on top of another, which is the bug this constant exists for.
  *
  * It is a constant rather than a measurement because a `divIcon` has no layout to measure at the
  * moment its geometry is decided, and because a per-marker measurement would make the fan depend on
- * which machine happened to be unconfirmed — the arrangement has to stay deterministic (`decollide`).
+ * which machine happened to be far away — the arrangement has to stay deterministic (`decollide`).
  */
-const PIN_LABEL_W = 156;
+const PIN_LABEL_W = 180;
 
 /**
  * ── The machine grows as the renter zooms in (owner, 2026-08-11) ────────────────────────────────────
@@ -347,12 +362,13 @@ function FleetLayer({
   useMapTick();
 
   const zoom = map.getZoom();
-  /* How big every marker is being drawn at this zoom, decided once and used three times: the fan's
-     threshold, the distance chip's clearance test, and the `divIcon` itself. Deriving it separately in
-     any of the three is how a marker starts overlapping a chip that was measured against a smaller
-     machine. */
+  /* How big every marker is being drawn at this zoom — the fan's threshold, and the `divIcon`'s own
+     box. Derived once: computing it separately in the two is how a marker starts overlapping a
+     neighbour that was measured against a smaller machine.
+
+     (It had a third reader, the route chip's clearance test, until the chip was removed on
+     2026-08-28 — the machine's own label carries the distance now.) */
   const scale = pinScale(zoom);
-  const box = pinBox(scale);
   const placed = useMemo(
     () =>
       decollide<MachinePin>(
@@ -374,10 +390,6 @@ function FleetLayer({
   const routes = useMemo(() => {
     if (!site) return [];
     const s = map.project([site.lat, site.lng], zoom);
-    // Chips already laid down this pass — a second machine in the same direction must not stack its
-    // chip on the first one's.
-    const taken: { x: number; y: number }[] = [];
-
     return placed.map((p, i) => {
       const b = { x: p.x, y: p.y };
       const vx = b.x - s.x;
@@ -400,50 +412,9 @@ function FleetLayer({
         return { pts, opacity };
       });
 
-      // The chip rides the line, but every line ENDS inside the marker box (anchored bottom), so a
-      // fixed fraction lands on the machine whenever the line is short. Walk back from the site end
-      // until the point clears that box, then nudge perpendicular, then clear of other chips.
-      //
-      // Measured against the box AT THIS ZOOM, not against the resting 132×124: the machine grows as
-      // the renter zooms in, and a clearance test frozen at the small size would park the chip on top
-      // of the machine it is captioning at exactly the zoom he went in to read it.
-      let chip: { at: L.LatLng; km: number; far: boolean } | null = null;
-      if (p.point.distanceKm != null) {
-        const clears = (x: number, y: number) =>
-          Math.abs(x - b.x) >= box.w / 2 + 20 || b.y - y >= box.h + 12 || y - b.y >= 26;
-        let tt = 0.62;
-        let x = s.x + vx * tt;
-        let y = s.y + vy * tt;
-        for (let n = 0; n < 9 && !clears(x, y); n++) {
-          tt = Math.max(0.18, tt - 0.07);
-          x = s.x + vx * tt;
-          y = s.y + vy * tt;
-          if (tt === 0.18) break;
-        }
-        if (!clears(x, y)) {
-          x += (-vy / len) * 30;
-          y += (vx / len) * 30;
-        }
-        for (let g = 0; g < 6 && taken.some((q) => Math.abs(q.x - x) < 58 && Math.abs(q.y - y) < 24); g++) {
-          const off = (g % 2 ? -1 : 1) * (26 + 13 * Math.floor(g / 2));
-          x = s.x + vx * tt + (-vy / len) * off;
-          y = s.y + vy * tt + (vx / len) * off;
-        }
-        taken.push({ x, y });
-        chip = {
-          at: map.unproject([x, y], zoom),
-          // One decimal, the SAME arithmetic `equipmentCardModel` does — a chip and its card must
-          // not disagree about one machine by a rounding step (owner, 2026-08-11).
-          km: Math.round(p.point.distanceKm * 10) / 10,
-          // Read off the UNROUNDED distance, and off the same `isOutOfCity` the card's «· خارج
-          // المدينة» reads — the pill and the card line are one fact stated twice.
-          far: isOutOfCity(p.point.distanceKm),
-        };
-      }
-
-      return { id: p.point.id, segments, chip };
+      return { id: p.point.id, segments };
     });
-  }, [placed, site, map, zoom, box.w, box.h]);
+  }, [placed, site, map, zoom]);
 
   const src = safeImageUrl(imageUrl);
 
@@ -460,20 +431,10 @@ function FleetLayer({
               // `className` carries the travelling dash; the dash pattern itself is a Leaflet path
               // option, not CSS, so it stays here.
               className="bm-flow"
-              pathOptions={{ color: "#6E869C", weight: 3, opacity: seg.opacity, dashArray: "1 9", lineCap: "round" }}
+              pathOptions={{ color: "var(--muted-dark)", weight: 3, opacity: seg.opacity, dashArray: "1 9", lineCap: "round" }}
               interactive={false}
             />
           ))}
-          {r.chip && (
-            <Marker
-              position={r.chip.at}
-              icon={distanceIcon(r.chip.km, r.chip.far, ar, t.bidMap.km, t.bidMap.mapOutOfCity)}
-              interactive={false}
-              // 700, the prototype's. Above the routes and the leader lines it rides, below the
-              // machines at 760 — a chip is a caption on a line, and it must never cover a marker.
-              zIndexOffset={700}
-            />
-          )}
         </Fragment>
       ))}
 
@@ -491,7 +452,7 @@ function FleetLayer({
             {p.displaced && (
               <Polyline
                 positions={[[pin.lat, pin.lng], [at.lat, at.lng]]}
-                pathOptions={{ color: "#A9BCCC", weight: 1, opacity: 0.8 }}
+                pathOptions={{ color: "var(--muted-light)", weight: 1, opacity: 0.8 }}
                 interactive={false}
               />
             )}
@@ -519,28 +480,6 @@ function useMapTick(): number {
   const bump = () => setTick((n) => n + 1);
   useMapEvents({ zoomend: bump, moveend: bump, resize: bump });
   return tick;
-}
-
-/**
- * The distance chip riding a route (§6.8). Non-interactive, and never a 0: a machine with no distance
- * gets no chip at all rather than a chip claiming it is at the project.
- *
- * **A second pill rides beside it when the yard is out of city** (decoded 701–705). That flag was
- * missing here entirely, and it is the one thing the number alone cannot say: 95 km reads as a
- * distance, «خارج المدينة» reads as a mobilisation to negotiate. Amber, never red — red on this canvas
- * is availability's and nothing else's, and a distant yard is not an unavailable machine.
- */
-function distanceIcon(km: number, far: boolean, ar: boolean, unit: string, farLabel: string): L.DivIcon {
-  return L.divIcon({
-    className: "",
-    iconSize: [150, 26],
-    iconAnchor: [75, 13],
-    html:
-      `<div class="bm-distchip" dir="rtl">` +
-      `<span><span dir="ltr">${esc(distanceDigits(km, ar))}</span> ${esc(unit)}</span>` +
-      (far ? `<span class="bm-distfar">${esc(farLabel)}</span>` : "") +
-      `</div>`,
-  });
 }
 
 /**
@@ -603,22 +542,26 @@ function hoverBoxHtml(card: EquipmentCardModel, ar: boolean, scale: number, t: R
   return (
     `<div class="bm-pinfo" aria-hidden="true" dir="${ar ? "rtl" : "ltr"}" style="inset-inline-start:calc(100% + ${clear}px)">` +
     `<div class="bm-pinfo-t">${esc(title)}</div>` +
-    // The card's ONE state chip (RM3-AC-32), in the card's own words and the model's own colour. Drawn
-    // as ink and a keyline rather than as a fill: on a white box a solid availability panel would be
-    // the loudest thing on the canvas, and the marker's own label already states this fact filled.
-    `<div class="bm-pinfo-r">` +
-    `<span class="bm-pinfo-chip" style="color:${card.chip.colour};border-color:${card.chip.colour}">` +
-    // Two states, two SHAPES as well as two colours — the card's rule, for the same reader.
-    `<span>${confirmed ? "✓" : "•"}</span>${esc(confirmed ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed)}` +
-    `</span>` +
-    (card.outOfCity ? `<span class="bm-pinfo-far">${esc(t.bidMap.eqOutOfCity)}</span>` : "") +
-    `</div>` +
-    // One decimal, always, through the one formatter (owner, 2026-08-11). An unknown distance is a
-    // sentence and never a 0.
-    `<div class="bm-pinfo-r bm-pinfo-km">` +
+    // ── The distance IS the state (owner, 2026-08-28) ──────────────────────────────────────────
+    // ~~A state chip on its own row — «Availability confirmed» / «Not confirmed yet» in the model's
+    // colour — with the distance in muted grey below it.~~ Withdrawn with the same ruling that
+    // changed the card and the marker's label: *"dont show this not confirmed or availability
+    // confirmed, show same distance color we have decided now on each equipment."*
+    //
+    // The two rows were one fact split in half: a number, and a verdict on whether to believe it.
+    // Joined, they are the card's own object — the distance in the availability colour — and the
+    // reader has one thing to read instead of two to reconcile.
+    //
+    // **The shape still carries the meaning as well as the fill** (the card's rule, for the same
+    // reader): ✓ for a settled fact, • for an open question, so a red-green deficiency does not cost
+    // the distinction. One decimal, always, through the one formatter (owner, 2026-08-11); an
+    // unknown distance is a sentence and never a 0.
+    `<div class="bm-pinfo-r bm-pinfo-km" style="color:${card.chip.colour}" title="${esc(confirmed ? t.bidMap.eqChipConfirmed : t.bidMap.eqChipUnconfirmed)}">` +
+    `<span>${confirmed ? "✓" : "•"}</span>` +
     (card.km != null
       ? `<span dir="ltr">${esc(distanceDigits(card.km, ar))}</span> ${esc(t.bidMap.eqDistanceUnit)}`
       : esc(t.bidMap.eqNoDistance)) +
+    (card.outOfCity ? `<span class="bm-pinfo-far">${esc(t.bidMap.eqOutOfCity)}</span>` : "") +
     `</div>` +
     // The certificates the REQUEST asked for, held or missing — the card's row 4, verbatim. The mark
     // is not decoration: at this size the two fills are close enough that colour alone would decide it.
@@ -653,9 +596,9 @@ function hoverBoxHtml(card: EquipmentCardModel, ar: boolean, scale: number, t: R
  *
  * ── The machine is a FREE-STANDING OBJECT (owner's ruling, 2026-08-08) ────────────────────────────
  * The prototype draws it as `machineArt(u)` at **94 × 74, `object-fit: contain`, with no container,
- * no fill and no ring**: it rests `translateY(-4px)` under `drop-shadow(0 7px 7px rgba(15,34,56,.30))`
+ * no fill and no ring**: it rests `translateY(-4px)` under `drop-shadow(0 7px 7px color-mix(in srgb, var(--info-deep) 30%, transparent))`
  * and, when selected, lifts on `dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards` under
- * `drop-shadow(0 14px 12px rgba(15,34,56,.34))`.
+ * `drop-shadow(0 14px 12px color-mix(in srgb, var(--info-deep) 34%, transparent))`.
  *
  * This drew a **44 px circle filled with the availability colour**, white-ringed, holding a Material
  * glyph with the taxonomy image painted over it at 62 %. The justification cited here was
@@ -696,6 +639,17 @@ function hoverBoxHtml(card: EquipmentCardModel, ar: boolean, scale: number, t: R
  * always in the DOM and the image is painted OVER it as a background, so a URL that 404s simply never
  * paints and the icon shows through. The icon is muted slate rather than the availability colour,
  * because a fallback is not a statement about availability; `map-proto.css` records the one residual.
+ *
+ * ── 🔴 The SUPPLIER'S OWN PHOTO, in a CIRCLE (owner, 2026-09-22) ──────────────────────────────────
+ * *"can we show the real equipment image of the supplier not this and show it as circle not squares
+ * like this"*. This reverses two rulings above for a machine that HAS a photo: the free-standing
+ * 94 × 74 object (2026-08-08) and AC-80's taxonomy image as the first choice. Every machine of one
+ * request drew the same stock render, so the map could not tell two of them apart, while the card
+ * beside it showed the real one.
+ *
+ * The photo is `pin.card.photo`, the SAME `heroPhotoUrl` the fleet card shows, so a marker and its
+ * card can never show two pictures of one machine. The chain is now photo → taxonomy image → icon,
+ * all three inside the circle; the background-over-icon trick still covers a URL that fails.
  */
 function machineIcon(
   pin: MachinePin,
@@ -714,26 +668,55 @@ function machineIcon(
   // The disc's fill is the ring at low alpha — one value per state, kept beside the ring so a fourth
   // state cannot be added to one and forgotten in the other.
   const tint = {
-    confirmed: "rgba(22,163,74,.34)",
-    unconfirmed: "rgba(217,54,42,.32)",
+    confirmed: "color-mix(in srgb, var(--ok) 34%, transparent)",
+    unconfirmed: "color-mix(in srgb, var(--danger) 32%, transparent)",
   }[pin.availability];
 
-  // «مؤكّد توفرها» / «لم يؤكد توفرها بعد». Both read as a STATE and neither carries a reason, a cause
-  // or a location-source explanation (AC-20, AC-30).
+  // ── The label under the machine is its DISTANCE, in its availability colour (owner, 2026-08-28) ──
+  // *"Dont show this not confirmed or availability confirmed, show same distance color we have
+  // decided now on each equipment."*
+  //
+  // The card had already made this move: the distance IS the state, because a distance nobody has
+  // promised is not the same fact as a distance the supplier has committed to — and printing the
+  // words as well put a second answer beside a colour that already said it. A red «15.5 km» says
+  // both things in the space one of them used to take, and the two surfaces now caption a machine
+  // the same way.
+  //
+  // The state is not lost, it is unprinted: `title` carries «Availability confirmed» / «Not confirmed
+  // yet» verbatim, so the words stay reachable on hover and to a reader who cannot separate the two
+  // fills. Both still read as a STATE and neither carries a reason, a cause or a location-source
+  // explanation (AC-20, AC-30).
   //
   // **No in-offer pin caption**, and that is a decision rather than an omission (app parity,
-  // `bid_map_strings.dart:708`): membership is a badge on the CARD. A pin caption saying it too would
-  // put a second answer on the surface for the reader to reconcile against the colour.
+  // `bid_map_strings.dart:708`): membership is a badge on the CARD.
   const state = {
     confirmed: t.bidMap.pinAvailable,
     unconfirmed: t.bidMap.pinUnconfirmed,
   }[pin.availability];
+  // The SAME arithmetic `equipmentCardModel` does — a label and its card must not disagree about one
+  // machine by a rounding step (owner, 2026-08-11). A machine with no distance says so rather than
+  // drawing a 0, which would read as "at the project".
+  const label =
+    pin.distanceKm != null && Number.isFinite(pin.distanceKm)
+      ? `${distanceDigits(Math.round(pin.distanceKm * 10) / 10, ar)} ${t.bidMap.km}`
+      : t.bidMap.eqNoDistance;
+  // «· Outside the city» rides the same label now that the route carries no chip of its own. It is
+  // the one thing the number cannot say: 95 km reads as a distance, out-of-city reads as a
+  // mobilisation to negotiate.
+  const far = isOutOfCity(pin.distanceKm);
 
-  // The object's own motion and shadow, both prototype values. `drop-shadow`, not `box-shadow`: it has
-  // to follow the machine's silhouette, which is the point of shadowing the art rather than a box.
+  // The object's own motion. It used to carry a `drop-shadow` as well — the one shadow in the app
+  // with a case for itself, since a marker on a map has terrain under it and the shadow is what said
+  // so. It went with the rest (owner, 2026-08-26: no shadows anywhere). If the machines stop reading
+  // against a busy map, these two lines are where to put it back:
+  //   selected: filter:drop-shadow(0 14px 12px color-mix(in srgb, var(--info-deep) 34%, transparent))
+  //   resting:  filter:drop-shadow(0 7px 7px color-mix(in srgb, var(--info-deep) 30%, transparent))
   const art = selected
-    ? "animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards;filter:drop-shadow(0 14px 12px rgba(15,34,56,.34))"
-    : "transform:translateY(-4px);filter:drop-shadow(0 7px 7px rgba(15,34,56,.30))";
+    ? "animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards"
+    : "transform:translateY(-4px)";
+  // The machine's own photo first (owner, 2026-09-22), the request's taxonomy image after it.
+  const photo = safeImageUrl(pin.card?.photo ?? null);
+  const artSrc = photo ?? src;
 
   return L.divIcon({
     className: "", // no Leaflet default box — the marker is entirely our own markup
@@ -749,7 +732,10 @@ function machineIcon(
       // state-DEPENDENT in the way the colours are: they are one fixed treatment, switched on, and
       // the stylesheet is where a fixed treatment belongs (and where it can be swept for the
       // availability colours it must not contain).
-      `<div class="bm-pin${selected ? " is-on" : ""}" dir="rtl" style="direction:rtl;width:${box.w}px;padding-top:${box.h - PIN_H}px">` +
+      // `data-pin` written by hand rather than through `pin()`: a `divIcon` is an HTML STRING, so
+      // there is no element to spread props onto. The number comes from the registry either way, so
+      // the overlay finds the marker like every other surface.
+      `<div data-pin="${PIN_REGISTRY["map-pin"].n}" class="bm-pin${selected ? " is-on" : ""}" dir="rtl" style="direction:rtl;width:${box.w}px;padding-top:${box.h - PIN_H}px">` +
       // The zoom LENS. A wrapper rather than a scale on the stage itself, because `.bm-pin.is-on
       // .bm-pin-stage` already owns that transform for the selection emphasis and a second one would
       // have replaced it — a selected machine would have stopped being bigger the moment it was zoomed
@@ -764,11 +750,14 @@ function machineIcon(
       // where the halo does not animate at all.
       (selected ? `<span class="bm-pin-ring"></span>` : "") +
       (selected ? `<span class="bm-pin-halo" style="border:2.5px solid ${ring}"></span>` : "") +
-      `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";box-shadow:0 0 0 4px rgba(37,99,235,.6),0 0 0 10px rgba(37,99,235,.16)" : ""}"></span>` +
+      // The selected disc's ring. It was two stacked rings drawn as a box-shadow — 4px solid, then a
+      // 10px wash. An outline draws one, so it keeps the inner, solid one; the wash was the softer
+      // half of a shadow this app no longer has.
+      `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";outline:4px solid color-mix(in srgb, var(--info) 60%, transparent)" : ""}"></span>` +
       `<span class="bm-pin-shadow"></span>` +
-      `<span class="bm-pin-art" style="${art}">` +
+      `<span class="bm-pin-art${photo ? " is-photo" : ""}" style="${art}">` +
       `<span class="bm-pin-glyph material-icons-outlined">${esc(iconName)}</span>` +
-      (src ? `<span class="bm-pin-img" style="background-image:url('${src}')"></span>` : "") +
+      (artSrc ? `<span class="bm-pin-img" style="background-image:url('${artSrc}')"></span>` : "") +
       `</span>` +
       // A sibling of the object, not a child: the object carries a `filter`, which would make it the
       // containing block and drag the tick along with the lift.
@@ -782,7 +771,10 @@ function machineIcon(
       // The label's own selected treatment — the scale and the white keyline — moved to `.bm-pin.is-on
       // .bm-pin-chip`. An inline `transform` here could not be combined with the shadow the emphasis
       // also wants, and would have overridden the stylesheet rather than joining it.
-      `<div class="bm-pin-chip" style="background:${ring};border:1px solid ${ring}">${esc(state)}</div>` +
+      `<div class="bm-pin-chip" title="${esc(state)}" style="background:${ring};border:1px solid ${ring}">` +
+      `<span dir="ltr">${esc(label)}</span>` +
+      (far ? `<span class="bm-pin-far">${esc(t.bidMap.mapOutOfCity)}</span>` : "") +
+      `</div>` +
       /* Only the focused marker names itself — the map stays quiet until the renter has chosen
          (AC-34).
 
@@ -796,6 +788,92 @@ function machineIcon(
         : "") +
       `</div>`,
   });
+}
+
+/**
+ * **Google's map under the canvas, the map the app shows** (owner, 2026-09-23: *"check the map on the
+ * app what does it use and use it"*, then *"why we cant use this"*).
+ *
+ * ~~Google's Map Tiles API (`createSession` + `2dtiles`) as a Leaflet `TileLayer`.~~ Tried first and
+ * refused by Google for every key we hold: the web key and the app's three answer
+ * `API_KEY_SERVICE_BLOCKED`, the fourth `SERVICE_DISABLED`. Turning that service on is a Google Cloud
+ * change nobody here can make.
+ *
+ * So the canvas uses the service the web key IS allowed: the **Maps JavaScript API**, the same one
+ * that already draws the web's location picker. `leaflet.gridlayer.googlemutant` renders a real
+ * Google map inside a Leaflet grid layer, so every marker, route and chip on this canvas stays exactly
+ * as it is. It is Google's own JS map, not scraped tiles, which keeps it within Google's terms.
+ *
+ * Returns true once Google is drawing. Until then, with no key, or on `gm_authFailure` (Google's hook
+ * for a refused key), the caller keeps the keyless Esri layer, so the canvas is never blank.
+ */
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+/** Google's roadmap, WHITE (owner, 2026-09-23: *"can't it be white"*): pale ground, white roads, no
+ *  shops or businesses competing with the machines. Colours from the palette's literal mirror, since
+ *  Google takes hex and a raw hex here would fail `palette-drift`. */
+const WHITE_MAP = [
+  { elementType: "geometry", stylers: [{ color: COLORS.surface2 }] },
+  { elementType: "labels.text.fill", stylers: [{ color: COLORS.muted }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: COLORS.surface }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: COLORS.surface }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: COLORS.border }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: COLORS.border }] },
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+];
+let mapsJs: Promise<void> | null = null;
+function loadMapsJs(ar: boolean): Promise<void> {
+  const w = window as unknown as { google?: { maps?: unknown }; gm_authFailure?: () => void };
+  if (w.google?.maps) return Promise.resolve();
+  if (!mapsJs) {
+    mapsJs = new Promise<void>((resolve, reject) => {
+      // The location picker loads the same script; a tag already on the page is waited on, not doubled.
+      const existing = document.getElementById("gmaps-js") as HTMLScriptElement | null;
+      const s = existing ?? document.createElement("script");
+      s.addEventListener("load", () => resolve());
+      s.addEventListener("error", () => reject(new Error("maps-js")));
+      if (!existing) {
+        s.id = "gmaps-js";
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_KEY)}&language=${ar ? "ar" : "en"}`;
+        s.async = true;
+        document.head.appendChild(s);
+      }
+    });
+  }
+  return mapsJs;
+}
+
+function GoogleBase({ ar, onReady }: { ar: boolean; onReady: (ok: boolean) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!GOOGLE_KEY) return;
+    let live = true;
+    let layer: L.GridLayer | null = null;
+    const w = window as unknown as { gm_authFailure?: () => void };
+    const prev = w.gm_authFailure;
+    // Google calls this when it refuses the key. Drop our layer and hand the canvas back to Esri.
+    w.gm_authFailure = () => {
+      prev?.();
+      if (layer) map.removeLayer(layer);
+      if (live) onReady(false);
+    };
+    loadMapsJs(ar)
+      .then(() => import("leaflet.gridlayer.googlemutant"))
+      .then(() => {
+        if (!live) return;
+        const mk = (L.gridLayer as unknown as { googleMutant: (o: object) => L.GridLayer }).googleMutant;
+        layer = mk({ type: "roadmap", maxZoom: 19, styles: WHITE_MAP }).addTo(map);
+        layer.bringToBack();
+        onReady(true);
+      })
+      .catch(() => live && onReady(false));
+    return () => {
+      live = false;
+      w.gm_authFailure = prev;
+      if (layer) map.removeLayer(layer);
+    };
+  }, [map, ar, onReady]);
+  return null;
 }
 
 export default function MapCanvas({
@@ -835,7 +913,9 @@ export default function MapCanvas({
   itemName?: string | null;
 }) {
   const t = useT();
-  const { dir } = useLocale();
+  const { dir, locale } = useLocale();
+  // Whether Google's map is drawing under the canvas; Esri stays until it is (see `GoogleBase`).
+  const [googleOn, setGoogleOn] = useState(false);
 
   /* The project pin — `siteIcon()`, decoded lines 262–265, value for value. `[40,52]` with the anchor
      at `[20,40]`, which is the teardrop's point rather than its centre: the pin marks the spot it
@@ -862,7 +942,7 @@ export default function MapCanvas({
   const iconName = useMemo(() => equipmentIcon(itemName), [itemName]);
 
   return (
-    <div className="bm-leaflet">
+    <div {...pin("map-canvas")} className="bm-leaflet">
       <MapContainer
         center={site ? [site.lat, site.lng] : FALLBACK_CENTRE}
         zoom={site ? SITE_ZOOM : FALLBACK_ZOOM}
@@ -895,20 +975,41 @@ export default function MapCanvas({
         inertiaDeceleration={2800}
         style={{ height: "100%", width: "100%" }}
       >
-        {/* CARTO **voyager**, not OpenStreetMap standard (`baseUrl('voyager')`, decoded 3840). Not a
-            taste choice: every colour on this canvas was judged against voyager's pale ground — the
-            `#6E869C` route, the `#A9BCCC` leader line, the white chips and the white pin tag. On OSM
-            standard's saturated green-and-buff they all lose contrast, and the route in particular
-            disappears into the road network it is drawn over.
-
-            The attribution carries BOTH credits because voyager's terms require both: the data is
-            OpenStreetMap's, the rendering is CARTO's. */}
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          subdomains="abcd"
-          maxZoom={19}
-        />
+        {/* 🔴 ~~CARTO **voyager** (`baseUrl('voyager')`, decoded 3840), chosen because every colour on
+            this canvas was judged against its pale ground.~~ CARTO began serving its keyless tiles with
+            an «API KEY REQUIRED» watermark (seen 2026-09-22 on staging and beta; the tile itself comes
+            back watermarked from `a.basemaps.cartocdn.com`, so no deploy of ours caused or can fix it).
+            ~~OpenStreetMap standard~~ was tried the same hour and refused: its servers answer a
+            non-browser fetch with an «Access blocked» tile and their policy is for light use.
+            **Esri World Street Map** now: keyless, labelled, no watermark, and a pale ground close to
+            voyager's, so the canvas colours judged against voyager still read.
+            ⚠️ Esri's terms expect an ArcGIS account for production use, and CARTO would take a key
+            too. A keyed provider (CARTO, Esri, or Google Maps as the app uses) is the durable fix and
+            needs an account decision.
+            **Google first (2026-09-23), Esri until it is ready or if Google refuses**: `GoogleBase`
+            above, which carries Google's own logo and attribution inside its layer. */}
+        <GoogleBase ar={locale === "ar"} onReady={setGoogleOn} />
+        {/* The fallback is Esri's LIGHT GREY canvas plus its label layer (owner, 2026-09-23: *"the map
+            looks weird, can't it be white"*). ~~World Street Map~~, whose tan relief read as desert
+            under every chip. `maxNativeZoom` 16 is where the canvas's own tiles stop; above it Leaflet
+            enlarges them rather than asking for tiles that do not exist. */}
+        {!googleOn && (
+          <>
+            <TileLayer
+              key="esri-base"
+              attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, &copy; OpenStreetMap contributors'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              maxNativeZoom={16}
+              maxZoom={19}
+            />
+            <TileLayer
+              key="esri-labels"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+              maxNativeZoom={16}
+              maxZoom={19}
+            />
+          </>
+        )}
         {/* Opposite the bid panel, which sits on the inline-START edge (owner, 2026-08-10) — so the
             buttons are top-right in English and top-left in Arabic. Being opposite is the rule, not the
             side: T41 M11's second clause is "never underneath the panel", and the panel is what moved.

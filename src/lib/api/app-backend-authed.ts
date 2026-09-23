@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { serverEnv } from "@/lib/config/env";
-import { authPost } from "@/lib/api/app-backend";
+import { authPost, CLIENT_PLATFORM_HEADER } from "@/lib/api/app-backend";
 import {
   ID_COOKIE,
   REFRESH_COOKIE,
@@ -88,6 +88,7 @@ async function rawCall<T>(path: string, init: RequestInit, accessToken: string, 
         Authorization: `Bearer ${accessToken}`,
         "X-Tenant-Id": serverEnv.tenantId,
         "Accept-Language": locale,
+        ...CLIENT_PLATFORM_HEADER,
         ...init.headers,
       },
       cache: "no-store",
@@ -158,6 +159,7 @@ export async function appPublicCall<T>(path: string, locale: string, init: Reque
         "Content-Type": "application/json",
         "X-Tenant-Id": serverEnv.tenantId,
         "Accept-Language": locale,
+        ...CLIENT_PLATFORM_HEADER,
         ...init.headers,
       },
       cache: "no-store",

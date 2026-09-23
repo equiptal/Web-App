@@ -29,7 +29,8 @@ Taken from the owner, 2026-08-11:
 | Cancel request | In the drawer, **quiet placement** — a text link away from the three buttons |
 | Certificates | **Map to the `CertCode` enum**; anything outside it is dropped |
 | Invite to Moedatech, the locked EQUIPMENT column | **Delayed** — drawn as mocked, press does nothing |
-| Editing a request | **Mirror the mobile app** (see below) |
+| Editing a request | **Mirror the mobile app** (see below) — its post-bid edit rule is live in production, on `main` and `staging` since 2026-08-05 |
+| The card's price | **The current price only.** The mockup's `80,210 → 76,440` counter arrow is dropped (2026-08-12) |
 | The dock's centre button | **Home** (`/`) |
 | How the old code goes away | **Comment out in place** plus a `docs/*-disabled.md` |
 
@@ -77,13 +78,17 @@ between `fetchBids` (bids placed through the app) and `fetchRequestSubmissions` 
 `submissionToBidCard` (link and offline submissions). Both feeds are already wired in `GroupBids`.
 
 **A bid card** carries its source and timestamp, the supplier's avatar, name and city, a chat
-control that opens `/deal-room/[id]` (with an unread dot), a `Terms` row opening `BidTermsModal`,
-and the price block: monthly rental with the `26 working days/month` basis — 26 is already the
+control that opens `/deal-room/[id]` (with an unread dot), and a `Terms` row opening
+`BidTermsModal`. The dial beside `Terms` reads **how much of the terms this supplier answered** —
+not bid quality, so it is not `QualityRing`. One slice per `TermRow.state` across
+`terms.equipment`, `terms.contract` and `terms.supplier`: `matched` and `agreed` are met,
+`conflict` is against, `grey` is unanswered. Then the price block: monthly rental with the `26 working days/month` basis — 26 is already the
 month's working-day count in `contract/comparison.ts:14` — then delivery, return, subtotal before
 VAT, VAT at 15%, and the grand total. Every label in that block already exists verbatim in
-`i18n priceFooter.*`. The footer is `Counter this price`, which deep-links to
-`/deal-room/[id]?act=counter`; where a counter has already been made it reads
-`Counter 80,210 → 76,440 SAR`. An offline card swaps that footer for `Invite to Moedatech`
+`i18n priceFooter.*`. The figures are the live ones: `BidCard.price` already resolves to the deal
+room's last proposed rate where one exists. The footer is `Counter this price`, which deep-links to
+`/deal-room/[id]?act=counter`. The mockup's `Counter 80,210 → 76,440 SAR` variant is **not built** —
+one price on the card, the current one. An offline card swaps that footer for `Invite to Moedatech`
 (delayed, inert) and `Edit quote`, which runs `transformBid` → `BidVerifyModal` → `commitBid`.
 
 **The compare matrix** lists suppliers down the left with their state (`★ Recommended` from
@@ -140,8 +145,9 @@ moment a bid arrives. The app (`request_detail_page.dart:165-174`, `638-674`) in
 
 ## Gaps
 
-Four things the page needs that today's web code cannot draw. Checked against the app-backend on
-2026-08-12; only one of them is genuinely someone else's work.
+Four things the page needs that today's web code does not draw. Checked against the app-backend and
+the mobile app on 2026-08-12: **none of them needs backend work.** Two are already served by data the
+web receives and ignores, one is a field the contract drops, and one is deliberately delayed.
 
 1. **`renteeEditUsed` — ours, not the backend's.** The column exists (`schema.prisma:1358`,
    `rentee_edit_used`) and the cap is already enforced server-side: `request.service.ts:830` updates
@@ -152,18 +158,18 @@ Four things the page needs that today's web code cannot draw. Checked against th
    `mapRequestListItem` does not read it. **Add the field to the contract and the mapper.** Escalate
    to the backend only if a live `/marketplace/my-requests` response turns out not to carry it.
    Until it is read, the renter can press Edit, fill the form, and only then be refused at save.
-2. **The counter figure on a bid card — a real backend ask.** `Counter 80,210 → 76,440 SAR` is the
-   latest rate proposal in that bid's deal room. `BidCard` carries `dealRoomId` and nothing else
-   about the negotiation; the rate lives in `DealRoomView.rate`, reachable only through
-   `fetchDealRoom(id)` — one call per room, so a seven-bid request would fire seven calls to draw a
-   list. The latest proposed or agreed rate belongs on the bids payload.
-3. **Per-bid chat unread — the backend computes it and throws it away.**
-   `deal-room.service.ts:1101` calls `streamService.getUnreadCounts(userId)`, which returns
-   **`byChannelId`** — exactly the per-room map the card's dot needs. It is summed into one integer
-   and served as `{ total }` for the Inbox badge. Either expose `byChannelId` (or per-room unread on
-   the deal-rooms list), or read it client-side: `stream-chat` is already a dependency here and
-   `fetchStreamToken` exists. `BidCard.unreadTerms` is unrelated — term keys with an unseen counter,
-   not messages.
+2. **The price on a bid card — nothing to build.** The mockup drew `Counter 80,210 → 76,440 SAR`,
+   the arrow standing for the latest counter made in that bid's deal room. **The arrow is dropped**
+   (owner, 2026-08-12): the card shows the current price, full stop. It already does — the backend
+   computes `currentPrice = dealRoom.lastProposedRate ?? priceAmount` and `contract/bids.ts:897`
+   reads it as `BidCard.price`, so a bid negotiated down already renders at its live rate and falls
+   back to the opening offer when there is no room. No extra call, no new field.
+3. **Per-bid chat unread — one call we already make.** `GET /marketplace/received-bids` returns
+   `bidId` + `unreadCount` for every bid (`bid.service.ts:866`, read out of Stream's `byChannelId`),
+   and the web already calls it as `fetchReceivedBids()` for the Inbox. Join it on `bidId` and the
+   card gets its dot — the same route `contract/chat-dock.ts` already takes. `fetchDealRoomUnread`
+   is the wrong tool: it returns one global total for the Inbox badge. `BidCard.unreadTerms` is a
+   third thing again — term keys with an unseen counter, not messages.
 4. **The delayed pair.** `Invite to Moedatech` has no action anywhere today, and the locked
    EQUIPMENT rail has no source. Both are drawn and inert until they do.
 
@@ -200,9 +206,10 @@ what was deliberately left alone, and how to put it back.
 `bids/[bidId]/equipment/page.tsx:195`. Then `npm run typecheck && npm run lint && npm test &&
 npm run build`.
 
-## Still open
+## The signed-out visitor
 
-- The donut beside `Terms` on a bid card — bid quality (`QualityRing`, which exists) or the share of
-  terms the supplier answered?
-- What a signed-out visitor sees at `/requests`. Today it is `SignInPrompt`; the new page has a rail
-  and a dock and no obvious empty state.
+There is nothing to draw — a guest has no requests, so no rail, no strip, no cards. The page renders
+its chrome and a **sign-in call to action** in the body, which opens the auth modal through the
+existing `useAuthGate().openAuth()`; there is no `/login` page under `PUBLIC_WEB_ENABLED`. The
+`SignInPrompt` component already does exactly this (it calls `openAuth()` when given no `ctaHref`),
+so the guest state is a matter of pointing it at the new copy rather than new machinery.

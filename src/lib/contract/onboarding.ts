@@ -22,6 +22,9 @@ export interface RenterProfile {
   lastName: string | null;
   /** Company name on the renter's profile (display name; verification holds the legal name). */
   companyName: string | null;
+  /** The firm's own mark, when one is on file. Null is "none uploaded", which is what the
+   *  quotation's renter prompt invites him to fix. */
+  companyLogoUrl?: string | null;
   city: string | null;
   jobTitle: string | null;
   email: string | null;
@@ -37,6 +40,20 @@ export interface RenterProfile {
    * app. Account-level and persistent: it survives the trial's 60-min auto-delete.
    */
   hasUsedFirstRequestSlot?: boolean;
+  /**
+   * The backend's own «this account finished signing up» column, and it is NOT the tier.
+   *
+   * 🔴 **`createRequest` gates on THIS, never on the tier** (`backend-agents`, the
+   * `GUEST_CANNOT_POST_REQUESTS` branch), while `getUserTier` never reads it — it answers `basic`
+   * off `firstName && lastName && city && jobTitle` alone. The two can therefore disagree, and when
+   * they do the renter is stuck: basic enough that the web sends his profile save to the EDIT
+   * endpoint, which never sets this flag, and not onboarded enough to post a request.
+   *
+   * Optional because an older backend omitted it. `undefined` is read as «assume complete» — the
+   * ordinary case by far, and guessing the other way would send a healthy renter through the
+   * first-save endpoint for no reason.
+   */
+  hasCompletedOnboarding?: boolean;
 }
 
 /** A master-data option (city / job title). */

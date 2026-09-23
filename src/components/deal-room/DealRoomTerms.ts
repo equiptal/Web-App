@@ -22,8 +22,9 @@
 type LFn = (en: string, ar: string) => string;
 
 /** A locally-collected resolution for one term (app parity: nothing is sent until Counter/Accept). */
-export type TermResolution = { action: "accept" | "counter"; value?: unknown };
 import { partyToken } from "@/lib/contract/labels";
+
+export type TermResolution = { action: "accept" | "counter"; value?: unknown };
 export type ResolutionsMap = Record<string, TermResolution>;
 
 /**
@@ -39,9 +40,9 @@ export function valText(v: unknown, L: LFn): string {
   if (v == null || v === "") return "—";
   if (Array.isArray(v)) return v.length ? v.map((x) => String(x)).join(", ") : "—";
   if (typeof v === "boolean") return v ? L("Yes", "نعم") : L("No", "لا");
-  // `partyToken` is precautionary here: this reads RAW enums today. The 2026-09-02 prefix lives on
-  // `GET /public/bid-form/{token}` and on the backend's own quotation PDF, not on this payload.
-  // Stripping it costs nothing and makes the next such rename harmless.
+  // `partyToken` because the same 2026-09-02 change that prefixed the bid form's values did it
+  // here too: `quotation.service.ts` and `term-matching.ts` now map SUPPLIER to "On Supplier".
+  // The Arabic gained «على » the same way and is left as sent — it is already display text.
   const str = partyToken(String(v));
   if (str === "supplier") return L("Supplier", "المؤجّر");
   if (str === "rentee") return L("Rentee", "المستأجر");

@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<title>Renter Home — Dashboard v2</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap"
+  rel="stylesheet"
+/>
+
+<!--
+  ═══════════════════════════════════════════════════════════════════════════════
+  Moedatech — RENTER HOME (dashboard) · v2
+
+  v1 was too much. v2 keeps FOUR things and drops everything else:
+    1 · Needs you    — at most three, and only what stops if ignored
+    2 · Your RFQs    — what is out to the market, and what came back
+    3 · In progress  — the rooms that are moving
+    4 · Suppliers    — the market, and the ones you already know
+
+  EVERY number on this page maps to a field that exists TODAY. The mono line under
+  each section header names the endpoint it comes from; the DATA SOURCES switch in
+  the prototype bar shows or hides them. Nothing here waits on a backend change.
+
+  Deliberately NOT here (needs fields that do not exist): PO, contract, on-hire
+  confirmation, delay notes, off-hire, invoices, utilisation, price benchmarks,
+  supplier scorecards. They belong on this page later — not as fake numbers now.
+  ═══════════════════════════════════════════════════════════════════════════════
+-->
+
+<style>
+  :root{
+    color-scheme: light;
+    --navy:#1c3550; --navy-mid:#2a4f72; --muted:#6b8fa8; --faint:#9bb3c8;
+    --action:#f79009; --action-deep:#d4780a; --action-dim:#fff4e5; --action-line:#f7c98b;
+    --good:#12a150; --good-dim:#e7f7ee; --good-line:#a9dcbf;
+    --info:#1a7ec8; --info-dim:#e6f2fb;
+    --bad:#d9362a; --bad-dim:#fcebea; --bad-line:#f0b4af;
+    --surface:#eff4f9; --card:#ffffff; --sunk:#f5f9fc; --border:#d9e4ee; --line:#e7eef5;
+    --r-sm:8px; --r-md:12px; --r-lg:18px; --r-xl:24px; --r-pill:100px;
+    --shadow-sm:0 1px 2px rgba(18,38,58,.06);
+    --shadow-md:0 6px 20px -8px rgba(18,38,58,.18);
+    --ease:cubic-bezier(.32,.72,.24,1);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--surface);color:var(--navy);
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  [dir="rtl"]{font-family:"IBM Plex Sans Arabic","Inter",sans-serif}
+  button{font:inherit;color:inherit;cursor:pointer}
+  a{color:inherit;text-decoration:none}
+  .icon{font-family:"Material Symbols Outlined";font-weight:normal;font-style:normal;line-height:1;
+    display:inline-block;white-space:nowrap;direction:ltr;-webkit-font-feature-settings:"liga";user-select:none}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+  :focus-visible{outline:2px solid var(--action);outline-offset:2px;border-radius:4px}
+
+  /* prototype chrome */
+  .protobar{max-width:1120px;margin:0 auto;padding:16px 20px 10px;display:flex;align-items:center;gap:12px;
+    flex-wrap:wrap;font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted)}
+  .protobar .brand{color:var(--navy-mid);font-weight:600}
+  .protobar .brand em{font-style:normal;color:var(--action)}
+  .protobar .spacer{flex:1}
+  .srcbtn{border:1px solid var(--border);background:var(--card);border-radius:var(--r-pill);padding:5px 11px;
+    font-family:inherit;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+  .srcbtn.on{background:var(--navy);border-color:var(--navy);color:#fff}
+
+  .app{max-width:1120px;margin:0 auto;padding:0 20px 80px}
+
+  /* top bar — the 2026-08-25 redesign */
+  .appbar{background:var(--card);border:1px solid var(--border);border-radius:var(--r-xl) var(--r-xl) 0 0;
+    height:62px;padding:0 20px;display:flex;align-items:center;gap:14px;position:relative}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px;letter-spacing:-.02em}
+  .logo .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(140deg,#1e3a5f,#0f1e2e);
+    display:grid;place-items:center;color:#fff;font-size:15px}
+  .logo em{font-style:normal;color:var(--action)}
+  .nav{position:absolute;inset-inline:0;display:flex;justify-content:center;pointer-events:none}
+  .nav .inner{pointer-events:auto;display:flex;gap:4px}
+  .nav a{padding:8px 14px;border-radius:var(--r-pill);font-size:13.5px;font-weight:600;color:var(--muted)}
+  .nav a.on{color:var(--navy);background:var(--sunk);font-weight:700;box-shadow:inset 0 0 0 1px var(--line)}
+  .nav a:hover{color:var(--navy);background:var(--sunk)}
+  .cluster{margin-inline-start:auto;display:flex;align-items:center;gap:14px;z-index:1}
+  .langtog{display:inline-flex;background:var(--sunk);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px}
+  .langtog button{border:0;background:transparent;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;color:var(--muted)}
+  .langtog button.on{background:var(--card);color:var(--navy);box-shadow:var(--shadow-sm)}
+  .iconbtn{width:34px;height:34px;border-radius:50%;border:0;background:transparent;color:#5b6672;
+    display:grid;place-items:center;position:relative}
+  .iconbtn:hover{color:var(--navy);background:var(--sunk)}
+  .iconbtn .icon{font-size:20px}
+  .badge{position:absolute;top:2px;inset-inline-end:2px;min-width:16px;height:16px;border-radius:9px;
+    background:var(--action);color:#fff;font-size:10px;font-weight:800;line-height:16px;text-align:center;padding:0 4px}
+  .sep{width:1px;height:24px;background:#eceef0}
+  .av{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--navy);display:grid;place-items:center;
+    font-size:12px;font-weight:800}
+
+  /* hero — one line, two buttons, nothing else */
+  .hero{background:linear-gradient(135deg,#1e3a5f,#0f1e2e);border:1px solid var(--border);border-top:0;
+    border-radius:0 0 var(--r-xl) var(--r-xl);padding:24px;color:#fff;position:relative;overflow:hidden;
+    display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .hero::after{content:"";position:absolute;width:260px;height:260px;border-radius:50%;background:var(--action);
+    opacity:.16;filter:blur(80px);top:-110px;inset-inline-end:-30px;pointer-events:none}
+  .hero .who{position:relative;z-index:1;flex:1 1 400px;min-width:0}
+  .hero h1{margin:0;font-size:23px;font-weight:800;letter-spacing:-.02em}
+  .sentence{margin:8px 0 0;font-size:14px;color:rgba(255,255,255,.72);line-height:1.7}
+  .sentence b{color:#fff;font-weight:700}
+  .heroacts{position:relative;z-index:1;display:flex;gap:10px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:var(--r-md);padding:11px 18px;
+    font-size:13.5px;font-weight:700;border:1px solid transparent;transition:transform .18s var(--ease)}
+  .btn:hover{transform:translateY(-1px)}
+  .btn .icon{font-size:18px}
+  .btn-primary{background:var(--action);color:#fff}
+  .btn-ghost{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.22)}
+
+  /* section scaffolding */
+  .sec{margin-top:30px}
+  .sechead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .sechead h2{margin:0;font-size:17px;font-weight:800;letter-spacing:-.02em}
+  .sechead .sub{font-size:12.5px;color:var(--muted)}
+  .sechead .spacer{flex:1}
+  .link{font-size:12.5px;font-weight:700;color:var(--action-deep);background:none;border:0;padding:2px;
+    text-decoration:underline;text-underline-offset:3px}
+  .src{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--faint);margin:5px 0 12px;
+    display:flex;align-items:center;gap:6px}
+  .src::before{content:"";width:14px;height:1px;background:var(--border);flex:none}
+  body:not(.showsrc) .src{display:none}
+  body:not(.showsrc) .sechead{margin-bottom:12px}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-sm)}
+
+  /* 1 · needs you */
+  .queue{display:grid;gap:9px}
+  .qrow{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--card);
+    border:1px solid var(--border);border-radius:var(--r-md);position:relative;overflow:hidden;
+    transition:transform .18s var(--ease),box-shadow .18s}
+  .qrow:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
+  .qrow::before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:4px;background:var(--info)}
+  .qrow.urgent::before{background:var(--bad)}
+  .qrow.warn::before{background:var(--action)}
+  .qic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none;
+    background:var(--info-dim);color:var(--info)}
+  .qrow.urgent .qic{background:var(--bad-dim);color:var(--bad)}
+  .qrow.warn .qic{background:var(--action-dim);color:var(--action-deep)}
+  .qic .icon{font-size:20px}
+  .qbody{flex:1 1 240px;min-width:0}
+  .qbody .t{font-size:14px;font-weight:700;letter-spacing:-.01em}
+  .qbody .s{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .qgo{display:inline-flex;align-items:center;gap:6px;background:var(--navy);color:#fff;border:0;
+    border-radius:var(--r-pill);padding:8px 14px;font-size:12.5px;font-weight:700;flex:none}
+  .qgo:hover{background:var(--navy-mid)}
+  .qgo .icon{font-size:16px}
+  [dir="rtl"] .qgo .icon{transform:scaleX(-1)}
+
+  /* 2 · RFQs */
+  .rfq{overflow:hidden}
+  .rfq + .rfq{margin-top:12px}
+  .rfqhead{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .rfqhead .id{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--faint);letter-spacing:.06em}
+  .rfqhead .loc{font-size:14.5px;font-weight:800;letter-spacing:-.01em;display:flex;align-items:center;gap:6px}
+  .rfqhead .loc .icon{font-size:17px;color:var(--muted)}
+  .rfqhead .spacer{flex:1}
+  .pill{display:inline-flex;align-items:center;gap:5px;border-radius:var(--r-pill);padding:4px 10px;
+    font-size:11.5px;font-weight:700;border:1px solid var(--border);background:var(--sunk);color:var(--navy-mid)}
+  .pill .icon{font-size:13px}
+  .pill.live{background:var(--good-dim);border-color:var(--good-line);color:var(--good)}
+  .pill.risk{background:var(--bad-dim);border-color:var(--bad-line);color:var(--bad)}
+  .pill.warn{background:var(--action-dim);border-color:var(--action-line);color:var(--action-deep)}
+
+  .items{padding:4px 16px 10px}
+  .item{display:flex;align-items:center;gap:12px;padding:10px 0}
+  .item + .item{border-top:1px dashed var(--line)}
+  .eq{width:38px;height:38px;border-radius:10px;background:var(--sunk);border:1px solid var(--line);
+    display:grid;place-items:center;position:relative;flex:none;color:var(--navy-mid)}
+  .eq .icon{font-size:20px}
+  .eq .x{position:absolute;bottom:-4px;inset-inline-end:-4px;background:var(--action);color:#fff;
+    font-family:"IBM Plex Mono",monospace;font-size:9.5px;font-weight:600;border-radius:var(--r-pill);
+    padding:1px 5px;border:2px solid var(--card)}
+  .iname{flex:1 1 200px;min-width:0}
+  .iname .n{font-size:13px;font-weight:700}
+  .iname .m{font-size:11.5px;color:var(--muted);margin-top:1px}
+  .bids{display:flex;align-items:center;gap:8px;flex:none}
+  .bidn{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:600;color:var(--navy)}
+  .bidn.zero{color:var(--bad)}
+  .bidlab{font-size:11.5px;color:var(--muted)}
+  .mini{border:1px solid var(--border);background:var(--card);border-radius:var(--r-sm);padding:6px 11px;
+    font-size:11.5px;font-weight:700;color:var(--navy-mid);flex:none}
+  .mini:hover{border-color:var(--navy-mid);background:var(--sunk)}
+  .mini.act{background:var(--action-dim);border-color:var(--action-line);color:var(--action-deep)}
+  .rfqfoot{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--sunk);
+    border-top:1px solid var(--line);font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .rfqfoot b{font-family:"IBM Plex Mono",monospace;color:var(--navy);font-weight:600}
+  .rfqfoot .spacer{flex:1}
+
+  /* 3 · in progress */
+  .rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+  .room{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+  .roomtop{display:flex;align-items:center;gap:10px}
+  .slogo{width:36px;height:36px;border-radius:10px;background:var(--sunk);border:1px solid var(--line);
+    display:grid;place-items:center;font-size:14px;font-weight:800;color:var(--navy);flex:none}
+  .roomtop .who{flex:1;min-width:0}
+  .roomtop .who .n{font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .roomtop .who .e{font-size:11.5px;color:var(--muted);margin-top:1px}
+  .unread{min-width:20px;height:20px;border-radius:10px;background:var(--action);color:#fff;font-size:11px;
+    font-weight:800;line-height:20px;text-align:center;padding:0 6px;flex:none}
+  .roomprice{display:flex;align-items:baseline;gap:7px;padding:9px 11px;background:var(--sunk);
+    border:1px solid var(--line);border-radius:var(--r-md)}
+  .roomprice .v{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;letter-spacing:-.02em}
+  .roomprice .u{font-size:11.5px;color:var(--muted)}
+  .roomprice .spacer{flex:1}
+  .roomacts{display:flex;align-items:center;gap:8px}
+  .roomacts .spacer{flex:1}
+
+  /* 4 · suppliers */
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{border:1px solid var(--border);background:var(--card);border-radius:var(--r-pill);padding:7px 14px;
+    font-size:12.5px;font-weight:700;color:var(--muted)}
+  .tab.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .tab .c{font-family:"IBM Plex Mono",monospace;font-size:11px;opacity:.7;margin-inline-start:5px}
+  .filters{display:flex;gap:9px;flex-wrap:wrap;margin:11px 0 14px}
+  .fld{height:38px;border:1px solid var(--border);background:var(--card);border-radius:var(--r-sm);
+    padding:0 11px;font-size:12.5px;font-weight:600;color:var(--navy-mid);min-width:150px}
+  .fld:focus{outline:0;border-color:var(--action)}
+  .search{flex:1 1 220px;display:flex;align-items:center;gap:8px;height:38px;border:1px solid var(--border);
+    background:var(--card);border-radius:var(--r-sm);padding:0 11px}
+  .search .icon{font-size:18px;color:var(--muted)}
+  .search input{border:0;outline:0;background:transparent;flex:1;font:inherit;font-size:12.5px;min-width:0}
+  .chk{display:inline-flex;align-items:center;gap:7px;height:38px;border:1px solid var(--border);
+    background:var(--card);border-radius:var(--r-sm);padding:0 12px;font-size:12.5px;font-weight:700;color:var(--navy-mid)}
+  .chk .icon{font-size:17px}
+  .chk.on{background:var(--good-dim);border-color:var(--good-line);color:var(--good)}
+  .stores{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:13px}
+  .store{border:1px solid var(--border);background:var(--card);border-radius:var(--r-lg);overflow:hidden;display:block;
+    transition:transform .18s var(--ease),box-shadow .18s}
+  .store:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+  .sbanner{height:78px;background:linear-gradient(135deg,#1e3a5f,#0f1e2e);position:relative;display:flex;
+    align-items:flex-end;padding-inline:14px}
+  .sb-logo{width:46px;height:46px;border-radius:12px;border:3px solid var(--card);background:var(--card);
+    display:grid;place-items:center;font-size:17px;font-weight:800;color:var(--navy);transform:translateY(23px)}
+  .sflag{position:absolute;top:9px;inset-inline-end:10px;display:inline-flex;align-items:center;gap:4px;
+    border-radius:var(--r-pill);padding:3px 9px;font-size:10.5px;font-weight:700;color:#fff;background:var(--good)}
+  .sflag.new{background:var(--info)}
+  .sflag .icon{font-size:12px}
+  .sworked{position:absolute;top:9px;inset-inline-start:10px;font-family:"IBM Plex Mono",monospace;font-size:9.5px;
+    letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.85);background:rgba(255,255,255,.13);
+    border:1px solid rgba(255,255,255,.24);border-radius:var(--r-pill);padding:2px 7px}
+  .sbody{padding:30px 14px 14px}
+  .sbody .n{font-size:13.5px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .smeta{display:flex;gap:12px;margin-top:7px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+  .smeta span{display:inline-flex;align-items:center;gap:4px}
+  .smeta .icon{font-size:13px}
+
+  /* past requests → start again */
+  .chips{display:flex;gap:9px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--card);
+    border-radius:var(--r-pill);padding:7px 14px 7px 8px;font-size:12.5px;font-weight:700;color:var(--navy-mid);
+    transition:transform .18s var(--ease),border-color .18s,background .18s}
+  .chip:hover{transform:translateY(-1px);border-color:var(--action-line);background:var(--action-dim);color:var(--action-deep)}
+  .chip .ci{width:26px;height:26px;border-radius:8px;background:var(--sunk);display:grid;place-items:center;border:1px solid var(--line)}
+  .chip .ci .icon{font-size:16px}
+  .chip small{font-family:"IBM Plex Mono",monospace;font-weight:500;color:var(--faint);font-size:11px}
+
+  .foot{margin-top:34px;text-align:center;font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+
+  @media (max-width:900px){ .nav{display:none} }
+  @media (max-width:640px){
+    .app{padding:0 12px 60px}
+    .protobar{padding-inline:12px}
+    .hero{padding:18px 16px}
+    .hero h1{font-size:20px}
+    .langtog{display:none}
+    .item{flex-wrap:wrap}
+  }
+</style>
+</head>
+<body class="showsrc">
+
+<div class="protobar">
+  <span class="brand">moedatech<em>·</em>prototype</span>
+  <span>renter home · v2</span>
+  <span class="spacer"></span>
+  <button class="srcbtn on" id="srcbtn" onclick="toggleSrc()">data sources: on</button>
+</div>
+
+<div class="app">
+
+  <header class="appbar">
+    <div class="logo"><span class="mark"><span class="icon">construction</span></span>moedatech<em>.</em></div>
+    <nav class="nav"><div class="inner">
+      <a href="#" class="on" data-en="Dashboard" data-ar="لوحة التحكم">Dashboard</a>
+      <a href="#" data-en="Requests" data-ar="الطلبات">Requests</a>
+      <a href="#" data-en="My Organization" data-ar="منشأتي">My Organization</a>
+    </div></nav>
+    <div class="cluster">
+      <div class="langtog">
+        <button class="on" onclick="setLang('en')">EN</button>
+        <button onclick="setLang('ar')">ع</button>
+      </div>
+      <button class="iconbtn" title="Inbox"><span class="icon">mail</span><span class="badge">2</span></button>
+      <button class="iconbtn" title="Notifications"><span class="icon">notifications</span><span class="badge">7</span></button>
+      <span class="sep"></span>
+      <span class="av">YA</span>
+    </div>
+  </header>
+
+  <!-- HERO — three counts, one CTA -->
+  <section class="hero">
+    <div class="who">
+      <h1 data-en="Morning, Yara" data-ar="صباح الخير، يارا">Morning, Yara</h1>
+      <p class="sentence"
+         data-en="<b>4</b> requests are live, <b>11</b> new bids came in, <b>2</b> deals are in negotiation."
+         data-ar="<b>٤</b> طلبات نشطة، و<b>١١</b> عرضاً جديداً وصلك، و<b>صفقتان</b> قيد التفاوض."></p>
+    </div>
+    <div class="heroacts">
+      <button class="btn btn-primary"><span class="icon">add</span><span data-en="New request" data-ar="طلب جديد">New request</span></button>
+      <button class="btn btn-ghost"><span class="icon">upload_file</span><span data-en="Upload an RFQ" data-ar="ارفع طلب تسعير">Upload an RFQ</span></button>
+    </div>
+  </section>
+
+  <!-- ══ 1 · NEEDS YOU — three at most ══════════════════════════════════════ -->
+  <section class="sec">
+    <div class="sechead">
+      <h2 data-en="Needs you" data-ar="يحتاج قرارك">Needs you</h2>
+      <span class="sub" data-en="three at most — only what stops if you do nothing" data-ar="ثلاثة كحدّ أقصى — فقط ما يتوقف إن لم تتصرّف">three at most — only what stops if you do nothing</span>
+    </div>
+    <div class="src">GET /api/me/activity · GET /api/me/requests · GET /api/me/received-bids</div>
+
+    <div class="queue">
+      <div class="qrow urgent">
+        <span class="qic"><span class="icon">error</span></span>
+        <div class="qbody">
+          <div class="t" data-en="RFQ-1031 · Aramco, Dhahran has no bids" data-ar="طلب-1031 · أرامكو، الظهران بلا عروض">RFQ-1031 · Aramco, Dhahran has no bids</div>
+          <div class="s" data-en="Posted 6 days ago · 1× Generator 250 kVA · bidCount 0" data-ar="نُشر قبل ٦ أيام · ١× مولّد ٢٥٠ ك.ف.أ · عدد العروض ٠">Posted 6 days ago · 1× Generator 250 kVA · bidCount 0</div>
+        </div>
+        <button class="qgo"><span data-en="Open the request" data-ar="افتح الطلب">Open the request</span><span class="icon">arrow_forward</span></button>
+      </div>
+
+      <div class="qrow warn">
+        <span class="qic"><span class="icon">gavel</span></span>
+        <div class="qbody">
+          <div class="t" data-en="11 new bids across 3 requests" data-ar="١١ عرضاً جديداً على ٣ طلبات">11 new bids across 3 requests</div>
+          <div class="s" data-en="Nothing moves until you compare them and award" data-ar="لا شيء يتقدّم حتى تقارنها وترسي">Nothing moves until you compare them and award</div>
+        </div>
+        <button class="qgo"><span data-en="Compare bids" data-ar="قارن العروض">Compare bids</span><span class="icon">arrow_forward</span></button>
+      </div>
+
+      <div class="qrow">
+        <span class="qic"><span class="icon">forum</span></span>
+        <div class="qbody">
+          <div class="t" data-en="Zahid Tractor is waiting in the deal room" data-ar="زاهد تراكتور بانتظارك في غرفة الصفقة">Zahid Tractor is waiting in the deal room</div>
+          <div class="s" data-en="2 unread · Excavator 20T · room is NEGOTIATING" data-ar="رسالتان غير مقروءتين · حفّار ٢٠ طن · الغرفة قيد التفاوض">2 unread · Excavator 20T · room is NEGOTIATING</div>
+        </div>
+        <button class="qgo"><span data-en="Open the room" data-ar="افتح الغرفة">Open the room</span><span class="icon">arrow_forward</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 2 · YOUR RFQs ══════════════════════════════════════════════════════ -->
+  <section class="sec">
+    <div class="sechead">
+      <h2 data-en="Your requests" data-ar="طلباتك">Your requests</h2>
+      <span class="sub" data-en="grouped by RFQ · what went out, what came back" data-ar="مجمّعة حسب الطلب · ما خرج وما عاد">grouped by RFQ · what went out, what came back</span>
+      <span class="spacer"></span>
+      <button class="link" data-en="All requests" data-ar="كل الطلبات">All requests</button>
+    </div>
+    <div class="src">GET /api/me/requests → status · city · item{name,qty} · bidCount · createdAt · requestGroupId</div>
+
+    <article class="card rfq">
+      <div class="rfqhead">
+        <div>
+          <div class="id">RFQ-1042 · 3 <span data-en="items" data-ar="بنود">items</span></div>
+          <div class="loc"><span class="icon">location_on</span><span data-en="Qiddiya — Zone 4" data-ar="القدية — المنطقة ٤">Qiddiya — Zone 4</span></div>
+        </div>
+        <span class="spacer"></span>
+        <span class="pill live"><span class="icon">bolt</span><span data-en="Active" data-ar="نشط">Active</span></span>
+      </div>
+      <div class="items">
+        <div class="item">
+          <span class="eq"><span class="icon">agriculture</span><span class="x">×2</span></span>
+          <div class="iname">
+            <div class="n" data-en="Excavator 20T" data-ar="حفّار ٢٠ طن">Excavator 20T</div>
+            <div class="m" data-en="3 months · posted 8 days ago" data-ar="٣ أشهر · نُشر قبل ٨ أيام">3 months · posted 8 days ago</div>
+          </div>
+          <div class="bids"><span class="bidn">5</span><span class="bidlab" data-en="bids" data-ar="عروض">bids</span></div>
+          <button class="mini" data-en="Details" data-ar="التفاصيل">Details</button>
+          <button class="mini act" data-en="View bids" data-ar="اعرض العروض">View bids</button>
+        </div>
+        <div class="item">
+          <span class="eq"><span class="icon">forklift</span><span class="x">×1</span></span>
+          <div class="iname">
+            <div class="n" data-en="Telehandler 4T" data-ar="مناولة تلسكوبية ٤ طن">Telehandler 4T</div>
+            <div class="m" data-en="3 months · posted 8 days ago" data-ar="٣ أشهر · نُشر قبل ٨ أيام">3 months · posted 8 days ago</div>
+          </div>
+          <div class="bids"><span class="bidn">3</span><span class="bidlab" data-en="bids" data-ar="عروض">bids</span></div>
+          <button class="mini" data-en="Details" data-ar="التفاصيل">Details</button>
+          <button class="mini act" data-en="View bids" data-ar="اعرض العروض">View bids</button>
+        </div>
+        <div class="item">
+          <span class="eq"><span class="icon">bolt</span><span class="x">×2</span></span>
+          <div class="iname">
+            <div class="n" data-en="Generator 250 kVA" data-ar="مولّد ٢٥٠ ك.ف.أ">Generator 250 kVA</div>
+            <div class="m" data-en="3 months · posted 8 days ago" data-ar="٣ أشهر · نُشر قبل ٨ أيام">3 months · posted 8 days ago</div>
+          </div>
+          <div class="bids"><span class="bidn">2</span><span class="bidlab" data-en="bids" data-ar="عروض">bids</span></div>
+          <button class="mini" data-en="Details" data-ar="التفاصيل">Details</button>
+          <button class="mini act" data-en="View bids" data-ar="اعرض العروض">View bids</button>
+        </div>
+      </div>
+      <div class="rfqfoot">
+        <span><span data-en="10 bids from 6 suppliers" data-ar="١٠ عروض من ٦ مؤجّرين">10 bids from 6 suppliers</span></span>
+        <span>·</span>
+        <span><span data-en="Cheapest so far" data-ar="الأرخص حتى الآن">Cheapest so far</span> <b>SAR 8,400</b>/<span data-en="month" data-ar="شهر">month</span></span>
+        <span class="spacer"></span>
+        <button class="mini" data-en="Compare all" data-ar="قارن الكل">Compare all</button>
+      </div>
+    </article>
+
+    <article class="card rfq">
+      <div class="rfqhead">
+        <div>
+          <div class="id">RFQ-1039 · 1 <span data-en="item" data-ar="بند">item</span></div>
+          <div class="loc"><span class="icon">location_on</span><span data-en="King Khalid Airport — Riyadh" data-ar="مطار الملك خالد — الرياض">King Khalid Airport — Riyadh</span></div>
+        </div>
+        <span class="spacer"></span>
+        <span class="pill warn"><span class="icon">warning</span><span data-en="1 bid only" data-ar="عرض واحد فقط">1 bid only</span></span>
+      </div>
+      <div class="items">
+        <div class="item">
+          <span class="eq"><span class="icon">precision_manufacturing</span><span class="x">×1</span></span>
+          <div class="iname">
+            <div class="n" data-en="Tower crane 8T" data-ar="رافعة برجية ٨ طن">Tower crane 8T</div>
+            <div class="m" data-en="6 months · posted 4 days ago" data-ar="٦ أشهر · نُشر قبل ٤ أيام">6 months · posted 4 days ago</div>
+          </div>
+          <div class="bids"><span class="bidn">1</span><span class="bidlab" data-en="bid" data-ar="عرض">bid</span></div>
+          <button class="mini" data-en="Details" data-ar="التفاصيل">Details</button>
+          <button class="mini act" data-en="View bid" data-ar="اعرض العرض">View bid</button>
+        </div>
+      </div>
+      <div class="rfqfoot">
+        <span data-en="One price is not a market — invite more suppliers" data-ar="سعر واحد ليس سوقاً — ادعُ مؤجّرين آخرين">One price is not a market — invite more suppliers</span>
+        <span class="spacer"></span>
+        <button class="mini act" data-en="Find suppliers" data-ar="ابحث عن مؤجّرين">Find suppliers</button>
+      </div>
+    </article>
+
+    <article class="card rfq">
+      <div class="rfqhead">
+        <div>
+          <div class="id">RFQ-1031 · 1 <span data-en="item" data-ar="بند">item</span></div>
+          <div class="loc"><span class="icon">location_on</span><span data-en="Aramco — Dhahran" data-ar="أرامكو — الظهران">Aramco — Dhahran</span></div>
+        </div>
+        <span class="spacer"></span>
+        <span class="pill risk"><span class="icon">error</span><span data-en="No bids" data-ar="لا عروض">No bids</span></span>
+      </div>
+      <div class="items">
+        <div class="item">
+          <span class="eq"><span class="icon">bolt</span><span class="x">×1</span></span>
+          <div class="iname">
+            <div class="n" data-en="Generator 250 kVA" data-ar="مولّد ٢٥٠ ك.ف.أ">Generator 250 kVA</div>
+            <div class="m" data-en="2 months · posted 6 days ago" data-ar="شهران · نُشر قبل ٦ أيام">2 months · posted 6 days ago</div>
+          </div>
+          <div class="bids"><span class="bidn zero">0</span><span class="bidlab" data-en="bids" data-ar="عروض">bids</span></div>
+          <button class="mini" data-en="Details" data-ar="التفاصيل">Details</button>
+          <button class="mini" data-en="Cancel" data-ar="إلغاء">Cancel</button>
+        </div>
+      </div>
+      <div class="rfqfoot">
+        <span data-en="Requires an Aramco certificate — fewer suppliers can answer" data-ar="يتطلّب شهادة أرامكو — عدد المؤجّرين القادرين أقل">Requires an Aramco certificate — fewer suppliers can answer</span>
+        <span class="spacer"></span>
+        <button class="mini act" data-en="Find suppliers" data-ar="ابحث عن مؤجّرين">Find suppliers</button>
+      </div>
+    </article>
+  </section>
+
+  <!-- ══ 3 · IN PROGRESS ════════════════════════════════════════════════════ -->
+  <section class="sec">
+    <div class="sechead">
+      <h2 data-en="In progress" data-ar="قيد التنفيذ">In progress</h2>
+      <span class="sub" data-en="the rooms that are moving" data-ar="الغرف المتحرّكة">the rooms that are moving</span>
+      <span class="spacer"></span>
+      <button class="link" data-en="Open inbox" data-ar="افتح الوارد">Open inbox</button>
+    </div>
+    <div class="src">GET /api/me/received-bids → supplierName · currentPrice · priceUnit · agreedUnits · dealRoomStatus · unreadCount</div>
+
+    <div class="rooms">
+      <article class="card room">
+        <div class="roomtop">
+          <span class="slogo">Z</span>
+          <span class="who">
+            <span class="n" data-en="Zahid Tractor" data-ar="زاهد تراكتور">Zahid Tractor</span>
+            <span class="e" data-en="Excavator 20T · 2 units · Qiddiya" data-ar="حفّار ٢٠ طن · وحدتان · القدية">Excavator 20T · 2 units · Qiddiya</span>
+          </span>
+          <span class="unread">2</span>
+        </div>
+        <div class="roomprice">
+          <span class="v mono">9,000</span><span class="u">SAR / <span data-en="month" data-ar="شهر">month</span></span>
+          <span class="spacer"></span>
+          <span class="pill warn"><span data-en="Negotiating" data-ar="قيد التفاوض">Negotiating</span></span>
+        </div>
+        <div class="roomacts">
+          <button class="mini" data-en="Quotation" data-ar="عرض السعر">Quotation</button>
+          <span class="spacer"></span>
+          <button class="qgo"><span data-en="Open room" data-ar="افتح الغرفة">Open room</span><span class="icon">arrow_forward</span></button>
+        </div>
+      </article>
+
+      <article class="card room">
+        <div class="roomtop">
+          <span class="slogo">A</span>
+          <span class="who">
+            <span class="n" data-en="Al-Rajhi Equipment" data-ar="الراجحي للمعدات">Al-Rajhi Equipment</span>
+            <span class="e" data-en="Manlift 16m · 4 units · Diriyah Gate" data-ar="مناولة أفراد ١٦م · ٤ وحدات · بوابة الدرعية">Manlift 16m · 4 units · Diriyah Gate</span>
+          </span>
+        </div>
+        <div class="roomprice">
+          <span class="v mono">3,400</span><span class="u">SAR / <span data-en="month" data-ar="شهر">month</span></span>
+          <span class="spacer"></span>
+          <span class="pill live"><span data-en="Agreed" data-ar="متّفق">Agreed</span></span>
+        </div>
+        <div class="roomacts">
+          <button class="mini" data-en="Quotation" data-ar="عرض السعر">Quotation</button>
+          <span class="spacer"></span>
+          <button class="qgo"><span data-en="Open room" data-ar="افتح الغرفة">Open room</span><span class="icon">arrow_forward</span></button>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ══ 4 · SUPPLIERS ══════════════════════════════════════════════════════ -->
+  <section class="sec">
+    <div class="sechead">
+      <h2 data-en="Suppliers" data-ar="المؤجّرون">Suppliers</h2>
+      <span class="sub" data-en="the market, and the ones you already know" data-ar="السوق، ومن تعرفهم مسبقاً">the market, and the ones you already know</span>
+      <span class="spacer"></span>
+      <button class="link" data-en="View all" data-ar="اعرض الكل">View all</button>
+    </div>
+    <div class="src">GET /api/stores · GET /api/master-data/cities · GET /api/stores/taxonomy — "worked with" = suppliers in /api/me/received-bids</div>
+
+    <div class="tabs">
+      <button class="tab on" onclick="pickTab(this,'all')"><span data-en="All suppliers" data-ar="كل المؤجّرين">All suppliers</span><span class="c">12</span></button>
+      <button class="tab" onclick="pickTab(this,'worked')"><span data-en="Worked with you" data-ar="تعاملت معهم">Worked with you</span><span class="c">4</span></button>
+    </div>
+
+    <div class="filters">
+      <div class="search">
+        <span class="icon">search</span>
+        <input id="q" oninput="filterStores()" data-ph-en="Search suppliers" data-ph-ar="ابحث عن مؤجّر" placeholder="Search suppliers" />
+      </div>
+      <select class="fld" id="city" onchange="filterStores()">
+        <option value="" data-en="All cities" data-ar="كل المدن">All cities</option>
+        <option data-en="Riyadh" data-ar="الرياض">Riyadh</option>
+        <option data-en="Jeddah" data-ar="جدة">Jeddah</option>
+        <option data-en="Dammam" data-ar="الدمام">Dammam</option>
+        <option data-en="Dhahran" data-ar="الظهران">Dhahran</option>
+      </select>
+      <select class="fld" id="cat" onchange="filterStores()">
+        <option value="" data-en="All categories" data-ar="كل الفئات">All categories</option>
+        <option data-en="Earthmoving" data-ar="حفر ونقل تربة">Earthmoving</option>
+        <option data-en="Lifting" data-ar="رفع">Lifting</option>
+        <option data-en="Power" data-ar="طاقة">Power</option>
+        <option data-en="Access" data-ar="وصول وارتفاعات">Access</option>
+      </select>
+      <button class="chk" id="ver" onclick="toggleVer()"><span class="icon">verified</span><span data-en="Verified only" data-ar="الموثّقون فقط">Verified only</span></button>
+    </div>
+
+    <div class="stores" id="stores"></div>
+  </section>
+
+  <!-- ══ 5 · START AGAIN ════════════════════════════════════════════════════ -->
+  <section class="sec">
+    <div class="sechead">
+      <h2 data-en="Request it again" data-ar="اطلبها مجدداً">Request it again</h2>
+      <span class="sub" data-en="opens /create prefilled from a past request — new dates" data-ar="يفتح صفحة الإنشاء معبّأة من طلب سابق — بتواريخ جديدة">opens /create prefilled from a past request — new dates</span>
+    </div>
+    <div class="src">GET /api/me/requests?status=CLOSED → item{name,qty} + stored request fields</div>
+    <div class="chips">
+      <button class="chip"><span class="ci"><span class="icon">agriculture</span></span><span data-en="Excavator 20T" data-ar="حفّار ٢٠ طن">Excavator 20T</span><small>×2</small></button>
+      <button class="chip"><span class="ci"><span class="icon">bolt</span></span><span data-en="Generator 250 kVA" data-ar="مولّد ٢٥٠ ك.ف.أ">Generator 250 kVA</span><small>×2</small></button>
+      <button class="chip"><span class="ci"><span class="icon">forklift</span></span><span data-en="Telehandler 4T" data-ar="مناولة تلسكوبية ٤ طن">Telehandler 4T</span><small>×1</small></button>
+      <button class="chip"><span class="ci"><span class="icon">elevator</span></span><span data-en="Manlift 16m" data-ar="مناولة أفراد ١٦م">Manlift 16m</span><small>×4</small></button>
+    </div>
+  </section>
+
+  <div class="foot" data-en="renter home v2 · every figure maps to a field that exists today" data-ar="الصفحة الرئيسية v2 · كل رقم مرتبط بحقل موجود اليوم">renter home v2 · every figure maps to a field that exists today</div>
+</div>
+
+<script>
+/* Suppliers. `worked` = the renter has a bid/room from them (/api/me/received-bids). */
+var STORES = [
+  {n:"Al-Rajhi Equipment Rental", nAr:"الراجحي لتأجير المعدات", city:"Riyadh", cityAr:"الرياض", cat:"Earthmoving", eq:128, ver:true,  worked:true},
+  {n:"Zahid Tractor",             nAr:"زاهد تراكتور",            city:"Riyadh", cityAr:"الرياض", cat:"Earthmoving", eq:210, ver:true,  worked:true},
+  {n:"United Rentals KSA",        nAr:"يونايتد رنتلز السعودية",  city:"Dammam", cityAr:"الدمام", cat:"Access",      eq:96,  ver:true,  worked:false},
+  {n:"Bin Quraya",                nAr:"بن قريّة",                city:"Dhahran",cityAr:"الظهران",cat:"Power",       eq:143, ver:true,  worked:false},
+  {n:"Almajdouie Equipment",      nAr:"المجدوعي للمعدات",        city:"Jeddah", cityAr:"جدة",    cat:"Lifting",     eq:87,  ver:true,  worked:false},
+  {n:"Saudi Diesel Equipment",    nAr:"الديزل السعودية للمعدات", city:"Dammam", cityAr:"الدمام", cat:"Power",       eq:174, ver:true,  worked:true},
+  {n:"Rawabi Rentals",            nAr:"روابي للتأجير",           city:"Riyadh", cityAr:"الرياض", cat:"Access",      eq:52,  ver:false, worked:false},
+  {n:"Al Sulaiman Equipment",     nAr:"السليمان للمعدات",        city:"Riyadh", cityAr:"الرياض", cat:"Lifting",     eq:64,  ver:false, worked:false},
+  {n:"Nesma Rental",              nAr:"نسما للتأجير",            city:"Jeddah", cityAr:"جدة",    cat:"Earthmoving", eq:118, ver:true,  worked:false},
+  {n:"Arabian Machinery",         nAr:"الآلات العربية",          city:"Riyadh", cityAr:"الرياض", cat:"Power",       eq:73,  ver:true,  worked:false},
+  {n:"Gulf Lifting Co.",          nAr:"الخليج للرفع",            city:"Dammam", cityAr:"الدمام", cat:"Lifting",     eq:41,  ver:false, worked:false},
+  {n:"Tawazun Heavy Equipment",   nAr:"توازن للمعدات الثقيلة",   city:"Riyadh", cityAr:"الرياض", cat:"Access",      eq:88,  ver:true,  worked:true}
+];
+
+var lang = "en", tab = "all", verOnly = false;
+
+function storeCard(s){
+  var name = lang === "ar" ? s.nAr : s.n;
+  var city = lang === "ar" ? s.cityAr : s.city;
+  var flag = s.ver
+    ? '<span class="sflag"><span class="icon">check</span>' + (lang === "ar" ? "موثّق" : "Verified") + '</span>'
+    : '<span class="sflag new">' + (lang === "ar" ? "جديد" : "New") + '</span>';
+  var worked = s.worked ? '<span class="sworked">' + (lang === "ar" ? "تعاملت معه" : "worked with") + '</span>' : '';
+  return '<a class="store" href="#">'
+    + '<div class="sbanner">' + worked + flag + '<span class="sb-logo">' + name.trim().charAt(0) + '</span></div>'
+    + '<div class="sbody"><div class="n">' + name + '</div>'
+    + '<div class="smeta">'
+    +   '<span><span class="icon">business_center</span>' + s.eq + ' ' + (lang === "ar" ? "معدّة" : "machines") + '</span>'
+    +   '<span><span class="icon">location_on</span>' + city + '</span>'
+    + '</div></div></a>';
+}
+
+function filterStores(){
+  var q = (document.getElementById("q").value || "").trim().toLowerCase();
+  var citySel = document.getElementById("city");
+  var cityV = citySel.selectedIndex > 0 ? citySel.options[citySel.selectedIndex].getAttribute("data-en") : "";
+  var catSel = document.getElementById("cat");
+  var catV = catSel.selectedIndex > 0 ? catSel.options[catSel.selectedIndex].getAttribute("data-en") : "";
+
+  var list = STORES.filter(function(s){
+    if (tab === "worked" && !s.worked) return false;
+    if (verOnly && !s.ver) return false;
+    if (cityV && s.city !== cityV) return false;
+    if (catV && s.cat !== catV) return false;
+    if (q && (s.n + " " + s.nAr + " " + s.cat + " " + s.city).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+
+  document.getElementById("stores").innerHTML = list.length
+    ? list.map(storeCard).join("")
+    : '<div style="grid-column:1/-1;padding:26px;text-align:center;color:var(--muted);font-size:13px">'
+      + (lang === "ar" ? "لا مؤجّر يطابق هذه التصفية." : "No supplier matches these filters.") + '</div>';
+}
+
+function pickTab(el, key){
+  tab = key;
+  var all = el.parentNode.querySelectorAll(".tab");
+  for (var i = 0; i < all.length; i++) all[i].classList.remove("on");
+  el.classList.add("on");
+  filterStores();
+}
+
+function toggleVer(){
+  verOnly = !verOnly;
+  document.getElementById("ver").classList.toggle("on", verOnly);
+  filterStores();
+}
+
+function toggleSrc(){
+  var on = document.body.classList.toggle("showsrc");
+  document.getElementById("srcbtn").classList.toggle("on", on);
+  document.getElementById("srcbtn").textContent = "data sources: " + (on ? "on" : "off");
+}
+
+function setLang(l){
+  lang = l;
+  var root = document.documentElement;
+  root.setAttribute("lang", l);
+  root.setAttribute("dir", l === "ar" ? "rtl" : "ltr");
+  var nodes = document.querySelectorAll("[data-en]");
+  for (var i = 0; i < nodes.length; i++){
+    var v = nodes[i].getAttribute(l === "ar" ? "data-ar" : "data-en");
+    if (v != null) nodes[i].innerHTML = v;
+  }
+  var ph = document.querySelectorAll("[data-ph-en]");
+  for (var j = 0; j < ph.length; j++){
+    ph[j].setAttribute("placeholder", ph[j].getAttribute(l === "ar" ? "data-ph-ar" : "data-ph-en"));
+  }
+  var btns = document.querySelectorAll(".langtog button");
+  btns[0].classList.toggle("on", l === "en");
+  btns[1].classList.toggle("on", l === "ar");
+  filterStores();
+}
+
+filterStores();
+</script>
+</body>
+</html>

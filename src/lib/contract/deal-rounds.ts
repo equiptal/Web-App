@@ -320,8 +320,8 @@ export interface ReplyStanding {
 export const CHAT_TERM_LABELS: Record<string, [string, string]> = {
   PRICE: ["Price", "السعر"],
   fat: ["Operator FAT", "وقت الحضور المجاني"],
-  fat_food: ["Operator FAT — Food", "الإعاشة (F.A.T) — الطعام"],
-  fat_accommodation_transport: ["Operator FAT — Accommodation/Transport", "الإعاشة (F.A.T) — الإقامة/النقل"],
+  fat_food: ["Operator food", "طعام المشغّل"],
+  fat_accommodation_transport: ["Operator accommodation and transport", "إقامة ونقل المشغّل"],
   diesel_included: ["Fuel Responsibility", "مسؤولية الوقود"],
   breakdown_response_sla: ["Breakdown SLA", "اتفاقية مستوى الخدمة للأعطال"],
   maintenance_responsibility: ["Maintenance", "الصيانة"],
@@ -639,6 +639,27 @@ export function buildChatCardView(card: ChatCard, ctx: ChatCardCtx): ChatCardVie
         ],
       };
   }
+}
+
+/**
+ * **A negotiation event as ONE line**, for the grey pill the map's chat draws it as (owner,
+ * 2026-09-22: *"check the chat on the app and align with it… show it like how it appears as grey
+ * pills on the app"*). The app's `DealSystemEvent` is a centred pill holding an icon and one line
+ * («Q proposed a rate: 2,500 SAR / day», «Payment Terms accepted»).
+ *
+ * Built from the CARD VIEW, never from `message.text`: the view is what carries the Arabic, the
+ * counter's two values and the localised term name, which are the three defects the old `.sysev`
+ * pill had when it printed the backend's English text. So this is the view's title, then what its
+ * rows say, then its transition: «You proposed a rate: 2,500 SAR / day · 0 SAR · …» is cut to the
+ * FIRST row for a rate, as the app does, because the mobilisation and return figures are the price
+ * footer's to state.
+ */
+export function chatEventLine(view: ChatCardView, ar: boolean): string {
+  const arrow = ar ? "←" : "→";
+  const rows = view.kind === "rate_proposal" ? view.rows.slice(0, 1) : view.rows;
+  const parts = rows.map((r) => r.value).filter((v) => v !== "");
+  if (view.transition) parts.push(`${view.transition.from} ${arrow} ${view.transition.to}`);
+  return parts.length ? `${view.title}: ${parts.join(" · ")}` : view.title;
 }
 
 /** The ask itself — «اطلب تأكيد التوفّر» / «اطلب مستنداً» / «اطلب معدّة أخرى», as it reads in the

@@ -19,6 +19,7 @@
  */
 
 import { useState } from "react";
+import { Dialog } from "@/components/Dialog";
 
 export function CallModal({
   ar,
@@ -40,26 +41,26 @@ export function CallModal({
     try { await navigator.clipboard.writeText(phone); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* clipboard blocked */ }
   };
   return (
-    <div dir={ar ? "rtl" : "ltr"} onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 80, background: "rgba(16,38,63,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(16,38,63,.35)", padding: "26px 22px 22px", textAlign: "center" }}>
-        <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: "50%", background: "#e7f7ee", color: "#1daf58", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+    <Dialog open onClose={onClose} size="sm" padded={false}>
+      <div dir={ar ? "rtl" : "ltr"} style={{ padding: "26px 22px 22px", textAlign: "center" }}>
+        <span style={{ display: "inline-flex", width: 56, height: 56, borderRadius: "50%", background: "var(--ok-soft)", color: "var(--ok)", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
           <span className="material-icons-outlined" style={{ fontSize: 28 }}>call</span>
         </span>
-        <h3 style={{ fontSize: 16, fontWeight: 900, color: "#1c3550", margin: 0 }}>{L("Call supplier", "الاتصال بالمؤجّر")}</h3>
-        <p style={{ fontSize: 13, fontWeight: 600, color: "#6b8fa8", margin: "4px 0 16px" }}>{name}</p>
-        <div style={{ direction: "ltr", unicodeBidi: "plaintext", fontSize: 22, fontWeight: 900, color: "#1c3550", letterSpacing: 0.5, userSelect: "all", marginBottom: 18 }}>{phone}</div>
+        <h3 style={{ fontSize: 16, fontWeight: 900, color: "var(--navy)", margin: 0 }}>{L("Call supplier", "الاتصال بالمؤجّر")}</h3>
+        <p style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)", margin: "4px 0 16px" }}>{name}</p>
+        <div style={{ direction: "ltr", unicodeBidi: "plaintext", fontSize: 22, fontWeight: 900, color: "var(--navy)", letterSpacing: 0.5, userSelect: "all", marginBottom: 18 }}>{phone}</div>
         <div style={{ display: "flex", gap: 10 }}>
           {canCall && (
-            <a href={`tel:${phone}`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 13, border: "none", background: "#1daf58", color: "#fff", fontWeight: 800, fontSize: 14, textDecoration: "none" }}>
+            <a href={`tel:${phone}`} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: "var(--radius-lg)", border: "none", background: "var(--ok)", color: "var(--surface)", fontWeight: 800, fontSize: 14, textDecoration: "none" }}>
               <span className="material-icons-outlined" style={{ fontSize: 18 }}>call</span>{L("Call", "اتصال")}
             </a>
           )}
-          <button onClick={copy} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: 13, border: "1.5px solid #d4e0ec", background: "#fff", color: "#1c3550", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
+          <button onClick={copy} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 7, padding: "13px", borderRadius: "var(--radius-lg)", border: "1.5px solid var(--border)", background: "var(--surface)", color: "var(--navy)", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit" }}>
             <span className="material-icons-outlined" style={{ fontSize: 18 }}>{copied ? "check" : "content_copy"}</span>{copied ? L("Copied", "تم النسخ") : L("Copy number", "نسخ الرقم")}
           </button>
         </div>
-        <button onClick={onClose} style={{ marginTop: 12, width: "100%", padding: "11px", borderRadius: 13, border: "none", background: "#eff4f9", color: "#6b8fa8", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Close", "إغلاق")}</button>
+        <button onClick={onClose} style={{ marginTop: 12, width: "100%", padding: "11px", borderRadius: "var(--radius-lg)", border: "none", background: "var(--surface2)", color: "var(--muted)", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}>{L("Close", "إغلاق")}</button>
       </div>
-    </div>
+    </Dialog>
   );
 }

@@ -18,6 +18,8 @@ interface BackendMe {
   tier?: string;
   /** mobile/016 — first-request slot flag; gates the home "Start Your Request" pop-up. */
   hasUsedFirstRequestSlot?: boolean;
+  /** The signup-completion column the request gate actually reads — see `RenterProfile`. */
+  hasCompletedOnboarding?: boolean;
   crNumber?: string | null;
   commercialRegistrationNumber?: string | null;
   vatNumber?: string | null;
@@ -36,10 +38,37 @@ interface BackendMe {
     companyCity?: string | null; postalCode?: string | null;
   } | null;
 }
+/**
+ * `GET /users/me/profile-status` — and it is the IDENTITY payload, not just a status.
+ *
+ * ⚠️ **This is where the app reads a renter's CR, VAT, company and address from.** `ProfileStatus`
+ * in `profile_models.dart` is built from this response and parses `crNumber`, `vatNumber`,
+ * `companyName`, `companyLegalName` and the five Saudi-address parts; `live_quotation_document.dart`
+ * then hands those straight to the quotation's Rentee block. The web was reading the same four
+ * fields off `GET /users/me`, which does not carry them — so where the app printed a number the web
+ * printed a "Verified" pill, and where the app composed "Jeddah" into the national address the web
+ * composed nothing. Verified against staging on 2026-09-04: `/users/me` answers `companyCity: null`
+ * while `/users/me/profile-status` answers `'Jeddah'` for the same account.
+ *
+ * The app is the source of truth for what a renter's identity IS, so this payload wins.
+ */
 interface BackendStatus {
   supplierStatus?: number | null;
   /** Also carried on profile-status; used as the fallback if `/users/me` omits it. */
   hasUsedFirstRequestSlot?: boolean;
+  companyName?: string | null;
+  /** The registered entity name. The app carries it; nothing on the web reads it yet. */
+  companyLegalName?: string | null;
+  /** The firm's own mark, presigned by `profile-status`. Drives the quotation's renter prompt. */
+  companyLogoUrl?: string | null;
+  crNumber?: string | null;
+  vatNumber?: string | null;
+  nationalAddress?: string | null;
+  buildingNumber?: string | null;
+  shortAddress?: string | null;
+  district?: string | null;
+  companyCity?: string | null;
+  postalCode?: string | null;
 }
 
 /**
@@ -58,7 +87,11 @@ export async function GET(req: Request) {
         tier: normalizeTier(me.tier),
         firstName: me.firstName ?? null,
         lastName: me.lastName ?? null,
-        companyName: me.companyName ?? me.supplierProfile?.companyName ?? null,
+        // Profile-status first, because that is the payload the app builds a renter's identity from.
+        companyName: status.companyName ?? me.companyName ?? me.supplierProfile?.companyName ?? null,
+        // The renter's OWN mark, so his quotation can tell him when his side of the header has none.
+        // `profile-status` presigns it (`profile.service.ts:357`); the web has never read it.
+        companyLogoUrl: status.companyLogoUrl ?? null,
         city: me.city ?? null,
         jobTitle: me.jobTitle ?? null,
         email: me.email ?? null,
@@ -66,22 +99,28 @@ export async function GET(req: Request) {
         // mobile/016 — the backend exposes this on BOTH /users/me and /users/me/profile-status; read
         // either so the home pop-up gate works regardless of which one carries it.
         hasUsedFirstRequestSlot: me.hasUsedFirstRequestSlot ?? status.hasUsedFirstRequestSlot ?? false,
+        /* 🔴 The flag `POST /agents/requests` refuses on, which is NOT the tier — see the note on
+           `RenterProfile.hasCompletedOnboarding`. Passed straight through, `undefined` and all: the
+           profile form tells «false» from «this backend does not send it» and they mean different
+           things. */
+        hasCompletedOnboarding: me.hasCompletedOnboarding,
         // Company identity for the quotation Rentee block — read from either the user or its profile,
         // tolerant of the backend's field naming. Null when absent (quotation falls back to the pill).
-        crNumber: me.crNumber ?? me.commercialRegistrationNumber ?? me.supplierProfile?.crNumber ?? me.supplierProfile?.commercialRegistrationNumber ?? null,
-        vatNumber: me.vatNumber ?? me.taxNumber ?? me.supplierProfile?.vatNumber ?? me.supplierProfile?.taxNumber ?? null,
+        crNumber: status.crNumber ?? me.crNumber ?? me.commercialRegistrationNumber ?? me.supplierProfile?.crNumber ?? me.supplierProfile?.commercialRegistrationNumber ?? null,
+        vatNumber: status.vatNumber ?? me.vatNumber ?? me.taxNumber ?? me.supplierProfile?.vatNumber ?? me.supplierProfile?.taxNumber ?? null,
         // Backend returns the National Address as structured parts, not a string — compose it
         // (building no. · short address · district · city · postal code) so the quotation shows the real
         // address instead of always falling back to the "Verified" pill (mobile composes it the same way).
         nationalAddress:
+          status.nationalAddress ??
           me.nationalAddress ??
           me.supplierProfile?.nationalAddress ??
           ([
-            me.buildingNumber ?? me.supplierProfile?.buildingNumber,
-            me.shortAddress ?? me.supplierProfile?.shortAddress,
-            me.district ?? me.supplierProfile?.district,
-            me.companyCity ?? me.supplierProfile?.companyCity,
-            me.postalCode ?? me.supplierProfile?.postalCode,
+            status.buildingNumber ?? me.buildingNumber ?? me.supplierProfile?.buildingNumber,
+            status.shortAddress ?? me.shortAddress ?? me.supplierProfile?.shortAddress,
+            status.district ?? me.district ?? me.supplierProfile?.district,
+            status.companyCity ?? me.companyCity ?? me.supplierProfile?.companyCity,
+            status.postalCode ?? me.postalCode ?? me.supplierProfile?.postalCode,
           ]
             .map((v) => (typeof v === "string" ? v.trim() : ""))
             .filter(Boolean)

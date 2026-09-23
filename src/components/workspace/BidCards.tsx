@@ -1,0 +1,1000 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { fmt, useLocale, useT } from "@/lib/i18n";
+import { Icon } from "@/components/ui";
+import { btn } from "@/lib/ds";
+import { JOIN_URL } from "@/lib/config/store-links";
+// Both were written and tested for the bid list this workspace retired, and have had no caller since
+// (owner, 2026-08-25). The rules did not stop being true when their surface went away.
+import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
+import { resolveRenteeBandState, renteeBandIsDead, renteeBandShowsDelta, type RenteeBandState } from "@/lib/contract/bid-band-state";
+import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
+import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
+import { liveRentalUnits } from "@/lib/contract/comparison";
+import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
+import { BidTermsModal } from "@/components/requests/BidTermsModal";
+import { checkArcs, equipmentCheckOf, type BidCardCheck, type CheckTone } from "@/lib/contract/bid-card-checks";
+import { computeBidReadiness } from "@/lib/contract/bid-readiness";
+import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmissionModal";
+import type { LinkBidSubmission } from "@/lib/contract/link-bids";
+import { termsDial, type WorkspaceBid } from "@/lib/contract/workspace";
+import { pin } from "@/lib/uiPins";
+
+/**
+ * The band's glyph per state (app parity, `renteeBandGlyph`).
+ *
+ * ⚠️ A Record over the union, never a `switch` with a default: adding a state to
+ * `RenteeBandState` must BREAK this map rather than silently falling through to one icon, which is
+ * the whole reason the app keeps an enum both cards switch on.
+ */
+const BAND_GLYPH: Record<RenteeBandState, string> = {
+  counterThisPrice: "gavel",
+  counterThisOffer: "gavel",
+  awaitingSupplier: "schedule",
+  awaitingConfirmation: "schedule",
+  newCounterOffer: "arrow_downward",
+  newMessage: "chat_bubble_outline",
+  supplierAnswered: "chat_bubble_outline",
+  offerUpdated: "edit",
+  dealClosed: "check_circle",
+  accepted: "check_circle",
+  withdrawn: "block",
+  expired: "lock_clock",
+};
+
+/** The band's caption per state. Exhaustive for the same reason as {@link BAND_GLYPH}. */
+const BAND_LABEL = (t: ReturnType<typeof useT>, s: RenteeBandState): string => ({
+  counterThisPrice: t.workspace.band.counterPrice,
+  counterThisOffer: t.workspace.band.counterOffer,
+  awaitingSupplier: t.workspace.band.awaitingSupplier,
+  newCounterOffer: t.workspace.band.newCounterOffer,
+  newMessage: t.workspace.band.newMessage,
+  supplierAnswered: t.workspace.band.supplierAnswered,
+  offerUpdated: t.workspace.band.offerUpdated,
+  awaitingConfirmation: t.workspace.band.awaitingConfirmation,
+  dealClosed: t.workspace.band.dealClosed,
+  accepted: t.workspace.band.accepted,
+  withdrawn: t.workspace.band.withdrawn,
+  expired: t.workspace.band.expired,
+}[s]);
+
+/**
+ * The Cards tab — one card per bid on the selected item, in a row that scrolls sideways.
+ *
+ * Every figure on a card is the LIVE one. `BidCard.price` already resolves to the deal room's last
+ * proposed rate where a negotiation has moved it, falling back to the opening offer where it has
+ * not, so the card needs no second number and no arrow between two: it shows what this bid costs
+ * today. The money itself is `computeQuoteTotals`, the same assembly the deal room and the quotation
+ * use — the three surfaces cannot drift because they are one calculation.
+ */
+export function BidCards({
+  bids,
+  checked,
+  unreadByBid,
+  submissionsByBid,
+  durationDays,
+  startDate,
+  mobByRentee = null,
+  demobByRentee = null,
+  largerHeld = 0,
+  showLarger = false,
+  onShowLarger,
+  onToggle,
+}: {
+  bids: WorkspaceBid[];
+  /** The bids ticked for the quotation download. */
+  checked: Set<string>;
+  /** The request's duration and start date — what the rental is prorated across. */
+  durationDays: number | null;
+  startDate: string | null;
+  /** Unread chat messages per bid, from received-bids. */
+  unreadByBid: Record<string, number>;
+  /** The raw submission behind an off-platform card, for the viewer. */
+  submissionsByBid: Record<string, LinkBidSubmission>;
+  /**
+   * Whose transport legs these are, off the renter's own request (`RequestListItem.mobByRentee`).
+   * `true` = his, so the supplier was never asked for a price and the row must say so rather than
+   * printing his silence, or the shared form's stored 0, as a quote.
+   */
+  mobByRentee?: boolean | null;
+  demobByRentee?: boolean | null;
+  /**
+   * How many bids on this item offer a machine LARGER than the one asked for (`sizeCounts.larger`).
+   * They are dropped by the backend unless the list asks for them, so on an otherwise empty item
+   * this is the difference between «nobody answered» and «somebody answered with a bigger machine».
+   */
+  largerHeld?: number;
+  /** Whether those bids are already being asked for — if they are, this empty state is the truth. */
+  showLarger?: boolean;
+  onShowLarger?: () => void;
+  onToggle: (bidId: string) => void;
+}) {
+  const t = useT();
+
+  if (bids.length === 0) {
+    /* ── «No bids» is a claim, and it can be false (owner, 2026-09-08) ────────────────────────
+       A supplier offering a bigger machine than the renter asked for is answered by dispatch and
+       then hidden here, so the renter gets a notification, opens the item and reads that nothing
+       arrived. The count says otherwise, and the button is the only route to the offer. Nothing is
+       said once the filter is already on: then the item really is empty. */
+    const held = showLarger ? 0 : largerHeld;
+    return (
+      <div className="grid min-h-[220px] place-items-center px-4 py-12 text-center">
+        <div>
+          <Icon name="inbox" size={30} className="text-muted" />
+          <p className="mt-2 text-body font-semibold text-muted">{t.workspace.noBidsYet}</p>
+          {held > 0 && (
+            <div className="mt-3 inline-flex flex-wrap items-center justify-center gap-2 rounded-md border border-brand/40 bg-brand-soft px-3 py-2">
+              <span className="inline-flex items-center gap-1.5 text-meta font-semibold text-navy">
+                <Icon name="straighten" size={14} className="text-brand-deep" />
+                {fmt(held === 1 ? t.workspace.sizeLargerHeldOne : t.workspace.sizeLargerHeldMany, { n: String(held) })}
+              </span>
+              {onShowLarger && (
+                <button type="button" onClick={onShowLarger} className={btn("secondary", "sm", { className: "transition" })}>
+                  {held === 1 ? t.workspace.showLargerCtaOne : t.workspace.showLargerCtaMany}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    /* ── A ROW you travel sideways, and the COLUMN carries its height (owner, 2026-09-09) ────────
+       *"No, the bids card must be scrolled horizontally to show all of them, but I meant we might
+       need vertical scrolling to show the height of the card in some cases only."*
+
+       ~~A wrapping `auto-fill` grid.~~ That was yesterday's answer to "no page scrolling is shown",
+       and it answered the wrong half: it fixed the missing VERTICAL scroll by taking the sideways
+       travel away. The bids are a rail — one card per supplier, read left to right, compared by
+       travelling — and that is the 2026-08-25 shape the owner has now restored.
+
+       What survives from yesterday is the part he actually reported: the workspace COLUMN scrolls
+       (`RequestsWorkspace`'s pinned root is `overflow-y-auto`, and neither tab pane clips), so a card
+       taller than the viewport is read by scrolling the page rather than by a bar inside a box. This
+       strip caps nothing and scrolls nothing downwards itself.
+
+       `items-stretch` keeps the 2026-08-30 ruling: every card takes the height of the tallest in the
+       row, so the «Counter this price» buttons line up and a shorter card's slack sits above its
+       footer. Both overflow axes are STATED — CSS computes the other from `visible` to `auto` the
+       moment one scrolls, and an unstated `overflow-y` is how this repo grew a phantom vertical bar
+       three times (the bid rail, the compare matrix, the suppliers table).
+
+       ── ~~The strip CENTRES what it holds.~~ WITHDRAWN (owner, 2026-09-21: *"why this
+       cewntered? revert it back"*) ─────────────────────────────────────────────────────────
+       It was centred on 2026-09-19, on his own pick from four options put to him: *«why margin from
+       left not equal to right»*, on a 1920 screen holding ONE bid. The measurement behind that is
+       still true and is worth keeping, because it is what will be reached for again — the gutters
+       WERE equal, 37px of grey left and 39px right; what was unequal was the CONTENT, a 344px card
+       against the leading gutter with ~1480px of empty white after it, because `PAGE_MAX` became
+       `max-w-none` the same morning and this container went 1360 -> 1840 while the card did not.
+       🔴 He has now looked at the centred strip and taken it back off. The card sits at the
+       READING START again, which is where every other band on this page begins, and a lone bid on a
+       wide screen simply has white after it.
+       ⚠️ **If it is ever centred again it must be `center-safe`, never a plain `justify-center`.**
+       This is an `overflow-x-auto` scroller, and centred content WIDER than its box overflows
+       equally at both ends — the overflow past the start edge cannot be scrolled to, so on a
+       request with six bids the FIRST one becomes unreachable. That is the whole reason the
+       withdrawn version carried the suffix, and it is the trap to re-read before reinstating. */
+    <div
+      {...pin("workspace-bid-cards")}
+      className="flex items-stretch gap-5 overflow-x-auto overflow-y-clip p-3"
+    >
+      {bids.map((b) => (
+        <BidCardTile
+          key={b.card.id}
+          bid={b}
+          selected={checked.has(b.card.id)}
+          unread={unreadByBid[b.card.id] ?? 0}
+          submission={submissionsByBid[b.card.id] ?? null}
+          durationDays={durationDays}
+          startDate={startDate}
+          mobByRentee={mobByRentee}
+          demobByRentee={demobByRentee}
+          onSelect={() => onToggle(b.card.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function BidCardTile({
+  bid,
+  selected,
+  unread,
+  submission,
+  durationDays,
+  startDate,
+  mobByRentee,
+  demobByRentee,
+  onSelect,
+}: {
+  bid: WorkspaceBid;
+  selected: boolean;
+  unread: number;
+  submission: LinkBidSubmission | null;
+  durationDays: number | null;
+  startDate: string | null;
+  mobByRentee?: boolean | null;
+  demobByRentee?: boolean | null;
+  onSelect: () => void;
+}) {
+  const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
+  const L = (en: string, arr: string) => (ar ? arr : en);
+  const router = useRouter();
+  const [open, setOpen] = useState(true);
+  const [termsOpen, setTermsOpen] = useState(false);
+  const [subOpen, setSubOpen] = useState(false);
+  /** Local, like «Provide it for me?»'s own acknowledgement: WhatsApp opening is all we can observe,
+   *  so the button reports that the renter was handed the message, never that it was sent. */
+  const [invited, setInvited] = useState(false);
+
+  const card = bid.card;
+  const offline = bid.source === "offline";
+  const dial = termsDial(card, bid.source);
+
+  /**
+   * The equipment half, the app's own model of it (`bid_card_checks.dart`, ported to
+   * `bid-card-checks.ts`). Requirement-level, not unit-level: a bid offering three machines that
+   * each want one more paper is «6 met · 3 missing», not «0 of 3 ready», which would read as total
+   * failure for a supplier who is one document short per machine.
+   *
+   * A bid nobody can act on any more draws a grey ring and says so rather than disappearing, which
+   * is the rule the negotiate footer already follows for the same two statuses.
+   */
+  const equipmentChecks = equipmentCheckOf(computeBidReadiness(card)?.units ?? [], {
+    dead: card.status === "EXPIRED" || card.status === "WITHDRAWN",
+  });
+
+  /** Digits only — `wa.me` refuses a number carrying spaces, dashes or a leading `+`. */
+  const invitePhone = (card.supplierPhone ?? "").replace(/\D/g, "") || null;
+
+  /**
+   * The counter's round, or null on a bid nobody has moved. `viewerRole` is the renter's: this whole
+   * surface is his, and the rule uses it to decide whose figure is being struck through.
+   */
+  const delta = bidCounterDelta({
+    originalPrice: card.openingPrice,
+    currentPrice: card.price,
+    lastCounterBy: card.lastCounterBy,
+    viewerRole: "rentee",
+    status: card.status,
+  });
+
+  /* The band's one caption, resolved by the app's own ordering. ⚠️ The ordering is a PURE FUNCTION
+     in `bid-band-state.ts` and the card only maps its answer to a word, a glyph and a tone — the
+     part that can be wrong is which state wins, and that is testable without rendering anything. */
+  const bandState = resolveRenteeBandState({
+    bidStatus: card.status,
+    hasDealRoom: card.dealRoomId != null,
+    dealRoomStatus: card.dealRoomStatus,
+    deltaSide: delta?.side ?? null,
+    liveStatusKind: card.liveStatus?.kind ?? null,
+    lastCounterBy: card.lastCounterBy,
+  });
+  const bandDead = renteeBandIsDead(bandState);
+  const bandShowsDelta = renteeBandShowsDelta(bandState);
+  /** The states that report something the SUPPLIER did, so a screen reader is told rather than
+   *  having to find it. The turn states and the terminal ones announce nothing: they are the card's
+   *  resting condition, not an event. */
+  const bandIsNews = bandState === "newCounterOffer" || bandState === "newMessage"
+    || bandState === "supplierAnswered" || bandState === "offerUpdated";
+  const bandLabel = BAND_LABEL(t, bandState);
+
+  /* ⚠️ Every live state opens the SAME place — the negotiation sheet — because every one of them is
+     answered there: the counter, the terms, the log and the supplier's own last move. An ACCEPTED bid
+     opens the room READ-ONLY rather than being drawn dead: the sheet says why in its header, and a
+     renter reading «Deal closed» is asking what the deal WAS. `openCounter` is declared below, so
+     the press calls it rather than aliasing it here — a `const` alias at this point is a TDZ error. */
+
+  // ── The price block, built the way the app builds it ───────────────────────────────────────────
+  // Mirrors `v3_bid_card.dart` + `price_expanded_breakdown.dart`, checked against the source on
+  // 2026-08-12. Every row here is PER UNIT; a multi-unit offer adds an all-units row at the foot.
+  //
+  // ── The count the money multiplies by is the DEAL ROOM's (owner, 2026-08-28) ─────────────────
+  // This card multiplied by `unitsOffered` — what the supplier put on the table — while the deal
+  // room and the app's own bid card multiply by the NEGOTIATED count (`agreedUnits`, then
+  // `currentRentalUnits`). On a four-unit offer cut to two, the deal room's quote panel said ×2 and
+  // this card said ×4: two totals for one bid, with nothing on either surface to say which was the
+  // price. `liveRentalUnits` is that shared rule (app parity, `v3_bid_card._liveRentalUnits`), and
+  // the comparison workspace was already using it.
+  const units = liveRentalUnits(card);
+  /** What the bid CLAIMS, which is a different question from what it prices — the note says so. */
+  const unitsOffered = card.unitsOffered > 0 ? card.unitsOffered : card.numberOfUnits > 0 ? card.numberOfUnits : 1;
+
+
+  /**
+   * What this bid owes the reader when its counts disagree — machines actually NAMED against units
+   * OFFERED against units PRICED. Silence where they agree, which is most bids.
+   *
+   * The three are genuinely different questions, and only the last one costs money: `offered` is what
+   * the bid claims (padded with repeats when a supplier commits to more units than he holds machines
+   * for), `machinesNamed` is how many distinct machines are actually behind it, and `priced` is what
+   * the money was built on. A bid offering five and naming three said nothing at all until now.
+   */
+  const countNotes = unitCountNotes({
+    priced: units,
+    offered: unitsOffered,
+    machinesNamed: distinctMachinesOffered(card.offeredUnitsDetail),
+  });
+  // The rental is prorated: (rate ÷ 26 or ÷ 6) × billable days, Fridays excluded. With no duration
+  // it stays the bare rate — never a fabricated single day, which would read as near-zero on a
+  // monthly bid.
+  const rental = computeRentalTotal({
+    rate: card.price,
+    priceUnit: card.priceUnit,
+    startDate,
+    durationDays,
+  });
+  const totals = computeQuoteTotals({
+    perUnitRental: rental.total,
+    rentalUnits: units,
+    mob: { amount: card.mobPrice, units: card.mobUnits, excluded: card.mobExcluded },
+    demob: { amount: card.demobPrice, units: card.demobUnits, excluded: card.demobExcluded },
+  });
+  // The headline is the quoted RATE — on a daily bid too (owner, 2026-08-26). It used to headline the
+  // period total there, which put a total in the same column as the other units' rates and made the
+  // rental row below a restatement of it. `headlineShowsRawRate` is the app's own rule and its own
+  // name for it. The prorated figure lives in the breakdown, one row down, for every unit alike.
+  const headline = headlineAmount(card.priceUnit, card.price ?? 0, rental.total);
+  const rentalTypeLabel =
+    card.priceUnit === "PER_MONTH" ? t.workspace.rentalMonthly
+    : card.priceUnit === "PER_WEEK" ? t.workspace.rentalWeekly
+    : card.priceUnit === "PER_JOB" ? t.workspace.rentalJob
+    : t.workspace.rentalDaily;
+  const headlineLabel = units > 1 ? t.workspace.perUnitLabel.replace("{label}", rentalTypeLabel) : rentalTypeLabel;
+  // The rental row explains the headline, so it is dropped when there is nothing left to explain:
+  // an exact period on a single-unit bid means the headline already IS the total.
+  const showRentalRow = !(rental.exact && units <= 1);
+  const rentalRowLabel = rental.raw
+    ? t.workspace.rentalRowNoDuration
+    : durationDays
+      ? t.workspace.rentalRowDays.replace("{n}", String(rental.billable))
+      : t.workspace.rentalRowCustom;
+  const basis = divisorNote(card.priceUnit, L);
+  /**
+   * `computeCycleTotals` is deliberately NOT called here any more.
+   *
+   * It is the comparison table's engine, and the table needs it: three columns that separate what
+   * recurs from what is paid once are the whole point of that view. A card is one bid read on its
+   * own, and the per-period column has no one to be compared against here — it only competed with the
+   * card's own total. `computeQuoteTotals` already gives this card the request's figure, and the two
+   * agree to the riyal at one unit, so nothing is lost by asking the simpler question.
+   */
+  const accepted = card.status === "ACCEPTED" || card.wonViaSurvey === true;
+  /** The count actually taken, once a bid is accepted — the app's `agreedUnits ?? unitsOfferedCount`,
+   *  which is what turns the units badge from "offers 3" into "2 of 3 accepted". Null before then. */
+  const acceptedUnits = accepted ? (card.agreedUnits ?? unitsOffered) : null;
+  /** ⚠️ What the bid COVERS, for the subtext under the firm's name - `null` on a single-unit
+   *  request, where every bid covers all of it. It reads the OFFERED count, never the priced one
+   *  the totals multiply by: they are separate questions and the card keeps them apart. */
+  const unitsLine =
+    card.numberOfUnits > 1
+      ? acceptedUnits != null
+        ? fmt(t.workspace.acceptedUnits, { accepted: String(acceptedUnits), offered: String(unitsOffered) })
+        : fmt(t.workspace.offersUnits, { n: String(unitsOffered) })
+      : null;
+  const submitted = card.submittedAt
+    ? new Date(card.submittedAt).toLocaleString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  /**
+   * ── The chat is the MAP's dock now, not the deal room (owner, 2026-08-26) ─────────────────────
+   *
+   * Chat is chat; negotiating is the three-step sheet. So the icon opens the conversation where the
+   * conversation lives — the dock on the equipment map, with a tab per item of this supplier's bid —
+   * instead of the deal-room page, which wrapped the same messages in a negotiation header.
+   *
+   * It also stops MINTING a room to read one. `startDealRoom` ran on every press, and a `DealRoom`
+   * row freezes the supplier's offered count; the dock's own rule is that opening a tab creates
+   * nothing and the first SEND creates the room (RM3-AC-47). Pressing chat is no longer an act.
+   */
+  const [countering, setCountering] = useState(false);
+
+  const openRoom = () => {
+    router.push(`/bids/${encodeURIComponent(card.id)}/equipment?chat=1`);
+  };
+
+  /**
+   * «Counter this price» opens the THREE-STYLES SHEET, always (owner, 2026-09-04).
+   *
+   * It only did when the bid already had a deal room. With no room — which is every bid nobody has
+   * spoken to yet, so most of them — the button fell through to `openRoom()` and landed the renter in
+   * the CHAT, on the machine tab, with no sheet and no counter in sight. Two different screens behind
+   * one button, and the one you got depended on whether you had chatted before.
+   *
+   * The map's own footer has always done it properly (`PriceFooter.handOff`): resolve or create the
+   * room first — countering is one of exactly three acts allowed to create one (004a §4.5) — then
+   * `?act=counter`, which is what opens the sheet. Same two lines here.
+   *
+   * A failure leaves the renter where he is rather than dumping him in a room he did not ask for:
+   * `ensureDealRoom` throwing means no room, and no room means no sheet to open.
+   */
+  const openCounter = async () => {
+    /* ⚠️ **Two enforcement points that must agree**, the argument `bid-equipment-access.ts` makes
+       for the same shape: the band above is not drawn for an off-platform bid, and this refuses one
+       anyway. An entry point is not a boundary — the terms modal reaches this function too, and a
+       later caller would otherwise inherit a call that 404s in silence. */
+    if (offline) return;
+    if (countering) return;
+    setCountering(true);
+    try {
+      const roomId = await ensureDealRoom(card.id, card.dealRoomId ?? null);
+      router.push(`/deal-room/${encodeURIComponent(roomId)}?act=counter`);
+    } catch {
+      setCountering(false);
+    }
+  };
+
+  return (
+    /* Not a control (owner, 2026-08-30: *"clicking on a card doesn't make anything"*). It carried
+       `onClick` and `cursor-pointer`, so it invited a press that only ever narrowed the quotation
+       download — an effect with no sign of itself anywhere on the card. The checkbox in the header
+       does that job now, and says so. What is left here is a container: no click, no pointer, and
+       the ring only when it IS checked. */
+    <article {...pin("bid-card")}
+      /* 344px and `flex-none`: the card states its own width again (owner, 2026-09-09), because a
+         rail is made of cards that keep their size and a bid drawn at 700px is a different card.
+         `h-full` still takes the row's stretched height, which is what lines the footers up. */
+      className={`flex h-full w-[344px] flex-none flex-col overflow-hidden rounded-lg border bg-surface transition ${
+        selected ? "border-brand" : "border-border"
+      }`}
+    >
+      {/* Where it came from, and when. */}
+      <header {...pin("bid-card-header")}
+        className={`flex flex-none items-center justify-between gap-2 border-b px-3.5 py-1.5 text-label font-semibold ${
+          offline ? "border-border bg-surface2 text-navy-mid" : "border-info/20 bg-info-soft text-info"
+        }`}
+      >
+        <span className="inline-flex items-center gap-2">
+          {/* A real `<input type=checkbox>`, not a styled span: it is the thing that decides what the
+              download contains, so it has to be reachable by keyboard and readable by a screen
+              reader without any of that being rebuilt by hand. `accent-brand` paints the native
+              control in the app's orange, which is all the styling it needs. */}
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={onSelect}
+            aria-label={L(`Include ${card.supplierName} in the download`, `أدرج ${card.supplierName} في التنزيل`)}
+            className="size-3.5 flex-none cursor-pointer accent-brand"
+          />
+          <Icon name={offline ? "drive_file_move" : "verified_user"} size={14} />
+          {offline ? t.workspace.sourceOfflineLong : t.workspace.sourceAppLong}
+        </span>
+        {submitted && <span className="font-semibold text-muted">{submitted}</span>}
+      </header>
+
+      <div {...pin("bid-card-footer")} className="flex flex-none items-center gap-3 px-3.5 py-2.5">
+        <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-navy text-body font-semibold text-white">
+          {card.supplierName.trim().charAt(0).toUpperCase() || "?"}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-subhead font-extrabold leading-[1.15] text-navy">{card.supplierName}</div>
+          {/* 🔴 **THE CITY, AND WHAT THE BID COVERS** (owner, 2026-09-23, on «Supplier · Riyadh
+              · 8 km»: *"make it, only city and offers x units if multi unit instead of this 2 units
+              badge"*).
+              ~~«Supplier», the city, then the distance.~~ Two of the three earned nothing on a card
+              in a column of bids: every row here IS a supplier, so the word was a caption on the
+              obvious; and the distance is the YARD's, which the equipment map states per machine
+              with its own «not confirmed» qualifier - one rounded figure here implied a precision
+              about a fleet that the map spends a whole surface refusing to claim.
+              ⚠️ **The count moved here FROM the pill column** (below), so the card says it once.
+              Same gate as the badge had - `numberOfUnits > 1`, the app's own: where the renter asked
+              for one machine every bid covers all of it and the line states nothing.
+              ⚠️ **The ACCEPTED shape survives with it.** «2 of 3 units accepted» is a partial
+              award, and it is the one fact the removed badge held that nothing else on the card
+              carries - the green band says THAT it was accepted, never how much of it. */}
+          <div className="truncate text-label font-semibold text-muted">
+            {[card.supplierCity || null, unitsLine].filter(Boolean).join(" · ")}
+          </div>
+        </div>
+        {/* ── The pill column, as the app builds it (`v3_bid_card._pillColumn`) ─────────────────
+            The chat control, against the card's trailing edge.
+            🔴 ~~The units badge sat under it.~~ Its count is in the SUBTEXT now (owner,
+            2026-09-23), so the column holds one thing again. */}
+        <div className="flex flex-none flex-col items-end gap-1.5">
+          {/* ~~«Not on the app», as a pill in the control's place on an off-platform card.~~ Removed
+              (owner, 2026-08-31): *"it is already labeled in the card header."* It is — the header
+              band is grey rather than blue and reads «Via an offline quote» across the top of the
+              card, which is the same fact stated first, larger, and where the reader meets it. The
+              pill restated it in the slot the chat control holds, so the eye went to a badge that
+              could not be pressed and said nothing new.
+
+              Nothing takes its place. An off-platform bid has no deal room to open, so that slot has
+              nothing to offer on this card; the units badge below it still draws. */}
+          {!offline && (
+            /* The conversation, as one round control: filled while there is something unread on it,
+               quiet while there is not. */
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void openRoom();
+              }}
+              aria-label={t.workspace.openChat}
+              title={t.workspace.openChat}
+              className={`relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border transition disabled:bg-disabled-bg disabled:text-disabled-fg ${
+                unread > 0 ? "border-navy bg-navy text-white" : "border-border bg-surface2 text-muted hover:bg-surface3"
+              }`}
+            >
+              <Icon name="chat_bubble_outline" size={16} />
+              {unread > 0 && <span className="absolute -end-px -top-px h-[9px] w-[9px] rounded-full bg-brand ring-2 ring-surface" />}
+            </button>
+          )}
+          {/* ── What THIS bid covers (owner, 2026-08-28) ──────────────────────────────────
+              A renter reading four offers to a four-unit request had no way to tell a supplier
+              covering the whole of it from one covering a single machine — both cards looked the
+              same until he opened the price. The app has said it on the card since 2026-08-17
+              (`_OffersUnitsBadge`), and this is that badge: what was OFFERED, never the priced count
+              the totals multiply by, so the two numbers stay separate questions.
+
+              Gated on the REQUEST being multi-unit, the app's own gate: where the renter asked for
+              one machine every bid covers all of it and the badge states nothing. */}
+        </div>
+      </div>
+
+      {/* ── The supplier's machines and their papers (owner, 2026-08-27) ────────────────────────────
+          ONE control, on the card of the supplier it is about. The request strip carried two —
+          «Review equipment» and «View documents» — and both pushed to `/bids/{id}/equipment`, the
+          same map, one of them with a panel open. Splitting it asked the renter to choose which half
+          of a page he wanted before he had seen either.
+
+          It sits above Terms because that is the order the questions come in: what is he offering,
+          then on what conditions. */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          router.push(`/bids/${encodeURIComponent(card.id)}/equipment`);
+        }}
+        className="flex min-h-[var(--control-lg)] flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition-colors hover:bg-surface2/40"
+      >
+        {/* ── One dial for both rows (owner, 2026-08-28) ──────────────────────────────────
+            This row and Terms below it answer the same question about two halves of one bid — how
+            much of what was asked for has been answered — so they now draw the same picture of it:
+            the Terms dial, at the Terms size, over `equipmentCheckOf`'s arcs. A donut here and a disc
+            there made two proportions look like two different kinds of fact.
+
+            The counts line under the label goes with it. «1 met · 11 missing» restated the dial in
+            words and made this row taller than the one it pairs with; the figures live behind
+            «View», on the verification map, where they can be acted on. */}
+        <DialGlyph slices={checkSlices(equipmentChecks)} />
+        <span className="flex-1 text-body font-semibold text-navy">{t.workspace.equipmentAndDocs}</span>
+        <span className="text-label font-semibold text-info">{L("View", "عرض")} ›</span>
+      </button>
+
+      {/* Terms: the dial says how much of them this supplier answered — never how good the offer is. */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setTermsOpen(true);
+        }}
+        className="flex min-h-[var(--control-lg)] flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition-colors hover:bg-surface2/40"
+      >
+        <DialGlyph slices={termsSlices(dial)} />
+        <span className="flex-1 text-body font-semibold text-navy">{L("Terms", "الشروط")}</span>
+        <span className="text-label font-semibold text-info">{L("View", "عرض")} ›</span>
+      </button>
+
+      {/* The money. */}
+      {/* No `flex-1`: it took whatever height the stretch left over, which is what turned the card's
+          slack into a gap inside this block. No `overflow-y-auto` either — the page's own rule is
+          that nothing here scrolls downwards, and a block that cannot be over-filled needs no way to
+          hide what does not fit. */}
+      <div className="flex flex-col gap-2.5 border-t border-border px-3.5 py-2.5">
+        {/* The headline: the rental type, and the rate or the total depending on the unit. An
+            accepted bid is the only status that touches this block — green, and a tick. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((o) => !o);
+          }}
+          aria-expanded={open}
+          className={`flex items-start gap-2.5 text-start ${
+            accepted ? "-mx-3.5 -mt-3.5 rounded-t-sm border-b-2 border-ok bg-ok-soft px-3.5 pb-2 pt-3.5" : ""
+          }`}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-body font-extrabold leading-none text-navy">{headlineLabel}</div>
+            {basis && <div className="mt-1.5 text-label font-semibold leading-none text-muted">{basis}</div>}
+          </div>
+          <div className="flex flex-none items-baseline gap-1.5">
+            <b className="text-subhead font-extrabold leading-none text-navy">{formatSar(headline)}</b>
+            <span className="text-label font-semibold leading-none text-muted">{t.priceFooter.currency}</span>
+            {accepted && <Icon name="check_circle" size={15} className="self-center text-ok" />}
+            <span aria-hidden="true" className={`text-label leading-none ${open ? "text-info" : "rotate-180 text-muted"}`}>
+              ⌃
+            </span>
+          </div>
+        </button>
+
+        {open && (
+          <div className="flex flex-none flex-col gap-2 rounded-sm border border-info/15 bg-info-soft/40 px-3 py-2.5">
+            {/* The rental, prorated across the billable days — what the headline's rate adds up to
+                over this request. Dropped when the headline already is the total. */}
+            {showRentalRow && <Row label={rentalRowLabel} value={totals.perUnit.rental} />}
+            {/* The legs name the party when the request kept one (owner, 2026-09-05) — see
+                `legDisplay`, which is where the three misreadings of a renter-owned leg are set out. */}
+            <LegRow label={t.workspace.deliveryToSite} amount={card.mobPrice} excluded={card.mobExcluded} onRentee={mobByRentee === true} />
+            <LegRow label={t.workspace.returnFromSite} amount={card.demobPrice} excluded={card.demobExcluded} onRentee={demobByRentee === true} />
+            <div className="flex flex-col gap-1.5 border-t border-border/70 pt-2">
+              <Row label={t.priceFooter.subtotal} value={totals.perUnit.subtotal} muted />
+              <Row label={t.priceFooter.vat} value={totals.perUnit.vat} muted />
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-none flex-col gap-2 rounded-sm border border-border px-3 py-2.5">
+          {/* ── One grand total, as the app and prod both state it (owner, 2026-08-26) ─────────────
+              There were two here: one billing period, then the whole request. The per-period one is
+              gone, and the app is where that was already settled — it carried the same pair, removed
+              it, and left the reasoning in `price_expanded_breakdown.dart:190-206`:
+
+                · **Delivery and return are charged ONCE, not per period.** Folding them into a "per
+                  month" subtotal makes 80,210 + 1,500 read as the cost of a month when the 1,500 is
+                  paid one time across the whole rental. On a daily bid it was worse than untidy — a
+                  5/day machine with a 20 delivery showed «Grand total · day 28.75», which multiplies
+                  out to 402 against a real total of 92.
+                · **Two shapes meant two rules**, so no one sentence described the card and the rental
+                  row restated the headline on daily bids.
+
+              On this web card it also printed a figure SMALLER than the subtotal directly above it —
+              93,967 under 476,590 — with both rows called «Grand total». Nothing told the reader
+              which one was the answer.
+
+              What is left is the request's own total, which is what the app's single grand total and
+              prod's «Grand total · incl. VAT» both are. The day count keeps its place in the rental
+              row above rather than being restated here. PER UNIT, like every row above it; the
+              all-units figure keeps its own row below. */}
+          <div className="flex items-baseline justify-between gap-2.5">
+            <span className="text-meta font-extrabold text-navy">{t.workspace.grandTotalInclVat}</span>
+            <span className="flex-none whitespace-nowrap">
+              <b className="text-subhead font-extrabold text-navy">{formatSar(totals.perUnit.total)}</b>{" "}
+              <span className="text-label font-semibold text-muted">{t.priceFooter.currency}</span>
+            </span>
+          </div>
+
+          {/* Multi-unit: a second row in the SAME box, carrying the real all-units figure. It is not
+              the per-unit total × units — each transport leg carries its own count.
+
+              The count is SPELLED (owner, 2026-08-28): «Overall total · 4» read as a line number, on
+              a row whose whole job is to say what the figure beside it was multiplied by.
+
+              ~~The app's own two-line shape — the label, with «Units: 4» as a caption under it
+              (`_GrandTotalCard`).~~ INLINE (owner, 2026-08-29). Stacked, the count read as a second
+              row of the totals box rather than as part of the label it qualifies, and it spent a
+              whole line saying four characters. «Overall total (4 units)» is one phrase, so it gets
+              one line. */}
+          {units > 1 && (
+            <div className="flex items-baseline justify-between gap-2 border-t border-border/70 pt-2.5">
+              <span className="min-w-0 text-meta font-extrabold text-brand">
+                {t.workspace.overallTotal}{" "}
+                <span className="font-semibold text-muted">
+                  {fmt(t.workspace.unitsCountLabel, { n: String(units) })}
+                </span>
+              </span>
+              <span className="flex-none">
+                <b className="text-subhead font-extrabold text-brand">{formatSar(totals.overall.total)}</b>{" "}
+                <span className="text-label font-semibold text-muted">{t.priceFooter.currency}</span>
+              </span>
+            </div>
+          )}
+
+          {/* ── What the counts do not agree about (owner, 2026-08-25, moved 2026-08-28) ───────────
+              `unitCountNotes` is the app's rule, ported and tested and — until now — called by nothing.
+              Most bids say nothing here, which is the point: it speaks only where the three counts
+              genuinely diverge, and a bid that offers five units while naming three machines has been
+              silent about it on every surface this workspace replaced.
+
+              INSIDE the totals box, under the overall total, rather than loose beneath it. It is the
+              footnote to that multiplication — «priced on 2 of the 4 units offered» is why the row
+              above says · 2 units — and a note sitting outside the box read as a remark about the
+              card rather than about the figure it qualifies. */}
+          {/* ── The CLAIMED note is gone from this card (owner, 2026-09-10) ───────────────────────
+              *"«1 من هذه الوحدات بلا معدّة مسمّاة: أُدرجت 1 معدّة.» remove this note from the bid
+              card"*. It fired on `claimedUnits > 0` — units offered without a named machine behind
+              them — which is the ORDINARY shape of an off-platform bid, so it printed in orange on
+              most cards and said nothing the renter acts on there.
+              ⚠️ Only the note is removed. `unitCountNotes` still computes `hasClaimedNote`,
+              `claimedUnits` and `machinesNamed`, with its tests: it is the app's own rule, and the
+              equipment map is where a unit with no machine behind it actually matters. */}
+          {countNotes.hasPricedNote && (
+            <div className="flex flex-col gap-1 border-t border-border/70 pt-2.5 text-label font-semibold leading-snug text-muted">
+              <span>
+                {fmt(
+                  countNotes.relation === "above" ? t.workspace.countPricedAbove : t.workspace.countPricedBelow,
+                  { priced: String(countNotes.priced), offered: String(countNotes.offered) },
+                )}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* The way on, at the foot of every card.
+          `mt-auto` is back and now earns it: the cards are stretched to a COMMON height rather than
+          to the pane, so the slack it crosses is only ever the difference between this card and the
+          fullest one. That is what puts the buttons on one line.
+          ⚠️ On an ON-PLATFORM bid this row now holds NOTHING — the band below it is the way on — so
+          it collapses to the `mt-auto` spacer that keeps the bands level across a row of cards. */}
+      <div className={`mt-auto flex flex-none gap-2 px-3.5 pt-0.5 ${offline ? "pb-3.5" : ""}`}>
+        {offline && (
+          <>
+            {/* ── «View quote» leads, «Invite» follows (owner, 2026-09-05) ───────────────────────
+                ~~Invite was the primary and took the width; «View quote» was the small secondary.~~
+                Swapped. Reading what the supplier actually quoted is why a renter opens this card;
+                inviting him onto the app is something he may do afterwards, and it was wearing the
+                emphasis of the act he came for.
+
+                ── It VIEWS the bid; it never edited one (owner, 2026-08-31) ───────────────────
+                ~~«Edit quote».~~ What it opens is `SharedBidSubmissionModal`, read-only by
+                construction — the supplier's own answers in the bid form's shape, Yes/No as static
+                chips and prices as static values. A renter editing another firm's quote is not a
+                thing the product does. */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSubOpen(true);
+              }}
+              /* Twice the invite's width (owner, 2026-09-06). `flex-1` against a `flex-none`
+                 invite left the two near-equal, because «Invite to Moedatech» is a long label — the
+                 emphasis has to be stated as a RATIO, not left to the words. */
+              /* Takes whatever the invite leaves. The pair was `2:1`, which squeezed «Invite to
+                 Moedatech» narrower than its own words and wrapped it onto two lines (owner,
+                 2026-09-07). The emphasis is still the ratio in practice — the invite is as wide as
+                 its label and no wider — and it cannot squeeze the label away. */
+              className={btn("primary", "lg", { className: "flex-1 transition" })}
+            >
+              {t.workspace.viewQuote}
+            </button>
+
+            {/* ── Invite him onto the app (owner, 2026-08-25) ────────────────────────────────────
+                Off-platform only, by decision: a supplier who bid THROUGH the app already has it.
+
+                The mechanism is «Provide it for me?»'s, not a new one (`MachineCard.tsx:327`) — fill a
+                template, open WhatsApp at the number, and let the renter press send. It reaches the
+                supplier from the renter's OWN account, which is what the owner asked for, and it
+                needs no endpoint and no projection: `supplierPhone` is on the bid.
+
+                The destination is `JOIN_URL`, not a URL inside the sentence (SUP-T01) — the supplier
+                list sends this same invitation, and two copies of a link drift apart the first time
+                one of them moves.
+
+                Where we hold no number the control still renders, disabled, saying why — a button
+                that vanished would read as «this supplier cannot be invited», when the truth is only
+                that this bid arrived without a way to reach him. Until 2026-09-05 that was EVERY
+                off-platform bid: the submission's phone sits in `contactInfo` and the mapper never
+                copied it to `supplierPhone` (`link-bids.ts`). */}
+            {invitePhone ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const msg = fmt(t.workspace.inviteMessage, { supplier: card.supplierName, url: JOIN_URL });
+                  window.open(`https://wa.me/${invitePhone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
+                  setInvited(true);
+                }}
+                /* LIGHT GREY (owner, 2026-09-06) — `tinted`, the house's own `--surface2` fill, not
+                   a white bordered button. It is the quieter of the two acts and now reads that way
+                   at a glance rather than only by size. */
+                className={btn("tinted", "lg", { className: "flex-none whitespace-nowrap transition" })}
+              >
+                {/* The same glyph the supplier row and the profile dialog use for this act, so a
+                    renter meets one «invite» across the product rather than three. */}
+                <Icon name={invited ? "check" : "person_add"} size={16} />
+                {invited ? t.workspace.inviteSent : t.workspace.inviteToApp}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled
+                title={t.workspace.inviteNoContact}
+                onClick={(e) => e.stopPropagation()}
+                className={btn("tinted", "lg", { className: "flex-none whitespace-nowrap" })}
+              >
+                <Icon name="person_add" size={16} />
+                {t.workspace.inviteToApp}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ── the band (app parity, `NegotiateFooter` + `resolveRenteeBandState`) ─────────────────
+          🔴 **The card's NEWS CHANNEL, not just its state readout** (owner, on the app, 2026-09-21),
+          and on the renter's side the ONLY one — which is why «awaiting», «new message» and «counter
+          this price» share a slot. They are not three kinds of thing; they are one answer to "what is
+          the state of this offer, and what do I do".
+
+          ~~One orange «Counter this price», on every card, whatever had happened.~~ It said the same
+          thing over a bid the supplier had just answered, a bid waiting on him, an accepted deal and a
+          withdrawn one — twelve situations behind one sentence, and the two terminal ones invited a
+          press that cannot do anything.
+
+          ⚠️ **A live bid's action is ORANGE whatever the caption** (the app's own reversal): a quiet
+          outline for «waiting» was meant to say "not your move", but the caption says that in words,
+          and a pale bar beside a coloured one reads as disabled. Only a TERMINAL bid is drawn down,
+          and that one really is unpressable.
+
+          ⚠️ Square corners: the CARD clips this to its own radius (`overflow-hidden` on the article).
+          Rounding here too would put the corner in two places and they would drift. */}
+      {/* 🔴 **NO BAND ON AN OFF-PLATFORM BID** (owner, 2026-09-22, on a picture of one carrying
+          «Counter this price»: *"how offline bids has counter this pruce, remove"*).
+
+          It was not merely wrong to offer — it could not work. `openCounter` calls
+          `ensureDealRoom(card.id)`, and an off-platform card's id is `link-<submissionId>`: a
+          `LinkBidSubmission`, which is **not a `Bid` row**, so the call 404s and the catch swallows
+          it. The renter pressed a full-width orange bar and nothing happened, with no sign of why.
+
+          And there is nothing for the band to say on such an offer either. Every state it carries —
+          «new message», «awaiting the supplier», «offer updated», the counter itself — is a fact
+          about a DEAL ROOM, and an off-platform supplier has no account, no Stream channel and no
+          room. The card keeps the two acts that are real for him: «View quote» and «Invite to
+          Moedatech», which is the route by which he could one day be countered.
+
+          ⚠️ The whole BUTTON is withheld rather than drawn dead: `bandDead` is the terminal state
+          of a live negotiation («Deal closed»), and a grey bar saying that over an offer nobody ever
+          negotiated would be a claim about a conversation that never happened. */}
+      {!offline && (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); if (!bandDead) void openCounter(); }}
+        disabled={bandDead || countering}
+        aria-live={bandIsNews ? "polite" : undefined}
+        className={`flex flex-none items-center justify-center gap-2.5 px-3.5 py-3 text-body font-extrabold transition ${
+          bandDead ? "cursor-default bg-surface2 text-muted" : "bg-brand text-white hover:bg-brand-press"
+        }`}
+      >
+        {/* The glyph rides its own translucent disc, as the app draws it: on a saturated orange a
+            bare white outline icon has almost no edge to sit against. */}
+        <span className={`grid size-7 flex-none place-items-center rounded-full ${bandDead ? "bg-border" : "bg-white/20"}`}>
+          <Icon name={BAND_GLYPH[bandState]} size={15} />
+        </span>
+        {/* Ellipsising: the band centres its content, so an over-long caption would push the glyph
+            off the leading edge rather than simply running past the trailing one. */}
+        <span className={`min-w-0 truncate ${bandShowsDelta ? "text-meta" : "text-body"}`}>{bandLabel}</span>
+        {/* ⚠️ Never truncated and never wrapped — a cut price is a WRONG price. Forced LTR, because
+            money reads left to right in both locales and a mirrored pair says the opposite of what
+            happened. */}
+        {bandShowsDelta && delta && (
+          <span dir="ltr" className="inline-flex flex-none items-baseline gap-1.5">
+            <span className="text-label font-semibold text-white/55 line-through">{formatSar(delta.from)}</span>
+            <span aria-hidden="true" className="text-label font-semibold text-white/55">→</span>
+            <span className="text-meta font-extrabold">{formatSar(delta.to)}</span>
+          </span>
+        )}
+      </button>
+      )}
+
+      {termsOpen && (
+        <BidTermsModal
+          supplier={card.supplierName}
+          terms={card.terms}
+          negotiable={card.negotiableTerms}
+          // Off-platform terms are answered Yes/No on a form: every answer is final, so there is no
+          // "pending review" state to show and no room to take them to.
+          allTerms={offline}
+          hidePending={offline}
+          busy={false}
+          negotiateLabel={offline ? t.workspace.viewQuote : t.priceFooter.counterPrice}
+          onNegotiate={() => {
+            setTermsOpen(false);
+            if (offline) setSubOpen(true);
+            else void openCounter();
+          }}
+          ar={ar}
+          L={L}
+          onClose={() => setTermsOpen(false)}
+        />
+      )}
+      {subOpen && (
+        <SharedBidSubmissionModal bid={card} submission={submission} ar={ar} L={L} onClose={() => setSubOpen(false)} />
+      )}
+    </article>
+  );
+}
+
+function Row({ label, value, muted }: { label: string; value: number; muted?: boolean }) {
+  const t = useT();
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className={`text-meta ${muted ? "font-semibold text-muted" : "font-semibold text-navy"}`}>{label}</span>
+      <span className={`flex-none whitespace-nowrap text-meta ${muted ? "font-semibold text-muted" : "font-semibold text-navy"}`}>
+        {formatSar(value)} <span className="text-label font-semibold text-muted">{t.priceFooter.currency}</span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * A transport leg. It falls back to words rather than a number, in the app's own priority: excluded
+ * first, then a price that was never quoted. A zero would claim the supplier delivers free, and a
+ * blank would claim nothing at all — both say more than the quote does.
+ */
+function LegRow({ label, amount, excluded, onRentee }: { label: string; amount: number | null; excluded?: boolean | null; onRentee?: boolean }) {
+  const t = useT();
+  const leg = legDisplay({ amount, excluded, onRentee });
+  return (
+    <div className="flex items-baseline justify-between gap-2 text-navy">
+      <span className="text-meta font-semibold">{label}</span>
+      <span className={`flex-none whitespace-nowrap text-meta font-semibold ${leg.kind === "amount" ? "" : "text-muted"}`}>
+        {leg.kind === "amount" ? (
+          <>
+            {formatSar(leg.amount)} <span className="text-label font-semibold text-muted">{t.priceFooter.currency}</span>
+          </>
+        ) : leg.kind === "on_rentee" ? (
+          t.workspace.onRentee
+        ) : leg.kind === "excluded" ? (
+          t.priceFooter.excluded
+        ) : (
+          t.workspace.notQuoted
+        )}
+      </span>
+    </div>
+  );
+}
+
+/* 🔴 ~~`OffersUnitsBadge` — the app's `_OffersUnitsBadge`, a pill under the chat control.~~
+   **Deleted** (owner, 2026-09-23: *"offers x units if multi unit instead of this 2 units badge"*).
+   Both of its shapes moved into the subtext under the firm's name, which is where the card's other
+   facts about the offer already live. Deleted rather than left unrendered: a component nothing
+   imports is one edit away from coming back beside the line that replaced it, and then the card
+   states its count twice. `t.workspace.offersUnits` and `acceptedUnits` survive - the subtext is
+   their only reader now. */
+
+/** One slice of a dial: a colour, and the share of the circle it holds (0–1). */
+type DialSlice = { colour: string; share: number };
+
+const CHECK_TONE_COLOUR: Record<CheckTone, string> = {
+  good: "var(--ok)",
+  bad: "var(--danger)",
+  warn: "var(--warn)",
+  dead: "var(--border-strong)",
+  none: "var(--border-strong)",
+};
+
+/** Terms: met, against, unanswered. */
+function termsSlices({ met, against, unanswered }: { met: number; against: number; unanswered: number }): DialSlice[] {
+  const total = met + against + unanswered;
+  if (total === 0) return [];
+  return [
+    { colour: "var(--ok)", share: met / total },
+    { colour: "var(--danger)", share: against / total },
+    { colour: "var(--border)", share: unanswered / total },
+  ];
+}
+
+/** Equipment: the app's own arcs (`bid_card_checks.dart`), in the tones that model states. Dead and
+ *  all-clear are one flat disc — the same two special cases `CheckRing` draws for the same states. */
+function checkSlices(check: BidCardCheck): DialSlice[] {
+  if (check.dead) return [{ colour: CHECK_TONE_COLOUR.dead, share: 1 }];
+  if (check.allClear) return [{ colour: CHECK_TONE_COLOUR.good, share: 1 }];
+  const arcs = checkArcs(check);
+  return check.parts
+    .map((p, i) => ({ colour: CHECK_TONE_COLOUR[p.tone], share: arcs[i] ?? 0 }))
+    .filter((s) => s.share > 0);
+}
+
+/** The dial both check rows draw. Nothing measured renders as a plain outline rather than a full
+ *  circle of any colour, which would claim an answer that was never given. */
+function DialGlyph({ slices }: { slices: DialSlice[] }) {
+  if (slices.length === 0) return <span className="h-[18px] w-[18px] flex-none rounded-full border-2 border-border" />;
+  const stops: string[] = [];
+  let at = 0;
+  slices.forEach((s, i) => {
+    // The last slice closes the circle: rounded shares can otherwise leave a hairline of nothing.
+    const end = i === slices.length - 1 ? 360 : at + s.share * 360;
+    stops.push(`${s.colour} ${at}deg ${end}deg`);
+    at = end;
+  });
+  return <span className="h-[18px] w-[18px] flex-none rounded-full" style={{ background: `conic-gradient(${stops.join(", ")})` }} />;
+}

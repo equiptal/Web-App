@@ -46,8 +46,15 @@ export interface BidCardDetails {
 const REF_SEPARATOR = " — ";
 const PART_SEPARATOR = " · ";
 
-/** Only `REQ-`/`RFQ-` codes lead a title. Anything else before an em dash is part of the headline. */
-const REF_RE = /^(?:REQ|RFQ)-\S+$/;
+/**
+ * A reference leads a title; anything else before an em dash is part of the headline.
+ *
+ * ⚠️ This used to be `^(?:REQ|RFQ)-\S+$` and it had stopped matching. Since 2026-08-17 a new request's
+ * code is `EXC170845` and the backend renders it `EXC-170845` (`formatShortCodeRef`), so every recent
+ * request failed the test, kept the code glued to the headline — "EXC-170845 — Tower light rental" —
+ * and drew no reference badge at all. Now: two to five letters, a dash, then the code.
+ */
+const REF_RE = /^[A-Z]{2,5}-[A-Z0-9-]+$/i;
 
 /**
  * Is this middle part the rental basis rather than the city?

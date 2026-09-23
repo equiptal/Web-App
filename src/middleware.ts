@@ -34,6 +34,53 @@ const publicWebEnabled = () => process.env.NEXT_PUBLIC_PUBLIC_WEB_ENABLED !== "0
 // form `/bid/<token>`, opened by suppliers who have no login).
 const PUBLIC_PREFIXES = ["/bid"];
 
+/**
+ * The routes the requests workspace replaced. `/requests` itself is NOT one of them — it is the
+ * workspace — so the match is deliberately narrow: the comparison page, and anything BELOW
+ * `/requests/`, which is only ever the old detail pages.
+ */
+export function isRetiredRequestsRoute(pathname: string): boolean {
+  return pathname === "/compare" || pathname.startsWith("/compare/") || pathname.startsWith("/requests/");
+}
+
+/**
+ * `/company` and everything under it (owner, 2026-09-04).
+ *
+ * The organization is a block on the renter's PROFILE now, not a page of its own, so the route that
+ * held it sends him where its contents went. Same treatment as the retired request pages, and for
+ * the same reason: a notification written last week, a bookmark, or the app's own deep link must not
+ * land on a 404.
+ */
+export function isRetiredCompanyRoute(pathname: string): boolean {
+  return pathname === "/company" || pathname.startsWith("/company/");
+}
+
+/**
+ * ── A locale-prefixed URL (owner, 2026-09-08: *"fix the /en 404"*) ─────────────────────
+ *
+ * This app has never had a locale SEGMENT — the language is a choice held in `localStorage`
+ * (`moedatech.locale`) and the routes are bare (`/requests`, `/create`) — so `/en` and `/en/requests`
+ * were a 404 on every environment, not a beta regression. Verified across all three before changing
+ * anything: beta, staging and production all answered 404.
+ *
+ * They are asked for anyway, and by people who have every reason to expect them to work: **Supplier
+ * OS puts the locale in the path** (`/en/bid/…`), so a colleague copying that shape, a hand-typed
+ * URL, or anything written against the other product lands here.
+ *
+ * So the prefix is honoured rather than merely un-404ed: it is stripped, and the language it names
+ * rides on as `?lang=`, which is already this app's own convention for saying so in a URL (the
+ * public bid form reads exactly that parameter). Nothing else about the request changes.
+ *
+ * ⚠️ **`/enterprise` must not match `/en`.** The test is the whole segment — `/en` exactly, or
+ * `/en/` followed by the rest — never `startsWith("/en")`, which would swallow every route that
+ * happens to begin with those two letters.
+ */
+export function localePrefix(pathname: string): { locale: "en" | "ar"; rest: string } | null {
+  const m = /^\/(en|ar)(\/.*)?$/.exec(pathname);
+  if (!m) return null;
+  return { locale: m[1] as "en" | "ar", rest: m[2] || "/" };
+}
+
 function safeNext(next: string | null): string {
   // Only allow same-origin relative paths (block protocol-relative `//host`).
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
@@ -79,6 +126,45 @@ export function middleware(req: NextRequest) {
     dest.pathname = "/api/auth/handoff";
     dest.search = `?token=${encodeURIComponent(handoff)}`;
     return NextResponse.redirect(dest);
+  }
+
+  /* The locale prefix, before any of the gating below: `/en/requests` is `/requests`, and the
+     language it asks for is carried as `?lang=` (see `localePrefix`). 308 rather than 307 — the app
+     has one canonical URL per page and this is not it — and the existing query survives, since a
+     shared link's parameters mean as much as its path. */
+  const prefixed = localePrefix(pathname);
+  if (prefixed) {
+    const dest = req.nextUrl.clone();
+    dest.pathname = prefixed.rest;
+    dest.searchParams.set("lang", prefixed.locale);
+    return NextResponse.redirect(dest, 308);
+  }
+
+  // Retired surfaces (docs/requests-workspace-disabled.md). The requests list, both request-detail
+  // pages and the comparison workspace are one page now, so their routes send the renter there.
+  //
+  // This is done here rather than with `redirect()` in a page, which was tried and does not work in
+  // this app: the thrown NEXT_REDIRECT is caught by a client error boundary in the provider tree and
+  // rendered as an error page, so the route answers 200 with a stack trace. At the edge it is a real
+  // 308 that never reaches React at all.
+  //
+  // The id is dropped rather than carried: the workspace resolves its own selection from the rail,
+  // and a stale or foreign id would land the renter on a request that is not theirs to see.
+  // 308, not 307 — these moved permanently, and the method is irrelevant on a GET-only surface.
+  if (isRetiredRequestsRoute(pathname)) {
+    const dest = req.nextUrl.clone();
+    dest.pathname = "/requests";
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
+  }
+
+  // The organization page, now a block on the profile (owner, 2026-09-04). Same 308, same edge, and
+  // the query is dropped for the same reason: nothing on the profile reads `/company`'s parameters.
+  if (isRetiredCompanyRoute(pathname)) {
+    const dest = req.nextUrl.clone();
+    dest.pathname = "/profile";
+    dest.search = "";
+    return NextResponse.redirect(dest, 308);
   }
 
   // A refresh token (normal sign-in) OR an idToken (handoff session, no refresh) counts as authed.

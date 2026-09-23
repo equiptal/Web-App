@@ -26,6 +26,9 @@ import type { InboxBid } from "./inbox";
 
 /** One item's conversation. */
 export interface DockTab {
+  /** The ITEM this tab belongs to — the fanned-out request's id, which is what makes two bids on the
+   *  same machine one conversation rather than two tabs. */
+  itemKey: string;
   bidId: string;
   /** Null = **compose-only**. The tab still appears; the room is created by the SEND, never by
    *  opening the tab (RM3-AC-47) — a `DealRoom` row freezes the supplier's offered count. */
@@ -56,8 +59,20 @@ export function inboxGroupKey(row: InboxBid): string {
   return row.request.groupId ?? row.request.id ?? row.bidId;
 }
 
-const rowLabel = (row: InboxBid): string | null =>
-  row.equipmentType.name ?? row.request.equipmentSummary ?? row.equipmentName;
+/**
+ * What a tab is called: the machine's SUBTYPE and its SIZE (owner, 2026-09-08).
+ *
+ * ~~The subtype alone.~~ A renter with two excavators on one request read «Crawler Excavator» twice
+ * and had to guess which tab was the 20-ton one. The size is the only thing that tells two lines of
+ * the same subtype apart, and the request card, the workspace and the bid rail all print the pair —
+ * `equipment.subtype` / `equipment.size`, straight off the request's own enriched item.
+ *
+ * The old chain stays behind it, for a projection that carries no `equipment` block.
+ */
+const rowLabel = (row: InboxBid): string | null => {
+  const pair = [row.equipment?.subtype, row.equipment?.size].filter(Boolean).join(" · ");
+  return pair || row.equipmentType.name || row.request.equipmentSummary || row.equipmentName;
+};
 
 /**
  * The dock's tabs: every bid **this counterparty** holds in **this RFQ group**, in the order the feed
@@ -85,7 +100,38 @@ export function dockTabs(anchor: DockAnchor, rows: InboxBid[]): DockTab[] {
     if (group == null || inboxGroupKey(row) !== group) {
       if (row.bidId !== anchor.bidId) continue;
     }
+    /**
+     * ⚠️ ONE TAB PER ITEM, not per bid (owner, 2026-09-08: *"how are 2 equipments shown in the chat
+     * while the request is one item"*).
+     *
+     * The fan-out gives one request per item, so the request id IS the item. A supplier can hold more
+     * than one bid against the same item — a re-bid, or two colleagues of one firm, which this dock
+     * already treats as ONE counterparty — and every one of them used to become its own tab. On a
+     * single-item request that drew two identical «Crawler Excavator» tabs for one conversation.
+     *
+     * The anchor's bid wins the slot whenever it is one of them, because that is the room the renter
+     * is standing in; otherwise the first row the feed returned keeps it.
+     */
+    const itemKey = row.request.id || row.bidId;
+    const seen = tabs.findIndex((t) => t.itemKey === itemKey);
+    if (seen >= 0) {
+      if (row.bidId === anchor.bidId) {
+        tabs[seen] = {
+          itemKey,
+          bidId: row.bidId,
+          dealRoomId: row.dealRoomId,
+          label: rowLabel(row),
+          unreadCount: row.unreadCount > 0 ? row.unreadCount : 0,
+          current: true,
+        };
+      } else {
+        // The conversation is one; its unread count is the sum of what arrived on either bid.
+        tabs[seen].unreadCount += row.unreadCount > 0 ? row.unreadCount : 0;
+      }
+      continue;
+    }
     tabs.push({
+      itemKey,
       bidId: row.bidId,
       dealRoomId: row.dealRoomId,
       label: rowLabel(row),
@@ -95,6 +141,7 @@ export function dockTabs(anchor: DockAnchor, rows: InboxBid[]): DockTab[] {
   }
   if (!tabs.some((t) => t.current)) {
     tabs.unshift({
+      itemKey: anchor.bidId,
       bidId: anchor.bidId,
       dealRoomId: anchor.dealRoomId,
       label: anchor.label,

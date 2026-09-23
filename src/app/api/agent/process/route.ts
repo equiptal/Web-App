@@ -53,6 +53,28 @@ export async function POST(req: Request) {
         // GUEST_PARSE_LIMIT cap above.
         ...(userIdFromRequest(req) ? { created_by: userIdFromRequest(req)! } : {}),
         language: body.locale === "ar" ? "ar" : undefined, // free-text in Arabic when the UI is Arabic
+        /**
+         * ── The web's opt-out of INVENTION (owner, 2026-08-31) ──────────────────────────────────
+         *
+         * *"For the app I want a tag so the web uses this new approach, and on the app it stays as
+         * it is now."*
+         *
+         * `/rfq/jobs` is shared: the mobile app posts to it too. The agent's standing instruction is
+         * *"try to fill EVERY field; null is the last resort"*, which is right for mobile — it has no
+         * project pills and no work-order templates, so an unstated responsibility there has nowhere
+         * else to come from.
+         *
+         * On the web it is wrong. A sentence silent about haulage came back asserting the renter
+         * transports it, indistinguishable from a renter who wrote *"we'll collect it ourselves"* —
+         * and that guess outranked the work order saying the SUPPLIER hauls it. The request went out
+         * contradicting the renter's own site with nobody having typed it.
+         *
+         * So the web asks for evidence only. Where the text is silent the agent stays silent, and the
+         * renter's own site fills the field — which is the whole reason they set one up.
+         *
+         * The tag, not a change to the prompt: both behaviours are correct for their caller.
+         */
+        evidence_only: true,
       };
       const res = await fetch(`${serverEnv.mansourUrl}/rfq/jobs`, {
         method: "POST",

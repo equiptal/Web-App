@@ -155,6 +155,83 @@ describe("agentOutputToDraft", () => {
   });
 });
 
+describe("agentOutputToDraft — an operator nobody asked for (owner, 2026-08-26)", () => {
+  // The agent marks a value it decided itself in one of two channels; either one means the RFQ was
+  // silent, and a silent RFQ must not open a priced operator on the line.
+  const withNotes = (notes: { field: string; note: string }[], line: object = confidentLine) => ({
+    ok: true,
+    data: {
+      id: "j",
+      status: "done",
+      result: { rfq_header: {}, line_items: [line], missing_required_fields: [], field_notes: notes },
+    },
+  });
+  const withMissing = (fields: string[], line: object = confidentLine) => ({
+    ok: true,
+    data: {
+      id: "j",
+      status: "done",
+      result: {
+        rfq_header: {},
+        line_items: [line],
+        missing_required_fields: fields.map((f) => ({ field: f, label: f, required: false, question_for_customer: "?" })),
+      },
+    },
+  });
+
+  it("closes the operator when the agent noted that it chose one", () => {
+    const d = agentOutputToDraft(
+      extractAgentOutput(withNotes([{ field: "line_items[0].operator_included", note: "assumed for a forklift" }])),
+    );
+    expect(d.items[0].operatorNeeded).toBe("no");
+  });
+
+  it("closes it when the agent raised it as a question, and clears the F.A.T it dragged along", () => {
+    const d = agentOutputToDraft(
+      extractAgentOutput(
+        withMissing(["line_items[0].operator_included"], {
+          ...confidentLine,
+          fat_required: true,
+          fat_food_by_rentee: false,
+          fat_accommodation_transport_by_rentee: false,
+        }),
+      ),
+    );
+    expect(d.items[0].operatorNeeded).toBe("no");
+    expect(d.items[0].operator.fatFood).toBeNull();
+    expect(d.items[0].operator.fatAccommodationTransport).toBeNull();
+    expect(d.items[0].operator.fatRequired).toBeNull();
+  });
+
+  it("keeps the operator when the RFQ evidenced one some other way", () => {
+    // A certificate, a nationality or a head count cannot be inferred from an equipment line: their
+    // presence IS the mention, so the agent's note does not overrule them.
+    const cert = agentOutputToDraft(
+      extractAgentOutput(
+        withNotes([{ field: "line_items[0].operator_included", note: "assumed" }], {
+          ...confidentLine,
+          operator_license_level: "TUV",
+        }),
+      ),
+    );
+    expect(cert.items[0].operatorNeeded).toBe("yes");
+
+    const nationality = agentOutputToDraft(
+      extractAgentOutput(
+        withNotes([{ field: "line_items[0].operator_included", note: "assumed" }], {
+          ...confidentLine,
+          operator_nationality: "saudi",
+        }),
+      ),
+    );
+    expect(nationality.items[0].operatorNeeded).toBe("yes");
+  });
+
+  it("leaves a stated operator alone when the agent marked nothing", () => {
+    expect(agentOutputToDraft(extractAgentOutput(jobPoll("done"))).items[0].operatorNeeded).toBe("yes");
+  });
+});
+
 describe("toItem — FAT split (A6/specs#245-AC-24)", () => {
   const opOf = (line: object) => agentOutputToDraft(extractAgentOutput(jobPoll("done", { ...confidentLine, ...line }))).items[0].operator;
 

@@ -1,0 +1,442 @@
+import { describe, it, expect } from "vitest";
+import { applyProjectDefaults, applyMachineTerms, machineTermsOf, machineTermsOfRequestItem } from "@/lib/contract/project-apply";
+import { fieldSource, isSystemChosen } from "@/lib/contract/provenance";
+import { defaultProjectDetails, defaultPreferences, newManualItem } from "@/lib/contract/draft";
+import { defaultProjectDefaults } from "@/lib/contract/project";
+import type { RfqDraft, EquipmentItem, ProjectDetails } from "@/lib/contract/draft";
+import type { ProjectDefaults } from "@/lib/contract/project";
+
+/**
+ * W-T4 — the merge, and where a value says it came from.
+ *
+ * The whole feature's correctness sits in one rule: **a field the agent filled is never overwritten
+ * by a project.** If a renter writes "from Oct 1" and their site says 1 September, a request that
+ * quietly reads September is worse than having no project at all — they will not re-read a field the
+ * page already shows as answered, and the RFQ goes out with the wrong month.
+ *
+ * Everything else here follows from that, so it is tested from the outside: what the draft holds
+ * afterwards, and what the canvas would say about each field.
+ */
+
+const QIDDIYA: ProjectDefaults = {
+  timing: { rentalBasis: "monthly", extendable: true, startDate: "2026-09-01", endDate: "2026-12-31" },
+  paymentTerms: "net-30",
+};
+
+const SITE = { label: "Qiddiya Zone 4, Riyadh 13513", lat: 24.6408, lng: 46.5731 };
+
+/** A blank draft, assembled from the same factories the store uses. */
+function blankDraft(): RfqDraft {
+  return {
+    project: defaultProjectDetails(),
+    items: [],
+    preferences: defaultPreferences(),
+    touchedFields: [],
+  } as unknown as RfqDraft;
+}
+
+/** A draft as it stands after the agent has run but before any project is applied. */
+function draftWith(agentProject: Partial<ProjectDetails> = {}): { draft: RfqDraft; agentOrigin: { project: ProjectDetails; items: EquipmentItem[] } } {
+  const base = blankDraft();
+  const project: ProjectDetails = {
+    ...base.project,
+    ...agentProject,
+    timing: { ...base.project.timing, ...(agentProject.timing ?? {}) },
+    location: { ...base.project.location, ...(agentProject.location ?? {}) },
+  };
+  const draft: RfqDraft = { ...base, project };
+  return { draft, agentOrigin: { project, items: draft.items } };
+}
+
+/* ============================================================================================== *
+ * The rule that must never break
+ * ============================================================================================== */
+
+describe("a field the agent filled always wins", () => {
+  it("keeps the renter's own start date over the site's", () => {
+    // "2 excavators at Qiddiya from Oct 1" — the agent read October.
+    const { draft, agentOrigin } = draftWith({ timing: { ...blankDraft().project.timing, startDate: "2026-10-01" } });
+
+    const { draft: next, filled } = applyProjectDefaults(draft, QIDDIYA, SITE, agentOrigin);
+
+    expect(next.project.timing.startDate).toBe("2026-10-01");
+    expect(filled).not.toContain("timing.start_date");
+    // The site's end date was NOT stated, so it still fills — the rule is per field, not per block.
+    expect(next.project.timing.endDate).toBe("2026-12-31");
+    expect(filled).toContain("timing.end_date");
+  });
+
+  it("keeps a location the agent extracted from the text", () => {
+    const base = blankDraft();
+    const { draft, agentOrigin } = draftWith({ location: { ...base.project.location, label: "Jubail Industrial City" } });
+
+    const { draft: next, filled } = applyProjectDefaults(draft, QIDDIYA, SITE, agentOrigin);
+
+    expect(next.project.location.label).toBe("Jubail Industrial City");
+    expect(filled).not.toContain("location.label");
+    // Surfaced as a conflict by the caller, never resolved here — both values stay.
+  });
+
+  it("fills everything the agent was silent about", () => {
+    const { draft, agentOrigin } = draftWith();
+
+    const { draft: next, filled } = applyProjectDefaults(draft, QIDDIYA, SITE, agentOrigin);
+
+    expect(next.project.location.label).toBe(SITE.label);
+    expect(next.project.location.lat).toBe(24.6408);
+    expect(next.project.timing.startDate).toBe("2026-09-01");
+    expect(next.project.timing.endDate).toBe("2026-12-31");
+    expect(next.project.timing.hoursPerDay).toBe(10);
+    expect(next.project.timing.rentalBasis).toBe("monthly");
+    expect(next.preferences.payment.terms).toBe("net-30");
+    expect(filled).toContain("preferences.payment_terms");
+  });
+
+  it("writes nothing at all from an empty project", () => {
+    const { draft, agentOrigin } = draftWith();
+    const { draft: next } = applyProjectDefaults(draft, defaultProjectDefaults(), { label: "", lat: null, lng: null }, agentOrigin);
+
+    expect(next.project.timing.startDate).toBeNull();
+    expect(next.preferences.payment.terms).toBe(draft.preferences.payment.terms);
+  });
+});
+
+/* ============================================================================================== *
+ * It never writes back, and never mutates
+ * ============================================================================================== */
+
+describe("nothing is written back", () => {
+  it("leaves the original draft untouched", () => {
+    const { draft, agentOrigin } = draftWith();
+    const before = JSON.stringify(draft);
+
+    applyProjectDefaults(draft, QIDDIYA, SITE, agentOrigin);
+
+    // The pure-function guarantee. A merge that mutated would make the agent snapshot unreliable on
+    // a second apply — the renter switching sites in the picker.
+    expect(JSON.stringify(draft)).toBe(before);
+  });
+
+  it("leaves the project's own defaults untouched", () => {
+    const { draft, agentOrigin } = draftWith();
+    const before = JSON.stringify(QIDDIYA);
+
+    applyProjectDefaults(draft, QIDDIYA, SITE, agentOrigin);
+
+    // This is what lets a request and its site drift apart safely: the copy goes one way only.
+    expect(JSON.stringify(QIDDIYA)).toBe(before);
+  });
+
+  it("applying twice lands on the same draft", () => {
+    const { draft, agentOrigin } = draftWith();
+    const once = applyProjectDefaults(draft, QIDDIYA, SITE, agentOrigin).draft;
+    const twice = applyProjectDefaults(once, QIDDIYA, SITE, agentOrigin).draft;
+
+    expect(JSON.stringify(twice.project)).toBe(JSON.stringify(once.project));
+  });
+});
+
+/* ============================================================================================== *
+ * The confirmed flag — which a PROJECT does grant, and the agent does not
+ * ============================================================================================== */
+
+describe("a location from the project arrives confirmed", () => {
+  it("confirms it, and says where it came from", () => {
+    /* REVERSED by the owner on 2026-08-31: *"the location is not filled in the request from the
+       project — it must show it as confirmed and selected"*.
+
+       This file used to assert the opposite, on the reading that AC-16 stands whoever supplied the
+       pin. That reading was wrong about which risk it was guarding. AC-16 exists because a location
+       the AGENT read out of a sentence has never been looked at by anyone — nobody dropped that
+       pin. A project's location is the opposite case: the renter dropped it and saved it, on
+       purpose, and asking them to confirm it again on every request for that site is asking them to
+       re-answer the one question projects exist to stop asking. */
+    const { draft, agentOrigin } = draftWith();
+    const { draft: next } = applyProjectDefaults(draft, QIDDIYA, SITE, agentOrigin);
+
+    expect(next.project.location.label).toBe(SITE.label);
+    expect(next.project.location.confirmed).toBe(true);
+
+    /* `project`, not `manual` — the difference is a visible label. `Provenance` renders *From your
+       project* for this source and nothing at all for a manual entry. */
+    expect(next.project.location.source).toBe("project");
+  });
+
+  it("does NOT confirm a project whose site is an address with no pin", () => {
+    /**
+     * Owner, 2026-09-06: *"Location confirmed is automatic only when location is selected from a
+     * project."* True — and with one condition inside it: the project must carry a POINT.
+     *
+     * Confirmation is a statement about a pin. A project typed as an address and never pinned fills
+     * the label and leaves `lat`/`lng` empty; claiming it confirmed put «Location confirmed» beside
+     * «drop a pin where the equipment goes» and dead-ended the flow, because `gateWhere` refuses on
+     * `locationMissing` before it ever reads the flag. This is that case, kept honest.
+     */
+    const { draft, agentOrigin } = draftWith();
+    const { draft: next } = applyProjectDefaults(
+      draft,
+      QIDDIYA,
+      { ...SITE, label: "Second industrial city, Dammam", lat: null, lng: null },
+      agentOrigin,
+    );
+    expect(next.project.location.label).toBe("Second industrial city, Dammam");
+    expect(next.project.location.confirmed).toBe(false);
+  });
+
+  it("still leaves a location the AGENT extracted alone, unconfirmed", () => {
+    // The guard AC-16 was actually written for: text nobody has checked against a map.
+    const { draft, agentOrigin } = draftWith();
+    const stated = {
+      ...agentOrigin,
+      project: { ...agentOrigin.project, location: { label: "Dammam industrial city", confirmed: false } },
+    } as typeof agentOrigin;
+
+    const { draft: next } = applyProjectDefaults(draft, QIDDIYA, SITE, stated);
+
+    /* The function does not WRITE the agent's value — it declines to overwrite it, and the draft
+       already holds whatever the agent put there. So the test is that the site's label did not
+       arrive, and that nothing was confirmed on the renter's behalf. */
+    expect(next.project.location.label).not.toBe(SITE.label);
+    expect(next.project.location.confirmed).toBe(false);
+    expect(next.project.location.source).not.toBe("project");
+  });
+});
+
+/* ============================================================================================== *
+ * Machine terms from a template
+ * ============================================================================================== */
+
+describe("machine terms", () => {
+  const terms = {
+    ...machineTermsOf(newManualItem("i1")),
+    fuelType: "diesel" as const,
+    deliveryOverride: "supplier" as const,
+    returnOverride: "me" as const,
+  };
+
+  it("copies terms onto every line and never the equipment", () => {
+    const base = blankDraft();
+    const item = { ...newManualItem("i1"), quantity: 3, rawLabel: "Excavator 20t" } as EquipmentItem;
+    const draft: RfqDraft = { ...base, items: [item] };
+
+    const { draft: next } = applyMachineTerms(draft, terms, { project: base.project, items: [] });
+
+    expect(next.items[0].deliveryOverride).toBe("supplier");
+    expect(next.items[0].returnOverride).toBe("me");
+    // The equipment always comes from the renter's own words, never from a template.
+    expect(next.items[0].quantity).toBe(3);
+    expect(next.items[0].rawLabel).toBe("Excavator 20t");
+  });
+
+  it("keeps what the agent read for a line, per line", () => {
+    const base = blankDraft();
+    const spoken = { ...newManualItem("i1"), operatorNeeded: "yes" as const };
+    const silent = newManualItem("i2");
+    const draft: RfqDraft = { ...base, items: [spoken, silent] };
+
+    const { draft: next } = applyMachineTerms(draft, { ...terms, operatorNeeded: "no" }, {
+      project: base.project,
+      items: [spoken], // the agent spoke for the first line only
+    });
+
+    expect(next.items[0].operatorNeeded).toBe("yes");
+    expect(next.items[1].operatorNeeded).toBe("no");
+  });
+});
+
+/* ============================================================================================== *
+ * What the canvas then says
+ * ============================================================================================== */
+
+describe("provenance", () => {
+  const key = "timing.start_date";
+
+  it("reads `project` for a value the site supplied", () => {
+    const draft = { touchedFields: [], projectFields: [key] };
+    expect(fieldSource({ current: "2026-09-01", key, draft })).toBe("project");
+  });
+
+  it("keeps the precedence renter > agent > project > default", () => {
+    const projectFields = [key];
+
+    // renter beats everything
+    expect(fieldSource({ current: "2026-11-01", key, draft: { touchedFields: [key], projectFields } })).toBe("renter");
+
+    // agent beats project — their words in THIS request outrank a standing site value
+    expect(
+      fieldSource({ current: "2026-10-01", agentOriginal: "2026-10-01", key, draft: { touchedFields: [], projectFields } }),
+    ).toBe("agent");
+
+    // project beats default — a stated fact beats a guess
+    expect(fieldSource({ current: "2026-09-01", key, draft: { touchedFields: [], projectFields } })).toBe("project");
+
+    // and without the project, the same value is just a default
+    expect(fieldSource({ current: "2026-09-01", key, draft: { touchedFields: [], projectFields: [] } })).toBe("default");
+  });
+
+  it("stops claiming a project source once the field is emptied", () => {
+    const draft = { touchedFields: [], projectFields: [key] };
+    // Otherwise the note would sit under a control with nothing in it.
+    expect(fieldSource({ current: "", key, draft })).toBe("empty");
+    expect(fieldSource({ current: null, key, draft })).toBe("empty");
+  });
+
+  it("marks a project value as system-chosen, so it carries the note", () => {
+    // The renter did choose it — but in March, for a different request. That is exactly the case
+    // the mark exists for; only the wording differs.
+    expect(isSystemChosen("project")).toBe(true);
+    expect(isSystemChosen("renter")).toBe(false);
+    expect(isSystemChosen("empty")).toBe(false);
+  });
+
+  it("every path `applyProjectDefaults` reports is one the canvas can resolve", () => {
+    const { draft, agentOrigin } = draftWith();
+    const { filled } = applyProjectDefaults(draft, QIDDIYA, SITE, agentOrigin);
+
+    // A path in `filled` that no control looks up is a value silently marked as nothing.
+    expect(filled.length).toBeGreaterThan(0);
+    for (const path of filled) {
+      expect(path).toMatch(/^[a-z_]+(\.[a-z_]+)+$/);
+      expect(fieldSource({ current: "x", key: path, draft: { touchedFields: [], projectFields: filled } })).toBe("project");
+    }
+  });
+});
+
+/* ============================================================================================== *
+ * The site's term beats the agent's guess
+ * ============================================================================================== */
+
+describe("a template term over a guessed one", () => {
+  const supplierTerms = {
+    ...machineTermsOf(newManualItem("i1")),
+    deliveryOverride: "supplier" as const,
+    returnOverride: "supplier" as const,
+    fuelResponsibilityOverride: "supplier" as const,
+  };
+
+  /* The renter's work order says the supplier delivers, returns and fuels it. Their sentence said
+     nothing about any of that, and the agent filled all three with "me" because it is told to fill
+     every field. Before this, the non-null guess blocked the template outright: the request went out
+     saying the renter hauls a machine their own site says the supplier hauls. */
+
+  const guessedItem = () =>
+    ({
+      ...newManualItem("i1"),
+      deliveryOverride: "me",
+      returnOverride: "me",
+      fuelResponsibilityOverride: "me",
+    }) as EquipmentItem;
+
+  it("fills over a guessed delivery, return and fuel", () => {
+    const base = blankDraft();
+    const draft: RfqDraft = {
+      ...base,
+      items: [guessedItem()],
+      assumedFields: ["preferences.delivery", "preferences.return", "preferences.fuel"],
+    };
+
+    const { draft: next } = applyMachineTerms(draft, supplierTerms, { project: base.project, items: draft.items });
+    expect(next.items[0].deliveryOverride).toBe("supplier");
+    expect(next.items[0].returnOverride).toBe("supplier");
+    expect(next.items[0].fuelResponsibilityOverride).toBe("supplier");
+  });
+
+  it("leaves a STATED delivery alone", () => {
+    // "we'll collect it ourselves" — their own words about THIS request beat a standing site term.
+    const base = blankDraft();
+    const draft: RfqDraft = { ...base, items: [guessedItem()], assumedFields: [] };
+
+    const { draft: next } = applyMachineTerms(draft, supplierTerms, { project: base.project, items: draft.items });
+    expect(next.items[0].deliveryOverride).toBe("me");
+  });
+
+  it("does not empty the field when the template has nothing to put there", () => {
+    const base = blankDraft();
+    const draft: RfqDraft = { ...base, items: [guessedItem()], assumedFields: ["preferences.delivery"] };
+    const bare = { ...supplierTerms, deliveryOverride: null };
+
+    const { draft: next } = applyMachineTerms(draft, bare, { project: base.project, items: draft.items });
+    expect(next.items[0].deliveryOverride).toBe("me");
+  });
+});
+
+/* ============================================================================================== *
+ * The order of precedence, stated once and pinned
+ * ============================================================================================== */
+
+describe("who wins when the project and the text disagree", () => {
+  /* Reported as a doubt rather than a bug (owner, 2026-08-31): *"it was chosen aramco certificate
+     but not filled in the request because maybe my text mentioned tuv — in this case the input text
+     will be used over the project settings."*
+
+     Right, and that IS the rule. What was broken was upstream: the fast lane's reader dropped
+     `safety_certifications` entirely, so on that path neither answer arrived and the field looked
+     empty for both reasons at once. Fixed separately; these cases pin the rule itself so the next
+     doubt has an answer that does not depend on reading the merge. */
+
+  const aramcoTemplate = {
+    ...machineTermsOf(newManualItem("i1")),
+    safetyCertsOverride: ["aramco"] as const,
+  } as ReturnType<typeof machineTermsOf>;
+
+  it("the TEXT wins: TUV in the sentence beats Aramco on the site", () => {
+    const base = blankDraft();
+    // What the agent read from "…with tuv".
+    const spoken = { ...newManualItem("i1"), safetyCertsOverride: ["tuv"] } as EquipmentItem;
+    const draft: RfqDraft = { ...base, items: [spoken] };
+
+    const { draft: next } = applyMachineTerms(draft, aramcoTemplate, { project: base.project, items: draft.items });
+    expect(next.items[0].safetyCertsOverride).toEqual(["tuv"]);
+  });
+
+  it("the PROJECT fills it when the sentence said nothing", () => {
+    const base = blankDraft();
+    const silent = newManualItem("i1");
+    const draft: RfqDraft = { ...base, items: [silent] };
+
+    const { draft: next } = applyMachineTerms(draft, aramcoTemplate, { project: base.project, items: [] });
+    expect(next.items[0].safetyCertsOverride).toEqual(["aramco"]);
+  });
+
+  it("an EMPTY answer from the text is not silence — it is «no certificate»", () => {
+    /* `[]` and `null` must not collapse: `null` means nobody has said, and the project fills it;
+       `[]` is the renter saying none, and a site's cert overwriting that is the site overruling a
+       deliberate answer. */
+    const base = blankDraft();
+    const none = { ...newManualItem("i1"), safetyCertsOverride: [] } as EquipmentItem;
+    const draft: RfqDraft = { ...base, items: [none] };
+
+    const { draft: next } = applyMachineTerms(draft, aramcoTemplate, { project: base.project, items: draft.items });
+    expect(next.items[0].safetyCertsOverride).toEqual([]);
+  });
+});
+
+
+/**
+ * ── A past request used as a template brings its YEAR (owner, 2026-09-12) ───────────────────────
+ *
+ * *"the year is not stored or shown from the request"*.
+ *
+ * `machineTermsOfRequestItem` read `maxEquipmentAge` alone. That is the DEPRECATED alias the web
+ * posts under and the backend never sends back — the live wire answers `minimumEquipmentYear` — so
+ * the template's year came back null on every real request, and the strip's year pill, guarded on a
+ * value, drew nothing.
+ *
+ * This is the FOURTH reader to make that mistake; `requestedMinYear` exists so there is one. Its own
+ * note lists the other three.
+ */
+describe("the year a request was asked with", () => {
+  it("Given the live field, Then the template carries it", () => {
+    expect(machineTermsOfRequestItem({ minimumEquipmentYear: 2020 }).equipmentYear).toBe("2020");
+  });
+
+  it("Given only the deprecated alias, Then it is still read", () => {
+    // Not removable: it is the only thing that reads a request submitted by an older app build.
+    expect(machineTermsOfRequestItem({ maxEquipmentAge: 2018 }).equipmentYear).toBe("2018");
+  });
+
+  it("Given the request asked for no year, Then the term says nothing", () => {
+    // Null means «say nothing» to the merge, never «any year» — a template must not invent an answer.
+    expect(machineTermsOfRequestItem({}).equipmentYear).toBeNull();
+  });
+});

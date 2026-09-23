@@ -1,5 +1,6 @@
 import type { Taxonomy } from "@/lib/contract";
-import { postableItems, normalizeSafetyCert } from "@/lib/contract";
+import { postableItems, normalizeSafetyCert, customName, isCustomLine } from "@/lib/contract";
+import { EQUIPMENT_NAME_ON_EVERY_LINE } from "@/lib/flags";
 import type { EquipmentItem } from "@/lib/contract";
 import type { RfqRequestPayload } from "@/lib/contract";
 import type { TaxonomyNode, CreateRequestPayload, CreateRequestItem } from "@/lib/contract/app";
@@ -14,6 +15,9 @@ export function nodesToTree(nodes: TaxonomyNode[]): Taxonomy {
     id: c.id,
     name: c.name,
     nameAr: c.name_ar, // carry Arabic display names (was dropped) so the UI can render them by locale
+    // The equipment PHOTOGRAPH, where the admin panel has set one. Dropped here until 2026-08-31,
+    // which is why the create screen drew a glyph even for a subtype that had artwork.
+    equipmentImageUrl: c.equipment_image_url ?? null,
     // Carry the canonical group tag — the taxonomy's own grouping signal, returned verbatim by the
     // endpoint. It drives no cert default any more (the lifting → Aramco rule is withdrawn, in the app
     // first). Tags live on CATEGORY rows, so a subcategory inherits its parent's.
@@ -25,6 +29,7 @@ export function nodesToTree(nodes: TaxonomyNode[]): Taxonomy {
         id: s.id,
         name: s.name,
         nameAr: s.name_ar,
+        equipmentImageUrl: s.equipment_image_url ?? null,
         tag: s.tag ?? c.tag,
         measurements: meas
           .filter((m) => m.parent_id === s.id)
@@ -174,7 +179,9 @@ const CERT_TOKEN_MAP: Record<string, string> = {
  * (me ⇒ byRentee true), fuel enum, etc. Taxonomy ids on items must be REAL app ids — true when the
  * catalogue was loaded from GET /agents/taxonomy.
  *
- * `userId` is required by the backend; while web auth is bypassed it comes from AGENTS_TEST_USER_ID.
+ * `userId` is required by the backend; it is the verified session user (a session-less submit 401s
+ * at the route since 2026-09-16; only local non-production dev falls back to a test id, in
+ * `session-user.ts`).
  *
  * Integration rules (ALIGNMENT-web-app-002.md): `startDate` is optional — omit it and the server
  * defaults to "now"; never invent one (rule 3). `urgency` is now sent, computed client-side to mirror
@@ -204,9 +211,18 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     project.certificates.safety.includes("other") && safetyOtherText ? `Additional certificate required: ${safetyOtherText}` : "";
   const mergedNotes = [preferences.additionalNotes?.trim(), otherCertNote].filter(Boolean).join("\n") || undefined;
 
+  // A request started from a store goes to that supplier ALONE (app parity, Epic 008): same form,
+  // same endpoint, `type: DIRECT` + the supplier's integer user id. A `direct` target whose id is not
+  // an integer is dropped rather than sent — the backend 400s on a DIRECT without a usable
+  // `supplierId`, and a broadcast the renter did not ask for is the worse of the two failures, so we
+  // keep the request addressed or not at all (the caller checks the same id before offering the button).
+  const directSupplierId = Number(draft.direct?.supplierId);
+  const direct = draft.direct && Number.isInteger(directSupplierId) && directSupplierId > 0 ? directSupplierId : null;
+
   return {
     userId: Number(userId), // agents-backend requires an integer id
-    type: "BROADCAST", // web is broadcast-only (brief Non-goals)
+    type: direct ? "DIRECT" : "BROADCAST",
+    ...(direct ? { supplierId: direct } : {}),
     rentalType: (project.timing.rentalBasis && RENTAL_MAP[project.timing.rentalBasis]) || "DAILY",
     startDate: toIsoDateTime(project.timing.startDate), // optional; omitted when unset → server defaults to now
     endDate: toIsoDateTime(project.timing.endDate),
@@ -216,13 +232,17 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     projectLat: project.location.lat,
     projectLng: project.location.lng,
     projectAddressLabel: project.location.label ?? undefined,
+    // PROJ - the filing label, carried through untouched. Omitted rather than sent as null when the
+    // request belongs to no site, so an unfiled request's payload stays byte-identical to before.
+    projectId: draft.projectId ?? undefined,
+    workOrderGroupId: draft.workOrderGroupId ?? undefined,
     additionalNotes: mergedNotes,
     // §4.2 header fields:
     workingHoursPerDay: project.timing.hoursPerDay, // AC-14/15 (default 8)
     workingDaysPerWeek: project.advanced.workingDaysPerWeek, // AC-15 (default 6)
-    // AC-15, narrowed 2026-09-05. Sent ONLY when the renter actually chose a rate. The picker is
+    // AC-15, narrowed 2026-09-04. Sent ONLY when the renter actually chose a rate. The picker is
     // hidden and the draft default is "without", which mapped to the string '0' — the very sentinel
-    // the backend now has to normalise away ('0' is truthy, so it read back as a rate). A draft that
+    // the backend now has to normalise away ('0' is truthy, so it printed as a rate). A draft that
     // still carries a real 1.5x/2x from before keeps sending it.
     overtimeRate:
       project.advanced.overtimeRate === "without" ? undefined : OVERTIME_MAP[project.advanced.overtimeRate],
@@ -239,10 +259,37 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     equipmentItems: items.map((i) => {
       const fuelParty = i.fuelResponsibilityOverride ?? project.fuelResponsibility ?? "me"; // AC-26 override → request-wide → default me
       const operatorIncluded = i.operatorNeeded === "yes";
+      /**
+       * Off-catalogue: the renter's own name instead of the three ids.
+       *
+       * The ids are OMITTED rather than nulled — they are `.optional()` on the backend, not
+       * `.nullable()`, so an explicit `null` 422s where an absent key passes. All three go or none
+       * do: a no-match line can carry a category id with no subtype (`deriveVerdict`), and a partial
+       * triple is refused by design.
+       */
+      const custom = isCustomLine(i) ? customName(i) : "";
+      /**
+       * His own words BESIDE the taxonomy, once the switch is thrown (owner, 2026-09-12).
+       *
+       * The two are separate columns on the backend and `isUndefined` is derived from the subtype
+       * alone, so a line carrying both dispatches, matches and reads back as any ordinary line, with
+       * his words stored as our reference. `hasValidEquipmentIdentity` asks only that ONE of them is
+       * present, which is also the rule the canvas gates on.
+       *
+       * ⚠️ Held behind `EQUIPMENT_NAME_ON_EVERY_LINE` until backend-agents ships B1 — see the flag.
+       * ⚠️ `undefined`, never `""`: the field is `min(1)` on the backend, so an empty box must omit
+       *    the key rather than 422 a line that is otherwise perfectly valid.
+       */
+      const ownWords = EQUIPMENT_NAME_ON_EVERY_LINE ? (i.customEquipment ?? i.rawLabel ?? "").trim().slice(0, 120) : "";
       return {
-        categoryId: i.ref.categoryId as string,
-        subtypeId: i.ref.subcategoryId as string,
-        capacityId: i.ref.measurementId as string,
+        ...(custom
+          ? { customEquipmentName: custom.slice(0, 120) }
+          : {
+              categoryId: i.ref.categoryId as string,
+              subtypeId: i.ref.subcategoryId as string,
+              capacityId: i.ref.measurementId as string,
+              ...(ownWords ? { customEquipmentName: ownWords } : {}),
+            }),
         // Per-item attachments: admin-defined ids + free-text customs (trimmed, de-duped, blanks dropped).
         attachmentIds: i.attachmentIds ?? [],
         customAttachments: [...new Set((i.customAttachments ?? []).map((s) => s.trim()).filter(Boolean))],

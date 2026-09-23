@@ -8,8 +8,8 @@ import { bidSizeCounts, mapBidList } from "@/lib/contract/bids";
  * (renteeService.getBidList; verifies ownership server-side, marks the request viewed).
  *
  * `?sizeMatch=exact_or_larger` is passed straight through. Omitted means `exact` server-side, and
- * `exact` DROPS every bid offering a machine larger than the one asked for - so the renter sees a
- * shorter list than the one dispatch notified him about. `sizeCounts` comes back with the answer
+ * `exact` DROPS every bid offering a machine larger than the one asked for — so the renter sees a
+ * shorter list than the one dispatch notified him about. `sizeCounts` comes back with the answer,
  * whichever way the filter is set, which is how the surface can say how many are being held.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {

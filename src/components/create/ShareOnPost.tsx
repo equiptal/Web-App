@@ -1,0 +1,496 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Icon, SuccessTick } from "@/components/ui";
+import { Dialog } from "@/components/Dialog";
+import { btn, cx } from "@/lib/ds";
+import { fmt, useT } from "@/lib/i18n";
+import { useRfq } from "@/lib/store/rfq-store";
+import { useSession } from "@/lib/session";
+import { AccountModal } from "@/components/onboarding/AccountModal";
+import { draftBidForm } from "@/lib/draftBidForm";
+import { ShareRequestPanel } from "@/components/share/ShareRequestPanel";
+import { SubmitError } from "@/components/create/SubmitError";
+import { projectTitle, shortSite, type ProjectSummary } from "@/lib/contract/project";
+import { useRouter } from "next/navigation";
+
+/**
+ * *Share this request* — the card under the summary on **Ready to send**.
+ *
+ * ── A card on the page, not a dialog (owner's prototype, 2026-09-02) ────────────────────────────
+ *
+ * Built first as a modal behind a *Post & share* button, which was wrong twice over: it hid the one
+ * thing the screen is for behind a press, and it made *post* and *share* read as two acts a renter
+ * chooses between. The prototype has neither. The card is simply there, under the request he is
+ * reviewing, and one button does the whole thing.
+ *
+ * ── This file is a SHELL ────────────────────────────────────────────────────────────────────────
+ *
+ * Everything about the share — who, how, and what they receive — is `ShareRequestPanel`, which the
+ * modal renders too. What is left here is what only *Ready to send* has: the coach mark, the frame,
+ * the draft to preview, and the submit that mints the link.
+ *
+ * ── Why it is mounted above the phase switch ────────────────────────────────────────────────────
+ *
+ * `SUBMIT_SUCCESS` flips `phase` to `confirmation`, which unmounts *Ready to send* mid-press. So
+ * this is rendered by `CreateSurface`, which owns the switch and survives it — the flip happens
+ * behind the card and the renter sees one continuous act.
+ */
+/**
+ * How long the tick waits for a hand-off that may never have happened.
+ *
+ * ⚠️ Longer than any browser takes to raise a window it agreed to open, and short enough that a
+ * renter staring at a card which did nothing is not left there. Two and a half seconds.
+ */
+const TELL_ANYWAY_MS = 2_500;
+
+/** How many addresses the tick names before it starts counting instead (owner, 2026-09-13). */
+const NAMED_RECIPIENTS = 5;
+
+/** One place the request reached, ticked. The mirror of the confirmation's own blocks. */
+function Landed({ title, detail, children }: { title: string; detail: string; children?: ReactNode }) {
+  return (
+    <span className="flex items-start gap-2.5 rounded-md border border-ok/40 bg-ok-soft px-3 py-2.5">
+      <Icon name="check_circle" size={17} className="mt-px flex-none text-ok-deep" />
+      <span className="min-w-0 flex-1">
+        <b className="block text-meta font-extrabold text-navy">{title}</b>
+        <span className="block text-meta leading-relaxed text-muted-dark">{detail}</span>
+        {children}
+      </span>
+    </span>
+  );
+}
+
+export function ShareOnPost({
+  /**
+   * The site this request was filed under, if it was.
+   *
+   * 🔴 **The project's whole dialog is this block** (owner, 2026-09-08). `ProjectFiled` still does
+   * the write, outside and on mount; what it used to draw is two lines here. Null when the request
+   * went into a site the renter had already chosen, or when the filing failed, and in both cases
+   * nothing is drawn: the first needs no telling, and the second is silent by design.
+   */
+  filed = null,
+}: { filed?: ProjectSummary | null } = {}) {
+  const t = useT();
+  const c = t.intake.postShare;
+  const { state, actions } = useRfq();
+  const router = useRouter();
+  const { tier } = useSession();
+  const [showAccount, setShowAccount] = useState(false);
+  /**
+   * ── The tick waits for the channel to be handed off (owner, 2026-09-03) ─────────────────────
+   *
+   * ~~It opened the moment the request was created.~~ But the post is step one of the press: the
+   * compose window or WhatsApp opens a few lines later, in a NEW TAB that takes focus — so the
+   * dialog appeared, was immediately covered, and the renter met it on his way back with no idea
+   * what it was answering.
+   *
+   * `onShared` fires after every channel has been opened, so the tick is the first thing he sees
+   * when he returns — which is exactly when "it is posted" is the thing he wants to know. With no
+   * extra channel there is no tab, and it simply appears.
+   *
+   * Once only: a second send is another channel, not another request, and the panel already reports
+   * that inline.
+   */
+  const [posted, setPosted] = useState(false);
+  /**
+   * ── The tick waits until he is LOOKING at us (owner, 2026-09-03) ────────────────────────────
+   *
+   * *"the send must go to the channel directly before seeing the sucess popup, success shown when
+   * he is back on the web."*
+   *
+   * ~~It opened as soon as the channel had been handed off.~~ That is a few milliseconds before the
+   * new tab takes focus, so the dialog was drawn and then buried — and a renter returning from
+   * Gmail met a pop-up that had appeared while he was not there.
+   *
+   * So the announcement is held until this tab is visible again. He goes, he sends, he comes back,
+   * and the tick is waiting for him — which is the moment "it is posted" is the thing he wants to
+   * know.
+   */
+  const [waitingToTell, setWaitingToTell] = useState(false);
+  /** How many suppliers that first send actually reached — 0 when he posted to Moedatech alone. */
+  const [reached, setReached] = useState(0);
+  /** What the server sent, when it sent it: the confirmation states the e-mail as well as the post. */
+  /**
+   * ⚠️ `emails` is OPTIONAL here while the panel always sends it.
+   *
+   * This dialog opens over a request that is already live, so a `TypeError` reading a field a
+   * partial payload happens not to carry would hide the one confirmation the renter gets — for a
+   * send that really happened. Read it as «what we were told, if anything».
+   */
+  const [mail, setMail] = useState<{ from: string; recipients: number; inSentFolder: boolean; emails?: string[] } | null>(null);
+  /**
+   * ── Guards ONE send against two announcements, not the SECOND send against any ─────────────────
+   *
+   * Owner, 2026-09-12: *"no success modal for sending to outlook only shown on first post"*.
+   *
+   * ~~Set on the first `onShared` and never cleared.~~ The tick's own «Keep sharing» exists to send
+   * the renter back to the panel to reach another supplier, and every send after that was silent:
+   * the mail left, the count rose, and the screen said nothing about the one outcome he cannot see
+   * for himself.
+   *
+   * 🔴 **This overturns the 2026-09-10 ruling «a second channel is not a second request»**, and the
+   * evidence is that the case it protected cannot occur: `ShareRequestPanel` calls `onShared` from
+   * exactly ONE place, at the end of `send()`, after every channel that press touched. So a second
+   * call is a second PRESS, never a second channel of the same press. What that rule actually
+   * suppressed was the announcement of the next send.
+   *
+   * The original job survives: two calls without a dismissal in between still announce once.
+   */
+  const announced = useRef(false);
+  /* ⚠️ ~~`minted` / `toldHim` / `onAnnouncing`.~~ They existed to queue the project dialog
+     behind this one (2026-09-08, earlier the same day). There is no second dialog to queue any
+     more: the project is a block inside this one, so the whole mechanism went with it. */
+  /** The request cap has a dialog of its own on the review above; this banner leaves it to it. */
+  const isLimit = state.errorDetail?.backendCode === "E8009";
+  /** The renter's own firm, for the From line. Read once, and a failure just leaves it unnamed. */
+  const [renterName, setRenterName] = useState<string | null>(null);
+  /** Dismiss the tick AND re-arm the announcement, so the next send is reported like the first. */
+  const closeTick = () => {
+    setPosted(false);
+    announced.current = false;
+  };
+
+  useEffect(() => {
+    if (!waitingToTell) return;
+    const tell = () => {
+      if (document.visibilityState !== "visible") return;
+      setWaitingToTell(false);
+      setPosted(true);
+    };
+    /* Both events: a tab switch fires `visibilitychange`, and returning from a window that never hid
+       this one (a second monitor, a small pop-up) fires only `focus`. */
+    document.addEventListener("visibilitychange", tell);
+    window.addEventListener("focus", tell);
+    /**
+     * 🔴 **And a floor under both, because the hand-off can be a lie** (owner, 2026-09-08: *"it is
+     * showing like nothing happened, even the modal confirming the post didn't appear"*).
+     *
+     * `openEmailCompose` opens the compose window with `noopener`, and a window opened that way
+     * returns NO handle — so a pop-up the browser silently blocked is indistinguishable from one
+     * that opened, and the panel reports a hand-off either way. Nothing then took focus, this tab
+     * never lost visibility, and neither event ever fired: the renter was left on the share card
+     * with a live request and no tick at all.
+     *
+     * ⚠️ This is not a race with the compose tab. `tell` still refuses while this tab is HIDDEN,
+     * and a compose window that really opened takes focus long before the grace is up — so the only
+     * case this catches is the one where nothing opened. If he did leave, the listeners above still
+     * hold the tick until he comes back.
+     */
+    const floor = window.setTimeout(tell, TELL_ANYWAY_MS);
+    return () => {
+      document.removeEventListener("visibilitychange", tell);
+      window.removeEventListener("focus", tell);
+      window.clearTimeout(floor);
+    };
+  }, [waitingToTell]);
+
+  useEffect(() => {
+    /* `fetch` itself can be missing — a test renderer, an old embedded browser — and calling it then
+       throws INSIDE the effect, where `.catch` never sees it and React takes the whole tree down
+       with it. The name is decoration on a From line; nothing here may cost the screen. */
+    try {
+      void fetch("/api/me", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        /* 🔴 `/api/me` answers `{ user, verification }`. Reading `companyName` off the envelope
+           gave `undefined`, so the From line has been saying "you" for every renter who has a
+           company name on file. Found while chasing the empty To row (owner, 2026-09-06). */
+        .then((body: { user?: { companyName?: string | null } } | null) =>
+          setRenterName(body?.user?.companyName?.trim() || null),
+        )
+        .catch(() => setRenterName(null));
+    } catch {
+      setRenterName(null);
+    }
+  }, []);
+
+  /**
+   * The request he is about to post, in the shape the card reads.
+   *
+   * This is what makes the preview readable BEFORE the post. It used to be an empty frame: the card
+   * came from the bid-form endpoint, that endpoint needs a token, and a token needs a request — so
+   * the renter was asked to approve a message he could not see, and his only chance to change it
+   * came once the request was already live.
+   */
+  const draftForm = useMemo(
+    () => draftBidForm(state.draft?.project, state.draft?.items, state.taxonomy),
+    [state.draft?.project, state.draft?.items, state.taxonomy],
+  );
+
+  /**
+   * Every machine on this request is off-catalogue, so no supplier on Moedatech will ever see it.
+   *
+   * 🔴 The marketplace is named three times on this screen and every one of them would be a lie
+   * here (owner, 2026-09-08). Read from the draft rather than from the posted request, because the
+   * tick is drawn the moment the post returns and the request has not been re-fetched.
+   */
+  const offCatalogue = !!draftForm?.items.length && draftForm.items.every((i) => i.isUndefined === true);
+
+  /**
+   * `asBroadcast` is the confirmation's «Broadcast instead» on a DIRECT request (app parity).
+   *
+   * ⚠️ It is handed to `submit`, never dispatched here and read back: `submit` reads the store
+   * through a ref written during RENDER, so a `goBroadcast()` on the line above would not be visible
+   * to the call on the line below and the request would go to the firm he had just declined.
+   */
+  const post = async (asBroadcast?: boolean): Promise<string | null> => {
+    /**
+     * The account gate lives here now, because this is the button that posts.
+     *
+     * It used to sit on the review screen's own Send, which is gone. Returning null stops the share
+     * without opening anything: the renter makes an account, presses Send again, and everything he
+     * picked is still on screen because nothing unmounted.
+     */
+    if (tier === "guest") {
+      setShowAccount(true);
+      return null;
+    }
+    const result = await actions.submit({ asBroadcast });
+    const uuid = result?.requestUuids?.[0] ?? null;
+    // `submit` has already put the failure on the store; the review above says what went wrong.
+    if (!uuid) return null;
+    // Keeps this card mounted once the phase flips to confirmation, and keeps the REVIEW on screen
+    // behind it rather than the confirmation page — see `CreateSurface`.
+    actions.setShareOnPost(true);
+    return uuid;
+  };
+
+  return (
+    <section className="relative mt-6 rounded-lg border border-border bg-surface p-6">
+      {/*
+        * — The coach mark lived here —
+        *
+        * «Share with your supplier to bid», a navy tab pinned to the card's top edge, with the card
+        * taking `pt-16` to make room for it. Removed (owner, 2026-09-06).
+        *
+        * ⚠️ It was a hint pointing at a card that already says what it is: the heading, the
+        * supplier list and the Send button are all on screen underneath it. It cost sixteen pixels
+        * of padding plus its own height, at the top of the one screen where the supplier list and
+        * the message preview are both fighting for room.
+        */}
+
+      {/* ⚠️ **A refused post must SAY it was refused, in words** ─────────────────────────────
+          The submit already carried everything needed to explain itself and nothing drew any of it;
+          only the request cap (`E8009`) had a home. Every other refusal was a press that did
+          nothing, which was the report: *"why i cant send to suppliers?"*
+
+          ⚠️ It printed the backend's code and status because *"a renter who has to ask us anyway
+          should be able to paste one line and be understood"* (2026-09-03). True for support, and
+          false for the renter, who was left reading «INTERNAL_ERROR · 500» over a request that
+          would not post (owner, 2026-09-12). `SubmitError` says what happened and what to do, and
+          keeps the code behind a press. */}
+      {state.error && !isLimit && <SubmitError detail={state.errorDetail} className="mb-5" />}
+
+      {/* The heading goes INTO the panel, at the head of its link row (owner, 2026-09-03). */}
+      <ShareRequestPanel
+        heading={<h2 className="me-1 flex-none text-subhead font-extrabold text-navy">{c.title}</h2>}
+        mode="post"
+        requestUuid={state.shareOnPost ? (state.requestUuids[0] ?? null) : null}
+        requestCode={state.requestId}
+        draftForm={draftForm}
+        /* Who this DIRECT request is for, so the confirmation names the firm instead of promising a
+           marketplace (owner, 2026-09-13). The draft is the only place that knows: a posted request
+           carries no supplier name on any projection yet. */
+        direct={state.direct ? { supplierName: state.direct.supplierName, storeId: state.direct.storeId } : null}
+        onPost={post}
+        renterName={renterName}
+        onShared={(n, channel, outcome) => {
+          if (announced.current) return;
+          announced.current = true;
+          setReached(n);
+          setMail(outcome?.mail ?? null);
+          /* ── Wait only when he actually WENT somewhere (owner, 2026-09-08) ─────────────────
+             *"When I sent a request through Outlook and Moedatech it must show sent successfully with
+             the post confirmation in the same modal, immediately after post and send."*
+
+             ~~Every channel but Moedatech waited for `visibilitychange` / `focus`.~~ That rule was
+             written for a compose tab, and it is right for one. But a CONNECTED Outlook opens
+             nothing — the server sends it through Graph and the renter never leaves — so the wait
+             was for an event that could not arrive, and the press that did the most looked like the
+             press that did nothing.
+
+             `handedOff` is the question that was really being asked all along. */
+          if (channel === "none" || outcome?.handedOff === false) setPosted(true);
+          else setWaitingToTell(true);
+        }}
+      />
+
+      {/* ── It is posted, and he has not gone anywhere (owner, 2026-09-03) ────────────────────
+          A tick, the code, and one way out. Deliberately NOT a page: he is midway through choosing
+          channels, and the supplier list, the wording he wrote and the channel he picked are all
+          behind this dialog, exactly where he left them. */}
+      {/* ── Centred, with the tick drawn in front of him (owner, 2026-09-03) ──────────────────
+          ~~The dialog's own header band: a 20px glyph in a soft green chip, the title beside it, the
+          subtitle under, all ranged left.~~ That is the shape of an ordinary dialog, and this is not
+          an ordinary moment — it is the one press the whole flow exists for, and the header band
+          announced it in the same voice a rename confirmation uses.
+
+          So the header is dropped and the body carries everything, centred under a tick that draws
+          itself. `Dialog` floats its close in the corner when there is no title, which is exactly
+          the shape the reference has.
+
+          The message is unchanged, and so is the rule under it. */}
+      <Dialog
+        open={posted}
+        onClose={closeTick}
+        size="md"
+      >
+        <div className="flex flex-col items-center px-2 pb-1 pt-4 text-center">
+          <SuccessTick />
+          {/* ⚠️ **The title carries what happened** (owner, 2026-09-08: *"the title is «your
+              request is posted into moedatech and shared from yara@outlook.co», then below it «sent
+              from ... to 1 supplier, a copy is in your sent folder»"*).
+
+              ~~Title, then the post again, then the send, then the Sent folder.~~ Four lines for
+              two facts, with the address he actually sent from buried third. A server send is the
+              one channel with no window of its own to prove it happened, so it leads.
+
+              ⚠️ No `capitalize`: the title now carries an e-mail address, and the class title-cases
+              every word in it. */}
+          {/* ⚠️ **The title is SHORT again, and the destinations are blocks** (owner, 2026-09-10:
+              *"even when sent, the successful modal must be clear"*).
+
+              ~~«Your request is posted to Moedatech and shared from yara@outlook.com» in one 17px
+              title.~~ That packed two facts into a sentence that wrapped to three lines and was read
+              once. The blocks under it are the SAME two rows he approved in the confirmation a
+              moment earlier, ticked — so the screen that asks and the screen that reports are the
+              same shape, and he can check them off rather than re-read them.
+
+              This keeps the half of 2026-09-08 that still holds (*"reduce the text, just keep the
+              title"*): there is no paragraph here, and the title says one thing. */}
+          <h2 className="mt-5 text-title font-extrabold capitalize text-navy">{c.postedTitle}</h2>
+
+          <div className="mt-4 grid w-full gap-2 text-start">
+            {/* Moedatech, unless this request can reach nobody there. */}
+            {offCatalogue ? (
+              /* ORANGE is this product's «pay attention» — the create card's off-catalogue box and
+                 the share panel's block wear the same three tokens (owner, 2026-09-13: *"can u unify
+                 the colours and their meanings"*). It was `warn`, a sandy cream, which said the same
+                 thing in a fourth colour. */
+              <span className="flex items-start gap-2.5 rounded-md border border-brand-light bg-brand-soft px-3 py-2.5">
+                <Icon name="error_outline" size={17} className="mt-px flex-none text-brand-deep" />
+                <span className="text-meta font-semibold leading-relaxed text-navy">{c.offCatalogueLine}</span>
+              </span>
+            ) : (
+              <Landed title={c.destMoedatech} detail={c.postedLive} />
+            )}
+
+            {/* ⚠️ The mail, and only when the server really sent one. A channel that merely opened
+                a window has no report to make here: the renter watched it happen. */}
+            {mail && (
+              <Landed
+                title={c.destOutlook}
+                detail={
+                  fmt(mail.recipients === 1 ? c.mailSentOne : c.mailSent, {
+                    from: mail.from,
+                    n: mail.recipients,
+                  }) + (mail.inSentFolder ? `, ${c.mailInSent}` : "")
+                }
+              >
+                {/* ── WHICH suppliers, not just how many (owner, 2026-09-13) ────────────────
+                    *"show to who it was sent, like their emails, if so much addresses then show
+                    first 5"*. The line above says how many; a mistyped address in his own supplier
+                    list is invisible behind a number, and this is the last screen that can show it
+                    to him.
+                    ⚠️ The ADDRESS, never the firm's name — the same ruling the confirmation took on
+                    2026-09-09: the name cannot tell him whether this went to the branch mailbox or
+                    to one salesman's personal one.
+                    ⚠️ `dir="ltr"` on each chip: an address inside an Arabic block reorders without
+                    it, and `@` can end up adrift.
+                    ⚠️ Drawn only when we KNOW them. The recipients are derived server-side, so an
+                    empty list means we were not told, and the count above still stands alone. */}
+                {(mail.emails?.length ?? 0) > 0 && (
+                  <span className="mt-1.5 flex flex-wrap gap-1">
+                    {(mail.emails ?? []).slice(0, NAMED_RECIPIENTS).map((address) => (
+                      <span
+                        key={address}
+                        dir="ltr"
+                        className="max-w-full truncate rounded-full border border-ok/30 bg-surface px-2 py-0.5 text-label text-navy-mid"
+                      >
+                        {address}
+                      </span>
+                    ))}
+                    {(mail.emails?.length ?? 0) > NAMED_RECIPIENTS && (
+                      <span className="px-1 py-0.5 text-label text-muted">
+                        {fmt(c.mailSentTo, { n: (mail.emails?.length ?? 0) - NAMED_RECIPIENTS })}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </Landed>
+            )}
+
+            {/* ⚠️ A channel we did not send through: say the count, because nothing else does. */}
+            {!mail && !offCatalogue && reached > 0 && (
+              <Landed
+                title={c.destShared}
+                detail={reached === 1 ? c.postedLiveOne : fmt(c.postedLiveMany, { n: reached })}
+              />
+            )}
+          </div>
+
+          {/* ⚠️ **The project, as a block rather than a second dialog** (owner, 2026-09-08).
+              Filing is a consequence of the post, so it belongs under the sentence that announces
+              the post. It appears when the write lands, which may be a moment after this opens. */}
+          {filed && (
+            /* GREY, not orange: the project is a plain statement of where this request was filed,
+               with no verdict in it. In peach it competed with the caution above it for the one
+               colour that means «pay attention», on a dialog that can show both at once. */
+            <div className="mt-4 flex w-full items-center gap-2.5 rounded-md border border-border bg-surface2 px-3 py-2.5 text-start">
+              <Icon name="folder_open" size={17} className="flex-none text-muted-dark" />
+              <span className="min-w-0 flex-1">
+                <b className="block truncate text-body font-semibold text-navy">
+                  {fmt(t.projects.offer.filedTitle, { site: projectTitle(filed) })}
+                </b>
+                <span className="block truncate text-meta text-muted">
+                  {t.projects.offer.fieldSite} · {shortSite(filed.location.label ?? "")}
+                </span>
+              </span>
+            </div>
+          )}
+
+          {/* The link is already on the card behind this, so the dialog does not offer it again — it
+              says the one thing he does not know yet and gets out of the way. */}
+          <p className="mt-3 text-meta text-muted">{c.postedNext}</p>
+          {/* Full width and last, as the reference has it: there is one thing to do here, so it
+              takes the whole row rather than hiding on a trailing edge.
+
+              ⚠️ With a project there are two, and «View the project» is the SECONDARY one: it
+              leaves this screen, and the renter is midway through choosing channels. Keep sharing
+              stays the press that returns him to what he was doing. */}
+          {filed && (
+            <button
+              type="button"
+              onClick={() => {
+                closeTick();
+                  /* `?site=` selects THIS project on the board rather than whichever was touched
+                   last. */
+                router.push(`/?site=${encodeURIComponent(filed.id)}`);
+              }}
+              className={cx(btn("secondary", "lg", { full: true }), "mt-6")}
+            >
+              <Icon name="open_in_new" size={15} />
+              {t.projects.offer.viewAction}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={closeTick}
+            className={cx(btn("primary", "lg", { full: true }), filed ? "mt-2" : "mt-6")}
+          >
+            {c.postedKeepSharing}
+          </button>
+        </div>
+      </Dialog>
+
+      <AccountModal
+        open={showAccount}
+        onClose={() => setShowAccount(false)}
+        onCreated={() => setShowAccount(false)}
+        title={t.guest.postGateTitle}
+        postSubhead={t.guest.postBodyRequest}
+      />
+    </section>
+  );
+}

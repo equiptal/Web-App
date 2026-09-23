@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { VerifiedMark } from "@/components/VerifiedMark";
+import { Dialog } from "@/components/Dialog";
+import { MastheadPill, PageMasthead, RowList, Section } from "@/components/PageSection";
 import { useT, useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { Icon } from "@/components/ui";
@@ -20,6 +22,9 @@ import {
   type CompanyResult,
 } from "@/lib/api/company-client";
 import type { CompanyMember, MyCompany } from "@/lib/contract/company";
+import { btn, cx } from "@/lib/ds";
+import { SkeletonFields, SkeletonRows, SkeletonSection } from "@/components/Skeleton";
+import { pin } from "@/lib/uiPins";
 
 /**
  * Company hub — the web twin of the app's `company_page.dart`
@@ -35,8 +40,54 @@ import type { CompanyMember, MyCompany } from "@/lib/contract/company";
  * Everything mutating confirms first, because none of it is reversible in-product: joining hands over
  * records one-way, leaving forfeits access to records you brought in, and dissolving retires the
  * company's verification.
+ *
+ * ── It is PART OF THE PROFILE now, not a page (owner, 2026-09-04) ───────────────────────────────
+ *
+ * *"My Organization will be removed in the nav bar and we will not have it as a separate page, but
+ * just part of the user profile below his personal info."* `/company` is gone; `ProfileView` renders
+ * this with `embedded`, which drops the page furniture this component brought with it — the outer
+ * page padding, the `dir` (the profile already sets it) and the firm's masthead, which would be a
+ * second slab under the renter's own. The states, the copy and every act are unchanged.
  */
-export function CompanyHub() {
+export function CompanyHub({
+  embedded = false,
+  onCompany,
+  onCreateCompany,
+  onViewDetails,
+  logoUrl = null,
+  onEditLogo,
+}: {
+  embedded?: boolean;
+  /** Reports the firm (or its absence) to the page around it — the profile prints one name, not two. */
+  onCompany?: (company: MyCompany | null) => void;
+  /**
+   * Open the verification form — the OTHER way to have a company, and the one that makes one for
+   * him. Owned by the page (the form is a dialog over it), offered here because this card is where
+   * the question «do you have a company?» is actually asked.
+   */
+  onCreateCompany?: () => void;
+  /**
+   * Open the company's own particulars — legal name, authority role, national ID, city, the
+   * national address and the three papers. Owned by the page for the same reason as the form:
+   * it is a layer over it.
+   *
+   * 🔴 **The two are offered on DIFFERENT conditions, and that is the app's rule rather than a
+   * preference** (`company_profile_card._verificationSection`). Anything submitted can be read:
+   * pending, verified or refused. The FORM is offered only when there is nothing on file or it
+   * came back refused — *"a supplier under review can look at what they submitted but must not
+   * send it a second time; sending again is what stacks a duplicate for the reviewer"*. A refused
+   * submission gets both presses, as it does in the app.
+   */
+  onViewDetails?: () => void;
+  /** The firm mark on file, presigned by `/api/me` (`companyLogoUrl`). */
+  logoUrl?: string | null;
+  /**
+   * Open the logo dialog. Withheld for a MEMBER, which is the app own gate
+   * (`CompanyLogoEditor.isOwner`): this card is the firm identity, and only its owners act on it.
+   * A member sees the same mark with no picker.
+   */
+  onEditLogo?: () => void;
+} = {}) {
   const t = useT();
   const c = t.company;
   const { locale } = useLocale();
@@ -77,9 +128,12 @@ export function CompanyHub() {
     else {
       setLoadError(false);
       setCompany(result);
+      // The page around this one prints the firm's name in its own field; told here so the two can
+      // never disagree, and only on a read that actually answered.
+      onCompany?.(result);
     }
     setLoading(false);
-  }, []);
+  }, [onCompany]);
 
   useEffect(() => {
     void load();
@@ -116,37 +170,63 @@ export function CompanyHub() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl" dir={ar ? "rtl" : "ltr"}>
+    /* ── The page is the page's width now (owner, 2026-08-30) ────────────────────────────
+       ~~`mx-auto max-w-2xl` — 672px centred, so the two account pages were one width (owner,
+       2026-08-26).~~ Withdrawn: at 1440 that left roughly two thirds of the row empty on either side
+       of a column of half-filled cards, and the reading argument for a narrow measure does not hold
+       here — these are FIELDS and rows, not prose. The unification survives; it is just that both
+       pages are now the shell's width and both split into two columns at `lg`.
+
+       The shell already caps at 1440 and owns the gutter, so this takes no width of its own. */
+    <div {...pin("company-hub")} className={cx("w-full", !embedded && "pb-10")} dir={embedded ? undefined : ar ? "rtl" : "ltr"}>
       {toast && (
-        <p className="mb-4 flex items-center gap-2 rounded-[10px] border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-[13px] font-semibold text-ok">
+        <p className="mb-4 flex items-center gap-2 rounded-sm border border-ok/30 bg-ok-soft px-3.5 py-2.5 text-body font-semibold text-ok">
           <Icon name="check_circle" size={16} /> {toast}
         </p>
       )}
       {error && (
-        <p className="mb-4 flex items-start gap-2 rounded-[10px] border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-[13px] font-semibold text-danger">
+        <p className="mb-4 flex items-start gap-2 rounded-sm border border-danger/30 bg-danger-soft px-3.5 py-2.5 text-body font-semibold text-danger">
           <Icon name="error" size={16} className="mt-px flex-none" /> {error}
         </p>
       )}
 
       {loading ? (
-        <p className="py-16 text-center text-[13px] text-muted">…</p>
+        /* The shape the page is about to be: the firm's particulars on one side, its roster on the
+           other. ~~A centred ellipsis.~~ It was indistinguishable from a renter with no company,
+           which is a real state this page also has — so the first thing it said was sometimes the
+           opposite of the truth. */
+        <div className="grid gap-5 lg:grid-cols-2">
+          <SkeletonSection><SkeletonFields rows={3} /></SkeletonSection>
+          <SkeletonSection><SkeletonRows rows={4} /></SkeletonSection>
+        </div>
       ) : loadError ? (
-        <div className="rounded-[14px] border border-border bg-surface p-8 text-center">
-          <p className="text-[13.5px] font-semibold text-navy">{c.loadError}</p>
+        <div className="rounded-sm border border-border bg-surface p-8 text-center">
+          <p className="text-body font-semibold text-navy">{c.loadError}</p>
           <button
             onClick={() => void load()}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-[10px] bg-brand px-5 py-2.5 text-[13px] font-bold text-brand-fg transition hover:brightness-105"
+            className={btn("primary", "md", { className: "mt-4 transition" })}
           >
             <Icon name="refresh" size={16} /> {c.retry}
           </button>
         </div>
       ) : !company ? (
         <div className="flex flex-col gap-4">
-          {/* App parity (companyCreateOwn* keys): the two ways to have a company, in the app's
-              order — create your own by verifying, ABOVE joining someone else's. */}
-          <CreateOwnCompanyCard />
-          <JoinForm
+          {/* ── ONE card, both routes (owner, 2026-09-12: *"keep the create as part of the company
+              but show it nice and without ui bugs"*) ──────────────────────────────────────────────
+
+              🔴 **This brings «create» back INTO the company block**, reversing the move made
+              earlier the same day (*"make one CTA for the verify"*, which sent this card's content
+              up to a full-width banner on the profile). What that ruling was really about survives:
+              there is still exactly ONE place to press. It is here, beside the other way to have a
+              company, rather than in a slab three hundred pixels above a card that answered half
+              the same question and had to point down at it.
+
+              App parity keeps the order: create your own by verifying, ABOVE joining someone
+              else's. */}
+          <NoCompanyCard
             busy={busy}
+            onCreate={onCreateCompany}
+            onViewDetails={onViewDetails}
             onJoin={(code, name) => setConfirm(joinSpec(code, name))}
             onError={setError}
             onAttempt={() => setError(null)}
@@ -157,7 +237,11 @@ export function CompanyHub() {
       ) : (
         <ActiveCompany
           company={company}
+          embedded={embedded}
           busy={busy}
+          onViewDetails={onViewDetails}
+          logoUrl={logoUrl}
+          onEditLogo={onEditLogo}
           onApprove={(m) => void run(() => approveMember(m.userId))}
           onRemove={(m) => void run(() => removeMember(m.userId))}
           onPromote={(m) => setConfirm(promoteSpec(m))}
@@ -267,46 +351,29 @@ export function CompanyHub() {
 
 // ── State 1: no company → create your own, or join by code ───────────────────
 
-/**
- * "Add your own company" — the other route to having one, and the one the app offers first
- * (`companyCreateOwnTitle/Desc/Cta`). A company is only ever minted by the verification form, so
- * this is a link to `/verify`, not an action of its own.
- *
- * Shown unconditionally in the no-company state: a renter who was already verified would have a
- * company (verification creates it), so reaching this state means verifying is still available to
- * them — whether they've never submitted, or submitted and were rejected.
- */
-function CreateOwnCompanyCard() {
-  const t = useT();
-  const c = t.company;
-  const router = useRouter();
-  return (
-    <button
-      onClick={() => router.push("/verify")}
-      className="flex w-full items-center gap-3.5 rounded-[14px] border border-brand/30 bg-brand-soft p-5 text-start transition hover:border-brand"
-    >
-      <span className="grid h-11 w-11 flex-none place-items-center rounded-[11px] bg-brand text-brand-fg">
-        <Icon name="verified" size={22} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-extrabold text-navy">{c.createOwnTitle}</p>
-        <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{c.createOwnDesc}</p>
-      </div>
-      <span className="inline-flex flex-none items-center gap-1 rounded-[9px] bg-brand px-3 py-2 text-[12px] font-bold text-brand-fg">
-        {c.createOwnCta}
-        <Icon name="arrow_forward" size={15} className="rtl:scale-x-[-1]" />
-      </span>
-    </button>
-  );
-}
 
-function JoinForm({
+/**
+ * Exported for `dev/preview` ONLY, which photographs it: the profile is behind a session and behind
+ * a backend, so this card had no way to be looked at before it shipped. Nothing else imports it.
+ */
+export function NoCompanyCard({
   busy,
+  onCreate,
+  onViewDetails,
   onJoin,
   onError,
   onAttempt,
 }: {
   busy: boolean;
+  /** Absent → the create route is not drawn, and the card is the join form it has always been. */
+  onCreate?: () => void;
+  /**
+   * Read what was submitted. Drawn here as well as on an active firm, because the two do not
+   * arrive together: verification is what CREATES the company, so between sending the papers and
+   * a reviewer approving them this card is the one on screen and his own submission is the one
+   * thing he can still look at.
+   */
+  onViewDetails?: () => void;
   /** Called with the code AND the firm's name, once `validate-code` confirmed both. */
   onJoin: (code: string, companyName: string) => void;
   onError: (message: string) => void;
@@ -339,16 +406,48 @@ function JoinForm({
   };
 
   return (
-    <div className="rounded-[14px] border border-border bg-surface p-6">
-      <div className="flex items-center gap-3">
-        <span className="grid h-11 w-11 flex-none place-items-center rounded-[11px] bg-brand-soft text-brand">
+    <div className="rounded-sm border border-border bg-surface p-6">
+      {/* ⚠️ `items-start`, not `items-center`: the body wraps to two lines at this column's width,
+          and centring on the taller block floats the 44px tile off the title it belongs to. */}
+      <div className="flex items-start gap-3">
+        <span className="grid h-11 w-11 flex-none place-items-center rounded-sm bg-brand-soft text-brand">
           <Icon name="business_center" size={22} />
         </span>
-        <div>
-          <h2 className="text-[15px] font-extrabold text-navy">{c.joinTitle}</h2>
-          <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{c.noCompany}</p>
+        <div className="min-w-0">
+          {/* The head names the QUESTION, not one of its two answers. «Join a company» over a card
+              that also creates one is the confusion this change removes. */}
+          <h2 className="text-subhead font-extrabold text-navy">{onCreate ? c.noneTitle : c.joinTitle}</h2>
+          <p className="mt-0.5 text-meta leading-relaxed text-muted">{onCreate ? c.noneBody : c.noCompany}</p>
         </div>
       </div>
+
+      {/* ── The first route: verify, and a company is made for him ──────────────────────────────
+          ⚠️ A real BUTTON with a plain label, and nothing nested inside it. The banner this
+          replaces was a `<button>` carrying a fake CTA `<span>` styled as a second button: two
+          affordances for one press, which is what read as broken in the screenshot. */}
+      {onCreate && (
+        <button
+          type="button"
+          onClick={onCreate}
+          className={btn("primary", "lg", { full: true, className: "mt-5 flex items-center justify-center gap-1.5 transition" })}
+        >
+          <Icon name="verified" size={16} />
+          {c.createOwnCta}
+        </button>
+      )}
+
+      {/* Under review, or sent back: the papers are still his to read. See `CompanyHub`'s own note
+          on why this press and the one above answer to different conditions. */}
+      {onViewDetails && (
+        <button
+          type="button"
+          onClick={onViewDetails}
+          className={btn("secondary", "md", { full: true, className: "mt-3 flex items-center justify-center gap-1.5 transition" })}
+        >
+          <Icon name="description" size={16} />
+          {t.profile.companyDetails}
+        </button>
+      )}
 
       <form
         className="mt-5"
@@ -357,7 +456,7 @@ function JoinForm({
           void check();
         }}
       >
-        <label htmlFor="invite-code" className="block text-[11.5px] font-bold uppercase tracking-wide text-navy-mid">
+        <label htmlFor="invite-code" className="block text-label font-semibold uppercase tracking-wide text-navy-mid">
           {c.enterCode}
         </label>
         <input
@@ -369,12 +468,15 @@ function JoinForm({
           autoComplete="off"
           spellCheck={false}
           dir="ltr"
-          className="mt-1.5 w-full rounded-[10px] border border-border bg-surface px-3.5 py-2.5 text-[14px] font-semibold tracking-[1px] text-navy outline-none transition focus:border-brand"
+          className="mt-1.5 w-full rounded-sm border border-border bg-surface px-3.5 py-2.5 text-body font-semibold tracking-[1px] text-navy outline-none transition focus:border-brand"
         />
+        {/* ⚠️ SECONDARY once «create» is on the card: two full-width brand buttons in one block
+            would put the same weight on both routes and let neither read as the one to press. With
+            no create route it is the card's only act and stays primary. */}
         <button
           type="submit"
           disabled={busy || checking || !code.trim()}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[10px] bg-brand px-5 py-3 text-[14px] font-bold text-brand-fg transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-55"
+          className={btn(onCreate ? "secondary" : "primary", "lg", { full: true, className: "mt-4 transition" })}
         >
           {checking ? "…" : c.joinButton}
         </button>
@@ -398,25 +500,25 @@ function PendingPanel({
   const t = useT();
   const c = t.company;
   return (
-    <div className="rounded-[14px] border border-border bg-surface px-6 py-10 text-center">
+    <div className="rounded-sm border border-border bg-surface px-6 py-10 text-center">
       <span className="mx-auto grid h-[88px] w-[88px] place-items-center rounded-full bg-warn-soft">
         <span className="grid h-[62px] w-[62px] place-items-center rounded-full bg-warn/15 text-warn">
           <Icon name="hourglass_top" size={30} />
         </span>
       </span>
-      <p className="mt-6 text-[19px] font-extrabold text-navy">{company.name}</p>
-      <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-warn-soft px-3 py-1.5 text-[12.5px] font-bold text-warn">
+      <p className="mt-6 text-title font-extrabold text-navy">{company.name}</p>
+      <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-warn-soft px-3 py-1.5 text-meta font-semibold text-warn">
         <Icon name="schedule" size={14} /> {c.pendingBadge}
       </span>
-      <p className="mx-auto mt-5 max-w-sm text-[14px] leading-relaxed text-navy">{c.pendingApproval}</p>
-      <p className="mx-auto mt-2 max-w-sm text-[12.5px] leading-relaxed text-muted">{c.pendingHint}</p>
+      <p className="mx-auto mt-5 max-w-sm text-body leading-relaxed text-navy">{c.pendingApproval}</p>
+      <p className="mx-auto mt-2 max-w-sm text-meta leading-relaxed text-muted">{c.pendingHint}</p>
 
       {/* Wrong code? Withdraw. Without this the pending row blocks joining anywhere else until an
           owner happens to reject you — the request would otherwise be a one-way door. */}
       <button
         onClick={onCancel}
         disabled={busy}
-        className="mt-6 inline-flex items-center gap-1.5 rounded-[10px] border border-border px-4 py-2.5 text-[13px] font-bold text-navy-mid transition hover:bg-surface2 disabled:opacity-55"
+        className={btn("secondary", "md", { className: "mt-6 transition" })}
       >
         <Icon name="undo" size={16} /> {c.cancelJoin}
       </button>
@@ -426,8 +528,46 @@ function PendingPanel({
 
 // ── States 3 & 4: active member / owner ──────────────────────────────────────
 
+/**
+ * The firm mark: its logo, or its initials while it has none.
+ *
+ * ⚠️ **`object-contain` on a SQUARE, never `cover`.** A logo is artwork with its own margins,
+ * and most of them are wordmarks: `cover` crops one to its middle third and shows a firm two
+ * letters of its own name at random. The app makes the same call for the same reason.
+ *
+ * ⚠️ **The dashed edge is drawn only for someone who can act on it.** An «add» affordance a
+ * member cannot use is a control that looks broken; a member gets the plain monogram.
+ */
+function CompanyMark({ name, logoUrl, onEdit }: { name: string; logoUrl: string | null; onEdit?: () => void }) {
+  const t = useT();
+  const p = t.verify.pile;
+  const monogram = (name || "?").trim().slice(0, 2).toUpperCase();
+  const inner = logoUrl ? (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img src={logoUrl} alt="" className="h-full w-full object-contain" />
+  ) : (
+    <span className="text-meta font-extrabold">{monogram}</span>
+  );
+  const base =
+    "grid size-9 flex-none place-items-center overflow-hidden rounded-sm border bg-surface text-brand";
+  if (!onEdit) return <span className={`${base} border-border`}>{inner}</span>;
+  const label = logoUrl ? p.logoChange : p.logoAdd;
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      title={label}
+      aria-label={label}
+      className={`${base} transition hover:border-brand ${logoUrl ? "border-border" : "border-dashed border-brand/45"}`}
+    >
+      {inner}
+    </button>
+  );
+}
+
 function ActiveCompany({
   company,
+  embedded,
   busy,
   onApprove,
   onRemove,
@@ -435,8 +575,13 @@ function ActiveCompany({
   onDemote,
   onExit,
   onCopied,
+  onViewDetails,
+  logoUrl,
+  onEditLogo,
 }: {
   company: MyCompany;
+  /** Inside the profile: no masthead, and one column — the profile's own is already narrow. */
+  embedded?: boolean;
   busy: boolean;
   onApprove: (m: CompanyMember) => void;
   onRemove: (m: CompanyMember) => void;
@@ -444,98 +589,220 @@ function ActiveCompany({
   onDemote: (m: CompanyMember) => void;
   onExit: () => void;
   onCopied: () => void;
+  /** Open the firm's particulars. Absent when nothing has been submitted — see `CompanyHub`. */
+  onViewDetails?: () => void;
+  logoUrl?: string | null;
+  onEditLogo?: () => void;
 }) {
   const t = useT();
   const c = t.company;
-  const card = "rounded-[14px] border border-border bg-surface";
+  const card = "rounded-sm border border-border bg-surface";
+
+  /**
+   * ── One organization page (owner, 2026-08-26) ─────────────────────────────────────────────────
+   * The company's PARTICULARS used to live on `/profile` in a green card, while this page carried
+   * the same firm's name, roster and invite code. One subject, two pages, split by nothing but which
+   * fetch each happened to make. `CompanyDetails` brings that half over, and the order below is the
+   * order a reader wants it in: who we are, what proves it, how to bring someone in, who is already
+   * here, and — last and set apart — how to leave.
+   */
+  /* The team block, held in a variable because the layout below places it in one of two
+     shapes: beside the papers on a verified firm, alone on one that is not. Building it twice
+     would be two rosters to keep in step. */
+  const team = (
+    <>
+        {/* ── One TEAM card (owner's reference, 2026-08-26) ────────────────────────────────────────
+            The invite code, the roster and the way out were three sections with three headings, and a
+            reader had to work out that they were all about the same thing: who is in this firm. They
+            are one card now — the code to bring someone in, the people already here, and the exit set
+            apart at its foot — which is the order the reference draws and the order the acts happen in.
+  
+            Pending joiners stay OUTSIDE it, above. An approval is a decision waiting on the owner
+            rather than a statement about the team, and burying it inside a card of settled facts is
+            how a join request goes unanswered for a week. */}
+  
+        {/* Pending join requests — owners approve or reject. */}
+        {company.isOwner && company.pendingMembers.length > 0 && (
+          <Section title={c.pendingJoiners} boxed={false}>
+            <div className="flex flex-col gap-2.5">
+              {company.pendingMembers.map((m) => (
+                <div key={m.userId} className={`${card} p-4`}>
+                  <p className="text-body font-semibold text-navy">{m.name}</p>
+                  {m.phone && (
+                    <p className="mt-0.5 text-meta text-muted" dir="ltr">
+                      {m.phone}
+                    </p>
+                  )}
+                  <div className="mt-3.5 flex gap-2.5">
+                    <button
+                      onClick={() => onRemove(m)}
+                      disabled={busy}
+                      className={btn("secondary", "md", { className: "flex-1 transition" })}
+                    >
+                      {c.remove}
+                    </button>
+                    <button
+                      onClick={() => onApprove(m)}
+                      disabled={busy}
+                      className="flex-1 rounded-sm bg-ok px-3 py-2.5 text-body font-semibold text-white transition disabled:bg-disabled-bg disabled:text-disabled-fg"
+                    >
+                      {c.approve}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+  
+        <Section title={c.team} grow>
+          {company.isOwner && company.inviteCode && (
+            <div className="p-4 pb-0">
+              <InviteCodeCard code={company.inviteCode} onCopied={onCopied} />
+            </div>
+          )}
+  
+          <div className="px-4 pt-3.5">
+            <h3 className="text-label font-semibold uppercase tracking-wide text-muted">{c.members}</h3>
+          </div>
+          <RowList>
+            {company.activeMembers.map((m) => (
+              <MemberRow
+                key={m.userId}
+                member={m}
+                company={company}
+                busy={busy}
+                onRemove={onRemove}
+                onPromote={onPromote}
+                onDemote={onDemote}
+              />
+            ))}
+          </RowList>
+  
+          {/* The way out, at the foot of the team it ends — and stated in red as what it is rather than
+              hidden in a neutral button, because leaving or dissolving is the one act on this page that
+              cannot be undone from this page. Centred and unboxed: it is the last thing here, not
+              another row of the roster. */}
+          <div className="border-t border-border px-4 py-3.5 text-center">
+            <button
+              onClick={onExit}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 text-body font-semibold text-danger transition hover:underline disabled:text-disabled-fg disabled:no-underline"
+            >
+              <Icon name="logout" size={17} className="rtl:scale-x-[-1]" />
+              {company.activeMembers.length <= 1 ? c.dissolve : c.leave}
+            </button>
+          </div>
+        </Section>
+    </>
+  );
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Identity */}
-      <div className={`${card} flex items-center gap-3.5 p-5`}>
-        <span className="grid h-12 w-12 flex-none place-items-center rounded-[12px] bg-brand-soft text-brand">
-          <Icon name="business_center" size={24} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[17px] font-extrabold text-navy">{company.name}</p>
-          <p className="mt-0.5 text-[12.5px] text-muted">{company.isOwner ? c.roleOwner : c.roleMember}</p>
-        </div>
-        {company.isVerified && (
-          <span className="inline-flex flex-none items-center gap-1 rounded-full bg-ok-soft px-2.5 py-1 text-[11.5px] font-bold text-ok">
-            <Icon name="verified" size={14} /> {c.verified}
+    <div>
+      {/* ── The firm's own line, inside the profile (owner, 2026-09-04) ───────────────────────────
+          A masthead is a page's opening statement, and this block does not open a page any more — it
+          sits under the renter's personal details, below his. Two slabs stacked would read as two
+          pages glued together, and the second would look like the more important of the two.
+
+          So embedded says the same three facts as a row: the firm, the renter's role in it, and
+          whether it is verified. The standalone masthead is kept for nothing else today; it is what
+          this shape has to beat if the firm ever gets a page again. */}
+      {embedded ? (
+        <div className="flex flex-wrap items-center gap-2.5 rounded-sm border border-border bg-surface2 px-4 py-3">
+          {/* 🔴 **The firm mark, where the app puts it** (owner, 2026-09-23: *"match it"*).
+              ~~A generic `business_center` disc.~~ It said «a company» on a row that already names
+              which one, and the logo the renter uploads had nowhere on this page to be seen at
+              all: it was collected by the verification form, printed on the quotation and the bid
+              form, and invisible to the person who owns it. In the app the mark IS this avatar
+              (`company_logo_editor.dart`, in the My Company header) and tapping it is how a logo
+              is added, changed or removed. */}
+          <CompanyMark
+            name={company.name}
+            logoUrl={logoUrl ?? null}
+            onEdit={company.isOwner ? onEditLogo : undefined}
+          />
+          <span className="min-w-0">
+            <span className="block truncate text-body font-extrabold text-navy">{company.name}</span>
+            <span className="block text-meta text-muted">{company.isOwner ? c.roleOwner : c.roleMember}</span>
           </span>
-        )}
-      </div>
-
-      {/* Invite code — active owners of a verified company only (the backend decides). */}
-      {company.isOwner && company.inviteCode && (
-        <InviteCodeCard code={company.inviteCode} onCopied={onCopied} />
-      )}
-
-      {/* Pending join requests — owners approve or reject. */}
-      {company.isOwner && company.pendingMembers.length > 0 && (
-        <section>
-          <h3 className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wide text-muted">{c.pendingJoiners}</h3>
-          <div className="flex flex-col gap-2.5">
-            {company.pendingMembers.map((m) => (
-              <div key={m.userId} className={`${card} p-4`}>
-                <p className="text-[14px] font-bold text-navy">{m.name}</p>
-                {m.phone && (
-                  <p className="mt-0.5 text-[12.5px] text-muted" dir="ltr">
-                    {m.phone}
-                  </p>
-                )}
-                <div className="mt-3.5 flex gap-2.5">
-                  <button
-                    onClick={() => onRemove(m)}
-                    disabled={busy}
-                    className="flex-1 rounded-[10px] border border-danger px-3 py-2.5 text-[13px] font-bold text-danger transition hover:bg-danger-soft disabled:opacity-55"
-                  >
-                    {c.remove}
-                  </button>
-                  <button
-                    onClick={() => onApprove(m)}
-                    disabled={busy}
-                    className="flex-1 rounded-[10px] bg-ok px-3 py-2.5 text-[13px] font-bold text-white transition hover:brightness-105 disabled:opacity-55"
-                  >
-                    {c.approve}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Roster */}
-      <section>
-        <h3 className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wide text-muted">{c.members}</h3>
-        <div className={`${card} divide-y divide-border overflow-hidden`}>
-          {company.activeMembers.map((m) => (
-            <MemberRow
-              key={m.userId}
-              member={m}
-              company={company}
-              busy={busy}
-              onRemove={onRemove}
-              onPromote={onPromote}
-              onDemote={onDemote}
-            />
-          ))}
+          {company.isVerified && (
+            <span className="ms-auto flex-none">
+              <MastheadPill tone="ok" onLight>
+                <VerifiedMark size={13} /> {c.verified}
+              </MastheadPill>
+            </span>
+          )}
         </div>
-      </section>
+      ) : (
+        <PageMasthead
+          tone="plain"
+          icon={<Icon name="business_center" size={26} className="text-white" />}
+          title={company.name}
+          subtitle={company.isOwner ? c.roleOwner : c.roleMember}
+          badge={
+            company.isVerified ? (
+              <MastheadPill tone="ok" onLight>
+                <VerifiedMark size={13} /> {c.verified}
+              </MastheadPill>
+            ) : undefined
+          }
+        />
+      )}
 
-      {/* The way out — leave, or dissolve when they're the last one standing. */}
-      <button
-        onClick={onExit}
-        disabled={busy}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-[12px] border border-danger px-5 py-3 text-[13.5px] font-bold text-danger transition hover:bg-danger-soft disabled:opacity-55"
-      >
-        <Icon name="logout" size={17} className="rtl:scale-x-[-1]" />
-        {company.activeMembers.length <= 1 ? c.dissolve : c.leave}
-      </button>
+      {/* 🔴 **The particulars have a door again** (owner, 2026-09-22: *"for company entity in the
+          app he can view its details and edit, use the same endpoints here"*).
+
+          ~~`CompanyDetails`, stacked open under this card.~~ Removed on 2026-09-07 because
+          stacked under his own details it made the profile a filing cabinet, and that is still
+          true; what was wrong is that it then had nowhere to be read at all. The app gives it a
+          SCREEN, reached from this row; here it is a layer, reached from this press.
+
+          ⚠️ A labelled BUTTON rather than the app's tappable row. On a phone a chevron on a row
+          is affordance enough; on a desktop card of plain facts nothing says the row is pressable,
+          and a row that silently is one is a control nobody finds. */}
+      {onViewDetails && (
+        <button
+          type="button"
+          onClick={onViewDetails}
+          className={btn("secondary", "md", { full: true, className: "mt-3 flex items-center justify-center gap-1.5 transition" })}
+        >
+          <Icon name="description" size={16} />
+          {t.profile.companyDetails}
+        </button>
+      )}
+
+      {/* ── Two columns, filling the page (owner, 2026-08-30) ───────────────────────────
+          The papers on one side, the people on the other: *what proves this firm* and *who is in
+          it* are the page's two subjects, and stacking them made a reader scroll past the whole of
+          one to reach the other on a screen with room for both.
+
+          ~~`items-start`, so a short column stops where its content stops.~~ Withdrawn (owner,
+          2026-08-30): *"I want both columns to have same length, same start and same end."* The
+          columns stretch to the taller one now, and one card in each is marked `grow` so it takes
+          the difference — the papers on the left, the roster on the right, both of which can use
+          the height. A column that stopped short left a strip of page under it beside a card that
+          ran on, which read as one of the two having failed to load.
+
+          The split is gated on `isVerified` because that is exactly the condition the left column
+          has anything to say under — `CompanyDetails` draws nothing for a firm with no verified
+          submission, and a two-column grid with an empty half is worse than the single column it
+          replaced. An unverified active company keeps the one column, with the team in it. */}
+      {/* ── The firm, and the people in it. Nothing else (owner, 2026-09-07) ─────────────────────
+          *"Even in the company details don't show it — just show profile, company, and the code with
+          team members."*
+
+          ~~`CompanyDetails`, the verification particulars: legal name, authority role, national id,
+          city, national address, and the three papers.~~ Gone from this page. They are a copy of the
+          form he filled once, none of it is editable here, and stacked under his own details they
+          made the profile a filing cabinet. What is left is what he acts on: the firm's identity row,
+          the invite code, the roster, and the way out.
+
+          The component is not deleted — it is the only rendering of those particulars, and it is
+          where they go if the firm is ever given a page of its own again. Nothing renders it today. */}
+      {team}
     </div>
   );
+
 }
 
 function InviteCodeCard({ code, onCopied }: { code: string; onCopied: () => void }) {
@@ -583,38 +850,45 @@ function InviteCodeCard({ code, onCopied }: { code: string; onCopied: () => void
     }
   };
 
+  /**
+   * ── Navy, with the code inside a frame of its own (owner's reference, 2026-08-26) ─────────────
+   * It was an amber-tinted box with the code as its heading. The reference makes it the darkest thing
+   * on the page and puts the code in a bordered well inside that: the code is a thing to be READ OUT
+   * or handed over, and a frame around it says "this is the part you copy" in a way a large font
+   * alone does not. The two controls move onto the navy beside it, quiet, because they are how you
+   * take the code rather than what the panel is about.
+   *
+   * The caption stays a full sentence under the well. «Share this code so teammates can join» is the
+   * only line here that explains what any of it is for.
+   */
   return (
-    <section>
-      <h3 className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wide text-muted">{c.inviteTeam}</h3>
-      <div className="rounded-[14px] border border-brand/30 bg-brand-soft p-4">
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[17px] font-extrabold tracking-[1.5px] text-navy" dir="ltr">
-              {code}
-            </p>
-            <p className="mt-0.5 text-[12px] leading-relaxed text-muted">{c.inviteHint}</p>
-          </div>
-          <div className="flex flex-none gap-1.5">
-            <button
-              onClick={() => void (canShare ? share() : copyInvite())}
-              aria-label={c.share}
-              title={c.share}
-              className="grid h-10 w-10 place-items-center rounded-[10px] border border-border bg-surface text-navy-mid transition hover:bg-surface2"
-            >
-              <Icon name={canShare ? "share" : "forward_to_inbox"} size={18} />
-            </button>
-            <button
-              onClick={() => void copy()}
-              aria-label={c.inviteCodeCopied}
-              title={c.inviteCodeCopied}
-              className="grid h-10 w-10 place-items-center rounded-[10px] border border-border bg-surface text-navy-mid transition hover:bg-surface2"
-            >
-              <Icon name="content_copy" size={18} />
-            </button>
-          </div>
+    <div className="rounded-sm bg-navy p-4">
+      <h3 className="text-label font-semibold uppercase tracking-wide text-white/55">{c.inviteCode}</h3>
+      <div className="mt-2 flex items-center gap-3 rounded-sm border border-brand/45 bg-white/[0.04] px-3.5 py-3">
+        <p className="min-w-0 flex-1 truncate text-title font-extrabold tracking-[1.5px] text-brand" dir="ltr">
+          {code}
+        </p>
+        <div className="flex flex-none gap-1.5">
+          <button
+            onClick={() => void (canShare ? share() : copyInvite())}
+            aria-label={c.share}
+            title={c.share}
+            className="grid h-[34px] w-[34px] place-items-center rounded-sm bg-white/10 text-white transition hover:bg-white/20"
+          >
+            <Icon name={canShare ? "share" : "forward_to_inbox"} size={17} />
+          </button>
+          <button
+            onClick={() => void copy()}
+            aria-label={c.inviteCodeCopied}
+            title={c.inviteCodeCopied}
+            className="grid h-[34px] w-[34px] place-items-center rounded-sm bg-white/10 text-white transition hover:bg-white/20"
+          >
+            <Icon name="content_copy" size={17} />
+          </button>
         </div>
       </div>
-    </section>
+      <p className="mt-2.5 text-meta leading-relaxed text-white/60">{c.inviteHint}</p>
+    </div>
   );
 }
 
@@ -651,11 +925,11 @@ function MemberRow({
         <Icon name={isOwner ? "admin_panel_settings" : "person"} size={18} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] font-bold text-navy">
+        <p className="truncate text-body font-semibold text-navy">
           {member.name}
-          {isSelf && <span className="ms-1.5 text-[11.5px] font-semibold text-muted">({c.you})</span>}
+          {isSelf && <span className="ms-1.5 text-label font-semibold text-muted">({c.you})</span>}
         </p>
-        <p className="text-[12px] text-muted">{isOwner ? c.roleOwner : c.roleMember}</p>
+        <p className="text-meta text-muted">{isOwner ? c.roleOwner : c.roleMember}</p>
       </div>
 
       {canManage && (
@@ -665,7 +939,7 @@ function MemberRow({
             disabled={busy}
             aria-label={c.members}
             aria-expanded={open}
-            className="grid h-8 w-8 flex-none place-items-center rounded-[9px] text-muted transition hover:bg-surface2 hover:text-navy disabled:opacity-55"
+            className="grid h-8 w-8 flex-none place-items-center rounded-sm text-muted transition hover:bg-surface2 hover:text-navy disabled:bg-disabled-bg disabled:text-disabled-fg"
           >
             <Icon name="more_vert" size={18} />
           </button>
@@ -673,7 +947,7 @@ function MemberRow({
             <>
               {/* Click-away layer — keeps the menu dismissible without a document listener. */}
               <button className="fixed inset-0 z-10 cursor-default" aria-hidden tabIndex={-1} onClick={() => setOpen(false)} />
-              <div className="absolute end-3 top-12 z-20 w-52 overflow-hidden rounded-[11px] border border-border bg-surface py-1 shadow-lg">
+              <div className="absolute end-3 top-12 z-20 w-52 overflow-hidden rounded-sm border border-border bg-surface py-1">
                 {!isOwner && (
                   <MenuItem
                     onClick={() => {
@@ -718,7 +992,7 @@ function MenuItem({ children, onClick, danger }: { children: React.ReactNode; on
   return (
     <button
       onClick={onClick}
-      className={`block w-full px-3.5 py-2.5 text-start text-[13px] font-semibold transition hover:bg-surface2 ${danger ? "text-danger" : "text-navy"}`}
+      className={`block w-full px-3.5 py-2.5 text-start text-body font-semibold transition hover:bg-surface2 ${danger ? "text-danger" : "text-navy"}`}
     >
       {children}
     </button>
@@ -756,45 +1030,35 @@ function ConfirmDialog({
   const c = t.company;
   const { locale } = useLocale();
   return (
-    <div
-      dir={locale === "ar" ? "rtl" : "ltr"}
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/45 p-4 sm:items-center"
-      onClick={onCancel}
-      role="dialog"
-      aria-modal="true"
-      aria-label={spec.title}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-center shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Dialog open onClose={onCancel} size="md" padded={false}>
+      <div dir={locale === "ar" ? "rtl" : "ltr"} className="p-6 text-center">
         <span
           className={`mx-auto grid h-[52px] w-[52px] place-items-center rounded-full ${spec.danger ? "bg-danger-soft text-danger" : "bg-brand-soft text-brand"}`}
         >
           <Icon name={spec.icon} size={26} />
         </span>
-        <h2 className="mt-4 text-[17px] font-extrabold text-navy">{spec.title}</h2>
+        <h2 className="mt-4 text-title font-extrabold capitalize text-navy">{spec.title}</h2>
         {/* `whitespace-pre-line` so the dissolve copy keeps its paragraph breaks (app parity). */}
-        <p className="mt-3 whitespace-pre-line text-start text-[13px] leading-relaxed text-muted">{spec.body}</p>
+        <p className="mt-3 whitespace-pre-line text-start text-body leading-relaxed text-muted">{spec.body}</p>
 
         <div className="mt-5 flex flex-col gap-1.5">
           {!spec.blocking && (
             <button
               onClick={onConfirm}
               disabled={busy}
-              className={`w-full rounded-[10px] px-5 py-3 text-[13.5px] font-bold transition hover:brightness-105 disabled:opacity-55 ${spec.danger ? "bg-danger text-white" : "bg-brand text-brand-fg"}`}
+              className={`w-full rounded-sm px-5 py-3 text-body font-semibold transition disabled:bg-disabled-bg disabled:text-disabled-fg ${spec.danger ? "bg-danger text-white" : "bg-brand text-brand-fg"}`}
             >
               {spec.confirmLabel ?? spec.title}
             </button>
           )}
           <button
             onClick={onCancel}
-            className="w-full rounded-[10px] px-5 py-2.5 text-[13px] font-bold text-muted transition hover:bg-surface2"
+            className="w-full rounded-sm px-5 py-2.5 text-body font-semibold text-muted transition hover:bg-surface2"
           >
             {c.cancel}
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

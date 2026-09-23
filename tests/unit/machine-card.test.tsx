@@ -1,0 +1,561 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
+import { screen, within } from "@testing-library/react";
+import { MachineCard } from "@/components/create/MachineCard";
+import { equipmentYears, FUEL_TYPES, SAFETY_CERTIFICATES, itemGaps, transportGaps } from "@/lib/contract";
+import { makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
+
+/* The two overlay pills are addressed by their accessible NAME, and that name is the field’s noun —
+   «Certificate», «Minimum year». Their visible text is an INSTRUCTION while unanswered («Pick
+   certificate»), because a shouted noun on an empty control reads as a label for a value that is not
+   there (owner, 2026-09-08). Read by name, not by the words on the pill, so the copy can change
+   again without touching these. */
+
+/**
+ * MREQ-TC-12/13/14/15/16 — the machine card's controls, and the vocabularies behind them.
+ *
+ * The defect worth guarding here is a wrong option list. The prototype offered CE, ISO 9001, a 2021+
+ * year band and Net 15/45 — none of which exist on this platform — and a certificate the platform
+ * does not recognise becomes a document demanded of every supplier who bids, i.e. a request nobody
+ * can answer. So each list is asserted against `options.ts` rather than against a literal.
+ */
+
+/** Render the card with the real gap computation, the way Canvas passes it. */
+function card(opts: Parameters<typeof renderCanvas>[1] = {}) {
+  return renderCanvas(
+    (store) => {
+      const draft = store.state.draft!;
+      const item = draft.items[0];
+      return <MachineCard item={item} gaps={[...itemGaps(item, draft), ...transportGaps([item], draft.project)]} shaking={false} />;
+    },
+    opts,
+  );
+}
+
+/**
+ * Open a dropdown by its accessible name and list what it offers.
+ *
+ * Queried by role rather than by DOM position: the check glyph beside the selected row is an
+ * `aria-hidden` ligature span, so its text is in `textContent` but not in the accessible name. Going
+ * through the a11y tree is both more robust and the thing a screen-reader user actually gets.
+ */
+/**
+ * The trigger, whichever kind it is.
+ *
+ * Certificates became a MULTI-select (owner, 2026-09-01) — the field has always been an array on the
+ * draft, on the wire and on the bid form, and only this control disagreed. A multi-select opener is a
+ * `button` with `aria-haspopup="listbox"`, not a `combobox`, so the helpers accept both rather than
+ * every certificate test learning which one it is.
+ */
+function triggerFor(name: string) {
+  const combo = screen.queryByRole("combobox", { name });
+  return combo ?? screen.getByRole("button", { name });
+}
+
+async function open(handle: Awaited<ReturnType<typeof card>>, name: string) {
+  const trigger = triggerFor(name);
+  // Idempotent: the trigger toggles, so opening one that is already open would close it.
+  if (trigger.getAttribute("aria-expanded") !== "true") {
+    await handle.run(() => trigger.click());
+  }
+  return screen.getByRole("listbox", name === "Certificate" ? undefined : { name });
+}
+
+async function close(handle: Awaited<ReturnType<typeof card>>, name: string) {
+  const trigger = triggerFor(name);
+  if (trigger.getAttribute("aria-expanded") === "true") {
+    await handle.run(() => trigger.click());
+  }
+}
+
+async function optionsOf(handle: Awaited<ReturnType<typeof card>>, name: string): Promise<string[]> {
+  const listbox = await open(handle, name);
+  const labels = within(listbox)
+    .getAllByRole("option")
+    // The longest ligature first: "check_box_outline_blank" starts with "check", so stripping the
+    // short one leaves "_box_outline_blank" glued to the label.
+    .map((o) => o.textContent!.replace(/^(check_box_outline_blank|check_box|check)/, "").trim());
+  await close(handle, name);
+  return labels;
+}
+
+async function pick(handle: Awaited<ReturnType<typeof card>>, name: string, option: string) {
+  const listbox = await open(handle, name);
+  await handle.run(() => within(listbox).getByRole("option", { name: option }).click());
+}
+
+describe("the four overlay controls (MREQ-AC-16)", () => {
+  // These sit ON the machine panel, where the prototype gives them no visible label — the control
+  // itself carries the meaning. So they are addressed by accessible name, which is also the only
+  // thing a screen-reader user gets, and the reason SearchSelect grew a `label` prop.
+  it("renders certificate, quantity, fuel and minimum year", async () => {
+    await card();
+    // A multi-select opener: `button` + aria-haspopup, not a combobox.
+    expect(screen.getByRole("button", { name: "Certificate" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "FUEL" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Minimum year" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "QUANTITY +" })).toBeTruthy();
+  });
+
+  it("floors the quantity stepper at one, by REMOVING the − (MREQ-AC-16)", async () => {
+    /**
+     * 🔴 **The − is withdrawn at one, not disabled** (owner, 2026-09-14: *"remove the − in case it
+     * is one unit, as it is confusing, this white −"*). Its disabled skin is a pale ground, and the
+     * chip it sits on is dark - so the one control that could do nothing was the brightest thing in
+     * it. A control that cannot act is better absent than greyed, which is the ruling the equipment
+     * tab’s ✕ already follows on a one-equipment request.
+     */
+    const handle = await card();
+    /* ⚠️ At ONE there is no − at all - which is the ruling - so the way to reach it is to count
+       up first. That is also the renter’s own path: the chip opens at one unit. */
+    expect(screen.queryByRole("button", { name: "QUANTITY −" })).toBeNull();
+    await handle.run(() => screen.getByRole("button", { name: "QUANTITY +" }).click());
+    expect(handle.store().state.draft!.items[0].quantity).toBe(2);
+
+    await handle.run(() => screen.getByRole("button", { name: "QUANTITY −" }).click());
+    expect(handle.store().state.draft!.items[0].quantity).toBe(1);
+    // ⚠️ Gone from the DOM, so there is nothing to disable and nothing to press.
+    expect(screen.queryByRole("button", { name: "QUANTITY −" })).toBeNull();
+    // The + is never withdrawn: nothing caps how many machines a request asks for.
+    expect(screen.getByRole("button", { name: "QUANTITY +" })).toBeTruthy();
+  });
+
+  it("counts up from the panel chip", async () => {
+    const handle = await card();
+    await handle.run(() => screen.getByRole("button", { name: "QUANTITY +" }).click());
+    expect(handle.store().state.draft!.items[0].quantity).toBe(2);
+    // ⚠️ The number ALONE (owner, 2026-09-14). The chip sits on the machine’s own photograph with
+    // a − and a + beside it, so what it counts is not in doubt - and «×2» beside «20 ton» read as
+    // part of the size.
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.queryByText("×2")).toBeNull();
+  });
+});
+
+describe("option lists come from the contract (MREQ-AC-17/18/19)", () => {
+  it("offers exactly the platform's fuel types", async () => {
+    const handle = await card();
+    expect(await optionsOf(handle, "FUEL")).toEqual(["Diesel", "Electric"]);
+    expect(FUEL_TYPES).toEqual(["diesel", "electric"]);
+  });
+
+  it("offers the app's own years — every one from 2010 to now, newest first, Any leading", async () => {
+    /**
+     * ⚠️ This used to assert the bands `2015+ … 2022+` and call them "the platform's". They were
+     * this app's alone: `year_stepper.dart` offers every year from 2010 to the current one, and the
+     * backend stores a plain number. A renter on the web could only ask for something the app has no
+     * way to express (owner, 2026-09-01).
+     */
+    const handle = await card();
+    const labels = await optionsOf(handle, "Minimum year");
+    const thisYear = new Date().getFullYear();
+
+    expect(labels[0]).toBe("Any year");
+    expect(labels[1]).toBe(String(thisYear));
+    expect(labels[labels.length - 1]).toBe("2010");
+    // Computed, so it is right every January rather than silently missing the newest year.
+    expect(labels.length).toBe(equipmentYears().length);
+    expect(labels).not.toContain("2018+");
+  });
+
+  it("offers the platform's certificates plus an explicit No certificate", async () => {
+    const handle = await card();
+    const labels = await optionsOf(handle, "Certificate");
+    expect(labels[0]).toBe("No certificate");
+    expect(labels.slice(1)).toEqual(["TÜV", "Aramco Certified", "Other"]);
+    expect(SAFETY_CERTIFICATES).toEqual(["tuv", "aramco", "other"]);
+    // The prototype's inventions must not be reachable.
+    for (const invented of ["CE", "ISO 9001", "SASO"]) expect(labels).not.toContain(invented);
+  });
+
+  it("takes more than one certificate, because the field has always been a list", async () => {
+    /**
+     * The defect this closes: a renter needing TÜV AND Aramco could ask for one of them, and found
+     * out which half he had lost at the bids. `safety_certificates` is an array on the draft, on the
+     * wire, and on the bid form where a supplier confirms each cert on its own row.
+     */
+    const handle = await card();
+    await pick(handle, "Certificate", "TÜV");
+    await pick(handle, "Certificate", "Aramco Certified");
+
+    expect(handle.store().state.draft!.items[0].safetyCertsOverride).toEqual(["tuv", "aramco"]);
+  });
+
+  it("un-ticks one without losing the other", async () => {
+    const handle = await card();
+    await pick(handle, "Certificate", "TÜV");
+    await pick(handle, "Certificate", "Aramco Certified");
+    await pick(handle, "Certificate", "TÜV");
+
+    expect(handle.store().state.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
+  });
+
+  it("stores No certificate as an explicit empty list, and records the answer (MREQ-AC-55)", async () => {
+    const handle = await card();
+    await pick(handle, "Certificate", "No certificate");
+
+    const item = handle.store().state.draft!.items[0];
+    expect(item.safetyCertsOverride).toEqual([]);
+    expect(handle.store().state.draft!.touchedFields).toContain(`line_items[${item.id}].safety_certificates`);
+  });
+
+  it("maps Any year to the literal 'any', which yearOut turns into null (MREQ-AC-55)", async () => {
+    const handle = await card();
+    await pick(handle, "Minimum year", "Any year");
+    expect(handle.store().state.draft!.items[0].equipmentYear).toBe("any");
+  });
+});
+
+describe("taxonomy — one pick, category derived (MREQ-AC-20/21)", () => {
+  it("shows the resolved names, never a hardcoded label", async () => {
+    await card();
+    expect(screen.getByText("Crawler excavator")).toBeTruthy();
+    expect(screen.getByText("30 ton")).toBeTruthy();
+  });
+
+  // The renter picks a TYPE and nothing else, so the list spans every category rather than being
+  // scoped to one that has not been chosen yet.
+  it("lists every subtype across all categories", async () => {
+    const handle = await card();
+    expect(await optionsOf(handle, "TYPE")).toEqual(["Crawler excavator", "Wheel loader", "Mobile crane"]);
+  });
+
+  /**
+   * 🔴 ~~CATEGORY is a read-only box showing the taxonomy's tag.~~ REMOVED from the card 2026-09-12
+   * (owner): the renter picks a TYPE and the category follows from it, so the box restated a fact the
+   * TYPE beside it already carried — and the freed column now holds «Doesn't match what I want?».
+   * The id is still derived and still sent; only the display went.
+   */
+  it("offers no category control at all — and no longer shows the tag either", async () => {
+    await card();
+    expect(screen.queryByText("CATEGORY")).toBeNull();
+    expect(screen.queryByText("Earthmoving")).toBeNull();
+    expect(screen.queryByRole("combobox", { name: "CATEGORY" })).toBeNull();
+  });
+
+  it("sets BOTH ids from one pick — the category is derived, and no longer drawn", async () => {
+    const handle = await card();
+    await pick(handle, "TYPE", "Mobile crane");
+
+    const ref = handle.store().state.draft!.items[0].ref;
+    expect(ref.subcategoryId).toBe("sub-mobile-crane");
+    expect(ref.categoryId).toBe("cat-lifting");
+    // The category still FOLLOWS the pick; since 2026-09-12 it is simply not shown on the card.
+    expect(screen.queryByText("Lifting, Cranes & Aerial")).toBeNull();
+    expect(handle.store().state.draft!.touchedFields).toContain("line_items[a0].subtype");
+  });
+
+  it("cascades the size list to the newly chosen subtype", async () => {
+    const handle = await card();
+    await pick(handle, "TYPE", "Mobile crane");
+    expect(await optionsOf(handle, "SIZE")).toEqual(["50 ton"]);
+  });
+
+  it("disables size until a type is chosen", async () => {
+    await card({
+      draft: makeAgentDraft({ items: [makeItem({ ref: { categoryId: "cat-earth", subcategoryId: null, measurementId: null } })] }),
+    });
+    expect(screen.getByRole("combobox", { name: "SIZE" }).hasAttribute("disabled")).toBe(true);
+  });
+});
+
+describe("attachments (MREQ-AC-22)", () => {
+  it("renders the admin list and defaults the pre-selected rows on", async () => {
+    const handle = await card({
+      attachments: [
+        { id: "att-bucket", name: "Standard bucket", nameAr: "دلو قياسي", preSelected: true },
+        { id: "att-breaker", name: "Rock breaker", nameAr: "مطرقة" },
+      ],
+    });
+    expect(screen.getByText("ATTACHMENT")).toBeTruthy();
+    expect(screen.getByText("Rock breaker")).toBeTruthy();
+    expect(handle.store().state.draft!.items[0].attachmentIds).toEqual(["att-bucket"]);
+  });
+
+  it("hides the section entirely when the subtype has none", async () => {
+    await card({ attachments: [] });
+    expect(screen.queryByText("ATTACHMENT")).toBeNull();
+  });
+
+  it("offers no free-text path — selection is from the admin set only", async () => {
+    await card({ attachments: [{ id: "att-bucket", name: "Standard bucket", nameAr: "دلو" }] });
+    const section = screen.getByText("ATTACHMENT").closest("div")!.parentElement!;
+    expect(section.querySelector("input")).toBeNull();
+  });
+});
+
+describe("crane-only work type (MREQ-AC-23)", () => {
+  it("appears for a crane subtype", async () => {
+    await card({
+      draft: makeAgentDraft({
+        items: [makeItem({ ref: { categoryId: "cat-lifting", subcategoryId: "sub-mobile-crane", measurementId: "cap-50t" } })],
+      }),
+    });
+    expect(screen.getByText("WORK TYPE")).toBeTruthy();
+  });
+
+  it("does not appear for an excavator", async () => {
+    await card();
+    expect(screen.queryByText("WORK TYPE")).toBeNull();
+  });
+});
+
+describe("logistics — the prototype's labels and options (MREQ-AC-62/63)", () => {
+  it("uses the prototype's wording throughout", async () => {
+    await card();
+    expect(screen.getByText("DELIVERY TO SITE")).toBeTruthy();
+    expect(screen.getByText("RETURN FROM SITE")).toBeTruthy();
+    /**
+     * ~~«FUEL RESPONSIBILITY».~~ Shortened to «FUEL PAID BY» (owner, 2026-09-12, on a screenshot of
+     * it wrapping): measured in the browser, the fuel box gives its label 119px and the old string
+     * needed 133px, so it drew on two lines at full desktop width while the two legs beside it
+     * stayed on one. Not «FUEL» alone — this card already labels the fuel TYPE control that.
+     */
+    expect(screen.getByText("FUEL PAID BY")).toBeTruthy();
+    // Three choices, each Supplier then Me — never the other way round.
+    expect(screen.getAllByRole("button", { name: "Supplier" }).length).toBe(3);
+    expect(screen.getAllByRole("button", { name: "Me" }).length).toBe(3);
+  });
+
+  // `PARTIES` is ["me","supplier"], so mapping it in array order silently reversed every pair.
+  it("puts Supplier before Me in every pair", async () => {
+    await card();
+    for (const label of ["DELIVERY TO SITE", "RETURN FROM SITE", "FUEL PAID BY"]) {
+      const field = screen.getByText(label).closest("div")!.parentElement!;
+      const names = within(field)
+        .getAllByRole("button")
+        .map((b) => b.textContent!.trim());
+      expect(names).toEqual(["Supplier", "Me"]);
+    }
+  });
+
+  // All three sit on ONE row: the two haulage legs share a box, fuel has its own beside it.
+  it("keeps all three choices on one row", async () => {
+    const { view } = await card();
+    const row = view.container.querySelector('[class*="2fr_1fr"]');
+    expect(row).toBeTruthy();
+    for (const label of ["DELIVERY TO SITE", "RETURN FROM SITE", "FUEL PAID BY"]) {
+      expect(row!.contains(screen.getByText(label))).toBe(true);
+    }
+  });
+});
+
+describe("an item the marketplace cannot supply (MREQ-AC-24)", () => {
+  it("shows the red panel and hands off to support without dropping the row", async () => {
+    const open = vi.fn();
+    vi.stubGlobal("open", open);
+    const handle = await card({
+      draft: makeAgentDraft({ items: [makeItem({ verdict: "no-match", rawLabel: "40 ton wheel digger" })] }),
+    });
+
+    expect(screen.getByText(/isn't available from suppliers right now/)).toBeTruthy();
+    // The taxonomy controls are replaced, not merely annotated.
+    expect(screen.queryByText("TYPE")).toBeNull();
+
+    await handle.run(() => {
+      screen.getByText(/^Message us$/).closest("button")!.click();
+    });
+
+    expect(open).toHaveBeenCalledOnce();
+    expect(String(open.mock.calls[0][0])).toContain("wa.me");
+    const item = handle.store().state.draft!.items[0];
+    expect(item.sourcingRequested).toBe(true);
+    expect(item.removed).toBe(false); // the row stays visible
+    expect(screen.getByText(/We're looking for this one/)).toBeTruthy();
+  });
+});
+
+/**
+ * MREQ — which way a dropdown opens.
+ *
+ * jsdom has no layout engine, so `getBoundingClientRect` returns zeros and every control looks like
+ * it has the whole viewport beneath it. The geometry is stubbed here to exercise the decision, which
+ * is the only part that can be tested without a renderer — that the list actually lands on screen is
+ * a thing only a real browser can confirm.
+ */
+describe("the option list opens where it can be read", () => {
+  const atViewportY = (top: number) => {
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      top,
+      bottom: top + 34,
+      left: 0,
+      right: 120,
+      width: 120,
+      height: 34,
+      x: 0,
+      y: top,
+      toJSON: () => ({}),
+    } as DOMRect);
+  };
+
+  /* The list is a PORTAL on `document.body` since 2026-09-01 — an absolute list was clipped by the
+     nearest scroll box, and half this app's lists live in one. So the direction is no longer a
+     Tailwind class on a relative box; it is a `top` in viewport pixels, which is what these read.
+     The control is stubbed at y=700 with a height of 34, so `bottom` is 734. */
+  const topOf = (listbox: HTMLElement) => Number.parseFloat(listbox.parentElement!.style.top);
+
+  it("opens upward when the control sits near the bottom of the viewport", async () => {
+    // 768-tall jsdom viewport; a control at 700 has ~34px below it and 700 above.
+    atViewportY(700);
+    const handle = await card();
+    const listbox = await open(handle, "Minimum year");
+    // Above the trigger's own top edge, never below its bottom.
+    expect(topOf(listbox)).toBeLessThan(700);
+  });
+
+  it("opens downward when there is room", async () => {
+    atViewportY(80);
+    const handle = await card();
+    const listbox = await open(handle, "Minimum year");
+    // Just under the trigger's bottom edge (80 + 34 + a 4px gap).
+    expect(topOf(listbox)).toBe(118);
+  });
+
+  // A cramped viewport must not send the list somewhere even worse than below.
+  it("stays downward when neither side has room", async () => {
+    atViewportY(20);
+    const handle = await card();
+    const listbox = await open(handle, "Minimum year");
+    expect(topOf(listbox)).toBe(58);
+  });
+});
+
+describe("the whole machine is visible, and the zoom only eats the margin", () => {
+  /**
+   * Owner, 2026-09-15: *"the equipment in the machine panel are so zoomed in that make the equipment
+   * not all appear"*.
+   *
+   * 🔴 **`object-cover` was wrong here, and the measurement that chose it was taken in the WRONG
+   * BOX.** It was judged on a 585x450 probe; the panel is **366x450**. At 585 the crop is 29% and
+   * the machine survives; at 366 it is **39%** and the bucket and the counterweight are both cut.
+   * A later `scale-[1.18]` on top of `cover` took it to ~48%.
+   *
+   * 🔴 **Re-measured at the real 366x450**, on the live asset, four fits side by side:
+   *   · `contain`           whole machine, 177px of band
+   *   · `contain` x1.2      whole machine, 122px of band   ← ships
+   *   · `contain` x1.3      whole machine, 95px, nothing to spare
+   *   · `contain` x1.4/1.5  the counterweight clips
+   *   · `cover` (x1.65)     bucket and counterweight both gone
+   * 1.3 is the ceiling for THIS render, so 1.2 leaves headroom for a machine drawn wider.
+   *
+   * ⚠️ The band is what a 1.34 landscape costs in a 0.81 portrait box. No CSS removes it: `cover`,
+   * `contain` and `scale` all clip from the same source ratio and only move WHERE the loss lands.
+   * The real fix is a square master — recorded in the change log, not achievable here.
+   */
+  const SRC = readFileSync("src/components/create/MachineCard.tsx", "utf8");
+  const code = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const at = code.indexOf("absolute inset-0 h-full w-full");
+  const panelImg = code.slice(at - 260, at + 80);
+
+  it("the panel photo is CONTAINED, so nothing of the machine is thrown away", () => {
+    expect(panelImg).toContain("object-contain");
+    expect(panelImg).not.toContain("object-cover");
+  });
+
+  it("and the zoom stays at or under the measured ceiling of 1.3", () => {
+    const m = panelImg.match(/scale-\[([\d.]+)\]/);
+    expect(m).toBeTruthy();
+    expect(Number(m![1])).toBeLessThanOrEqual(1.3);
+    expect(Number(m![1])).toBeGreaterThan(1);
+  });
+
+  it("the zoom is only safe because the panel CLIPS", () => {
+    // Without `overflow-hidden` the scaled photo spills over the four chips on the corners.
+    const pAt = code.indexOf('pin("machine-card-image")');
+    expect(code.slice(pAt, pAt + 240)).toMatch(/overflow-hidden/);
+  });
+
+  it("Given a real photograph, Then the panel is painted the photograph's OWN ground", () => {
+    /**
+     * Owner, 2026-09-20: *"why the image doesnt exist for margins and padding, keep it 100% fit"*.
+     *
+     * 🔴 The image was there; what he was reading as its absence was the LETTERBOX — this panel's
+     * `surface2` showing through under the picture, with two of the four chips sitting on it. The
+     * band above is unfixable by any fit and this does not try: it paints the unfilled part the
+     * beige these renders are shot on, so there is no band left to look at.
+     *
+     * ⚠️ MEASURED off the assets — twelve samples across `crawler-excavator` and `wheel-loader`,
+     * decoded pixel by pixel, all within 4/255 of #e3ded7 — and therefore a fact about that render
+     * batch rather than a colour of ours. It lives in `globals.css` with that note.
+     */
+    const pAt = code.indexOf('pin("machine-card-image")');
+    const panel = code.slice(pAt, pAt + 260);
+    expect(panel).toContain("bg-photo-ground");
+    // 🔴 Only under a real photograph: behind the glyph fallback a beige panel with a grey drawing
+    // on it reads as a picture that failed to load, which is the state it would be imitating.
+    expect(panel).toContain('photo && !photoBroken ? "bg-photo-ground" : "bg-surface2"');
+  });
+
+  it("Given the ground colour, Then it is a TOKEN and the stylesheet carries the measurement", () => {
+    // `palette-drift` forbids a raw hex in a component, and a colour `:root` defines that `@theme`
+    // does not is a colour half the app cannot reach — so both halves are asserted.
+    const css = readFileSync("src/app/globals.css", "utf8");
+    expect(css).toContain("--photo-ground: #e3ded7;");
+    expect(css).toContain("--color-photo-ground: var(--photo-ground);");
+    expect(SRC).not.toContain("#e3ded7");
+  });
+
+  it("Given the ROW thumbnail, Then it is contained too, at its own size", () => {
+    const rowAt = code.indexOf("h-full w-full object-contain p-0.5");
+    expect(rowAt).toBeGreaterThan(0);
+    expect(code.slice(rowAt - 200, rowAt + 40)).not.toContain("absolute inset-0");
+  });
+
+  it("Given the panel, Then it matches the column beside it - between a floor and a CEILING", () => {
+    /**
+     * Two owner rulings meet on that one line, hours apart, and neither is wrong:
+     *  · *"keep it fixed at its card height"* - the catalogue panel adds ~300px to the right column
+     *    and a stretched photograph followed it to 800.
+     *  · *"make the equipment image card same height as its neighbour card"* - at a flat 450 it
+     *    ended short of an ordinary fields column and left a gap under it.
+     * ⚠️ The ceiling also bounds the BAND: the taller the panel, the more empty ground a 1.34
+     * picture leaves above and below it.
+     */
+    expect(code).toContain("min-h-[450px]");
+    expect(code).toContain("max-h-[640px]");
+    expect(code).toContain("items-stretch");
+    const pAt = code.indexOf('pin("machine-card-image")');
+    expect(code.slice(pAt, pAt + 240)).not.toMatch(/h-full/);
+  });
+});
+
+/**
+ * 🔴 **Nothing on this card may refuse to wrap at PHONE width** (owner, 2026-09-23, with a
+ * photograph of staging on his handset: the «In our catalogue» pill and the right borders of TYPE
+ * and SIZE cut off by the screen's edge).
+ *
+ * The equipment-name LABEL carried an unconditional `whitespace-nowrap`. Measured against the
+ * compiled stylesheet: it runs **328px** and cannot shrink, so with the pill beside it the card's
+ * min-content is **356px inside a 328px box** and the DOCUMENT overflows by 13px at a 360 viewport
+ * - which drags the header, the tabs and every panel sideways with it.
+ *
+ * ⚠️ **The one-line rule survives from `sm` up**, which is the 2026-09-14 ruling it came from
+ * (*"the pill dropping under the label put a third row into a block meant to read as a single
+ * field"*). That was right about the card he was looking at - a desktop one. Below `sm` the
+ * alternative is not a third row, it is the card leaving the screen.
+ *
+ * ⚠️ jsdom lays nothing out, so this reads the RULE rather than the width. The 13px is a
+ * measured fact recorded in the comment, not something a unit test can re-derive.
+ */
+describe("the card fits a phone", () => {
+  const SRC = readFileSync("src/components/create/MachineCard.tsx", "utf8");
+  /* Comments stripped: the note above the label NAMES the class it removed, so a bare sweep would
+     fail on its own explanation - the tenth time this repo has recorded that. */
+  const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+
+  it("lets the equipment-name label wrap below sm, and holds one line above it", () => {
+    expect(CODE).toContain('className="inline-flex items-center gap-2 align-middle sm:whitespace-nowrap"');
+    expect(CODE).not.toContain('className="inline-flex items-center gap-2 whitespace-nowrap align-middle"');
+  });
+
+  /* A nowrap run is only safe when it cannot outgrow its box: a short fixed string, or one with
+     `truncate` beside it so it clips instead of pushing. Every other one on this card is one of
+     those, and this case is what says so the next time one is added. */
+  it("leaves no unguarded nowrap on a run that can grow", () => {
+    for (const m of CODE.matchAll(/className=\{?["`][^"`]*whitespace-nowrap[^"`]*["`]/g)) {
+      const cls = m[0];
+      const guarded = cls.includes("sm:whitespace-nowrap") || cls.includes("truncate") || cls.includes("text-subhead");
+      expect(guarded, `unguarded nowrap: ${cls}`).toBe(true);
+    }
+  });
+});

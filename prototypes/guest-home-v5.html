@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<title>Guest Home — Moedatech</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap"
+  rel="stylesheet"
+/>
+
+<!--
+  Moedatech — GUEST HOME · v5 (layout pass)
+
+  On the system, not beside it. DESIGN.md is binding, so this prototype takes its
+  values: the navy ramp, the six-step type scale, radii 8/10/14, control heights
+  30/34/44, the 4px spacing grid, colour-only hover — and NO SHADOWS anywhere;
+  separation is border, surface step and scrim.
+
+  Layout thesis
+    Primary path  — say what the site needs, send it. The field is the loudest
+                    object on the page and the only orange one.
+    Secondary     — browse the market. Its heading and first card row sit inside
+                    the first viewport, so a guest with no request still has one.
+    Grouping      — 4/8px inside a group, 12px between related groups, 32/40px
+                    between blocks. Tight where things belong together, generous
+                    where they do not.
+    Removed       — the eyebrow chip above the headline. The AI disclosure it
+                    carried moved onto the field's own header row, where it is
+                    read at the moment it matters.
+-->
+
+<style>
+  :root{
+    /* navy ramp — globals.css */
+    --navy-deep:#16263f; --navy:#1c3550; --navy-mid:#2a4f72;
+    --muted-dark:#5a6b82; --muted:#6b8fa8; --muted-light:#9aa7b8;
+    --border-strong:#c3d2e0; --border:#d4e0ec;
+    --surface3:#e4edf5; --surface2:#eff4f9; --background:#f5f8fc; --surface:#ffffff;
+
+    /* brand */
+    --brand:#f79009; --brand-hover:#e58108; --brand-press:#cc7207;
+    --brand-deep:#b45309; --brand-pale:#fde8cc; --brand-soft:#fff4e5;
+
+    /* status */
+    --ok:#1daf58; --ok-soft:#e7f7ee; --ok-deep:#15803d;
+
+    /* type — the six steps, plus hero for display copy */
+    --t-label:11px; --t-meta:12.5px; --t-body:13px; --t-subhead:15px;
+    --t-title:17px; --t-display:22px; --t-hero:32px;
+
+    --r-sm:8px; --r-md:10px; --r-lg:14px; --r-full:999px;
+    --c-sm:30px; --c-md:34px; --c-lg:44px;
+    --t:150ms cubic-bezier(.32,.72,.24,1);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--background);color:var(--navy);
+    font-family:"Nunito",-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-size:var(--t-body);line-height:1.5;-webkit-font-smoothing:antialiased}
+  [dir="rtl"] body{font-family:"IBM Plex Sans Arabic","Nunito",sans-serif}
+  body.locked{overflow:hidden}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3,h4,h5{margin:0;line-height:1.2;font-weight:800;letter-spacing:-.02em}
+  p{margin:0}
+  ::selection{background:var(--brand-pale);color:var(--navy)}
+  .icon{font-family:"Material Symbols Rounded";line-height:1;display:inline-block;direction:ltr;
+    -webkit-font-feature-settings:"liga";user-select:none;font-variation-settings:"opsz" 24,"wght" 400,"FILL" 0}
+  .mono{font-family:"IBM Plex Mono",monospace}
+  :focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){ *,*::before,*::after{transition:none !important} html{scroll-behavior:auto} }
+
+  .wrap{max-width:1360px;margin:0 auto;padding:0 16px}
+  @media (min-width:640px){ .wrap{padding:0 24px} }
+  @media (min-width:1024px){ .wrap{padding:0 32px} }
+
+  /* ── top bar — the app's own shell ──────────────────────────────────────── */
+  .appbar{position:sticky;top:0;z-index:40;height:62px;background:var(--navy);color:#fff;
+    border-bottom:1px solid rgba(255,255,255,.12);display:flex;align-items:center;padding:0 16px}
+  @media (min-width:640px){ .appbar{padding:0 24px} }
+  @media (min-width:1024px){ .appbar{padding:0 32px} }
+  .wordmark{display:flex;align-items:center;gap:8px;font-weight:800;font-size:var(--t-title);letter-spacing:-.02em}
+  .wordmark .m{width:var(--c-sm);height:var(--c-sm);border-radius:var(--r-sm);background:#fff;color:var(--navy);
+    display:grid;place-items:center;font-size:var(--t-title)}
+  .navslot{position:absolute;inset-inline:0;display:none;justify-content:center;pointer-events:none}
+  @media (min-width:1024px){ .navslot{display:flex} }
+  .navslot ul{pointer-events:auto;display:flex;gap:4px;list-style:none;margin:0;padding:0}
+  .navtab{display:inline-flex;align-items:center;height:var(--c-md);border-radius:var(--r-full);
+    padding:0 16px;font-size:var(--t-body);font-weight:600;color:rgba(255,255,255,.72);
+    transition:background var(--t),color var(--t)}
+  .navtab:hover{background:rgba(255,255,255,.1);color:#fff}
+  .navtab[aria-current="page"]{background:#fff;color:var(--navy);font-weight:800}
+  .barright{margin-inline-start:auto;display:flex;align-items:center;gap:12px;z-index:1}
+  .loc{display:inline-flex;align-items:center;gap:6px;height:var(--c-sm);border-radius:var(--r-full);
+    border:1px solid rgba(255,255,255,.28);padding:0 12px;font-size:var(--t-meta);font-weight:600;color:#fff;
+    transition:background var(--t)}
+  .loc:hover{background:rgba(255,255,255,.1)}
+  .loc .icon{font-size:var(--t-subhead)}
+  .signin{display:inline-flex;align-items:center;gap:6px;height:var(--c-md);background:var(--brand);color:#fff;
+    border-radius:var(--r-full);padding:0 16px;font-size:var(--t-body);font-weight:800;transition:background var(--t)}
+  .signin:hover{background:var(--brand-hover)}
+  .signin:active{background:var(--brand-press)}
+  .signin .icon{font-size:var(--t-subhead)}
+
+  /* ── 1 · the request field ──────────────────────────────────────────────── */
+  .agent{padding:24px 0 32px;display:flex;flex-direction:column;align-items:center;text-align:center}
+  .agent h1{font-size:var(--t-hero);max-width:24ch;text-wrap:balance}
+  .agent .sub{margin-top:8px;color:var(--muted-dark);font-size:var(--t-subhead);max-width:60ch;text-wrap:balance}
+
+  .askwrap{width:100%;max-width:840px;margin-top:24px;text-align:start}
+  .askhead{display:flex;align-items:baseline;gap:12px;margin-bottom:4px}
+  .askhead label{font-size:var(--t-body);font-weight:800}
+  .askhead .ai{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-label);
+    font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-deep)}
+  .askhead .ai .icon{font-size:var(--t-subhead);color:var(--brand)}
+  .askhint{display:block;font-size:var(--t-meta);color:var(--muted);margin-bottom:8px}
+
+  .box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);transition:border-color var(--t)}
+  .box:hover{border-color:var(--border-strong)}
+  .box:focus-within{border-color:var(--brand)}
+  .box textarea{display:block;width:100%;border:0;outline:0;resize:none;background:none;font:inherit;
+    font-size:var(--t-subhead);color:var(--navy);padding:14px 16px 4px;min-height:52px}
+  .box textarea::placeholder{color:var(--muted-light)}
+  .boxbar{display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
+  .tool{display:inline-flex;align-items:center;gap:6px;height:var(--c-md);border-radius:var(--r-md);
+    padding:0 12px;font-size:var(--t-body);font-weight:600;color:var(--navy-mid);border:1px solid var(--border);
+    transition:background var(--t),border-color var(--t)}
+  .tool:hover{background:var(--surface2);border-color:var(--border-strong)}
+  .tool:active{background:var(--surface3)}
+  .tool .icon{font-size:var(--t-subhead)}
+  .boxbar .spacer{flex:1}
+  .send{display:inline-flex;align-items:center;gap:8px;height:var(--c-lg);background:var(--brand);color:#fff;
+    border-radius:var(--r-full);padding:0 24px;font-size:var(--t-body);font-weight:800;transition:background var(--t)}
+  .send:hover{background:var(--brand-hover)}
+  .send:active{background:var(--brand-press)}
+  .send .icon{font-size:var(--t-subhead)}
+  [dir="rtl"] .send .icon{transform:scaleX(-1)}
+
+  .examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .ex{height:var(--c-sm);border-radius:var(--r-full);padding:0 12px;font-size:var(--t-meta);font-weight:600;
+    color:var(--navy-mid);background:var(--surface);border:1px solid var(--border);
+    transition:background var(--t),border-color var(--t)}
+  .ex:hover{background:var(--surface2);border-color:var(--border-strong)}
+
+  .proof{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 20px;margin-top:16px;
+    color:var(--muted);font-size:var(--t-meta)}
+  .proof span{display:inline-flex;align-items:center;gap:6px}
+  .proof .icon{font-size:var(--t-subhead);color:var(--ok)}
+
+  /* ── 2 · the market ─────────────────────────────────────────────────────── */
+  .suppliers{padding:24px 0 40px;border-top:1px solid var(--border)}
+  .sechead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .sechead h2{font-size:var(--t-display)}
+  .sechead .count{color:var(--muted);font-size:var(--t-meta)}
+
+  .chiprow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .chip{height:var(--c-sm);border-radius:var(--r-full);padding:0 14px;font-size:var(--t-meta);font-weight:600;
+    color:var(--navy-mid);background:var(--surface);border:1px solid var(--border);
+    transition:background var(--t),border-color var(--t),color var(--t)}
+  .chip:hover{background:var(--surface2);border-color:var(--border-strong)}
+  .chip[aria-pressed="true"]{background:var(--brand-soft);border-color:var(--brand);color:var(--brand-deep)}
+  .chip.more{border-style:dashed;color:var(--muted)}
+
+  .grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:20px 16px}
+  .card{display:flex;flex-direction:column;text-align:start;background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;
+    transition:border-color var(--t),background var(--t)}
+  .card:hover{border-color:var(--border-strong);background:var(--surface2)}
+  .card:active{background:var(--surface3)}
+  .shot{aspect-ratio:2/1;background:var(--surface3);display:grid;place-items:center;position:relative}
+  .shot .glyph{font-size:40px;color:var(--muted-light);transition:color var(--t)}
+  .card:hover .shot .glyph{color:var(--muted)}
+  .shot .floor{position:absolute;inset-inline:24%;bottom:14%;height:6px;border-radius:var(--r-full);
+    background:var(--border-strong);opacity:.5}
+  .badge{position:absolute;top:8px;inset-inline-start:8px;display:inline-flex;align-items:center;gap:4px;
+    background:var(--ok-soft);color:var(--ok-deep);border-radius:var(--r-full);padding:2px 8px;
+    font-size:var(--t-label);font-weight:800}
+  .badge .icon{font-size:var(--t-body)}
+  .info{padding:12px}
+  .info h3,.info .meta,.info .price{display:block}
+  .info h3{font-size:var(--t-subhead);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .info .meta{color:var(--muted);font-size:var(--t-meta);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .info .price{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:var(--t-meta);color:var(--muted)}
+  .info .price b{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:var(--t-subhead);
+    color:var(--navy);font-variant-numeric:tabular-nums}
+
+  .pager{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:24px}
+  .pager .n{font-size:var(--t-meta);color:var(--muted);min-width:8ch;text-align:center;font-variant-numeric:tabular-nums}
+  .pager button{width:var(--c-lg);height:var(--c-lg);border-radius:var(--r-full);border:1px solid var(--border);
+    background:var(--surface);display:grid;place-items:center;color:var(--navy);
+    transition:background var(--t),border-color var(--t)}
+  .pager button:hover:not(:disabled){background:var(--surface2);border-color:var(--border-strong)}
+  .pager button:disabled{background:var(--surface2);border-color:var(--border);color:var(--muted-light);cursor:not-allowed}
+  .pager .icon{font-size:var(--t-display)}
+  [dir="rtl"] .pager .icon{transform:scaleX(-1)}
+
+  /* ── store sheet ────────────────────────────────────────────────────────── */
+  .veil{position:fixed;inset:0;background:color-mix(in srgb,var(--navy-deep) 55%,transparent);z-index:60;
+    opacity:0;pointer-events:none;transition:opacity var(--t)}
+  .veil.on{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;inset:24px;max-width:1080px;margin:0 auto;background:var(--background);
+    border:1px solid var(--border);border-radius:var(--r-lg);z-index:61;overflow:hidden auto;
+    opacity:0;pointer-events:none;transition:opacity var(--t)}
+  .sheet.on{opacity:1;pointer-events:auto}
+  .sheetbar{position:sticky;top:0;z-index:5;height:56px;background:var(--navy);color:#fff;display:flex;
+    align-items:center;gap:12px;padding:0 12px}
+  .round{width:var(--c-md);height:var(--c-md);border-radius:var(--r-full);border:1px solid rgba(255,255,255,.28);
+    display:grid;place-items:center;color:#fff;transition:background var(--t)}
+  .round:hover{background:rgba(255,255,255,.12)}
+  .round .icon{font-size:var(--t-display)}
+  [dir="rtl"] .round.back .icon{transform:scaleX(-1)}
+  .sheetbar h2{font-size:var(--t-subhead);font-weight:800}
+  .sheetbar .spacer{flex:1}
+
+  .shead{padding:24px 24px 0;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .slogo{width:56px;height:56px;border-radius:var(--r-md);background:var(--surface);border:1px solid var(--border);
+    display:grid;place-items:center;font-size:var(--t-display);font-weight:800;flex:none}
+  .shead h3{font-size:var(--t-display)}
+  .shead .meta{display:flex;flex-wrap:wrap;gap:16px;margin-top:4px;color:var(--muted);font-size:var(--t-meta)}
+  .shead .meta span{display:inline-flex;align-items:center;gap:4px}
+  .shead .meta .icon{font-size:var(--t-subhead);color:var(--muted-light)}
+  .shead .meta .ver{color:var(--ok-deep)}
+  .shead .meta .ver .icon{color:var(--ok)}
+
+  .sbody{padding:24px}
+  .sbody h4{font-size:var(--t-title);margin-bottom:12px}
+  .eqgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+  .eq{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;
+    transition:border-color var(--t)}
+  .eq:hover{border-color:var(--border-strong)}
+  .eqshot{aspect-ratio:3/2;background:var(--surface3);display:grid;place-items:center;position:relative}
+  .eqshot .glyph{font-size:36px;color:var(--muted-light)}
+  .eqshot .floor{position:absolute;inset-inline:24%;bottom:14%;height:6px;border-radius:var(--r-full);
+    background:var(--border-strong);opacity:.5}
+  .eqinfo{padding:12px}
+  .eqinfo h5{font-size:var(--t-subhead);font-weight:800}
+  .eqinfo .meta{color:var(--muted);font-size:var(--t-meta);margin-top:4px}
+  .eqinfo .price{margin-top:8px;font-size:var(--t-display);font-weight:800;font-variant-numeric:tabular-nums}
+  .eqinfo .price span{font-size:var(--t-meta);font-weight:600;color:var(--muted)}
+  .req{width:100%;height:var(--c-md);margin-top:12px;border-radius:var(--r-md);background:var(--brand);color:#fff;
+    font-size:var(--t-body);font-weight:800;transition:background var(--t)}
+  .req:hover{background:var(--brand-hover)}
+  .req:active{background:var(--brand-press)}
+
+  /* ── gate ───────────────────────────────────────────────────────────────── */
+  .gate{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:16px;opacity:0;
+    pointer-events:none;transition:opacity var(--t)}
+  .gate.on{opacity:1;pointer-events:auto}
+  .gate .bg{position:absolute;inset:0;background:color-mix(in srgb,var(--navy-deep) 60%,transparent)}
+  .gbox{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
+    max-width:420px;width:100%;padding:24px}
+  .gbox h2{font-size:var(--t-display);text-wrap:balance}
+  .gbox p{margin-top:8px;color:var(--muted-dark);font-size:var(--t-body)}
+  .gbox .acts{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:24px}
+  .gbox .acts button{height:var(--c-lg);border-radius:var(--r-md);padding:0 20px;font-size:var(--t-body);
+    font-weight:800;transition:background var(--t)}
+  .gbox .primary{background:var(--brand);color:#fff}
+  .gbox .primary:hover{background:var(--brand-hover)}
+  .gbox .ghost{border:1px solid var(--border);color:var(--navy)}
+  .gbox .ghost:hover{background:var(--surface2)}
+
+  .foot{padding:0 0 32px;color:var(--muted);font-size:var(--t-meta);text-align:center}
+
+  @media (max-width:1200px){ .grid{grid-template-columns:repeat(4,minmax(0,1fr))} }
+  @media (max-width:900px){ .grid{grid-template-columns:repeat(3,minmax(0,1fr))} .agent h1{font-size:var(--t-display)} }
+  @media (max-width:560px){
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px}
+    .agent{padding:24px 0 32px}
+    .loc span:not(.icon){display:none}
+    .sheet{inset:0;border-radius:0;border:0}
+    .shead,.sbody{padding-inline:16px}
+  }
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <a class="wordmark" href="#"><span class="m icon" aria-hidden="true">construction</span>moedatech</a>
+  <nav class="navslot" aria-label="Main"><ul>
+    <li><a class="navtab" href="#agent" aria-current="page" data-en="Rent" data-ar="استأجر">Rent</a></li>
+    <li><a class="navtab" href="#suppliers" data-en="Suppliers" data-ar="المؤجّرون">Suppliers</a></li>
+    <li><a class="navtab" href="#suppliers" data-en="How it works" data-ar="كيف تعمل">How it works</a></li>
+  </ul></nav>
+  <div class="barright">
+    <button class="loc" onclick="setLang(lang === 'en' ? 'ar' : 'en')" id="locbtn">
+      <span class="icon" aria-hidden="true">language</span><span id="loclabel">English</span>
+    </button>
+    <button class="signin" onclick="gate('signin')">
+      <span class="icon" aria-hidden="true">login</span><span data-en="Sign in" data-ar="تسجيل الدخول">Sign in</span>
+    </button>
+  </div>
+</header>
+
+<section class="wrap agent" id="agent">
+  <h1 data-en="Tell us what your site needs" data-ar="أخبرنا بما يحتاجه موقعك">Tell us what your site needs</h1>
+  <p class="sub" data-en="It becomes a request every verified supplier can price. You review it before anything is sent." data-ar="يتحوّل إلى طلب يستطيع كل مؤجّر موثّق تسعيره. تراجعه قبل إرسال أي شيء.">It becomes a request every verified supplier can price. You review it before anything is sent.</p>
+
+  <div class="askwrap">
+    <div class="askhead">
+      <label for="ask" data-en="What do you need on site?" data-ar="ماذا تحتاج في الموقع؟">What do you need on site?</label>
+      <span class="ai"><span class="icon" aria-hidden="true">auto_awesome</span><span data-en="AI assistant" data-ar="مساعد ذكي">AI assistant</span></span>
+    </div>
+    <span class="askhint" id="askhint" data-en="Equipment, quantity, city and dates — plain words are fine." data-ar="المعدّة والكمية والمدينة والتواريخ — الكلام العادي كافٍ.">Equipment, quantity, city and dates — plain words are fine.</span>
+
+    <div class="box">
+      <textarea id="ask" rows="2" aria-describedby="askhint"
+        data-ph-en="Two 20-ton excavators with operators in Qiddiya, three months from 1 September"
+        data-ph-ar="حفّارتان ٢٠ طن مع مشغّلين في القدية، ثلاثة أشهر من ١ سبتمبر"
+        placeholder="Two 20-ton excavators with operators in Qiddiya, three months from 1 September"></textarea>
+      <div class="boxbar">
+        <button class="tool" onclick="gate('request')">
+          <span class="icon" aria-hidden="true">attach_file</span><span data-en="Attach file" data-ar="أرفق ملفاً">Attach file</span>
+        </button>
+        <span class="spacer"></span>
+        <button class="send" onclick="gate('request')">
+          <span data-en="Build my request" data-ar="ابنِ طلبي">Build my request</span>
+          <span class="icon" aria-hidden="true">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="examples" id="examples" role="group" aria-label="Examples"></div>
+  </div>
+
+  <p class="proof">
+    <span><span class="icon" aria-hidden="true">verified</span><span data-en="214 verified suppliers" data-ar="٢١٤ مؤجّراً موثّقاً">214 verified suppliers</span></span>
+    <span><span class="icon" aria-hidden="true">schedule</span><span data-en="First offers in about 36 hours" data-ar="أول العروض خلال ٣٦ ساعة تقريباً">First offers in about 36 hours</span></span>
+    <span><span class="icon" aria-hidden="true">payments</span><span data-en="Free to post — no card" data-ar="النشر مجاني — بدون بطاقة">Free to post — no card</span></span>
+  </p>
+</section>
+
+<main class="wrap suppliers" id="suppliers">
+  <div class="sechead">
+    <h2 id="listtitle"></h2>
+    <span class="count" id="listcount"></span>
+  </div>
+
+  <div class="chiprow" id="chips" role="group" aria-label="Equipment type"></div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="pager">
+    <button id="prev" onclick="page(-1)" aria-label="Previous page"><span class="icon" aria-hidden="true">chevron_left</span></button>
+    <span class="n mono" id="pagen"></span>
+    <button id="next" onclick="page(1)" aria-label="Next page"><span class="icon" aria-hidden="true">chevron_right</span></button>
+  </div>
+</main>
+
+<p class="foot" data-en="Moedatech · equipment rental marketplace" data-ar="معداتك · سوق تأجير المعدات">Moedatech · equipment rental marketplace</p>
+
+<div class="veil" id="veil" onclick="closeStore()"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheettitle"></div>
+
+<div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gtitle">
+  <div class="bg" onclick="closeGate()"></div>
+  <div class="gbox">
+    <h2 id="gtitle"></h2>
+    <p id="gbody"></p>
+    <div class="acts">
+      <button class="ghost" onclick="closeGate()" data-en="Not now" data-ar="ليس الآن">Not now</button>
+      <button class="primary" data-en="Create a free account" data-ar="أنشئ حساباً مجانياً">Create a free account</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var CATS = [
+  {k:"top",            en:"All suppliers",  ar:"كل المؤجّرين",     ic:"grid_view"},
+  {k:"excavators",     en:"Excavators",     ar:"حفّارات",          ic:"agriculture"},
+  {k:"mobile-cranes",  en:"Mobile cranes",  ar:"رافعات متحركة",    ic:"precision_manufacturing"},
+  {k:"telehandlers",   en:"Telehandlers",   ar:"مناولات تلسكوبية", ic:"forklift"},
+  {k:"generators",     en:"Generators",     ar:"مولّدات",          ic:"bolt"},
+  {k:"boom-lifts",     en:"Boom lifts",     ar:"مناولات أفراد",    ic:"elevator"},
+  {k:"forklifts",      en:"Forklifts",      ar:"رافعات شوكية",     ic:"pallet"},
+  {k:"wheel-loaders",  en:"Wheel loaders",  ar:"لوادر",            ic:"snowplow"},
+  {k:"bulldozers",     en:"Bulldozers",     ar:"بلدوزرات",         ic:"dozer"},
+  {k:"compressors",    en:"Compressors",    ar:"ضواغط",            ic:"air"},
+  {k:"scissor-lifts",  en:"Scissor lifts",  ar:"مقصّات رفع",       ic:"stairs"},
+  {k:"tippers",        en:"Tippers",        ar:"قلّابات",          ic:"local_shipping"},
+  {k:"water-trucks",   en:"Water trucks",   ar:"صهاريج ماء",       ic:"water_drop"},
+  {k:"concrete-pumps", en:"Concrete pumps", ar:"مضخات خرسانة",     ic:"foundation"}
+];
+var VISIBLE = 8;   /* the rest sit behind "+n more" — chips wrap, never clip */
+
+var SIZES = {
+  excavators:["1.5–3 t","5–8 t","13–15 t","20 t","30 t"], "mobile-cranes":["25 t","50 t","100 t","200 t"],
+  telehandlers:["6 m","14 m","17 m"], forklifts:["3 t","5 t","10 t"], "wheel-loaders":["1.5 m³","3 m³","5 m³"],
+  bulldozers:["D6","D8"], generators:["30 kVA","60 kVA","250 kVA","500 kVA"], compressors:["185 cfm","375 cfm","750 cfm"],
+  "boom-lifts":["16 m","28 m"], "scissor-lifts":["8 m","12 m"], tippers:["20 t","30 t"],
+  "water-trucks":["10,000 L","20,000 L"], "concrete-pumps":["36 m","Truck-mounted"]
+};
+var MAKES = {
+  excavators:[["Caterpillar","320D"],["Komatsu","PC210"],["Hitachi","ZX350"],["Volvo","EC300"],["JCB","JS205"],["Caterpillar","308"]],
+  "mobile-cranes":[["Liebherr","LTM 1100"],["Grove","GMK4100"],["Tadano","GT-550"],["XCMG","QY25K"]],
+  telehandlers:[["JCB","540-170"],["Manitou","MT 1440"],["Genie","GTH-1256"],["JLG","4017RS"]],
+  forklifts:[["Toyota","8FD30"],["Hyster","H5.0FT"],["Komatsu","FD100"],["Linde","H35D"]],
+  "wheel-loaders":[["Caterpillar","950 GC"],["Volvo","L120H"],["Komatsu","WA470"],["SDLG","L956F"]],
+  bulldozers:[["Caterpillar","D6"],["Komatsu","D85"],["Caterpillar","D8T"]],
+  generators:[["Caterpillar","C15"],["FG Wilson","P250"],["Perkins","2506"],["Cummins","C1000"]],
+  compressors:[["Atlas Copco","XAS 186"],["Ingersoll Rand","P375"],["Atlas Copco","XATS 750"]],
+  "boom-lifts":[["Genie","Z-45"],["JLG","800AJ"],["Haulotte","HA16"],["Genie","S-85"]],
+  "scissor-lifts":[["Genie","GS-2632"],["JLG","4045R"],["Skyjack","SJ3219"]],
+  tippers:[["Mercedes-Benz","Actros 3341"],["MAN","TGS 33.400"],["Isuzu","FVZ"]],
+  "water-trucks":[["Mercedes-Benz","Actros 2640"],["Isuzu","FVM"],["HOWO","ZZ1257"]],
+  "concrete-pumps":[["Putzmeister","M36-4"],["Schwing","S 36 X"],["Sany","SYG5230"]]
+};
+
+var STORES = [
+  {n:"Zahid Tractor", nAr:"زاهد تراكتور", city:"Riyadh", cityAr:"الرياض", ver:true, eq:210,
+   cats:{excavators:{n:48,p:8400},"wheel-loaders":{n:31,p:6900},bulldozers:{n:18,p:12400},telehandlers:{n:22,p:5600},generators:{n:26,p:3900},tippers:{n:35,p:4200}}},
+  {n:"Al-Rajhi Equipment", nAr:"الراجحي للمعدات", city:"Riyadh", cityAr:"الرياض", ver:true, eq:128,
+   cats:{"boom-lifts":{n:34,p:3400},"scissor-lifts":{n:29,p:2600},telehandlers:{n:19,p:5900},forklifts:{n:24,p:2900},generators:{n:22,p:4100}}},
+  {n:"United Rentals KSA", nAr:"يونايتد رنتلز", city:"Dammam", cityAr:"الدمام", ver:true, eq:96,
+   cats:{generators:{n:31,p:3600},compressors:{n:24,p:2200},"boom-lifts":{n:23,p:3800}}},
+  {n:"Bin Quraya", nAr:"بن قريّة", city:"Dhahran", cityAr:"الظهران", ver:true, eq:143,
+   cats:{"mobile-cranes":{n:26,p:38000},generators:{n:44,p:3400},"water-trucks":{n:21,p:5200},tippers:{n:29,p:4400}}},
+  {n:"Almajdouie Equipment", nAr:"المجدوعي للمعدات", city:"Jeddah", cityAr:"جدة", ver:true, eq:87,
+   cats:{"mobile-cranes":{n:22,p:41000},tippers:{n:19,p:4600},telehandlers:{n:14,p:6200}}},
+  {n:"Saudi Diesel", nAr:"الديزل السعودية", city:"Dammam", cityAr:"الدمام", ver:true, eq:174,
+   cats:{generators:{n:68,p:3200},compressors:{n:41,p:2100},"water-trucks":{n:16,p:5750}}},
+  {n:"Nesma Rental", nAr:"نسما للتأجير", city:"Jeddah", cityAr:"جدة", ver:true, eq:118,
+   cats:{excavators:{n:39,p:8900},"wheel-loaders":{n:24,p:7200},bulldozers:{n:16,p:13100},tippers:{n:22,p:4300}}},
+  {n:"Arabian Machinery", nAr:"الآلات العربية", city:"Riyadh", cityAr:"الرياض", ver:true, eq:73,
+   cats:{excavators:{n:21,p:4200},"concrete-pumps":{n:12,p:14800},generators:{n:14,p:3800}}},
+  {n:"Tawazun Equipment", nAr:"توازن للمعدات", city:"Riyadh", cityAr:"الرياض", ver:true, eq:88,
+   cats:{"scissor-lifts":{n:26,p:2400},"boom-lifts":{n:19,p:3600},forklifts:{n:28,p:2700},telehandlers:{n:15,p:5800}}},
+  {n:"Rawabi Rentals", nAr:"روابي للتأجير", city:"Riyadh", cityAr:"الرياض", ver:false, eq:52,
+   cats:{"scissor-lifts":{n:18,p:2300},"boom-lifts":{n:14,p:3300},generators:{n:8,p:4300}}},
+  {n:"Gulf Lifting", nAr:"الخليج للرفع", city:"Dammam", cityAr:"الدمام", ver:false, eq:41,
+   cats:{"mobile-cranes":{n:14,p:36500},telehandlers:{n:16,p:5400},forklifts:{n:11,p:3100}}},
+  {n:"Al Sulaiman Equipment", nAr:"السليمان للمعدات", city:"Riyadh", cityAr:"الرياض", ver:false, eq:64,
+   cats:{"water-trucks":{n:22,p:5100},tippers:{n:26,p:4100}}},
+  {n:"Riyadh Plant Services", nAr:"خدمات معدات الرياض", city:"Riyadh", cityAr:"الرياض", ver:true, eq:69,
+   cats:{"concrete-pumps":{n:19,p:15600},generators:{n:12,p:4000}}},
+  {n:"Hejaz Earthmovers", nAr:"معدات الحجاز", city:"Jeddah", cityAr:"جدة", ver:true, eq:102,
+   cats:{bulldozers:{n:21,p:12800},"wheel-loaders":{n:28,p:7100},excavators:{n:33,p:8700},tippers:{n:20,p:4500}}},
+  {n:"Qassim Equipment", nAr:"معدات القصيم", city:"Buraydah", cityAr:"بريدة", ver:false, eq:47,
+   cats:{excavators:{n:14,p:7800},"wheel-loaders":{n:12,p:6400},generators:{n:11,p:3700}}},
+  {n:"Yanbu Industrial", nAr:"ينبع الصناعية", city:"Yanbu", cityAr:"ينبع", ver:true, eq:81,
+   cats:{compressors:{n:26,p:2300},generators:{n:29,p:3500},"boom-lifts":{n:15,p:3900}}},
+  {n:"Madinah Access", nAr:"المدينة لمعدات الوصول", city:"Madinah", cityAr:"المدينة", ver:true, eq:58,
+   cats:{"scissor-lifts":{n:21,p:2500},"boom-lifts":{n:17,p:3500},forklifts:{n:12,p:2800}}},
+  {n:"Neom Plant Partners", nAr:"شركاء معدات نيوم", city:"Tabuk", cityAr:"تبوك", ver:true, eq:134,
+   cats:{excavators:{n:30,p:9200},generators:{n:38,p:3800},"water-trucks":{n:24,p:5400},tippers:{n:27,p:4700}}}
+];
+
+var EXAMPLES = [
+  {en:"2 excavators 20t · Qiddiya · 3 months", ar:"حفّارتان ٢٠ طن · القدية · ٣ أشهر"},
+  {en:"250 kVA generator · Dhahran · 6 weeks", ar:"مولّد ٢٥٠ ك.ف.أ · الظهران · ٦ أسابيع"},
+  {en:"Mobile crane 100t · one lift day", ar:"رافعة ١٠٠ طن · يوم رفع واحد"}
+];
+
+var lang = "en", cat = "top", pageIndex = 0, PER = 12, showAllChips = false, open = null, sheetCat = null;
+function L(en, ar){ return lang === "ar" ? ar : en; }
+function money(n){ return n.toLocaleString("en-US"); }
+function icOf(k){ var c = CATS.filter(function(x){ return x.k === k; })[0]; return c ? c.ic : "construction"; }
+function catName(k){ var c = CATS.filter(function(x){ return x.k === k; })[0]; return c ? L(c.en, c.ar) : k; }
+
+/* ── the agent ───────────────────────────────────────────────────────────── */
+function renderExamples(){
+  document.getElementById("examples").innerHTML = EXAMPLES.map(function(e){
+    return '<button class="ex" type="button" onclick="fill(this)">' + L(e.en, e.ar) + '</button>';
+  }).join("");
+}
+function fill(el){
+  var t = document.getElementById("ask");
+  t.value = el.textContent.trim();
+  t.focus();
+}
+
+/* ── chips: wrap, with a +n disclosure — never a clipped row ─────────────── */
+function renderChips(){
+  var shown = showAllChips ? CATS : CATS.slice(0, VISIBLE);
+  var html = shown.map(function(c){
+    return '<button class="chip" type="button" aria-pressed="' + (cat === c.k) + '" onclick="pickCat(\'' + c.k + '\')">'
+      + L(c.en, c.ar) + '</button>';
+  }).join("");
+  var rest = CATS.length - VISIBLE;
+  if (rest > 0){
+    html += '<button class="chip more" type="button" onclick="toggleChips()">'
+      + (showAllChips ? L("Show less", "عرض أقل") : "+" + rest + " " + L("more", "أخرى")) + '</button>';
+  }
+  document.getElementById("chips").innerHTML = html;
+}
+function toggleChips(){ showAllChips = !showAllChips; renderChips(); }
+function pickCat(k){ cat = k; pageIndex = 0; renderChips(); renderGrid(); }
+
+/* ── the grid ────────────────────────────────────────────────────────────── */
+function listFor(k){
+  if (k === "top") return STORES.slice();
+  return STORES.filter(function(s){ return s.cats[k]; }).sort(function(a, b){ return b.cats[k].n - a.cats[k].n; });
+}
+function biggest(s){
+  var keys = Object.keys(s.cats);
+  return keys.reduce(function(m, x){ return s.cats[x].n > s.cats[m].n ? x : m; }, keys[0]);
+}
+function cheapest(s){
+  var keys = Object.keys(s.cats);
+  return keys.reduce(function(m, x){ return s.cats[x].p < s.cats[m].p ? x : m; }, keys[0]);
+}
+
+function renderGrid(){
+  var list = listFor(cat), pages = Math.max(1, Math.ceil(list.length / PER));
+  if (pageIndex >= pages) pageIndex = 0;
+  var from = pageIndex * PER;
+
+  document.getElementById("grid").innerHTML = list.slice(from, from + PER).map(function(s){
+    var k = cat === "top" ? null : cat;
+    var meta = k ? s.cats[k].n + " " + catName(k).toLowerCase() + " · " + L(s.city, s.cityAr)
+                 : s.eq + " " + L("machines", "معدّة") + " · " + L(s.city, s.cityAr);
+    var p = k ? s.cats[k].p : s.cats[cheapest(s)].p;
+    return '<button class="card" type="button" onclick="showStore(' + STORES.indexOf(s) + ')">'
+      + '<span class="shot"><span class="glyph icon" aria-hidden="true">' + icOf(k || biggest(s)) + '</span>'
+      +   '<span class="floor"></span>'
+      +   (s.ver ? '<span class="badge"><span class="icon" aria-hidden="true">verified</span>' + L("Verified", "موثّق") + '</span>' : '')
+      + '</span>'
+      + '<span class="info"><h3>' + L(s.n, s.nAr) + '</h3>'
+      +   '<span class="meta">' + meta + '</span>'
+      +   '<span class="price">' + L("from", "من") + ' <b>' + money(p) + '</b> SAR / ' + L("month", "شهر") + '</span>'
+      + '</span></button>';
+  }).join("");
+
+  document.getElementById("listtitle").textContent = cat === "top"
+    ? L("Suppliers", "المؤجّرون") : L(catName(cat) + " suppliers", "مؤجّرو " + catName(cat));
+  document.getElementById("listcount").textContent = list.length + " " + L("stores", "متجراً");
+  document.getElementById("pagen").textContent = (pageIndex + 1) + " / " + pages;
+  document.getElementById("prev").disabled = pageIndex === 0;
+  document.getElementById("next").disabled = pageIndex >= pages - 1;
+}
+
+function page(d){
+  var pages = Math.max(1, Math.ceil(listFor(cat).length / PER));
+  pageIndex = Math.min(Math.max(0, pageIndex + d), pages - 1);
+  renderGrid();
+  document.getElementById("suppliers").scrollIntoView({ block:"start" });
+}
+
+/* ── store sheet ─────────────────────────────────────────────────────────── */
+function showStore(i){
+  open = i;
+  var s = STORES[i];
+  sheetCat = (cat !== "top" && s.cats[cat]) ? cat : Object.keys(s.cats)[0];
+  renderSheet();
+  document.getElementById("veil").classList.add("on");
+  document.getElementById("sheet").classList.add("on");
+  document.body.classList.add("locked");
+  var back = document.querySelector("#sheet .round");
+  if (back) back.focus();
+}
+function closeStore(){
+  open = null;
+  document.getElementById("veil").classList.remove("on");
+  document.getElementById("sheet").classList.remove("on");
+  document.body.classList.remove("locked");
+}
+function pickSheetCat(k){ sheetCat = k; renderSheet(); }
+
+function renderSheet(){
+  if (open === null) return;
+  var s = STORES[open], k = sheetCat, sizes = SIZES[k] || ["Standard"], pool = MAKES[k] || [["Generic","Unit"]];
+
+  var chips = Object.keys(s.cats).map(function(x){
+    return '<button class="chip" type="button" aria-pressed="' + (x === k) + '" onclick="pickSheetCat(\'' + x + '\')">'
+      + catName(x) + ' · ' + s.cats[x].n + '</button>';
+  }).join("");
+
+  var n = Math.min(s.cats[k].n, 6), cards = "";
+  for (var i = 0; i < n; i++){
+    var m = pool[i % pool.length], p = Math.round(s.cats[k].p * (1 + (i % 3) * 0.09));
+    cards += '<article class="eq">'
+      + '<div class="eqshot"><span class="glyph icon" aria-hidden="true">' + icOf(k) + '</span><span class="floor"></span></div>'
+      + '<div class="eqinfo"><h5>' + m[0] + ' ' + m[1] + '</h5>'
+      +   '<div class="meta">' + sizes[i % sizes.length] + ' · ' + (2019 + (i % 6)) + '</div>'
+      +   '<div class="price">' + money(p) + ' <span>SAR / ' + L("month", "شهر") + '</span></div>'
+      +   '<button class="req" type="button" onclick="gate(\'request\')">' + L("Request this", "اطلبها") + '</button>'
+      + '</div></article>';
+  }
+
+  document.getElementById("sheet").innerHTML =
+      '<div class="sheetbar">'
+    +   '<button class="round back" type="button" onclick="closeStore()" aria-label="' + L("Back", "رجوع") + '">'
+    +     '<span class="icon" aria-hidden="true">arrow_back</span></button>'
+    +   '<h2 id="sheettitle">' + L(s.n, s.nAr) + '</h2><span class="spacer"></span>'
+    +   '<button class="round" type="button" onclick="closeStore()" aria-label="' + L("Close", "إغلاق") + '">'
+    +     '<span class="icon" aria-hidden="true">close</span></button>'
+    + '</div>'
+
+    + '<div class="shead"><span class="slogo" aria-hidden="true">' + L(s.n, s.nAr).trim().charAt(0) + '</span>'
+    +   '<div><h3>' + L(s.n, s.nAr) + '</h3><div class="meta">'
+    +     '<span><span class="icon" aria-hidden="true">location_on</span>' + L(s.city, s.cityAr) + '</span>'
+    +     '<span><span class="icon" aria-hidden="true">inventory_2</span>' + s.eq + ' ' + L("machines", "معدّة") + '</span>'
+    +     (s.ver ? '<span class="ver"><span class="icon" aria-hidden="true">verified</span>' + L("Verified supplier", "مؤجّر موثّق") + '</span>' : '')
+    +   '</div></div></div>'
+
+    + '<div class="sbody">'
+    +   '<div class="chiprow" role="group" aria-label="' + L("Equipment type", "نوع المعدّة") + '">' + chips + '</div>'
+    +   '<h4>' + catName(k) + '</h4>'
+    +   '<div class="eqgrid">' + cards + '</div>'
+    + '</div>';
+}
+
+/* ── gate ────────────────────────────────────────────────────────────────── */
+var GATES = {
+  request:{tEn:"Create an account to send this", tAr:"أنشئ حساباً لإرساله",
+    bEn:"Suppliers price a named site, not an anonymous one. It takes a phone number and a minute, and your draft is waiting on the other side.",
+    bAr:"المؤجّرون يسعّرون موقعاً معروفاً لا مجهولاً. يستغرق الأمر رقم جوال ودقيقة، ومسوّدتك بانتظارك."},
+  signin:{tEn:"Sign in with your phone", tAr:"سجّل الدخول برقم جوالك",
+    bEn:"A code arrives by SMS. No password to remember, no card to enter.",
+    bAr:"يصلك رمز عبر رسالة نصية. لا كلمة مرور تتذكّرها، ولا بطاقة تُدخلها."}
+};
+function gate(kind){
+  var g = GATES[kind] || GATES.request;
+  document.getElementById("gtitle").textContent = L(g.tEn, g.tAr);
+  document.getElementById("gbody").textContent = L(g.bEn, g.bAr);
+  document.getElementById("gate").classList.add("on");
+  document.body.classList.add("locked");
+  document.querySelector("#gate .primary").focus();
+}
+function closeGate(){
+  document.getElementById("gate").classList.remove("on");
+  if (open === null) document.body.classList.remove("locked");
+}
+document.addEventListener("keydown", function(e){
+  if (e.key !== "Escape") return;
+  if (document.getElementById("gate").classList.contains("on")) closeGate();
+  else if (open !== null) closeStore();
+});
+
+function setLang(l){
+  lang = l;
+  document.documentElement.setAttribute("lang", l);
+  document.documentElement.setAttribute("dir", l === "ar" ? "rtl" : "ltr");
+  var nodes = document.querySelectorAll("[data-en]");
+  for (var i = 0; i < nodes.length; i++){
+    var v = nodes[i].getAttribute(l === "ar" ? "data-ar" : "data-en");
+    if (v != null) nodes[i].textContent = v;
+  }
+  var ask = document.getElementById("ask");
+  ask.setAttribute("placeholder", ask.getAttribute(l === "ar" ? "data-ph-ar" : "data-ph-en"));
+  document.getElementById("loclabel").textContent = l === "ar" ? "العربية" : "English";
+  document.getElementById("locbtn").setAttribute("aria-label", l === "ar" ? "التبديل إلى الإنجليزية" : "Switch to Arabic");
+  renderExamples(); renderChips(); renderGrid(); if (open !== null) renderSheet();
+}
+
+renderExamples();
+renderChips();
+renderGrid();
+</script>
+</body>
+</html>

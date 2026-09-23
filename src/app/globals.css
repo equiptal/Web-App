@@ -3,69 +3,630 @@
 /* Material Icons fonts are loaded via <link> in layout.tsx (Tailwind v4 inlines its own
    import, which would push CSS @imports out of legal position). */
 
-/* Moedatech Design System v3 palette (from the web-app/002 prototype). */
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   Moedatech Design System — the web app's single source of truth.
+
+   Every value a screen is allowed to use is named here. `DESIGN.md` carries the reasoning and the
+   rules; this file carries the numbers. If a screen needs a colour, a size, a radius or a state
+   that is not in this file, the answer is to change this file — never to write the value inline.
+
+   The scale was derived from the app itself (owner, 2026-08-26): the sizes, colours and radii it
+   already used most, named rather than reinvented, so nothing moved that did not have to. What did
+   move, and why, is listed in `DESIGN.md` under "What changed".
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
+
 :root {
-  --navy: #1c3550;
-  --navy-mid: #2a4f72;
-  --gold: #b8860b;
-  --background: #f5f8fc;
-  --surface: #ffffff;
-  --surface2: #eff4f9;
-  --surface3: #e4edf5;
-  --foreground: #1c3550;
-  --muted: #6b8fa8;
-  --border: #d4e0ec;
-  --brand: #f79009; /* action orange — primary CTA */
+  /* ══════════════════════════════════════════════════════════════════════════════════════════
+     The palette is the SUPPLIER OS palette (owner, 2026-09-04), carried here from
+     `docs/design-tokens.md` — the file he handed over, kept in the repo so the next change starts
+     from the same numbers.
+
+     Two products, one set of colours. The OS and this app were drifting apart a shade at a time:
+     navy #1c2738 here against #22384e there, orange #f79009 against #f97316, a blue-tinted neutral
+     ramp against a flat grey one. None of those differences was a decision anybody made; they were
+     three separate derivations of "the brand". The OS set is now the source, and both names live
+     here — ours, because 122 files read them, and the OS's, because that is the vocabulary the
+     token file speaks and the one to write new code in.
+
+     ⚠️ **Where the OS file has no equivalent, the value is DERIVED from one that does and says so.**
+     It defines no hover, press or tint step for the brand, and this app needs all three. Each is a
+     stated mix of the OS brand hex, never a fourth guess at "the orange". */
+
+  /* ── Ink / neutral ramp ──────────────────────────────────────────────────────────────────────
+     Twelve steps, dark to light, now on the OS's flat grey ramp rather than a blue-tinted one. */
+  --navy-deep: #1c2738;      /* dark headers, overlay grounds — OS `ink-deep` */
+  --navy: #22384e;           /* foreground text, navy blocks — OS `ink` / `navy` / `text-primary` */
+  --navy-mid: #33506d;       /* the step up from navy: hover on a navy surface — OS `navy-soft` */
+  --muted-dark: #444f57;     /* secondary text that still has to carry weight — OS `text-secondary` */
+  --muted: #59646e;          /* secondary text — OS `text-muted` */
+  --muted-light: #8a95a0;    /* tertiary text, placeholders, disabled — OS `neutral` */
+  --border-strong: #c6c6c6;  /* a divider that has to be seen */
+  --border: #dcdcdc;         /* the default border — OS `border-soft` */
+  --surface3: #e8e8e8;       /* pressed, selected — OS `chrome-press` */
+  --surface2: #f4f4f4;       /* inset panels, tinted fills, hover — OS `chrome` */
+  --background: #f4f4f4;     /* the page ground — OS `desktop-base` */
+  --surface: #ffffff;        /* cards, floating layers */
+  --foreground: #22384e;     /* tracks `--navy` on purpose — see the note in `ds-colors.ts` */
+
+  /* The OS names for the same ink, and the two tiers our ramp had no word for. */
+  --ink: #22384e;
+  --ink-deep: #1c2738;
+  --navy-soft: #33506d;
+  --text-primary: #22384e;
+  --text-secondary: #444f57;
+  --text-tertiary: #515a64;
+  --text-muted: #59646e;
+  --text-faint: #6f695a;
+  --text-on-dark: #c8d4e4;
+  --text-on-dark-dim: #8698b0;
+
+  /* The OS chrome ramp, in full. `surface2`/`surface3` above are two of these under our names. */
+  --desktop-base: #f4f4f4;
+  --desktop-hi: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-alt: #fafafa;
+  --chrome: #f4f4f4;
+  --chrome-press: #e8e8e8;
+  --chrome-deep: #e0e0e0;
+  --neutral-btn: #e0e0e0;
+  --neutral-btn-hi: #d4d4d4;
+  --map-plate: #dfe3e7;
+
+  /* Four borders where we had two. `--border` is `border-soft`; the other three are new. */
+  --border-mid: #d0d0d0;
+  --border-hair: #e4e4e4;
+  --border-hair2: #e0e0e0;
+
+  /* ── Brand ───────────────────────────────────────────────────────────────────────────────────
+     #f97316 is the orange, and it is a FILL. At 2.80:1 on white it cannot carry small text; orange
+     TEXT is `--brand-deep` #c2570f (4.50:1, AA). That split is the OS file's own rule. */
+  --brand: #f97316;          /* the primary CTA — OS `brand` / `accent` */
+  --brand-deep: #c2570f;     /* brand text on a light ground — OS `brand-dark` */
+  /* Derived, because the OS set defines no interaction steps: the brand mixed toward black at 12%
+     and 24%. Pressed is a visible step past hover rather than the same value twice. */
+  --brand-hover: #db6513;
+  --brand-press: #bd5711;
+  --brand-light: #e8b64c;    /* accents, dots — OS `warn-amber` */
+  /* Derived: the brand at 22% and 10% over white. The OS set has no orange tint, and using its
+     amber background here would put a yellow wash under an orange control. */
+  --brand-pale: #fee0cc;     /* fills, progress tracks */
+  --brand-soft: #fef1e8;     /* tinted backgrounds, selected chips */
   --brand-fg: #ffffff;
-  --brand-soft: #fff4e5;
-  --warn: #d4780a;
-  --warn-soft: #fff3e0;
-  --danger: #d9362a;
-  --danger-soft: #fcebea;
-  --ok: #1daf58;
-  --ok-soft: #e7f7ee;
-  --info: #1a7ec8;
-  --info-soft: #e6f2fb;
+  --gold: #b8860b;           /* the mark's own colour — not a UI state, and not in the OS set */
+
+  /* ── The taxonomy photographs' own studio ground ─────────────────────────────────────────────
+     NOT a UI colour and not in the OS set: it is the beige those renders are shot on, so that the
+     machine-card panel has nothing to letterbox against and the picture reads as filling it.
+
+     🔴 MEASURED, not picked (owner, 2026-09-20: *"why the image doesnt exist for margins and
+     padding, keep it 100% fit"*). Twelve samples — four corners and two edge midpoints of two
+     assets from the batch, `crawler-excavator` and `wheel-loader`, decoded and read pixel by pixel:
+     every one lands between #e1dcd5 and #e6dfd7, a spread of 4/255 per channel. This is their mean.
+
+     ⚠️ It is a property of the ASSET BATCH, not of this design system, so it belongs to whoever
+     re-cuts those renders. If the masters are ever re-shot on a different ground — or given
+     transparency, which is the real fix and would retire this — re-measure it or delete it. */
+  --photo-ground: #e3ded7;
+
+  /* ── Status ──────────────────────────────────────────────────────────────────────────────────
+     Three tiers each, and the same fill/text split the brand has: `--warn` fills at 2.97:1 and
+     `--warn-deep` is the amber that may carry text. */
+  /* 🔴 **THE VERIFIED BADGE'S GREEN, and it was never DECLARED** (owner, 2026-09-22, on a
+     picture of a BLACK tick beside a company name: *"make it green"*).
+     The theme block below mirrored `--color-verified` and `VerifiedMark` filled its rosette
+     with `var(--verified)`, but no `:root` ever defined it — so the whole chain resolved to an
+     invalid value, `fill` fell back to its initial BLACK, and the badge rendered as a dark blob
+     on every surface that draws it.
+     ⚠️ **It is NOT `--ok`.** That is the app's «this went well» and a badge that drifted with a
+     status colour would stop being a badge — `VerifiedMark`'s own header says so. This is the
+     value `--shop-ok` already carried under the comment *"the verified tick"*, so the storefront's
+     tick and this one are one green rather than two.
+     🔴 **The comment above may not contain the theme directive's own name**, for the reason this
+     one found the hard way: `ds-colors.test.ts` reads `:root` by slicing to the FIRST occurrence of
+     it, so a mention inside a comment truncates the block and every token after it reads as
+     undefined. 46 colours went missing over one word in prose.
+     ⚠️ `ds-colors.test.ts` walks every colour `:root` defines and requires `ds-colors.ts` to
+     name it, which is why that mirror moved in the same edit — and why a token declared in
+     neither slipped through unnoticed for as long as it did. */
+  --verified: #2f9e5c;
+  --ok: #1d9e55;             /* OS `success` */
+  --ok-soft: #e2efe7;        /* OS `success-bg` */
+  --ok-deep: #1d7a45;        /* OS `success-ink` */
+  --warn: #b98a1d;           /* OS `warn` — FILL only */
+  --warn-soft: #f7edd8;      /* OS `warn-bg` */
+  --warn-deep: #8a6412;      /* OS `warn-ink` — text */
+  --warn-border: #e0c583;
+  --warn-amber: #e8b64c;
+  --danger: #c02626;         /* OS `danger` */
+  --danger-soft: #f7e3e3;    /* OS `danger-bg` */
+  --danger-deep: #b91c1c;    /* OS `bad`, the darker red for text on a tint */
+  --danger-border: #e8c1c1;
+  --danger-wash: #fbeeee;
+  /* Derived, as with the brand: the danger red mixed toward black at 12% and 24%. */
+  --danger-hover: #a92121;
+  --danger-press: #921d1d;
+  /* ⚠️ **The ONE hex here that the token file does not define, and it is deliberate.**
+     RM3-AC-33 says the bid map's ask control is blue and NEVER navy, and `equipment-card.test.ts`
+     measures the channels to prove it. The OS palette has no true blue by design — its `info` is a
+     slate that "sits in the ink family" (#3b556e, blue channel 110), which is exactly the navy the
+     AC forbids. So the ask keeps the blue it shipped with, under a name that says it is the ask's
+     colour rather than a general "info", and `--info` below takes the OS value as written. */
+  --action: #1a7ec8;
+  --info: #3b556e;           /* OS `info` — slate, deliberately not cyan */
+  --info-soft: #e7ebee;      /* OS `info-bg` */
+  --info-deep: #22384e;      /* the ink, which is where this family lives */
+  --ai: #6d4fc4;
+  --ai-bg: #eee9fa;
+  --neutral: #8a95a0;
+  --neutral-bg: #eceae3;
+
+  /* ── Machine status, and the brighter pips beside them ───────────────────────────────────────
+     Text and border tones first, then the LED colours, which are the same states louder. Nothing in
+     this app draws them yet; they are here so the two products name a machine's state alike. */
+  --st-idle: #b98a1d;
+  --st-reserved: #5d6b77;
+  --st-transit: #c2570f;
+  --st-active: #1d7a45;
+  --st-mnt: #c02626;
+  --st-hold: #8a95a0;
+  --led-idle: #e8b64c;
+  --led-reserved: #8698b0;
+  --led-transit: #f97316;
+  --led-active: #38b06a;
+  --led-mnt: #ff6b5e;
+  --led-hold: #8a95a0;
+  --tick-up: #38e07d;
+  --tick-down: #ff6b5e;
+
+  /* ── Dark cards, the terminal, and the document facsimiles ───────────────────────────────────
+     The OS's dark surfaces. Carried whole so a screen that needs one does not invent it. */
+  --dark-card: #1c2738;
+  --dark-card-border: #2c3a4e;
+  --dark-card-well: #141d2b;
+  --dark-card-chip: #2c3a4e;
+  --term-bg: #16202c;
+  --term-bar: #0f1722;
+  --term-border: #2b3850;
+  --term-barline: #223047;
+  --term-text: #8698b0;
+  --term-caret: #38e07d;
+  --term-close: #4d5e75;
+  --doc-registration: #2f6b4f;
+  --doc-customs: #2f4d8a;
+  --doc-insurance: #4d7d74;
+  --doc-inspection: #6a7fae;
+  --doc-reference: #b9bdc9;
+
+  /* The OS's own legacy pair, which its login screen still reads. */
+  --sand: #e4e1d8;
+  --paper: #faf9f6;
+
+  /* ── Storefront ──────────────────────────────────────────────────────────────────────────────
+     The supplier-facing three — Browse, the equipment sheet, the store profile — drawn from the
+     approved prototype (`Zahid Tractor Store Profile`, owner, 2026-09-01) and matched to it exactly.
+
+     **A second neutral family, and that is the whole point of naming it.** The app's ramp above is
+     blue-tinted (`--border` #d4e0ec, `--muted` #6b8fa8); the prototype's is warm grey (#e3e6e9,
+     #8a929b) on white rather than on `--background`. Rendering the prototype through the app's ramp
+     is not the same design — it is a near miss, which is worse than either, so the values live here
+     under their own names instead of being written into three components or quietly overwriting the
+     app's ramp for every other screen.
+
+     Bounded on purpose: `shop-*` is reachable from the storefront surfaces and nothing else. If it
+     ever becomes the app's palette, that is a decision to make once, here, by moving these values up
+     into the ramp above — not by spreading them file by file. */
+  --shop-ink: #1f2d3a;        /* headings, names, the value in a chip */
+  --shop-ink-2: #3a4552;      /* prose — the About paragraph */
+  --shop-ink-3: #5b6672;      /* meta rows, the back link */
+  --shop-ink-4: #8a929b;      /* section labels, icon strokes */
+  --shop-line: #e3e6e9;       /* the card border */
+  --shop-line-soft: #eceef0;  /* a divider INSIDE a card */
+  --shop-fill: #f2f4f5;       /* image ground, the neutral chip */
+  --shop-ok: #2f9e5c;         /* the verified tick */
+  --shop-ok-soft: #e9f7ee;    /* a document chip's ground */
+  --shop-amber: #eda153;      /* link hover */
+  --shop-amber-deep: #b5761a; /* the size chip's text, a price */
+  --shop-amber-soft: #fdf1e0; /* the size chip's ground */
+  --shop-field: #fafbfb;      /* the search field, the one surface that is not white */
+
+  /* ── The National Day skin (owner, 2026-09-16) ───────────────────────────────────────────────
+     A SEASON, not a repaint. These seven are ADDITIVE: they are declared all year and painted only
+     under `[data-season="nd"]`, which `layout.tsx` writes between 16 September and 1 October. No
+     token above this block changes value while the season runs — `--brand` in particular stays
+     #f97316, because this app already spends green on `--ok` («it happened») and a celebration
+     borrowing the success colour would give one colour two meanings on the same screen.
+
+     The values are the Flutter kit's own, so the two products celebrate in the same green. */
+  /* 🔴 **A STEP DARKER, all of them** (owner, 2026-09-22: *"can u make the all greens color
+     of the national day theme more darker? a little bit"*). Each channel at 85% of the kit's own
+     value, so the HUE is untouched and only the depth moves — the flag's green read bright against
+     this product's navy chrome, which is the one thing the season must not fight.
+     ⚠️ Every one of them is a GROUND under white text, so darker is strictly safer: the bar's
+     contrast goes up, never down. `--nd-mint` is deliberately NOT moved — it is the pale chip's
+     ground on a LIGHT surface, near-white by design, and darkening it would make the one quiet
+     weight in the kit read as a second solid chip. */
+  --nd-ground: #004724;      /* the bar's ground — the kit's `nd-ground`, darkened */
+  --nd-deep: #042d1a;        /* the gradient's dark corner */
+  --nd-mid: #096835;         /* the gradient's light corner */
+  --nd-green: #005c2d;       /* the flag's green: a solid chip, the corner ribbon */
+  --nd-accent: #d7c48a;      /* pale gold — the Najdi seam, the chip's figure, the hairline */
+  --nd-mint: #e8f2ea;        /* the pale chip's ground, for a LIGHT surface */
+  --nd-ink: #0b4e35;         /* the pale chip's ink, AA on `--nd-mint` — darker only helps it */
+
+  /* ── Disabled ────────────────────────────────────────────────────────────────────────────────
+     A state with its own colours rather than a faded copy of another one. `opacity: .5` over an
+     orange or red fill produced a muddy tint nobody chose, and landed around 2.1:1 against white
+     — under the 3:1 floor WCAG 1.4.11 sets for a control. */
+  --disabled-bg: var(--surface2);
+  --disabled-fg: var(--muted-light);
+  --disabled-border: var(--border);
+
+  /* ── Control heights ─────────────────────────────────────────────────────────────────────────
+     Three. 34px is the default and matches the top bar. 44px is the touch minimum: a primary CTA,
+     and anything a thumb has to hit on a phone. */
+  --control-sm: 30px;
+  --control-md: 34px;
+  --control-lg: 44px;
+
+  /* ── Focus ───────────────────────────────────────────────────────────────────────────────────
+     A solid outline, not a shadow. This app has no shadows, and a focus ring is not decoration —
+     a keyboard user has no other way to know where they are. */
+  --ring-focus: 2px solid var(--brand);
+  /* 0, not 2: an offset ring is a SECOND line outside the control's own border. See the focus rule
+     below for why the two became one. */
+  --ring-offset: 0px;
+
+  /* ── Floating layers ─────────────────────────────────────────────────────────────────────────
+     Nothing in this app casts a shadow. A modal, sheet, dropdown or tooltip is separated from the
+     page by its own border and by the page dimming behind it. */
+  --scrim: rgba(34, 56, 78, 0.45);
+  /* The pills and controls laid over a photo (storefront). Alpha, because they have to read on any
+     image — a solid navy would go black over a dark machine and disappear over a bright sky. Four
+     strengths, and the prototype uses each for a different job. */
+  --shop-tag: rgba(15, 23, 31, 0.62);        /* the city pill on a photo */
+  --shop-tag-strong: rgba(15, 23, 31, 0.7);  /* the address label on the map */
+  --shop-tag-mid: rgba(15, 23, 31, 0.55);    /* the carousel's own arrows */
+  --shop-tag-light: rgba(255, 255, 255, 0.16); /* the city pill on the NAVY store tile */
 }
 
 @theme inline {
+  /* ── Colour ──────────────────────────────────────────────────────────────────────────────── */
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface2: var(--surface2);
   --color-surface3: var(--surface3);
   --color-foreground: var(--foreground);
+  --color-navy-deep: var(--navy-deep);
   --color-navy: var(--navy);
   --color-navy-mid: var(--navy-mid);
+  --color-muted-dark: var(--muted-dark);
   --color-muted: var(--muted);
+  --color-muted-light: var(--muted-light);
+  --color-border-strong: var(--border-strong);
   --color-border: var(--border);
+  --color-brand-deep: var(--brand-deep);
   --color-brand: var(--brand);
-  --color-brand-fg: var(--brand-fg);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-press: var(--brand-press);
+  --color-brand-light: var(--brand-light);
+  --color-brand-pale: var(--brand-pale);
   --color-brand-soft: var(--brand-soft);
-  --color-warn: var(--warn);
-  --color-warn-soft: var(--warn-soft);
-  --color-danger: var(--danger);
-  --color-danger-soft: var(--danger-soft);
+  --color-brand-fg: var(--brand-fg);
+  --color-gold: var(--gold);
+  --color-photo-ground: var(--photo-ground);
+  /* The National Day skin. Mirrored here for the same reason every other token is: a colour
+     `:root` defines and `@theme` does not is a colour half the app cannot reach. */
+  --color-nd-ground: var(--nd-ground);
+  --color-nd-deep: var(--nd-deep);
+  --color-nd-mid: var(--nd-mid);
+  --color-nd-green: var(--nd-green);
+  --color-nd-accent: var(--nd-accent);
+  --color-nd-mint: var(--nd-mint);
+  --color-nd-ink: var(--nd-ink);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
+  --color-ok-deep: var(--ok-deep);
+  /* The verified badge's green — see the note on `--verified` above. Mirrored here because a colour
+     `:root` defines and `@theme` does not is a colour half the app cannot reach; `ds-colors` fails
+     the build over exactly that, which is how this one was caught. */
+  --color-verified: var(--verified);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-deep: var(--warn-deep);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-deep: var(--danger-deep);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-press: var(--danger-press);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
-  --font-sans: var(--font-nunito);
-  --font-mono: var(--font-plex);
+  --color-info-deep: var(--info-deep);
+  /* ── The Supplier OS vocabulary ───────────────────────────────────────────────────────────
+     The names the token file speaks, as utilities. Ours above are the same colours under the names
+     122 files already read; these are what new code should use. */
+  --color-action: var(--action);
+  --color-ink: var(--ink);
+  --color-ink-deep: var(--ink-deep);
+  --color-navy-soft: var(--navy-soft);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-text-on-dark: var(--text-on-dark);
+  --color-text-on-dark-dim: var(--text-on-dark-dim);
+  --color-desktop-base: var(--desktop-base);
+  --color-desktop-hi: var(--desktop-hi);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-alt: var(--surface-alt);
+  --color-chrome: var(--chrome);
+  --color-chrome-press: var(--chrome-press);
+  --color-chrome-deep: var(--chrome-deep);
+  --color-neutral-btn: var(--neutral-btn);
+  --color-neutral-btn-hi: var(--neutral-btn-hi);
+  --color-map-plate: var(--map-plate);
+  --color-border-mid: var(--border-mid);
+  --color-border-hair: var(--border-hair);
+  --color-border-hair2: var(--border-hair2);
+  --color-warn-border: var(--warn-border);
+  --color-warn-amber: var(--warn-amber);
+  --color-danger-border: var(--danger-border);
+  --color-danger-wash: var(--danger-wash);
+  --color-ai: var(--ai);
+  --color-ai-bg: var(--ai-bg);
+  --color-neutral: var(--neutral);
+  --color-neutral-bg: var(--neutral-bg);
+  --color-st-idle: var(--st-idle);
+  --color-st-reserved: var(--st-reserved);
+  --color-st-transit: var(--st-transit);
+  --color-st-active: var(--st-active);
+  --color-st-mnt: var(--st-mnt);
+  --color-st-hold: var(--st-hold);
+  --color-led-idle: var(--led-idle);
+  --color-led-reserved: var(--led-reserved);
+  --color-led-transit: var(--led-transit);
+  --color-led-active: var(--led-active);
+  --color-led-mnt: var(--led-mnt);
+  --color-led-hold: var(--led-hold);
+  --color-tick-up: var(--tick-up);
+  --color-tick-down: var(--tick-down);
+  --color-dark-card: var(--dark-card);
+  --color-dark-card-border: var(--dark-card-border);
+  --color-dark-card-well: var(--dark-card-well);
+  --color-dark-card-chip: var(--dark-card-chip);
+  --color-term-bg: var(--term-bg);
+  --color-term-bar: var(--term-bar);
+  --color-term-border: var(--term-border);
+  --color-term-barline: var(--term-barline);
+  --color-term-text: var(--term-text);
+  --color-term-caret: var(--term-caret);
+  --color-term-close: var(--term-close);
+  --color-doc-registration: var(--doc-registration);
+  --color-doc-customs: var(--doc-customs);
+  --color-doc-insurance: var(--doc-insurance);
+  --color-doc-inspection: var(--doc-inspection);
+  --color-doc-reference: var(--doc-reference);
+  --color-sand: var(--sand);
+  --color-paper: var(--paper);
+  --color-shop-ink: var(--shop-ink);
+  --color-shop-ink-2: var(--shop-ink-2);
+  --color-shop-ink-3: var(--shop-ink-3);
+  --color-shop-ink-4: var(--shop-ink-4);
+  --color-shop-line: var(--shop-line);
+  --color-shop-line-soft: var(--shop-line-soft);
+  --color-shop-fill: var(--shop-fill);
+  --color-shop-ok: var(--shop-ok);
+  --color-shop-ok-soft: var(--shop-ok-soft);
+  --color-shop-amber: var(--shop-amber);
+  --color-shop-amber-deep: var(--shop-amber-deep);
+  --color-shop-amber-soft: var(--shop-amber-soft);
+  --color-shop-field: var(--shop-field);
+  --color-shop-tag: var(--shop-tag);
+  --color-shop-tag-strong: var(--shop-tag-strong);
+  --color-shop-tag-mid: var(--shop-tag-mid);
+  --color-shop-tag-light: var(--shop-tag-light);
+  --color-disabled-bg: var(--disabled-bg);
+  --color-disabled-fg: var(--disabled-fg);
+  --color-disabled-border: var(--disabled-border);
+
+  /* ── Font families ───────────────────────────────────────────────────────────────────────── */
+  /* The token file's stacks (owner, 2026-09-04). Latin first, Arabic behind it in the sans stack so
+     a mixed line does not fall to the browser's guess; `--font-mono` deliberately resolves to TEXT
+     faces, and true monospace is the explicit opt-in `.keep-mono` below. */
+  --font-sans: var(--font-inter), var(--font-almarai), ui-sans-serif, system-ui, sans-serif;
+  /* The CTA banner headline only. Oswald first; the Arabic face behind it, because Oswald has
+     no Arabic and an Arabic headline must not fall to the browser's guess. The system stack
+     closes it, so a blocked webfont degrades to the same face as the rest of the app. */
+  --font-hero: var(--font-oswald), var(--font-almarai), var(--font-inter), system-ui, sans-serif;
+  --font-arabic: var(--font-almarai), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-inter), var(--font-almarai), ui-sans-serif, system-ui, sans-serif;
+  --font-mono-data: var(--font-jetbrains-mono), var(--font-almarai), ui-monospace, monospace;
+  --font-display: var(--font-inter), var(--font-almarai), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The scales below are literal values rather than references into `:root`, so they belong in a
+   plain `@theme` — `inline` exists to stop Tailwind copying a variable it should point at. */
+@theme {
+  /* ── Type ────────────────────────────────────────────────────────────────────────────────────
+     Six sizes and no others. The app had twenty, among them 13.5px, 11.5px and 10.5px — sizes a
+     reader cannot tell apart, but which guarantee two screens never quite match. Every default
+     Tailwind size (`text-xs` … `text-9xl`) is cleared so it cannot be reached by accident. */
+  --text-*: initial;
+  --text-label: 11px;        /* UPPERCASE SECTION LABEL */
+  --text-meta: 12.5px;       /* the muted sentence under a value */
+  --text-body: 13px;         /* the answer, list rows, buttons — the default */
+  --text-subhead: 15px;      /* card headings */
+  --text-title: 17px;        /* a page or masthead name */
+  --text-display: 22px;      /* a number worth shouting */
+  /* Display copy, not UI: the auth headline and the home banner, and nothing else. It is a seventh
+     step in a six-step scale, which is a debt, not a feature — the alternative was leaving those two
+     headlines at a hardcoded 36px and 29px, which is the same debt with no name on it. */
+  --text-hero: 32px;
+
+  /* The storefront's own steps (owner, 2026-09-01: match the prototype exactly). Seven sizes the
+     six above cannot express — 19 for a store's name, 13.5 for its prose, 12 for a card's category
+     label, 11.5 for a document chip. They are prefixed and belong to those three screens; the rule
+     that the app has six sizes is unchanged everywhere else, and this is the exception with a name
+     on it rather than thirty loose numbers. */
+  --text-shop-page: 24px;    /* the machine's name on its own sheet */
+  --text-shop-h1: 22px;      /* «Suggested Suppliers» */
+  --text-shop-name: 19px;    /* a store's name, the machine's category */
+  --text-shop-lead: 17px;    /* «Supplied by Zahid Tractor» */
+  --text-shop-value: 14.5px; /* a spec's value, the supplier's prose on the sheet */
+  --text-shop-control: 14px; /* the search field, a button, a card's store name */
+  --text-shop-body: 13.5px;  /* the About paragraph, the back link */
+  --text-shop-item: 13px;    /* a machine's name on a card, a pill, the city menu */
+  --text-shop-meta: 12.5px;  /* the city · count · views row, size and year chips */
+  --text-shop-label: 12px;   /* THE CATEGORY OVER A MACHINE (store profile) */
+  --text-shop-chip: 11.5px;  /* a document chip, a category chip */
+  --text-shop-tag: 11px;     /* the location pill on a photo, a spec's label */
+  --text-shop-micro: 10px;   /* the carousel's 1/2 counter */
+
+  /* ── Weight ──────────────────────────────────────────────────────────────────────────────────
+     Three. `font-medium`, `font-bold` and `font-black` are cleared: five weights is not a
+     hierarchy, it is one guess repeated across files. */
+  --font-weight-*: initial;
+  --font-weight-normal: 400;     /* body copy, answers */
+  --font-weight-semibold: 600;   /* labels, buttons, inline emphasis */
+  --font-weight-extrabold: 800;  /* titles, mastheads, big numbers */
+  /* The storefront's bold (owner, 2026-09-01: match the prototype exactly). The prototype sets 700
+     for a store's name, a card's category label and a chip; 800 renders those visibly heavier and
+     600 visibly lighter, so neither is the reference. Named for those three screens, so the app's
+     three-weight rule stands everywhere else. */
+  --font-weight-shop-bold: 700;
+
+  /* ── Radius ──────────────────────────────────────────────────────────────────────────────────
+     Four steps. `rounded-md` is the default; `rounded-lg` is the card skin.
+
+     **Sharp** (owner, 2026-08-28), from a console he sent as the reference. Its buttons measure a
+     1px corner inset — a 2px radius — so a control there reads as a rectangle with the corner taken
+     off rather than as a rounded thing. ~~8 / 10 / 14.~~
+
+     `rounded-full` is a separate utility and no part of this scale, which is why nothing round in
+     the app moved with it: the header's nav tabs, the status badges, the rail's request circles,
+     avatars, unread dots and the back arrow are all untouched. The reference draws its own status
+     pills round for the same reason — a pill is a shape, not a radius. */
+  --radius-*: initial;
+  --radius-sm: 2px;    /* chips, tags, tight controls */
+  --radius-md: 4px;    /* inputs, buttons, list rows — the default */
+  --radius-lg: 6px;    /* cards, panels, sheets */
+  /* The storefront's own steps. A shop is a softer object than a form row — the reference the app's
+     2/4/6 came from is a console, and these three screens are a catalogue.
+
+     ~~14 for a card, 16 for the media, 10 for a control~~ — halved on 2026-09-01 (owner: *"use less
+     rounded cards"*). A pill is still a pill: `shop-tab` and the round tags did NOT move with them,
+     because their shape is the control, not a corner treatment on a rectangle. */
+  --radius-shop-tab: 20px;      /* a category pill on Browse — a shape, not a radius */
+  --radius-shop-media: 10px;    /* the gallery and the map */
+  --radius-shop-chip-lg: 8px;   /* the subtype / size chips on the sheet */
+  --radius-shop-card: 8px;      /* the card skin */
+  --radius-shop-pill: 8px;      /* the location pill, a document chip */
+  --radius-shop-control: 6px;   /* the search field, a button, a spec box, the map label */
+  --radius-shop-logo: 8px;      /* a store's logo square */
+  --radius-shop-logo-md: 8px;   /* the supplier's logo on the sheet */
+  --radius-shop-chip: 6px;      /* a size / year chip, a gallery thumbnail */
+  --radius-shop-logo-sm: 4px;   /* the 24px logo beside a name on a card */
+
+  /* ── Shadow ──────────────────────────────────────────────────────────────────────────────────
+     There are none (owner, 2026-08-26). The whole namespace is cleared, so `shadow-sm` and its
+     relatives resolve to nothing rather than quietly reintroducing depth. Separation is carried by
+     a border, by a step on the surface ramp, and by the scrim behind a floating layer. */
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-nunito), var(--font-inter), -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* ── The Latin face is INTER, and this rule is what makes it so (owner, 2026-09-10) ─────────
+     *"apply it, and make sure to register it as part of the web design system so any further
+     changes will follow and use it"*.
+
+     ~~`"Segoe UI", system-ui, -apple-system, Roboto, sans-serif`.~~ The token file named Inter on
+     2026-09-04 and `layout.tsx` began downloading it that day — but NOTHING ever read
+     `--font-sans`: this rule went on declaring the system stack, and a declaration on `body` beats
+     anything preflight puts on `html`. So the app paid for the webfont on every load and rendered
+     in Segoe UI anyway, which is the worst of the two choices it was picking between. The Arabic
+     half was applied correctly the same day, which is why only the English screens drifted.
+     ⚠️ This repaints EVERY Latin screen. It is the change the token file has been asking for since
+     it landed; `tests/unit/font-drift.test.ts` is what stops it drifting back. */
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  /* ── So a band can reach the window's edge (owner, 2026-08-30) ─────────────────────────
+     The home CTA is full-bleed: it escapes the page's 1440px cap and its gutter with the standard
+     `w-screen` + `-ms-[50vw]` pair. `100vw` INCLUDES the vertical scrollbar, so on a scrolling page
+     that pair overhangs by the scrollbar's width and the document grows a horizontal scrollbar it
+     has no content for.
+
+     `clip`, not `hidden`. `overflow: hidden` on the body makes it a scroll container, which breaks
+     `position: sticky` on the app header — the one thing on every page that must not come unstuck.
+     `clip` cuts the overhang without creating one. */
+  overflow-x: clip;
 }
 
-/* Arabic uses IBM Plex Sans Arabic — the prototype's own face (owner, 2026-08-19; `layout.tsx` carries
-   the full reasoning and the three things it fixed). ~~Tajawal.~~ Withdrawn: it runs wider at the same
-   sizes, and every RTL screen's geometry is measured against Plex Arabic in the prototype.
+/* Arabic is ALMARAI (owner, 2026-09-04, from `docs/design-tokens.md`; `layout.tsx` carries what this
+   overturns). ~~IBM Plex Sans Arabic~~, itself ~~Tajawal~~ before that.
    Layout is RTL-capable via logical properties (AC-46, flag-gated). */
 :lang(ar) body,
 [dir="rtl"] body {
-  font-family: var(--font-arabic), var(--font-inter), sans-serif;
+  font-family: var(--font-almarai), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Almarai has no 500 (the family is 300/400/700/800), so an Arabic `font-medium` heading would
+   render at 400 and lose the emphasis its Latin twin keeps. The token file's own fix: 500 becomes
+   700 inside Arabic, and nowhere else. */
+:lang(ar) [style*="font-weight: 500"],
+:lang(ar) .font-semibold,
+[dir="rtl"] .font-semibold {
+  font-weight: 700;
+}
+
+/* ── Focus ──────────────────────────────────────────────────────────────────────────────────────
+   One rule for everything focusable. `:focus-visible` rather than `:focus`, so a mouse click on a
+   button does not leave a ring behind it.
+
+   ── ONE orange line, not two (owner, 2026-09-02) ──────────────────────────────────────────────
+   *"Some focuses still show a double line. I want one consistent focus style: orange, single line,
+   across all sections and forms."*
+
+   Two things were drawing it. The ring sat 2px OUTSIDE the control, and 29 controls also turn their
+   own border brand on focus, so a focused input showed an orange border, a gap, and an orange ring
+   around that. Both were orange, which is why it read as a mistake rather than as a style.
+
+   Now the ring hugs the border box (`--ring-offset: 0`) and the border joins it, so the two are one
+   continuous orange band instead of two lines with air between them. Controls with no border of
+   their own — buttons, links, pills — are unaffected by the border rule and keep the same single
+   ring, which is what makes the style the same everywhere.
+
+   ── In `@layer base`, so a component can still opt out ────────────────────────────────────────
+   ⚠️ This rule was UNLAYERED. In Tailwind v4 an unlayered rule beats every utility, so
+   `focus-visible:outline-none` did nothing at all — three components ask for it and none of them
+   were getting it, which is a second way the same double line appeared. Inside `base`, a utility
+   wins, and a control that genuinely draws its own ring (the intake card, which rings the whole box
+   rather than the field inside it) can say so and be believed. */
+@layer base {
+  :focus-visible {
+    outline: var(--ring-focus);
+    outline-offset: var(--ring-offset);
+    border-color: var(--brand);
+  }
+}
+
+/* Inside a card that clips its own corners, the ring is drawn INSIDE the control it belongs to.
+ *
+ * `--ring-offset` pushes the outline outwards, and an outline pushed outwards inside an
+ * `overflow-hidden` parent is cut off by it — on the intake card that produced a full-width orange
+ * bar between the term pills and the textarea, which reads as a divider cutting one field into
+ * sections (owner, 2026-09-01: *"I want the focus to include the full text box as one parent, not
+ * this separate line between the boxes and the text"*).
+ *
+ * A negative offset draws the same ring against the inside of the control's own edge, so it cannot
+ * reach the parent's clip and a keyboard user still sees exactly which pill they are on. */
+@layer base {
+  .field-card :focus-visible {
+    outline-offset: -2px;
+  }
 }
 
 .material-symbols-rounded {
@@ -73,8 +634,19 @@ body {
   line-height: 1;
 }
 .tabular {
-  font-family: var(--font-plex), monospace;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
 }
+
+/* ── Control heights ────────────────────────────────────────────────────────────────────────────
+   Classes rather than an arbitrary `h-[34px]`, so a control's height and its horizontal padding
+   move together and no screen can set one without the other. `.control-icon` squares it off for a
+   button that holds nothing but a glyph. */
+.control-sm { height: var(--control-sm); padding-inline: 10px; }
+.control-md { height: var(--control-md); padding-inline: 14px; }
+.control-lg { height: var(--control-lg); padding-inline: 18px; }
+.control-sm.control-icon { width: var(--control-sm); padding-inline: 0; }
+.control-md.control-icon { width: var(--control-md); padding-inline: 0; }
+.control-lg.control-icon { width: var(--control-lg); padding-inline: 0; }
 
 /* Waving hand for the home greeting — plays a couple of times on first land. */
 @keyframes wave {
@@ -87,3 +659,463 @@ body {
   transform-origin: 70% 70%;
   animation: wave 2.2s ease 0.3s 2;
 }
+
+/* ---- Request canvas (MREQ) ----
+   A refused move shakes the blocks that caused it (MREQ-AC-02/03/15). The canvas gates its panels in
+   order and does not explain why, so the shake is the whole of the feedback — it has to be visible
+   without being alarming, hence a ring rather than a colour change on the content itself.
+   Respecting `prefers-reduced-motion` leaves the ring, which is the part that carries the meaning.
+   The ring is an outline, not an inset shadow: this app has no shadows. */
+@keyframes shake-x {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+.shake-error {
+  animation: shake-x 0.4s ease;
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+  border-radius: var(--radius-lg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shake-error {
+    animation: none;
+  }
+}
+
+/* A value carried from the previous equipment item (MREQ-AC-41) — the renter needs to see what was
+   inherited rather than chosen, so it pulses once on arrival and keeps the ring. */
+@keyframes carried-bump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.06); }
+  60% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+.carried-mark {
+  animation: carried-bump 0.5s ease-out;
+  outline: 3px solid var(--brand-pale);
+  border-radius: var(--radius-md);
+}
+@media (prefers-reduced-motion: reduce) {
+  .carried-mark {
+    animation: none;
+  }
+}
+
+/* The renter has just asked to name the machine himself, so the card POINTS at what changed: the
+   name box and the note that appeared under it (owner, 2026-09-13). A pulse and never a shake —
+   `shake-error` is this canvas's word for a REFUSAL, and nothing was refused here; the line simply
+   moved to a state he chose. Two beats, so it reads as deliberate rather than as a flicker.
+   Reduced motion keeps the outline, which is the part carrying the meaning — the same trade the
+   shake makes above. */
+@keyframes attn-glow {
+  0%   { outline-color: transparent; }
+  22%  { outline-color: var(--brand); }
+  50%  { outline-color: transparent; }
+  72%  { outline-color: var(--brand); }
+  100% { outline-color: transparent; }
+}
+.attn-pulse {
+  animation: attn-glow 1.4s ease-in-out;
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+  border-radius: var(--radius-md);
+}
+@media (prefers-reduced-motion: reduce) {
+  .attn-pulse {
+    animation: none;
+    outline-color: var(--brand);
+  }
+}
+
+/* ---- The success tick (owner, 2026-09-03) ----
+   A confirmation that a request went out is the one moment in the flow worth marking: the renter has
+   just pressed the button he came to press, and everything else on the screen is the work he did to
+   get there. A 20px glyph in a header band states it; a tick drawn in front of him CONFIRMS it.
+
+   Two movements, and they are sequenced rather than simultaneous. The disc arrives first, with a
+   small overshoot, because a circle that snaps into place reads as a rendering artefact. The check
+   is then DRAWN on it, which is the part that says "done" — a check that fades in is a picture of a
+   check, and a check that draws is an act finishing.
+
+   `stroke-dasharray` and `stroke-dashoffset` are the whole mechanism: the path is 30 units long, so
+   the dash starts fully offset (invisible) and animates to zero (complete). It needs no library and
+   no JS, and it cannot desynchronise from the disc because both are on one timeline.
+
+   Reduced motion keeps BOTH, and animates neither: the disc and the finished check are the meaning,
+   the movement is the flourish. A reader who asked for less motion still gets the answer. */
+/* ── The processing line (owner, 2026-09-13: *"show process line anyways too"*) ────────────────────
+   🔴 **INDETERMINATE, and it has to be.** The screen lost its progress bar on 2026-09-12 because
+   `processRfq` is ONE request: the server answers once, so there is no position to report and the
+   old bar was a number moving on a timer. He asked for the line back anyway, and the honest form of
+   «anyway» is a bar that says WORKING without claiming how far: a short segment travelling the
+   track, which reports nothing and hides nothing.
+
+   On a match it stops travelling and the track FILLS, which is the same news the ring and the
+   drawing are giving at that moment - the search is over.
+
+   ⚠️ Reduced motion: the segment stops moving and sits at the start of the track. A bar that is
+   there and still is the honest version for a reader who asked for no movement; removing it would
+   take away the one thing on the screen that says a request is in flight. */
+@keyframes proc-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(340%); }
+}
+.proc-seg {
+  animation: proc-slide 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .proc-seg {
+    animation: none;
+  }
+}
+
+/* ── The agent FOUND it (owner, 2026-09-13: *"when the image is found show it appear to the screen
+   like winner"*) ───────────────────────────────────────────────────────────────────────────────────
+   The processing screen flicks through the catalogue while it reads, then lands on the machine the
+   agent matched. Landing had no moment: the drawing simply swapped and a renter watching the reel
+   could not tell the answer from one more candidate.
+
+   `found-pop` overshoots to 1.12 and settles, which is what reads as ARRIVAL rather than as the next
+   frame of a reel; `found-ring` is the ring completing behind it — the search stopping. They share a
+   timeline and start together, so the ring closes as the machine lands.
+
+   ⚠️ Reduced motion keeps the RESULT and drops the flourish: the machine is still there at full size
+   and the ring is still closed. What goes is the overshoot, which is the part that is decoration. */
+@keyframes found-pop {
+  0% { transform: scale(0.62); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+/* The winner's halo: one ring thrown off the disc as the machine lands, and gone. Outside the
+   disc, which clips; and ONCE, because a repeating pulse reads as «still searching». */
+@keyframes found-halo {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+.found-halo {
+  animation: found-halo 0.7s ease-out both;
+}
+
+@keyframes found-ring {
+  0% { transform: scale(0.86); opacity: 0.35; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.found-pop {
+  animation: found-pop 0.46s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+.found-ring {
+  animation: found-ring 0.46s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .found-pop,
+  .found-ring {
+    animation: none;
+  }
+}
+
+@keyframes tick-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  55% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes tick-draw {
+  to { stroke-dashoffset: 0; }
+}
+.tick-disc {
+  animation: tick-pop 0.34s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+.tick-check {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  animation: tick-draw 0.3s 0.22s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tick-disc {
+    animation: none;
+  }
+  .tick-check {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+}
+
+/* ══ The legal documents ════════════════════════════════════════════════════════════════════════
+   `/legal/[key]` renders admin-authored HTML (privacy policy, terms of use). Tailwind resets every
+   tag to nothing, so an unstyled `<h2>` reads at body size and an `<ul>` loses its bullets — which
+   is how a rendered document still looks broken. These are the same few rules the mobile app hands
+   `HtmlWidget` (`legal_content_page.dart`): headings, paragraphs, lists, links. Scoped to the one
+   class, so nothing else in the app inherits a prose stylesheet.                                */
+.legal-doc h1, .legal-doc h2 { font-size: 17px; font-weight: 800; color: var(--navy); margin: 22px 0 8px; }
+.legal-doc h1:first-child, .legal-doc h2:first-child { margin-top: 0; }
+.legal-doc h3, .legal-doc h4 { font-size: 15px; font-weight: 800; color: var(--navy); margin: 18px 0 6px; }
+.legal-doc p { margin: 0 0 10px; }
+.legal-doc ul, .legal-doc ol { margin: 0 0 12px; padding-inline-start: 22px; }
+.legal-doc ul { list-style: disc; }
+.legal-doc ol { list-style: decimal; }
+.legal-doc li { margin: 0 0 6px; }
+.legal-doc strong, .legal-doc b { font-weight: 700; color: var(--navy); }
+.legal-doc a { color: var(--brand-deep); text-decoration: underline; text-underline-offset: 2px; }
+.legal-doc hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+.legal-doc blockquote { margin: 0 0 12px; padding-inline-start: 12px; border-inline-start: 2px solid var(--border); color: var(--muted-dark); }
+
+/* ══ The category rail on Browse ════════════════════════════════════════════════════════════════
+   A slim scrollbar for the horizontal strip of category pills (owner, 2026-09-16: *"make it thinner
+   and nicer"*). The browser's default bar is ~15px of chrome under a 28px row, so the furniture was
+   half the height of the thing it scrolled.
+
+   ⚠️ **`overflow-x: auto` STAYS on the element** — this styles the bar, it does not remove it. A
+   hidden bar on a strip that really does overflow is a row whose rest is unreachable on a trackpad
+   with no shift-scroll, which is the fault the dropdown list met on 2026-09-13.
+
+   ⚠️ Firefox takes `scrollbar-width`/`scrollbar-color` and ignores the pseudo-elements; WebKit takes
+   the pseudo-elements and ignores those two. Both are stated, so neither engine falls back to the
+   default bar.                                                                                   */
+.shop-rail { scrollbar-width: thin; scrollbar-color: var(--shop-line) transparent; }
+.shop-rail::-webkit-scrollbar { height: 6px; }
+.shop-rail::-webkit-scrollbar-track { background: transparent; }
+.shop-rail::-webkit-scrollbar-thumb { background: var(--shop-line); border-radius: 999px; }
+.shop-rail:hover::-webkit-scrollbar-thumb { background: var(--shop-ink-4); }
+
+
+/* ════════════════════════════════════════════════════════════════════════════════════════════════
+   THE NATIONAL DAY SKIN
+
+   Owner, 2026-09-16: *"can i do a national day version that stay until 1-10 and it is another
+   design theme not replacing ours so maybe just a flag"*, with the Flutter decor kit and a
+   screenshot of the app's own green header as the reference.
+
+   Everything below is scoped under `[data-season="nd"]`, which `layout.tsx` writes on `<html>`
+   between 16 September and 1 October (Asia/Riyadh). Out of season not one of these rules matches,
+   nothing above this block is overridden, and `/nd96-palms.svg` is never fetched.
+
+   🔴 **Nothing here redefines a token.** The season paints by ADDING marks to named hosts, never by
+   moving `--brand`, `--navy-deep` or `--ok` under everyone's feet. That is the whole difference
+   between a second theme and a repaint, and it is why «turn it off» is one attribute.
+
+   ⚠️ **The hosts carry their class ALL YEAR** — `.nd-bar` on the header, `.nd-decor` on its
+   backdrop span, `.nd-seam` on the dashboard band. A component that branched on the date in JS
+   would either mismatch on hydration (the server knows the date, the client re-reads it) or paint
+   navy first and flip green a frame later. An unstyled class costs nothing; a flicker on every
+   cold load for a fortnight is what it buys.
+   ════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── The bar ─────────────────────────────────────────────────────────────────────────────────────
+   `bg-navy-deep` sets a background-COLOUR, so the gradient goes on top as a background-IMAGE and the
+   navy stays underneath as the fallback the moment the season ends. The kit's own three stops. */
+[data-season="nd"] .nd-bar {
+  background-image: linear-gradient(to bottom left, var(--nd-deep) 0%, var(--nd-ground) 46%, var(--nd-mid) 100%);
+}
+
+/* ── The backdrop: the dot lattice, then the grove ───────────────────────────────────────────────
+   A real child rather than a `::before`, and deliberately. The header is `sticky z-30`, so it opens
+   a stacking context; a positioned pseudo-element would either paint OVER the logo and the tabs
+   (z-index auto, later in paint order than its non-positioned siblings) or, at `z-index: -1`, drop
+   behind the header's own background and disappear. A sibling span with the content after it in the
+   source needs no z-index at all.
+
+   The dots are 1px at 10% white on a 20px lattice — the campaign deck's own texture, and what stops
+   a flat green bar reading as a colour swatch. The grove is the file, anchored bottom and cropped by
+   `cover`, so the trunks run off the bar's own edge the way the app's do. */
+.nd-decor { display: none; }
+[data-season="nd"] .nd-decor {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    url("/nd96-palms.svg"),
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.1) 1px, transparent 1.6px);
+  background-repeat: no-repeat, repeat;
+  background-position: center bottom, 0 0;
+  background-size: cover, 20px 20px;
+}
+
+/* ── The Najdi seam ──────────────────────────────────────────────────────────────────────────────
+   One rank of gold triangles along a bottom edge — 6px tall at a 12px pitch, the kit's own numbers.
+
+   The SHAPE is a mask and the COLOUR is `--nd-accent`, rather than a gold triangle baked into a data
+   URI: a colour written inside an encoded SVG is a colour no token can reach and no sweep can find,
+   which is exactly the drift `palette-drift.test.ts` exists to catch. The mask carries black because
+   a mask reads alpha and luminance, never hue.
+
+   Both prefixes are stated: WebKit still wants `-webkit-mask` on the older Safari this product is
+   opened on. */
+[data-season="nd"] .nd-decor::after,
+[data-season="nd"] .nd-seam::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 6px;
+  background: var(--nd-accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 6'%3E%3Cpath d='M0 0h12L6 6z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 12px 6px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 6'%3E%3Cpath d='M0 0h12L6 6z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 12px 6px;
+}
+/* The seam is drawn by the host, so the host has to be a containing block. The header already is
+   (`relative`); the dashboard band is stated here rather than in a class on the element, because a
+   `relative` added to that band all year would change what its own absolute children measure
+   against. `.nd-seam` is inert out of season for the same reason. */
+[data-season="nd"] .nd-seam { position: relative; }
+
+/* ── The season chip ─────────────────────────────────────────────────────────────────────────────
+   🔴 ~~Outlined gold on the green bar, beside «Beta».~~ The bar wears the MARK now (owner,
+   2026-09-17), and this skin is left holding only the weight it is actually good at: `is-pale`, on
+   a light surface, which is the role gate's head strip.
+
+   The base rule is kept rather than folded into `.nd-chip.is-pale` because the kit ships the chip
+   in two weights and the second one — solid green on a dark ground — is still the right answer the
+   day a light card needs a louder mark. What it must not be again is a second outlined pill an inch
+   from «Beta», where two pills read as a pair of controls. */
+.nd-chip { display: none; }
+[data-season="nd"] .nd-chip {
+  align-items: center;
+  gap: 4px;
+}
+
+/* 🔴 **A width rule for a seasonal host belongs HERE, never as a utility on the element**, and
+   this is the one thing about this skin that was measured rather than reasoned about.
+
+   Tailwind emits its utilities inside `@layer utilities`; this block is UNLAYERED. Unlayered CSS
+   beats layered CSS outright, whatever the specificity and whatever the order — so
+   `[data-season="nd"] .nd-chip { display: inline-flex }` overrode
+   `.max-sm\:hidden { @media (width < 40rem) { display: none } }` at EVERY width, and the pill it
+   was written for would have ridden the phone bar all season. It typechecks, it lints, it looks
+   right on a laptop, and it is only visible at 392px in a real browser.
+
+   Same family as the `hidden md:grid` fault of 2026-09-16 and the `rounded-full` one of 2026-09-12:
+   two rules for one property, and the loser is decided somewhere the call site cannot see.
+
+   The pill is gone and the MARK carries that rule now (`@media (width >= 40rem)`, above). The chip
+   has no width rule left, because the only thing wearing it is a card's head strip, which is the
+   same shape at every width. 40rem is `sm`, read off the compiled sheet rather than assumed. */
+[data-season="nd"] .nd-chip { display: inline-flex; }
+
+/* ── The pale chip, for a LIGHT surface ───────────────────────────────────────────
+   The kit ships the chip in two weights and says which is for which: pale on a light surface, solid
+   on a dark one. The bar takes the outlined gold; a card's own head strip takes this. The ordinal
+   keeps the flag's green against the mint, which is the kit's own pairing. */
+[data-season="nd"] .nd-chip.is-pale {
+  border-color: transparent;
+  background: var(--nd-mint);
+  color: var(--nd-ink);
+}
+[data-season="nd"] .nd-chip.is-pale b { color: var(--nd-green); }
+
+/* ── The tree line, for the dashboard band ────────────────────────────────────────
+   Eight palms of varying height, which is the piece the kit says needs room — "for a splash or a
+   role gate, not a 66 dp bar". The band is 160px and full-window, which is that room; the header
+   keeps the four cut-off trees, which is what the kit says a bar should have.
+
+   ⚠️ **`-z-10`, and it must come AFTER the band's own layers in source.** The photograph, the two
+   gradients and the multiply are all at exactly that depth, so a decoration declared before them
+   paints underneath and is invisible. That is the CTA halo's fault of 2026-09-16, and the reason
+   this span sits last among the band's `-z-10` children rather than first. */
+/* 🔴 **`.nd-band` is DELETED** (owner, 2026-09-22: *"remove the palms and theme here on the
+   cta keep it as its original"*). ~~The eight-palm tree line and the dot lattice, across the
+   dashboard band.~~ Fourth treatment withdrawn from that element, after the gold seam, the dune
+   sweep and the ordinal mark: **the band takes no seasonal decoration at all**, on its edges or
+   across its face. `public/nd96-treeline.svg` went with the rule - an unused seasonal rule is one
+   edit away from returning by accident, and its own artwork is what makes that cheap. */
+
+/* 🔴 ~~The season MARK on the bar — `.nd-mark`, `.nd-mark-fig`, `.nd-mark-rule`,
+   `.nd-mark-sub`: the outlined ordinal, a 1x14 gold hairline and a small caption, laid out as a row
+   for a 52px bar.~~ REMOVED (owner, 2026-09-22: *"remove this"*, on a picture of it).
+
+   Deleted rather than left inert, the same ruling the dune sweep took below on 2026-09-17: an
+   unused seasonal rule is one edit away from coming back by accident, and the strike-through
+   carries the reasoning without carrying the code.
+
+   ⚠️ Two things worth keeping out of it, because both were learned the hard way:
+     · the width rule belonged HERE and never as a `max-sm:hidden` on the element — Tailwind emits
+       its utilities inside `@layer utilities` and this block is unlayered, so the season's own
+       `display` wins at every width. That trap outlives this mark and applies to the next one.
+     · `-webkit-text-stroke` is the only way to outline text, so an outlined figure always needs a
+       filled fallback under an `@supports`, never a guessed value.
+
+   The bar still wears the season in everything that is not words: the gradient, the dot lattice,
+   the palm grove and the gold Najdi seam. */
+
+/* 🔴 ~~The dune sweep — a shallow curved cut, in the page's own colour, along the dashboard band's
+   bottom edge.~~ WITHDRAWN (owner, 2026-09-17: *"make the cta of ai straight line as it was"*), and
+   deleted rather than left inert, `public/nd96-dune.svg` with it.
+
+   Worth keeping the reason, because the kit still ships the motif and someone will reach for it
+   again: it is the one piece here that changes a SILHOUETTE rather than adding a mark inside a box,
+   and this band's bottom edge is a structural join — the first band of the dashboard meeting the
+   page. A curve there reads as the layout having moved, not as a season. The band wears its season
+   on the inside instead (`.nd-band`, above).
+
+   Two edges were tried on it and both are gone; the band's bottom is a straight line. */
+
+/* ── The corner palm ────────────────────────────────────────────────────────
+   "The cheapest way to mark a single card as seasonal without touching its layout or its colours."
+   One oversized palm bleeding out of the trailing-bottom corner at 7% of the flag's green — a mask,
+   so the same file marks a white card in green and would mark a navy one in white.
+
+   `inset-inline-end` rather than `right`, so it leaves from the corner the reader finishes at in
+   both scripts. The host must clip it; a card that does not would let the fronds run over the page. */
+.nd-palm-corner { display: none; }
+[data-season="nd"] .nd-palm-corner {
+  display: block;
+  position: absolute;
+  /* NEGATIVE, so the tree is CUT by the card's edge rather than standing politely inside it
+     - the kit's word is «bleeding», and a palm with air on both sides of it is a sticker.
+     Logical properties, so it leaves from the corner the reader finishes at in both scripts. */
+  inset-block-end: -14px;
+  inset-inline-end: -34px;
+  /* 🔴 **142x124, and the first cut was 220x190 — measured, not guessed.** A palm taller
+     than its host shows the middle of its own trunk and none of its crown, so a card body of
+     about 100px got a pale vertical smudge rather than a tree. Seen in a browser; from the
+     source it reads as «oversized», which is what the kit asks for and what the kit's own
+     150px canvas could afford. The crown is the recognisable half, so the box is sized to put
+     the crown in the corner.
+     ⚠️ A HOST TALLER than this can take it back up; anything shorter has to come down again.
+     The rule is that the palm fits inside the box it bleeds out of. */
+  width: 142px;
+  height: 124px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--nd-green) 10%, transparent);
+  -webkit-mask: url("/nd96-corner-palm.svg") no-repeat center / contain;
+  mask: url("/nd96-corner-palm.svg") no-repeat center / contain;
+}
+
+/* ── The Najdi BAND, the interlocking rank ───────────────────────────────────────
+   The kit's louder seam: a second rank inverted into the gaps, "so it reads as a woven band rather
+   than a row of spikes". One mask, two triangles per 24px tile — the gold one pointing up from the
+   bottom, the dark one down from the top, which is what makes it interlock.
+
+   It is used where the strip is SHORT and has to carry the whole season on its own; the long edges
+   (the bar, and the band before it took the dune) keep the quiet single rank. */
+[data-season="nd"] .nd-crown::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 7px;
+  background: var(--nd-accent);
+  pointer-events: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 7'%3E%3Cpath d='M0 7h12L6 0zM12 7h12L18 0z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 24px 7px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 7'%3E%3Cpath d='M0 7h12L6 0zM12 7h12L18 0z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 24px 7px;
+}
+
+/* ── A card's head strip, in season ──────────────────────────────────────────────
+   The strip keeps its height and its type; what changes is the ground under it — the kit's gradient,
+   the dot lattice, and the woven band along its foot. `!important` is not needed and not used: the
+   strip's own `bg-surface2` is a background-COLOUR and these are background-IMAGES, so the two
+   layer rather than compete, and the colour is what remains the moment the season ends. */
+[data-season="nd"] .nd-crown {
+  position: relative;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.1) 1px, transparent 1.6px),
+    linear-gradient(to bottom left, var(--nd-deep) 0%, var(--nd-ground) 46%, var(--nd-mid) 100%);
+  background-repeat: repeat, no-repeat;
+  background-size: 20px 20px, cover;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────────────────────────
+   Nothing in this skin animates, and that is a decision rather than an omission: the kit's confetti
+   is not carried here. It would fire over the dashboard's own «your request is posted» tick, which
+   is the one moment on this product that is allowed to celebrate something. */

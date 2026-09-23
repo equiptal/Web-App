@@ -1,0 +1,118 @@
+"use client";
+
+import { use, useEffect, useState } from "react";
+import { AppShell, PageBack } from "@/components/AppShell";
+import { looksLikeHtml, sanitizeLegalHtml } from "@/lib/contract/legal-html";
+import { Icon } from "@/components/ui";
+import { Section } from "@/components/PageSection";
+import { SkeletonText } from "@/components/Skeleton";
+import { btn } from "@/lib/ds";
+import { useLocale, useT } from "@/lib/i18n";
+import type { LegalContent } from "@/app/api/app-content/[key]/route";
+
+/**
+ * `/legal/privacy-policy` and `/legal/terms-of-use` — the app's own two documents, on the web.
+ *
+ * ~~`moedatech.net/privacy` and `/terms`.~~ Both 404 (owner, 2026-08-30), and they were never right:
+ * the app does not send anyone to the marketing site for these. It routes to a `LegalContentPage`
+ * fed by `GET /app/content/{key}`, so the text is a row the product serves and the two clients read
+ * one copy of it. This is that page, on this side.
+ *
+ * The document is TEXT, not markup: the backend stores plain text with paragraph breaks, so it is
+ * rendered with `whitespace-pre-wrap` rather than parsed. Nothing here interprets it — a legal
+ * document that a renderer reshaped would be a different document from the one the app shows, and
+ * `dangerouslySetInnerHTML` over content the client did not write is worse than plain.
+ */
+export default function LegalPage({ params }: { params: Promise<{ key: string }> }) {
+  const { key } = use(params);
+  const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
+  const L = (en: string, arr: string) => (ar ? arr : en);
+
+  const [doc, setDoc] = useState<LegalContent | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    setLoading(true);
+    setFailed(false);
+    fetch(`/api/app-content/${encodeURIComponent(key)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: LegalContent) => live && setDoc(d))
+      .catch(() => live && setFailed(true))
+      .finally(() => live && setLoading(false));
+    return () => {
+      live = false;
+    };
+  }, [key, reload]);
+
+  /* The title comes from the DOCUMENT, in the reader's script, and falls back to the app's own label
+     for the route while it loads — a blank masthead reads as a page that failed. */
+  const fallbackTitle = key === "terms-of-use" ? t.profile.terms : t.profile.privacy;
+  const title = doc ? (ar ? doc.titleAr || doc.title : doc.title || doc.titleAr) : fallbackTitle;
+  const body = doc ? (ar ? doc.contentAr || doc.content : doc.content || doc.contentAr) : "";
+
+  return (
+    <AppShell title={title}>
+      <PageBack fallback="/profile" />
+      {/* ── The one page that caps its own CONTENT (owner, 2026-09-19) ───────────────────────
+          Every page is fluid since the app-wide cap was dropped (*"make the web resposive to fit
+          any screen size"*), which is right for a table, a rail or a grid of cards and wrong for a
+          legal document: measured at 1920, a paragraph here ran 1798px, about 250 characters a
+          line. The cap belongs to the CONTENT rather than to the page's gutter, which is exactly
+          the case `PAGE_MAX`'s own note reserves — `ch` on the prose, so it follows the reader's
+          own type size. */}
+      <div className="w-full max-w-[86ch] pb-10" dir={ar ? "rtl" : "ltr"}>
+        <Section title={title} hint={doc ? `${L("Version", "الإصدار")} ${doc.version}` : undefined}>
+          <div className="p-5">
+            {/* A document's worth of lines, in three paragraphs — the shape of the thing arriving. */}
+            {loading && (
+              <div className="flex flex-col gap-6">
+                <SkeletonText lines={4} />
+                <SkeletonText lines={5} />
+                <SkeletonText lines={3} />
+              </div>
+            )}
+
+            {failed && !loading && (
+              <div className="py-10 text-center">
+                <p className="text-body font-semibold text-navy">
+                  {L("This document could not be loaded.", "تعذّر تحميل هذه الوثيقة.")}
+                </p>
+                {/* Never an empty page presented as the terms: the failure says so, and offers the
+                    one thing that can fix it. */}
+                <button onClick={() => setReload((n) => n + 1)} className={btn("primary", "md", { className: "mt-4 transition" })}>
+                  <Icon name="refresh" size={16} /> {L("Try again", "أعد المحاولة")}
+                </button>
+              </div>
+            )}
+
+            {/* ── The document is HTML, and it is rendered as HTML (owner, 2026-09-07) ───────────
+                *"Privacy policy and terms of use are showing plain html — what is this issue!!"*
+                They were: `{body}` printed the markup as text, so the reader met `<h2>` and `<p>`.
+                The mobile app has rendered this field since it shipped (`legal_content_page.dart` →
+                `HtmlWidget`, styling h1-h3, p/li/span and a), and this is the web's half of it.
+
+                Through an allow-list (`sanitizeLegalHtml`), because the string arrives over the
+                network and goes in with `dangerouslySetInnerHTML` — see that file for why the list
+                is small and why there is no dependency. A document stored as plain paragraphs is
+                still printed as text, so nothing loses its line breaks. */}
+            {!loading && !failed && (
+              looksLikeHtml(body) ? (
+                <article
+                  className="legal-doc text-body leading-[1.9] text-navy"
+                  dangerouslySetInnerHTML={{ __html: sanitizeLegalHtml(body) }}
+                />
+              ) : (
+                <article className="whitespace-pre-wrap text-body leading-[1.9] text-navy">{body}</article>
+              )
+            )}
+          </div>
+        </Section>
+      </div>
+    </AppShell>
+  );
+}

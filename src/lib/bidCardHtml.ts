@@ -8,22 +8,36 @@
  *
  * `copyBidLink` therefore writes TWO clipboard flavours at once:
  *   - `text/html`  → this card. Gmail, Outlook web, Word, Notion take it.
- *   - `text/plain` → the bare URL. WhatsApp, Telegram, SMS take it, and unfurl it themselves.
+ *   - `text/plain` → **the same card in words** (`bidCardText`). WhatsApp, Telegram and SMS take it,
+ *     and unfurl the URL inside it themselves.
  * The destination picks; the user never chooses.
+ *
+ * ⚠️ The plain flavour was the BARE URL, and that was the last place the one template leaked: a
+ * renter who copied and pasted into WhatsApp sent a naked link, while the same press into Gmail sent
+ * a full card (owner, 2026-09-01). Same facts either way now.
+ *
+ * ── THE CARD SAYS MORE THAN THE IMAGE ────────────────────────────────────────────────────────────
+ * The generated image carries the logo, the reference, the machine and one line asking for the bid —
+ * and nothing else (owner, 2026-09-01). Here there is markup, so here is where the detail goes: every
+ * machine, the site and the dates, the terms, the deadline. Same model behind both, so they cannot
+ * disagree about the request; different amounts of room, so they do not carry the same load.
  *
  * ── MIRROR ────────────────────────────────────────────────────────────────────────────────────────
  * The markup below mirrors `renderBidLinkCard()` in
  * `Moedatech-App/apps/backend-admin/src/services/email/bid-link-card.ts`, which renders the same card
- * into app-sent email. Separate repos, no shared package. The WORDING is not duplicated — it comes
- * from the backend via `/api/bid-form/{token}/preview`, so only the markup is repeated here. Both
- * come from the approved prototype (`email-link-preview.html`): 1px #E1E4E8 border, 10px radius,
- * 440px wide, a 160px image band, then title / description / source domain.
+ * into app-sent email. Separate repos, no shared package. Both come from the approved prototype
+ * (`prototypes/bid-link-card-v1.html`): 1px --background border, 10px radius, 440px wide, a 160px
+ * image band, then the title, the detail rows, the app line and the source domain.
  */
+
+import { COLORS, RADII } from "@/lib/ds-colors";
+import { logoDataUri } from "@/lib/bidOgAssets";
+import type { BidCardModel } from "@/lib/bidCardModel";
 
 export interface BidCardPreview {
   title: string;
   description: string;
-  /** 880×320, displayed at 440×160 — the prototype's band. */
+  /** 1200×630, displayed at 440×160 — the prototype's band. */
   imageUrl: string;
   url: string;
 }
@@ -44,74 +58,173 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Host for the card's source-domain line — the trust signal (element 4 in the prototype). */
-function hostOf(url: string): string {
-  return url.replace(/^https?:\/\//, "").split("/")[0].toUpperCase();
+/*
+ * — `hostOf` lived here —
+ *
+ * It upper-cased the link's domain for the band's source line. Both are gone (owner, 2026-09-05):
+ * the card is inside an `<a>`, so it IS the link, and every unfurling client draws its own domain
+ * line anyway.
+ */
+
+/*
+ * — `JOIN_LINE` lived here —
+ *
+ * "New to Moedatech? Bid from the app and see every request from this renter — get the app."
+ * Removed 2026-09-03: the card is a REQUEST, and a supplier reading it is deciding whether to price
+ * a job. An advertisement at the foot of it spends his attention on something he did not ask about,
+ * in the one place we have it.
+ */
+
+/*
+ * — `row` and `block` lived here —
+ *
+ * They drew the term table: a two-column list of «Mobilization / Renter» pairs under the title.
+ * Removed 2026-09-03 because no client builds one. An unfurl has four slots — image, title,
+ * description, host — and everything a table said now rides in the description, which is the same
+ * string `og:description` carries.
+ */
+/**
+ * The navy band, drawn as MARKUP rather than fetched as a picture.
+ *
+ * `/bid/[token]/og` renders the real one, and it needs a token — which does not exist until the
+ * request does. The share panel therefore showed a generic band with nothing on it but the logo, so
+ * the most visible half of the card was the one part of the preview that was not true.
+ *
+ * This is the same four elements in the same order as that route: the mark, the reference, the
+ * equipment, the call to bid, and the host underneath. Not a replica of the pixels — a statement of
+ * the same facts, which is what a preview owes.
+ */
+function navyBand(model: BidCardModel, align: string): string {
+  const headline = escapeHtml(model.imageHeadline);
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;background:${COLORS.navy};">
+      <tr><td align="${align}" style="padding:23px 27px;height:231px;vertical-align:middle;">
+        ${
+          /* ⚠️ **The MARK, not the word** (owner, 2026-09-05: *"make sure moedatech show the
+             moedatech logo not the text"*). `MOEDATECH` in letter-spaced caps was a stand-in that
+             outlived its excuse: the real card at `/bid/<token>/og` has drawn the logo all along, so
+             the preview was showing a different brand from the thing it previews.
+
+             The same `logoDataUri` that route uses, white on navy. A data URI rather than a path,
+             because this markup is also what a paste carries into a mail client, and a client
+             fetching `/moedatech-logo.svg` from wherever it happens to be would fetch nothing.
+
+             ⚠️ **Every number here is the rendered card's, scaled by 440/1200.** They were
+             eyeballed before, and the two drew the same facts at visibly different sizes — the panel
+             showed one card before the post and another after it (owner, 2026-09-06: *"the preview
+             still show a template card before the request different from post request, make sure it
+             is always the same and as sent"*).
+
+             `route.tsx` draws at 1200 x 630 with 62/74 padding, a 228 x 86 mark, a 78px headline
+             (56 when it runs long), a 37px call to bid and -1.5 letter-spacing. At 0.3667 that is
+             23/27, 84 x 32, 29 (21), 14 and -0.55, which is what this now uses. The box is given
+             the scaled height, 231, with the content centred, so the vertical rhythm matches too.
+
+             🔴 **Change one and change the other.** They are two renderers of one picture: this
+             markup stands in until a token exists, and the PNG replaces it the moment one does. A
+             number edited on one side alone puts the difference straight back.
+
+             ⚠️ The ground is `COLORS.navy`, which IS `--navy` from `globals.css` — a test pins
+             the two files together. Satori cannot read a CSS variable, so the hex travels through
+             `ds-colors.ts` rather than the card inventing a navy of its own. */ ""
+        }
+        <img src="${logoDataUri(COLORS.surface)}" alt="Moedatech" width="84" height="32" style="display:block;width:84px;max-width:84px;height:auto;border:0;outline:none;">
+        <div style="font-size:${headline.length > 46 ? 21 : 29}px;font-weight:700;color:${COLORS.surface};line-height:1.1;letter-spacing:-0.55px;padding-top:26px;">${headline}</div>
+        <div style="font-size:14px;font-weight:700;letter-spacing:0.07px;color:${model.accepting ? COLORS.brand : COLORS.dangerHover};padding-top:14px;">${escapeHtml(model.cta)}</div>
+        ${
+          /* ⚠️ ~~The host, small and grey under the call to bid.~~ Removed (owner, 2026-09-05).
+             It was a trust signal when the card was the whole message, and it is noise now: the
+             whole block is inside an `<a>`, so the card IS the link, and `WEB-PRODUCTION-DE3C8.
+             UP.RAILWAY.APP` under a request reads as machinery rather than as reassurance. The same
+             line was removed from the white half on 2026-09-03; this copy was missed. */ ""
+        }
+      </td></tr>
+    </table>`;
 }
 
-/**
- * Table-based with inline styles, because that is what survives a paste into Gmail and Outlook —
- * both strip `<style>` blocks and ignore flex/grid. The image is a fixed 160px band rather than
- * `object-fit: cover`, which Outlook does not support; the asset is already that shape.
- */
-export function bidCardHtml(card: BidCardPreview, lang: "en" | "ar" = "en"): string {
+export function bidCardHtml(card: BidCardPreview, model: BidCardModel | null, lang: "en" | "ar" = "en"): string {
   const dir = lang === "ar" ? "rtl" : "ltr";
   const align = lang === "ar" ? "right" : "left";
   const url = escapeHtml(card.url);
 
+  /*
+   * — `bandIsMarkup` lived here —
+   *
+   * 🔴 It suppressed the white title block whenever the band was drawn as markup, on the reasoning
+   * that the band already carries the headline. True, and the PICTURE carries it too — so the real
+   * card, the one a supplier unfurls, shows the machine twice and this showed it once.
+   *
+   * The result was a card that changed shape the moment a request was posted: a tall band and
+   * nothing under it before, a smaller band over a white block with the title and the site after
+   * (owner, 2026-09-07, with the two side by side). Whatever the repetition costs, the preview's job
+   * is to be the thing, not to improve on it.
+   */
+  const title = model?.cardTitle || card.title;
+
+  /**
+   * ── The card names the request; the MESSAGE carries the detail (owner, 2026-09-03) ───────────
+   *
+   * *"i want them as points not like this will never be read by user, i want them part of the text
+   * message of this link preview like below the image."*
+   *
+   * `bidCardDescription` put nine facts in one grey paragraph that wrapped to four lines — site,
+   * dates, deadline, four responsibilities, year, certificate, all separated by middots. Nobody
+   * reads that. It is what `og:description` has to be, because Open Graph has one description slot
+   * and no others; but our own card is not obliged to imitate a limitation.
+   *
+   * So the card keeps what an unfurl can genuinely show — picture, name, host — and every term
+   * becomes a line in the message underneath, where it can be scanned.
+   */
+  const description = model ? model.where : card.description;
+
   return `<a href="${url}" style="text-decoration:none;color:inherit;display:block;max-width:440px;">
-  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid #E1E4E8;border-radius:10px;border-collapse:separate;overflow:hidden;background:#ffffff;font-family:'Segoe UI',Roboto,Arial,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="440" dir="${dir}" style="width:440px;max-width:100%;border:1px solid ${COLORS.background};border-radius:${RADII.md};border-collapse:separate;overflow:hidden;background:${COLORS.surface};font-family:'Segoe UI',Roboto,Arial,sans-serif;">
     <tr><td style="padding:0;line-height:0;">
-      <img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="160" style="display:block;width:440px;max-width:100%;height:160px;border:0;outline:none;text-decoration:none;background-color:#1C3550;">
+      ${
+        /* The real rendering when there is one; the same facts in markup when there is not yet a
+           request to render. An `<img>` pointing at the generic file drew a band with nothing on it,
+           which is the half of the card a supplier sees first. */
+        card.imageUrl
+          ? /* ⚠️ 440 × 231, which is 1200 × 630 to scale. It was drawn at 440 × 160 — a 2.75:1 box
+               for a 1.9:1 picture — so every card squashed the mark and the headline vertically
+               (owner, 2026-09-03: *"the image text has wierd dimentions"*). Both attributes AND the
+               style carry it, because Outlook reads the attributes and ignores the style. */
+            `<img src="${escapeHtml(card.imageUrl)}" alt="" width="440" height="231" style="display:block;width:440px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none;background-color:${COLORS.navy};">`
+          : model
+            ? navyBand(model, align)
+            : ""
+      }
     </td></tr>
     <tr><td align="${align}" style="padding:14px 16px 16px;">
-      <div style="font-size:13.5px;font-weight:700;color:#1a1a1a;line-height:1.35;">${escapeHtml(card.title)}</div>
-      <div style="font-size:11.5px;color:#6B7280;line-height:1.4;padding-top:7px;">${escapeHtml(card.description)}</div>
-      <div style="font-size:10.5px;color:#9AA0A6;letter-spacing:0.4px;padding-top:7px;">${escapeHtml(hostOf(card.url))}</div>
+      ${
+        /* ⚠️ The picture already names the machine and asks for the bid, so a title here is the same
+           words again twenty pixels lower. What an unfurl needs under the image is the ONE thing the
+           image cannot be trusted to carry: where the link goes. The detail lives in the message
+           below the card, as lines a supplier can scan (owner, 2026-09-03). */
+        ""
+      }
+      ${title ? `<div style="font-size:13px;font-weight:700;color:${COLORS.foreground};line-height:1.35;">${escapeHtml(title)}</div>` : ""}
+      ${description ? `<div style="font-size:12px;color:${COLORS.mutedDark};line-height:1.5;padding-top:4px;">${escapeHtml(description)}</div>` : ""}
+      ${
+        /* ── No host line (owner, 2026-09-03: *"remove this web.prod url view in the card just
+             opening it wil open the link"*) ───────────────────────────────────────────────────
+           It was there as a trust signal, and it earned its place when the card was the whole
+           message. It is noise now: the card IS the link — the whole block is inside an `<a>` — and
+           a raw railway.app hostname under a request reads as machinery rather than as
+           reassurance. WhatsApp, Telegram and Slack draw their own domain line under an unfurl
+           regardless, so nothing is lost where it was doing work. */
+        ""
+      }
     </td></tr>
   </table>
 </a>`;
 }
 
-/**
- * Put the link on the clipboard as both the card and the plain URL.
+/*
+ * ── `copyBidLink` lived here ────────────────────────────────────────────────────────────────────
  *
- * Falls back to writing just the URL when the rich path isn't available — an insecure context, an
- * older browser, a failed preview fetch, or a `ClipboardItem` the browser refuses. The user always
- * ends up with a working link; the card is the enhancement.
- *
- * Returns `true` when the card went on the clipboard, so the caller can say so.
+ * It wrote the card to the clipboard in two flavours, and it rendered the DEFAULT wording: no
+ * greeting the renter had written, no company name. `copyShareMessage` does the same two-flavour
+ * write from the renter's own template, so keeping this one meant one dialog could put two
+ * different messages on the clipboard depending on which Copy was pressed. Removed rather than
+ * wrapped: a second clipboard writer is a second message waiting to happen.
  */
-export async function copyBidLink(shareUrl: string, lang: "en" | "ar" = "en"): Promise<boolean> {
-  const plain = () => navigator.clipboard?.writeText(shareUrl);
-
-  const token = bidTokenFromUrl(shareUrl);
-  // `ClipboardItem` is undefined in non-secure contexts and older Safari.
-  if (!token || typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
-    await plain();
-    return false;
-  }
-
-  try {
-    const res = await fetch(`/api/bid-form/${encodeURIComponent(token)}/preview`);
-    if (!res.ok) throw new Error(String(res.status));
-    const p = (await res.json()) as Partial<BidCardPreview> & { en?: BidCardPreview; ar?: BidCardPreview };
-    const copy = lang === "ar" ? p.ar : p.en;
-    const title = copy?.title ?? p.title;
-    const description = copy?.description ?? p.description;
-    if (!title || !description || !p.imageUrl) throw new Error("incomplete preview");
-
-    const html = bidCardHtml({ title, description, imageUrl: p.imageUrl, url: shareUrl }, lang);
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        "text/html": new Blob([html], { type: "text/html" }),
-        "text/plain": new Blob([shareUrl], { type: "text/plain" }),
-      }),
-    ]);
-    return true;
-  } catch {
-    // Never leave the user with nothing because the card failed.
-    await plain().catch(() => {});
-    return false;
-  }
-}

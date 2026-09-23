@@ -12,6 +12,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useT } from "@/lib/i18n";
+import { btn } from "@/lib/ds";
 
 // Fix default marker icon (leaflet + bundler issue)
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
@@ -39,6 +40,14 @@ interface MapLocationPickerProps {
   label?: string | null;
   onChange: (lat: number, lng: number, address: string) => void;
   height?: string;
+  /**
+   * Suppress the resolved-address line under the map.
+   *
+   * For a caller that needs the address on ONE row with a control of its own beside it. The line is
+   * not moved into a slot here on purpose: this component is `next/dynamic` and renders as nothing until
+   * it loads (and as nothing at all under jsdom), so anything gating a step must not live inside it.
+   */
+  hideAddress?: boolean;
 }
 
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
@@ -81,7 +90,7 @@ function MapClickHandler({ onClick }: { onClick: (lat: number, lng: number) => v
   return null;
 }
 
-export default function MapLocationPicker({ value, label, onChange, height = "300px" }: MapLocationPickerProps) {
+export default function MapLocationPicker({ value, label, onChange, height = "300px", hideAddress }: MapLocationPickerProps) {
   const t = useT();
   const mp = t.step1.location.mapPicker;
   const [searchInput, setSearchInput] = useState("");
@@ -196,7 +205,7 @@ export default function MapLocationPicker({ value, label, onChange, height = "30
           <Search className="absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
           <input
             type="text"
-            className="w-full rounded-lg border border-border bg-surface ps-8 pe-8 py-2 text-sm outline-none focus:border-brand"
+            className="w-full rounded-sm border border-border bg-surface ps-8 pe-8 py-2 text-body outline-none focus:border-brand"
             placeholder={mp.searchPlaceholder}
             aria-label={mp.searchPlaceholder}
             value={searchInput}
@@ -215,18 +224,18 @@ export default function MapLocationPicker({ value, label, onChange, height = "30
 
           {/* Type-ahead suggestions — clear, full address per row. */}
           {open && suggestions.length > 0 && (
-            <ul className="absolute z-[1000] mt-1 max-h-64 w-full overflow-auto rounded-lg border border-border bg-surface py-1 shadow-lg">
+            <ul className="absolute z-[1000] mt-1 max-h-64 w-full overflow-auto rounded-sm border border-border bg-surface py-1">
               {suggestions.map((s, i) => (
                 <li key={`${s.lat},${s.lng},${i}`}>
                   <button
                     type="button"
                     onClick={() => select(s.lat, s.lng, s.display)}
-                    className="flex w-full items-start gap-2 px-3 py-2 text-start text-sm hover:bg-surface2"
+                    className="flex w-full items-start gap-2 px-3 py-2 text-start text-body hover:bg-surface2"
                   >
                     <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-brand" />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">{s.primary}</span>
-                      <span className="block truncate text-xs text-muted">{s.display}</span>
+                      <span className="block truncate text-label text-muted">{s.display}</span>
                     </span>
                   </button>
                 </li>
@@ -239,19 +248,19 @@ export default function MapLocationPicker({ value, label, onChange, height = "30
           onClick={handleMyLocation}
           title={mp.useMyLocation}
           aria-label={mp.useMyLocation}
-          className="flex items-center rounded-lg border border-border px-2.5 py-2 text-xs hover:bg-background"
+          className={btn("secondary", "md", { className: "flex" })}
         >
           <Navigation className="h-3.5 w-3.5 text-muted" />
         </button>
       </div>
 
-      <div style={{ height }} className="overflow-hidden rounded-lg border border-border">
+      <div style={{ height }} className="overflow-hidden rounded-sm border border-border">
         <MapContainer center={[center.lat, center.lng]} zoom={value ? 15 : 12} style={{ height: "100%", width: "100%" }} ref={mapRef}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {value && (
+          {value && !hideAddress && (
             <Marker
               position={[value.lat, value.lng]}
               draggable
@@ -273,13 +282,13 @@ export default function MapLocationPicker({ value, label, onChange, height = "30
 
       {/* Chosen location as TEXT (the address), with coordinates as a secondary line. */}
       {value && (
-        <div className="flex items-start gap-1.5 rounded-lg border border-border bg-surface2 px-3 py-2">
+        <div className="flex items-start gap-1.5 rounded-sm border border-border bg-surface2 px-3 py-2">
           <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-brand" />
-          <div className="min-w-0 text-sm">
+          <div className="min-w-0 flex-1 text-body">
             <div className="font-semibold leading-tight">
               {resolved || (resolving ? mp.locating : label?.trim() || mp.pinnedNoAddress)}
             </div>
-            <div className="text-[11px] text-muted">{value.lat.toFixed(6)}, {value.lng.toFixed(6)}</div>
+            <div className="text-label text-muted">{value.lat.toFixed(6)}, {value.lng.toFixed(6)}</div>
           </div>
         </div>
       )}

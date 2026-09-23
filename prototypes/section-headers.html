@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8" />
+<title>Section headers — options</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500;600&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,400,0..1,0&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --navy-deep:#16263f; --navy:#1c3550; --navy-mid:#2a4f72;
+    --muted-dark:#5a6b82; --muted:#6b8fa8; --muted-light:#9aa7b8;
+    --border-strong:#c3d2e0; --border:#d4e0ec;
+    --surface3:#e4edf5; --surface2:#eff4f9; --background:#f5f8fc; --surface:#fff;
+    --brand:#f79009; --brand-deep:#b45309; --brand-soft:#fff4e5;
+    --t-label:11px; --t-meta:12.5px; --t-body:13px; --t-subhead:15px; --t-title:17px; --t-display:22px;
+    --c-sm:30px; --c-md:34px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--background);color:var(--navy);
+    font-family:"Nunito",-apple-system,"Segoe UI",Roboto,sans-serif;font-size:var(--t-body);line-height:1.5}
+  h1,h2{margin:0;font-weight:800;letter-spacing:-.02em;line-height:1.25}
+  .icon{font-family:"Material Symbols Rounded";line-height:1;display:inline-block;
+    -webkit-font-feature-settings:"liga";font-variation-settings:"opsz" 24,"wght" 400,"FILL" 0}
+  .wrap{max-width:1240px;margin:0 auto;padding:28px}
+  .lead{color:var(--muted);font-size:var(--t-meta);margin:6px 0 26px}
+  .case{margin-bottom:34px}
+  .tag{font-family:"IBM Plex Mono",monospace;font-size:var(--t-label);letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted-light);margin-bottom:8px}
+  .panel{background:var(--surface);border:1px solid var(--border);height:64px;
+    display:flex;align-items:center;padding:0 14px;color:var(--muted-light);font-size:var(--t-meta)}
+  .sum{color:var(--muted);font-size:var(--t-meta)}
+  .sum b{color:var(--navy);font-weight:800}
+  .btn{display:inline-flex;align-items:center;gap:6px;height:var(--c-md);padding:0 14px;
+    background:var(--brand);color:#fff;font-size:var(--t-body);font-weight:700;border:0;cursor:pointer}
+  .btn .icon{font-size:var(--t-subhead)}
+  .spacer{flex:1}
+
+  /* ── A · band with a navy edge (what the dashboard uses now) ─────────── */
+  .a{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);
+    border-inline-start:3px solid var(--navy);padding:11px 14px;margin-bottom:12px}
+  .a h2{font-size:var(--t-title);text-transform:uppercase;letter-spacing:.04em}
+  .a h2::after{content:"";display:inline-block;width:1px;height:13px;background:var(--border);
+    margin-inline-start:12px;vertical-align:-2px}
+
+  /* ── B · editorial rule: no box, a hairline across the page ──────────── */
+  .b{display:flex;align-items:baseline;gap:14px;padding-bottom:9px;margin-bottom:12px;
+    border-bottom:2px solid var(--navy)}
+  .b h2{font-size:var(--t-display)}
+
+  /* ── C · file tab attached to the panel ──────────────────────────────── */
+  .c{display:flex;align-items:flex-end;gap:0;margin-bottom:0}
+  .c .tabx{display:inline-flex;align-items:center;gap:10px;background:var(--navy);color:#fff;
+    padding:9px 16px;font-size:var(--t-body);font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+  .c .rest{flex:1;display:flex;align-items:center;gap:12px;padding:0 14px 8px}
+
+  /* ── D · title, then a rule that fills the gap, then the numbers ─────── */
+  .d{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+  .d h2{font-size:var(--t-display);flex:none}
+  .d .rule{flex:1;height:1px;background:var(--border)}
+
+  /* ── E · mono index + title, quiet ───────────────────────────────────── */
+  .e{display:flex;align-items:baseline;gap:12px;padding-bottom:10px;margin-bottom:12px;
+    border-bottom:1px solid var(--border)}
+  .e .no{font-family:"IBM Plex Mono",monospace;font-size:var(--t-meta);color:var(--brand-deep);font-weight:600}
+  .e h2{font-size:var(--t-title);text-transform:uppercase;letter-spacing:.06em}
+
+  /* ── F · solid navy bar, sitting on the panel ────────────────────────── */
+  .f{display:flex;align-items:center;gap:12px;background:var(--navy);color:#fff;padding:10px 14px}
+  .f h2{color:#fff;font-size:var(--t-body);text-transform:uppercase;letter-spacing:.08em}
+  .f .sum{color:rgba(255,255,255,.72)}
+  .f .sum b{color:#fff}
+  .f .btn{background:#fff;color:var(--navy)}
+
+  /* ── G · icon plate + stacked title and summary ──────────────────────── */
+  .g{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .g .plate{width:38px;height:38px;background:var(--navy);color:#fff;display:grid;place-items:center;flex:none}
+  .g .plate .icon{font-size:var(--t-display)}
+  .g h2{font-size:var(--t-title)}
+  .g .sum{display:block;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Section headers</h1>
+  <p class="lead">Same content in every option — title, summary, action — so only the treatment differs. Pick a letter.</p>
+
+  <div class="case">
+    <div class="tag">A · band with a navy edge — current</div>
+    <div class="a"><h2>My Projects</h2><span class="sum"><b>3</b> projects · <b>8</b> units awarded</span>
+      <span class="spacer"></span><button class="btn"><span class="icon">add</span>Assign new request</button></div>
+    <div class="panel">the panel this header introduces</div>
+  </div>
+
+  <div class="case">
+    <div class="tag">B · editorial rule — no box, one heavy hairline</div>
+    <div class="b"><h2>My Projects</h2><span class="sum"><b>3</b> projects · <b>8</b> units awarded</span>
+      <span class="spacer"></span><button class="btn"><span class="icon">add</span>Assign new request</button></div>
+    <div class="panel">the panel this header introduces</div>
+  </div>
+
+  <div class="case">
+    <div class="tag">C · file tab — the header is attached to the panel</div>
+    <div class="c"><span class="tabx">My Projects</span>
+      <span class="rest"><span class="sum"><b>3</b> projects · <b>8</b> units awarded</span>
+      <span class="spacer"></span><button class="btn"><span class="icon">add</span>Assign new request</button></span></div>
+    <div class="panel">the panel this header introduces</div>
+  </div>
+
+  <div class="case">
+    <div class="tag">D · title · rule · numbers</div>
+    <div class="d"><h2>My Projects</h2><span class="rule"></span>
+      <span class="sum"><b>3</b> projects · <b>8</b> units awarded</span>
+      <button class="btn"><span class="icon">add</span>Assign new request</button></div>
+    <div class="panel">the panel this header introduces</div>
+  </div>
+
+  <div class="case">
+    <div class="tag">E · mono index — quiet, and it numbers the page</div>
+    <div class="e"><span class="no">02</span><h2>My Projects</h2>
+      <span class="sum"><b>3</b> projects · <b>8</b> units awarded</span>
+      <span class="spacer"></span><button class="btn"><span class="icon">add</span>Assign new request</button></div>
+    <div class="panel">the panel this header introduces</div>
+  </div>
+
+  <div class="case">
+    <div class="tag">F · solid navy bar — the header IS the panel's top</div>
+    <div class="f"><h2>My Projects</h2><span class="sum"><b>3</b> projects · <b>8</b> units awarded</span>
+      <span class="spacer"></span><button class="btn"><span class="icon">add</span>Assign new request</button></div>
+    <div class="panel">the panel this header introduces</div>
+  </div>
+
+  <div class="case">
+    <div class="tag">G · icon plate, title over summary</div>
+    <div class="g"><span class="plate"><span class="icon">apartment</span></span>
+      <span><h2>My Projects</h2><span class="sum"><b>3</b> projects · <b>8</b> units awarded</span></span>
+      <span class="spacer"></span><button class="btn"><span class="icon">add</span>Assign new request</button></div>
+    <div class="panel">the panel this header introduces</div>
+  </div>
+</div>
+</body>
+</html>

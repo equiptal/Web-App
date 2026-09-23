@@ -1,0 +1,1216 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { fmt, useLocale, useT } from "@/lib/i18n";
+import { useSession } from "@/lib/session";
+import { Icon } from "@/components/ui";
+import { PAGE_MAX, PAGE_X } from "@/components/AppShell";
+import { Skeleton } from "@/components/Skeleton";
+import { SignInPrompt } from "@/components/common/SignInPrompt";
+import { GuestRequestsPreview, GuestWall } from "@/components/common/GuestWall";
+import { cancelRequest, fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
+import {
+  cancelBlockedReason,
+  cancellableItems,
+  groupBiddingClosed,
+  groupRequests,
+  isBiddingClosed,
+  requestCodeOf,
+  type RequestGroup,
+} from "@/lib/contract/requests";
+import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import {
+  EMPTY_SELECTION,
+  filterBySource,
+  railTiles,
+  isNewEntryRequest,
+  resolveSelection,
+  selectedGroup,
+  selectedItem,
+  sourceCounts,
+  type SourceFilter,
+  type WorkspaceBid,
+  type WorkspaceSelection,
+} from "@/lib/contract/workspace";
+import { RequestRail } from "@/components/workspace/RequestRail";
+import { hiddenRequests, hideRequest } from "@/lib/access/hidden-requests";
+import { HIDE_BIDLESS_REQUESTS } from "@/lib/flags";
+import { RequestContextBar } from "@/components/workspace/RequestContextBar";
+import { ItemTier } from "@/components/workspace/ItemTier";
+import { BidCards } from "@/components/workspace/BidCards";
+import { CompareMatrix } from "@/components/workspace/CompareMatrix";
+import { AiRankPanel } from "@/components/workspace/AiRankPanel";
+import { BidSizeFilter } from "@/components/workspace/BidSizeFilter";
+import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
+import { ConfirmCancelModal } from "@/components/requests/RequestEditModals";
+import { computeCycleTotals } from "@/lib/contract/cycle-totals";
+import { buildCompareSheet, type SheetMoneyCol } from "@/lib/export/compare-sheet";
+import { formatSar } from "@/lib/pricing/rental";
+import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
+import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
+import { quotationDownloadName } from "@/lib/compare/quotation-token";
+import { btn, cx } from "@/lib/ds";
+import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
+import { BIDS_POLL_MS, useLiveTick } from "@/lib/live/useLiveTick";
+import { pin } from "@/lib/uiPins";
+
+type Tab = "cards" | "compare";
+
+/**
+ * The requests workspace — one page for every request, its items and its bids, replacing the old
+ * list / detail / comparison trio (docs/implementation-plans/requests-workspace/plan.md).
+ *
+ * This is phase 1: the rail, the strip, the tabs and the selection that drives them. The two panes
+ * arrive with phases 2 (cards) and 3 (compare).
+ *
+ * **Selection is never trusted, only resolved.** The three choices are held as ids, and
+ * `resolveSelection` re-reads them against the data on every render — so a request that closed, an
+ * item that belongs to another group, or a bid from the item you just left can never be what the
+ * page is showing. Nothing here has to remember to clean up after a change.
+ */
+export function RequestsWorkspace() {
+  const t = useT();
+  const { locale } = useLocale();
+  const ar = locale === "ar";
+  const { status, tier } = useSession();
+
+  const [groups, setGroups] = useState<RequestGroup[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [bids, setBids] = useState<WorkspaceBid[]>([]);
+  // The submission behind each off-platform card, kept so its viewer has the original to show.
+  const [submissionsByBid, setSubmissionsByBid] = useState<Record<string, LinkBidSubmission>>({});
+  // Unread chat per bid. `fetchDealRoomUnread` is one global total for the Inbox badge; the per-bid
+  // number lives on received-bids, which reads it out of Stream's own per-channel counts.
+  const [unreadByBid, setUnreadByBid] = useState<Record<string, number>>({});
+  /** Each bid's supplier mark as a SIGNED link, from the received-bids list (2026-09-23). */
+  const [logoByBid, setLogoByBid] = useState<Record<string, string | null>>({});
+  const [wanted, setWanted] = useState<WorkspaceSelection>(EMPTY_SELECTION);
+  const [tab, setTab] = useState<Tab>("cards");
+  const [source, setSource] = useState<SourceFilter>("all");
+  /* ── Bids offering a LARGER machine (owner, 2026-09-08) ───────────────────────────────────────
+     The backend answers `exact` unless asked otherwise, and `exact` DROPS every bid whose machine
+     is bigger than the one the renter asked for. So this is not a filter over `bids`: it is part of
+     the request for them, and flipping it refetches. `largerHeld` is the envelope's own count,
+     taken before that filter runs, so it says how many such bids exist either way.
+
+     Held at the WORKSPACE, not per item: a renter who asked to see larger machines has answered a
+     question about what he will consider, not about one line of his RFQ. */
+  const [showLarger, setShowLarger] = useState(false);
+  const [largerHeld, setLargerHeld] = useState(0);
+  const [reloads, setReloads] = useState(0);
+  /* ── The open drawer is a STEP, so it lives in the URL (owner, 2026-09-07) ────────────────────
+     *"Back must take the user back to the step he was in, not only the page screen."*
+
+     ~~`useState(false)`.~~ The drawer is where a renter reads the request and where he presses the
+     rows that lead OUT of this page — edit, the map, the bid form. Held in component state, leaving
+     recorded `/requests?r=…` on the trail and coming back drew the page with the drawer shut, which
+     is not the step he left. `?open=details|share|cancel` is one history entry, so Back reopens it
+     on the door he was reading and Close is the same motion. `useUrlOverlay` holds the mechanics. */
+  const drawer = useUrlOverlay("open");
+  const drawerOpen = drawer.value !== null;
+  // «Share» on the strip is the same drawer, entered at its share sheet…
+  const drawerShare = drawer.value === "share";
+  // …and «Cancel» is the same drawer entered at its confirm step, for the dashboard's row action.
+  const drawerCancel = drawer.value === "cancel";
+  // The public bid link's own settings, which the share sheet edits.
+  const [link, setLink] = useState<ShareLinkMeta | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  /**
+   * The agent's read of the comparison, held HERE rather than inside the matrix (owner, 2026-08-25).
+   *
+   * Two surfaces show it — the ★ beside the supplier's name in the table, and the suggestion bar
+   * under the card — and the bar sits outside the matrix's own border, so one of them would have been
+   * reading the other's local state.
+   */
+  const [ranking, setRanking] = useState<{ bidId: string | null; note: string | null } | null>(null);
+  /**
+   * The selected request's own code, when the LIST row arrived without one.
+   *
+   * `GET /marketplace/my-requests` returns neither `displayId` nor `shortCode`, though creation
+   * mints the code and answers with it — so the strip had nothing human to name the request by and was
+   * printing the head of a cuid. The detail record is the next place to ask, and the drawer already
+   * fetches it for Edit; this asks for the code alone, once per item, and only when it is missing.
+   */
+  const [fetchedCode, setFetchedCode] = useState<string | null>(null);
+
+  // ── The renter's requests ──
+  useEffect(() => {
+    if (status !== "authed") return;
+    let live = true;
+    setFailed(false);
+    fetchAllMyRequests()
+      .then((r) => live && setGroups(groupRequests(r.requests)))
+      .catch(() => {
+        if (!live) return;
+        setGroups([]);
+        setFailed(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [status, reloads]);
+
+  const resolved = useMemo(() => {
+    const all = groups ?? [];
+    /* 🔴 **DEMO ONLY**, and it is what makes the rail filter below actually hold. `resolveSelection`
+       falls back to `groups[0]` — the NEWEST request — and a tile that is the page's own subject is
+       kept on the rail whatever else says otherwise. So landing on a bidless request would draw the
+       very circle `HIDE_BIDLESS_REQUESTS` exists to remove. With the flag on, the fallback chooses
+       among the requests that have bids instead.
+
+       ⚠️ Only when nothing is WANTED. A group named by the URL or by a press is resolved against the
+       whole list, so a deliberate visit to a bidless request still works and still shows its tile. */
+    const pool =
+      HIDE_BIDLESS_REQUESTS && !wanted.groupId && all.some((g) => g.totalBids > 0)
+        ? all.filter((g) => g.totalBids > 0)
+        : all;
+    return resolveSelection(pool, bids, wanted);
+  }, [groups, bids, wanted]);
+  /** What is open RIGHT NOW, for the entry reader — see `appliedR`. A ref, not state: it is read
+   *  inside an effect to tell an arrival from an echo, and reading it must not schedule a render. */
+  const resolvedItemId = useRef<string | null>(null);
+  const group = useMemo(() => selectedGroup(groups ?? [], resolved), [groups, resolved]);
+  const item = useMemo(() => selectedItem(groups ?? [], resolved), [groups, resolved]);
+
+  // ── The selected item's bids: those placed through the app, then those that arrived off it ──
+  // Keyed on the item, so switching item drops the previous item's bids rather than showing them
+  // against the wrong machine while the new ones load.
+  const itemId = resolved.itemId;
+  /* ── A bid that lands while he is reading is ON the page (owner, 2026-09-17) ──────────────────
+     *"i want all bids recieved in real time directly in cards and in compare and in the bids list on
+     home page"*. This read used to happen once per item and never again, so a supplier could answer
+     while the renter sat on the very screen that shows the answer and he would learn nothing until
+     he reloaded. The tick re-runs it; `useLiveTick` is what keeps it off a hidden tab and makes the
+     return to the tab a read of its own. */
+  const bidTick = useLiveTick(BIDS_POLL_MS);
+  /** The item this state belongs to, so a TICK can refresh in place while an item CHANGE empties
+   *  first. Without the distinction every poll would blank both panes for the length of a round
+   *  trip - the cards would flash their «No bids yet» and the table would fold to nothing. */
+  const loadedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (status !== "authed" || !itemId) {
+      loadedFor.current = null;
+      setBids([]);
+      setSubmissionsByBid({});
+      return;
+    }
+    let live = true;
+    // The size filter changes WHICH bids the backend answers with, so it is part of the identity of
+    // what is on screen: switching it is an item change, not a refresh.
+    const key = `${itemId}|${showLarger}`;
+    if (loadedFor.current !== key) {
+      loadedFor.current = key;
+      setBids([]);
+      setSubmissionsByBid({});
+      setLargerHeld(0);
+    }
+    Promise.all([
+      fetchBids(itemId, showLarger).catch(() => ({ bids: [], sizeCounts: undefined })),
+      fetchRequestSubmissions(itemId).catch(() => ({ submissions: [] as Awaited<ReturnType<typeof fetchRequestSubmissions>>["submissions"] })),
+    ]).then(([app, link]) => {
+      if (!live) return;
+      // One card per item of a submission — an off-platform supplier can answer several lines of the
+      // same RFQ in one go, and each line is its own offer to compare.
+      const offline = link.submissions.flatMap((sub) =>
+        (sub.items.length ? sub.items : [undefined]).map((it) => ({ bid: { card: submissionToBidCard(sub, it), source: "offline" } as WorkspaceBid, sub })),
+      );
+      setBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
+      // What the size filter is worth on this item, whichever way it is currently set.
+      setLargerHeld(app.sizeCounts?.larger ?? 0);
+      setSubmissionsByBid(Object.fromEntries(offline.map((o) => [o.bid.card.id, o.sub])));
+      // The same call already carries the public bid link's settings; the drawer's share sheet edits
+      // them, so keep them rather than throwing them away with the rest of the envelope.
+      setLink(
+        "renterName" in link
+          ? { renterName: link.renterName, bidDeadline: link.bidDeadline, logoUrl: link.logoUrl }
+          : null,
+      );
+    });
+    return () => {
+      live = false;
+    };
+  }, [status, itemId, showLarger, bidTick]);
+
+  // The code the list row lacked. One call, keyed on the item, dropped the moment the item changes so
+  // a stale code can never sit over the wrong request.
+  useEffect(() => {
+    setFetchedCode(null);
+    if (status !== "authed" || !itemId) return;
+    const row = (groups ?? []).flatMap((g) => g.items).find((i) => i.id === itemId);
+    if (!row || row.code) return; // the list already carried it
+    let live = true;
+    fetchRequestDetail(itemId)
+      .then((rec) => live && setFetchedCode(requestCodeOf(rec as unknown as Record<string, unknown>)))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [status, itemId, groups]);
+
+  // Unread is per bid across every request, so it is fetched once for the session rather than per
+  // item — switching item does not change anyone's unread count.
+  useEffect(() => {
+    if (status !== "authed") return;
+    let live = true;
+    fetchReceivedBids()
+      .then((r) => {
+        if (!live) return;
+        setUnreadByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.unreadCount])));
+        // The supplier's mark, SIGNED, for the quotation (owner, 2026-09-23). The bid projection
+        // only holds a bare key, which the private bucket refuses; this list is where the dashboard's
+        // working avatar comes from.
+        setLogoByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.supplierLogoUrl])));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+    // On the same tick as the bids themselves: a bid arriving with a message on it must not show a
+    // card with no unread mark until the next reload.
+  }, [status, bidTick]);
+
+  /* ── Arriving from somewhere else, on a named request (owner, 2026-08-29) ─────────────────
+     The dashboard's request table has row actions — open, share, edit, cancel — and every one of
+     them ends in machinery that already lives HERE, in the details drawer: the edit gate that reads
+     `renteeEditUsed`, the share sheet that owns the bid link, the cancel confirm. Rebuilding any of
+     it on the dashboard would be a second surface for one request, drifting from this one.
+
+     So the dashboard links instead: `?g=<groupId>` chooses the request, and `share` / `cancel` /
+     `details` say which door of the drawer to come in by. Read ONCE, on arrival — the params are an
+     entry instruction, not state: re-applying them would drag the renter back to that request every
+     time he picked another. */
+  const params = useSearchParams();
+  const [entered, setEntered] = useState(false);
+  /**
+   * The last `r` this screen ACTED ON, so a second instruction can be told from its own echo.
+   *
+   * 🔴 **Read once per mount was the bug** (owner's list, «Clicking on the bid doesn't take me
+   * directly where to the request», with a screenshot of the notification bell).
+   *
+   * ~~`if (entered) return;`~~ The renter is usually ALREADY on `/requests` when he opens the bell —
+   * that is where the screenshot was taken — and `router.push("/requests?r=<id>")` is a client-side
+   * navigation to the same route, so nothing remounts and `entered` is already true. The effect
+   * returned before reading `r`: the URL changed, the screen did not, and every bid notification
+   * looked dead.
+   *
+   * ⚠️ The «read once» rule was right about the thing it was written for, and the comment below
+   * still states it: the effect must not drag him back to a request every time he picks another. But
+   * the effect cannot tell a NEW instruction from its own echo by counting mounts, because the
+   * writer effect below `replaceState`s `?r=` on every selection. It can tell them apart by VALUE,
+   * which is what this ref is: apply an `r` that is neither the one we last applied nor the one
+   * already on screen.
+   */
+  const appliedR = useRef<string | null>(null);
+  useEffect(() => {
+    if (!groups?.length) return;
+
+    /**
+     * A request named in the URL that is neither what we last opened nor what is open now is a
+     * fresh instruction — from the bell, the dashboard, or a link a colleague pasted.
+     */
+    const incoming = params?.get("r") ?? null;
+    if (entered && !isNewEntryRequest(incoming, appliedR.current, resolvedItemId.current)) return;
+    setEntered(true);
+    /**
+     * ── `r` opens ONE request without knowing its group (owner, 2026-09-03) ────────────────────
+     *
+     * A caller that holds a bid holds the REQUEST it was made on, not the fan-out group that
+     * request belongs to. `SupplierBidsDialog` was pushing `/requests/<requestId>` — a route that
+     * does not exist — so every «open in the request» landed on the whole list, which is what the
+     * owner saw as *"the general marketplace page"*.
+     *
+     * Resolving it here rather than making the caller look up a group keeps the knowledge where the
+     * groups already are: for a solo request `g` and `r` are the same id, and for a fanned-out one
+     * only this screen can say which group holds it.
+     */
+    const r = params?.get("r");
+    if (r) {
+      appliedR.current = r;
+      const owner = groups.find((x) => x.items.some((it) => it.id === r));
+      if (owner) setWanted({ groupId: owner.id, itemId: r, bidId: null });
+      /**
+       * ⚠️ **A miss is SILENT, and that is deliberate.** The id can name a request this renter no
+       * longer has in the list — cancelled, or filtered out — and the honest answer there is the
+       * list he does have rather than an error about a row he cannot see. It is recorded as applied
+       * either way, so a failed lookup cannot re-fire on every render.
+       */
+    }
+
+    const g = params?.get("g");
+    if (g && groups.some((x) => x.id === g)) {
+      // `i` picks ONE machine of a multi-item group (the dashboard's per-item rows link with it).
+      // Validated against the group it names rather than trusted: a stale or hand-edited id must
+      // open the group rather than an empty item panel.
+      const wantItem = params?.get("i");
+      const grp = groups.find((x) => x.id === g);
+      const itemId = wantItem && grp?.items.some((it) => it.id === wantItem) ? wantItem : null;
+      setWanted({ groupId: g, itemId, bidId: null });
+    }
+    // …and which side of the workspace he was reading, so Back from the equipment map returns to the
+    // COMPARE he left rather than to the cards (owner, 2026-09-06).
+    const wantTab = params?.get("tab");
+    if (wantTab === "compare" || wantTab === "cards") setTab(wantTab);
+
+    const door = params?.get("share") ? "share" : params?.get("cancel") ? "cancel" : params?.get("details") ? "details" : null;
+    if (!door) return;
+    // Arriving on a link that names a door: opening it here adds the entry, so the renter's first
+    // Back closes the drawer and leaves him on the workspace rather than off the app.
+    drawer.open(door);
+  }, [drawer, entered, groups, params]);
+
+  /* ── The view the renter is looking at is IN THE URL (owner, 2026-09-06) ──────────────────────
+     *"The back button must be wired to the previous page in all cases — I clicked the equipment
+     panel in the compare and back took me to the cards of another request; it must take me to the
+     compare of the request I was in."*
+
+     It could not, and the reason was here: the chosen request and the open tab were component state
+     and nothing else. Leaving for `/bids/<id>/equipment` recorded `/requests` on the trail, and
+     `/requests` means "whatever this component picks by default" — the newest request, on Cards. The
+     renter came back to a different request and a different tab and read it, rightly, as the Back
+     button being wrong.
+
+     `replaceState`, never `push`: choosing a request is not a navigation, and pushing would make the
+     browser's own Back walk the rail one request at a time instead of leaving the page. What it
+     costs is nothing and what it buys is that the URL — the thing the trail records, the thing a
+     reload reads and the thing a renter can paste to a colleague — says which request and which tab.
+
+     `r` (not `g`) because the entry reader resolves an ITEM id to its group; the same parameter the
+     dashboard and the supplier dialog already link with. */
+  useEffect(() => {
+    if (typeof window === "undefined" || !entered) return;
+    const url = new URL(window.location.href);
+    const before = url.search;
+    if (resolved.itemId) url.searchParams.set("r", resolved.itemId);
+    else url.searchParams.delete("r");
+    /* ⚠️ What this screen wrote is not an instruction to itself. The reader above compares against
+       it, so its own `replaceState` can never be mistaken for a renter arriving on a link. */
+    resolvedItemId.current = resolved.itemId ?? null;
+    if (tab !== "cards") url.searchParams.set("tab", tab);
+    else url.searchParams.delete("tab");
+    // The entry instructions are consumed on arrival; leaving them in the URL would re-open the
+    // drawer on every reload (see the note on `entered`).
+    for (const k of ["g", "i", "share", "cancel", "details"]) url.searchParams.delete(k);
+    if (url.search !== before) window.history.replaceState(window.history.state, "", url.toString());
+  }, [entered, resolved.itemId, tab]);
+
+  const pickGroup = useCallback((groupId: string) => setWanted({ groupId, itemId: null, bidId: null }), []);
+  const pickItem = useCallback((id: string) => setWanted((w) => ({ groupId: w.groupId, itemId: id, bidId: null })), []);
+  /* ~~`pickBid` — the comparison's chosen supplier.~~ Gone with the picker itself (owner,
+     2026-09-04): the table no longer asks for a supplier, and the map it leads to carries every
+     offer on the request in its own header. `WorkspaceSelection.bidId` still exists and still
+     resolves to the first bid; nothing sets it by hand any more. */
+
+  /**
+   * Which bids the quotation download covers — by TICK, not by click (owner, 2026-08-30).
+   *
+   * It used to read `resolved.bidId`, the single bid a card-click set. That made the card a control
+   * whose only effect was invisible: pressing one silently narrowed a download the renter had not
+   * asked for yet, and there was no way to pick two. A checkbox says what it does and lets him take
+   * three of the five.
+   *
+   * `resolved.bidId` is untouched, and since 2026-09-04 nothing PICKS one: the comparison stopped
+   * asking for a supplier, so the field simply resolves to the first bid on the item. Only the
+   * download ever changed hands.
+   */
+  const [checkedBids, setCheckedBids] = useState<Set<string>>(new Set());
+  const toggleBid = useCallback((bidId: string) => {
+    setCheckedBids((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(bidId)) next.add(bidId);
+      return next;
+    });
+  }, []);
+
+
+  /**
+   * Requests this device has taken off the rail (owner, 2026-08-27) — closed ones only, and hidden
+   * rather than deleted. Read once on mount because `localStorage` is not available while the server
+   * renders, and a first paint that differs from the second is a hydration mismatch.
+   */
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => setHidden(hiddenRequests()), []);
+  const hide = useCallback((key: string) => setHidden(hideRequest(key)), []);
+
+  /* 🔴 **The × on a circle: cancel a LIVE request, hide a CLOSED one** (owner, 2026-09-22:
+     *"clicking it for active will cancel it with confirm popup same used when i cancel from the
+     request details and if it is closed then will remove it from the fleet only"*).
+
+     ⚠️ **The DECISION is here, not in the rail**, and it reads the tile's own `closed` - the
+     same `groupBiddingClosed` that drew the greyscale and the caption. The rail could not make it:
+     the confirmation has to NAME the request and cancel its items, and only this component holds
+     the group.
+
+     🔴 **A LIVE group with nothing cancellable SAYS WHY, and is never hidden.** `isCancellable`
+     is `OPEN || ACTIVE` while `groupBiddingClosed` also admits `PARTIALLY_ACCEPTED` - so a group
+     whose live items are all partially accepted reads LIVE and has no item the backend would take
+     (`REQUEST_CANCEL_NOT_ALLOWED`). Both other answers are wrong:
+       · ~~hide it~~ breaks `hidden-requests`'s own standing rule - *"only a closed group can be
+         hidden … a live request that vanished from the rail would be a request the renter cannot
+         get back to, and this store has no undo"*. It is still taking bids on its siblings.
+       · ~~draw no ×~~ leaves one circle in a row of them with no control and no reason.
+     So it takes the product's OWN answer, which already existed for this exact case:
+     `cancelBlockedReason`, written to be *"shown inline when the renter taps its disabled ×, so a
+     greyed-out control always explains itself (a tooltip wouldn't, on touch)"*.
+
+     ⚠️ **The reason is read off a LIVE item, never off the group.** The group has no status of
+     its own, and the terminal siblings are not what is blocking the cancellation - a group holding
+     one EXPIRED item and one PARTIALLY_ACCEPTED one would otherwise report the expiry, which the
+     renter can do nothing about and which is not why the × refused. */
+  const [cancelling, setCancelling] = useState<RequestGroup | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelled, setCancelled] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const dismissTile = useCallback(
+    (key: string) => {
+      const g = (groups ?? []).find((x) => x.id === key);
+      if (!g) return;
+      // Shut: the circle comes off THIS device's rail and nothing is told to the backend.
+      if (groupBiddingClosed(g.items)) {
+        hide(key);
+        return;
+      }
+      // Live, but the backend would refuse every item: say why, and leave the circle where it is.
+      if (!cancellableItems(g.items).length) {
+        const blocking = g.items.find((i) => !isBiddingClosed(i.status)) ?? g.items[0];
+        if (blocking) setToast(cancelBlockedReason(blocking.status, ar));
+        return;
+      }
+      setCancelError(null);
+      setCancelled(false);
+      setCancelling(g);
+    },
+    [ar, groups, hide],
+  );
+
+  /* ⚠️ **Every cancellable item, one DELETE each** - the dashboard's own `doCancel`, because a
+     circle stands for the whole request and a fanned-out RFQ is several requests behind it. The
+     backend refuses anything that is not OPEN or ACTIVE, which is what `cancellableItems` filters.
+
+     ⚠️ `Promise.all`, so one refusal reports a failure for the batch rather than a partial
+     success nothing states. The reload after Done is what tells the renter which items really went.
+
+     ⚠️ `busy` is NOT lowered on success (`RequestEditModals`'s own rule): the act is over, and
+     a confirm button coming back to life under a tick invites a second cancellation. */
+  const doCancel = useCallback(async () => {
+    const g = cancelling;
+    if (!g || cancelBusy) return;
+    setCancelBusy(true);
+    setCancelError(null);
+    try {
+      await Promise.all(cancellableItems(g.items).map((i) => cancelRequest(i.id)));
+      setCancelled(true);
+    } catch {
+      setCancelError(ar ? "لم يتمّ الإجراء. حاول مجددًا." : "That didn’t go through. Try again.");
+    } finally {
+      setCancelBusy(false);
+    }
+  }, [ar, cancelBusy, cancelling]);
+
+  const tiles = useMemo(() => {
+    const all = railTiles(groups ?? [], ar);
+    /* A hidden request whose circle is nonetheless the one being READ stays on the rail: taking the
+       page's own subject out from under it would leave the workspace showing a request the renter
+       cannot see the tile for. The demo filter below follows the same rule, for the same reason. */
+    const kept = all.filter((tl) => !hidden.includes(tl.key) || tl.key === resolved.groupId);
+    /* 🔴 **DEMO ONLY** (owner, 2026-09-14: *"i want no bids to be hidden from requests list in
+       requests, just for demo purpose"*). `HIDE_BIDLESS_REQUESTS` is a code toggle; set it false and
+       this whole branch stands down. See the flag's own note for what it costs - chiefly that
+       `bids` here is `totalBids`, which counts APP bids and not the renter's own link submissions.
+
+       ⚠️ Guarded on at least one tile HAVING a bid: with none, every circle would go and the page
+       would fall through to «create your first request» over an account that has several. */
+    if (!HIDE_BIDLESS_REQUESTS || !kept.some((tl) => tl.bids > 0)) return kept;
+    return kept.filter((tl) => tl.bids > 0 || tl.key === resolved.groupId);
+  }, [groups, hidden, resolved.groupId, ar]);
+
+  /**
+   * Bids the renter has taken off the comparison. Owned here rather than inside the matrix so the
+   * EXPORT can read it (owner, 2026-08-25): a sheet that printed a bid he had just removed from the
+   * table in front of him is a sheet that disagrees with its own screen.
+   *
+   * Cleared whenever the item changes — a bench is about the comparison being read, and the next
+   * item is a different comparison.
+   */
+  const [benched, setBenched] = useState<Set<string>>(new Set());
+  const benchBid = useCallback((bidId: string, off: boolean) => {
+    setBenched((s) => {
+      const next = new Set(s);
+      if (off) next.add(bidId);
+      else next.delete(bidId);
+      return next;
+    });
+  }, []);
+  // A bench is about the comparison being read, and the next item is a different comparison.
+  useEffect(() => { setBenched(new Set()); }, [itemId]);
+  // So is a ranking: it ranked THIS item's bids, and the next item's are other bids entirely.
+  useEffect(() => { setRanking(null); }, [itemId]);
+
+  /* ~~`rank`, and the `rankBusy` flag beside it.~~ The ranking is the assistant's own act now
+     (`AiRankPanel`), which owns the presets, the conversation and the busy state — the workspace
+     keeps only the RESULT, because the matrix draws a ★ from it and the item switch clears it. */
+
+  /**
+   * What the COMPARISON is being read on: the source filter, minus what the renter benched. The
+   * table's own export and the assistant read it, because both answer questions about the table.
+   *
+   * 🔴 **The cards rail does NOT** (owner, 2026-09-17). Bench is a ✕ on a compare COLUMN, and it was
+   * taking the bid off the cards tab as well - a tab with no bench strip, no ✕ and no way back, so
+   * a bid the renter had merely set aside while comparing looked like a bid that had never arrived,
+   * and only a reload (which empties `benched`) brought it back. That is half of what he reported as
+   * *"bids doesnt appear directly in the bid cards"*.
+   */
+  const shown = useMemo(
+    () => filterBySource(bids, source).filter((b) => !benched.has(b.card.id)),
+    [bids, source, benched],
+  );
+  /** Every bid the filter allows, benched or not: what the CARDS rail draws, and what the matrix
+   *  needs in order to draw the bench strip itself. */
+  const shownAll = useMemo(() => filterBySource(bids, source), [bids, source]);
+
+  // A tick on a bid that is no longer on screen — the item changed, the source filter moved — must
+  // not silently ride along into the next download. Benching does not remove a tick: the card is
+  // still on the cards tab, where the ticking happens.
+  const shownIds = shownAll.map((b) => b.card.id).join(",");
+  useEffect(() => {
+    const live = new Set(shownIds.split(",").filter(Boolean));
+    setCheckedBids((prev) => {
+      const next = new Set([...prev].filter((id) => live.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [shownIds]);
+  const counts = useMemo(() => sourceCounts(bids), [bids]);
+  /* ~~The picked bid's card.~~ The strip drew it above the tabs — the machine offered, its yard
+     ribbon, its fact chips — which is the bid card's own job, done twice. With the strip gone
+     nothing at this level needs the bid itself; `resolved.bidId` is now only the item's first bid. */
+
+  /** The export: the browser's own print dialog over the plain Moedatech sheet. */
+  /**
+   * ── The Cards tab's download: the formal QUOTATION (owner, 2026-08-26) ─────────────────────────
+   *
+   * One button, two jobs, because the two tabs hold two different things: the comparison exports the
+   * TABLE, and the cards export the OFFER — the quotation paper a renter sends on to his own people.
+   *
+   * It is the app's own document, not a second one: `buildBidQuotationDoc` + `renderQuotationSection`
+   * + `wrapQuotationPage`, the same three the deal room and the grouped bid view issue, so the same
+   * deal downloaded from any of them is the same paper. One section per SUPPLIER (`quotationSupplierKey`
+   * — two colleagues of one firm are one counterparty), for the bid picked, or for every bid on the
+   * table when none is.
+   *
+   * The identity block is best-effort on purpose: `/api/me` for the renter, the request record for the
+   * window and the transport assignment. A refused call costs the letterhead, not the quotation.
+   */
+  const downloadQuotation = useCallback(async () => {
+    if (typeof window === "undefined" || !item || shownAll.length === 0) return;
+    // Ticked bids, or every bid on screen when none is ticked. "None ticked" is the renter asking
+    // for the lot, not for nothing — the button is «Download quotation», and a download that
+    // silently produced an empty file would be the worse reading.
+    // `shownAll`, not `shown`: this paper belongs to the CARDS tab, and the cards tab does not keep
+    // a bench. A bid set aside on the comparison is still a bid the renter can download the offer of.
+    const chosen = checkedBids.size > 0 ? shownAll.filter((b) => checkedBids.has(b.card.id)) : shownAll;
+    if (chosen.length === 0) return;
+
+    const [rec, me] = await Promise.all([
+      fetchRequestDetail(item.id).catch(() => null),
+      fetch("/api/me", { cache: "no-store" })
+        .then((r) => (r.ok ? (r.json() as Promise<{ user?: Record<string, string | null | undefined> }>) : null))
+        .catch(() => null),
+    ]);
+    const u = me?.user ?? {};
+    const renteeVerified = tier === "verified";
+    const profileHref = `${window.location.origin}/profile`;
+    const reqItem = (rec as unknown as { equipmentItems?: { mobilizationByRentee?: boolean | null; demobilizationByRentee?: boolean | null }[] } | null)?.equipmentItems?.[0] ?? null;
+    const code = item.code ?? fetchedCode ?? item.displayId;
+    const reqCode = code.replace(/[^A-Za-z0-9-]/g, "");
+    const itemName = item.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : code;
+
+    // One quotation per supplier, cut by the key the grouped download uses.
+    const bySupplier = new Map<string, typeof chosen>();
+    for (const b of chosen) {
+      const key = quotationSupplierKey(b.card);
+      const list = bySupplier.get(key);
+      if (list) list.push(b);
+      else bySupplier.set(key, [b]);
+    }
+
+    const sections = [...bySupplier.values()]
+      .map((supBids, si) =>
+        renderQuotationSection(
+          buildBidQuotationDoc({
+            lang: ar ? "ar" : "en",
+            quotationNumber: `Q-${reqCode}-${quotationSupplierInitials(supBids[0].card.supplierName)}${si + 1}`,
+            reference: code,
+            // The job's site, for the reference strip and the renter's box. The GROUP holds it
+            // ("City — Neighbourhood"), which is the short form the app prints; a request with none
+            // simply omits the pair rather than printing a blank.
+            workSite: group?.locationLabel ?? null,
+            // ABSOLUTE: the quotation opens in a blank window, where a relative path resolves to nothing.
+            sealUrl: `${window.location.origin}/moedatech-logomark.svg`,
+            supplierLogoUrl: logoByBid[supBids[0].card.id] ?? null,
+            entries: supBids.map((b) => ({
+              bid: b.card,
+              itemLabel: itemName,
+              requestCode: code,
+              startDate: item.startDate,
+              endDate: item.endDate,
+              durationDays: item.durationDays,
+              rentalType: item.rentalType,
+              mobByRentee: reqItem?.mobilizationByRentee ?? item.mobByRentee,
+              demobByRentee: reqItem?.demobilizationByRentee ?? item.demobByRentee,
+            })),
+            rentee: {
+              companyName: u.companyName ?? "",
+              personName: [u.firstName, u.lastName].filter(Boolean).join(" "),
+              crNumber: u.crNumber ?? null,
+              vatNumber: u.vatNumber ?? null,
+              nationalAddress: u.nationalAddress ?? null,
+              phone: u.phone ?? null,
+              email: u.email ?? null,
+              verified: renteeVerified,
+              logoUrl: u.companyLogoUrl ?? null,
+              // The app's two asks on his own box: verify first (no company, no mark to add), then
+              // the empty logo slot. Screen only; the PDF never carries them.
+              asks: {
+                verify: renteeVerified ? null : { href: `${profileHref}?verify=1`, label: ar ? "وثّق شركتك" : "Verify your company" },
+                // Opens the logo dialog on the profile (`CompanyLogoModal`), the web's in-place upload.
+                addLogo:
+                  renteeVerified && !u.companyLogoUrl ? { href: `${profileHref}?logo=1`, label: ar ? "أضف شعارًا" : "Add a logo" } : null,
+              },
+            },
+          }),
+        ),
+      )
+      .join("");
+
+    const dlName = quotationDownloadName(code, [code]);
+    // No auto-print any more: the page opens as the app's preview does, with «Download PDF» and
+    // «Share» above it (owner, 2026-09-23).
+    const html = wrapQuotationPage(sections, {
+      lang: ar ? "ar" : "en",
+      title: dlName,
+      autoPrint: false,
+      tools: { download: ar ? "تنزيل PDF" : "Download PDF", share: ar ? "مشاركة" : "Share", fileName: dlName },
+    });
+    // A popup-blocked `window.open` returns null and used to fail silently — a dead click. Fall back
+    // to downloading the self-printing file so the quotation is never a no-op.
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      return;
+    }
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${dlName.replace(/[^\w.-]+/g, "_")}.html`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }, [ar, item, shownAll, checkedBids, fetchedCode, tier, group?.locationLabel, logoByBid]);
+
+  /**
+   * ── The comparison, on paper (owner, 2026-09-09) ──────────────────────────────────────────────
+   * *"i wanna the export template for compare table to be as full table with all but grouped by
+   * section price or terms but showing moedatech logo at top and showing green and red too"*.
+   *
+   * ~~Four columns: supplier, rate, transport, grand total.~~ A renter who had spent the afternoon
+   * reading eight term columns exported a sheet with none of them on it, and the verdicts he was
+   * choosing BY - this one meets the certificate, that one refuses it - printed nowhere.
+   *
+   * The money is resolved HERE, from the same `computeCycleTotals` the matrix renders from and with
+   * the same inputs, so a figure on the sheet is the figure on the screen. The terms and their
+   * colours are the matrix's own `buildTermColumns` / `readTerm`, called inside the builder.
+   */
+  const printComparison = useCallback(() => {
+    if (typeof window === "undefined" || !item || shown.length === 0) return;
+    const title = item.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : item.displayId;
+    const subtitle = [
+      group?.locationLabel,
+      group?.groupRef ?? item.displayId,
+      item.durationDays ? t.workspace.overDays.replace("{n}", String(item.durationDays)) : null,
+      new Date().toLocaleDateString(ar ? "ar" : "en-GB"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    const totals = new Map(
+      shown.map((b) => [
+        b.card.id,
+        computeCycleTotals({
+          rate: b.card.price,
+          priceUnit: b.card.priceUnit,
+          mob: { amount: b.card.mobPrice, units: b.card.mobUnits, excluded: b.card.mobExcluded },
+          demob: { amount: b.card.demobPrice, units: b.card.demobUnits, excluded: b.card.demobExcluded },
+          durationDays: item.durationDays,
+          startDate: item.startDate,
+          units: b.card.unitsOffered > 0 ? b.card.unitsOffered : b.card.numberOfUnits,
+        }),
+      ]),
+    );
+    /** The cheapest stated figure on a column, or null when fewer than two bids state one. */
+    const low = (pick: (b: WorkspaceBid) => number | null | undefined): string | null => {
+      const stated = shown.map((b) => ({ id: b.card.id, v: pick(b) })).filter((x): x is { id: string; v: number } => x.v != null);
+      if (stated.length < 2) return null;
+      return stated.reduce((a, c) => (c.v < a.v ? c : a)).id;
+    };
+    const money = (v: number | null | undefined) => (v == null ? null : formatSar(v));
+
+    const perCycle: SheetMoneyCol[] = [
+      { label: t.workspace.colRate, cell: (b) => money(b.card.price), win: low((b) => b.card.price) },
+      // A leg the RENTER moves was never quoted, so it prints as unstated rather than as 0 SAR,
+      // which on a sheet reads as free delivery (the same rule the matrix's `onRentee` applies).
+      { label: t.priceFooter.mobilisation, cell: (b) => (b.card.mobExcluded ? null : money(b.card.mobPrice)) },
+      { label: t.priceFooter.demobilisation, cell: (b) => (b.card.demobExcluded ? null : money(b.card.demobPrice)) },
+    ];
+    const grandTotal: SheetMoneyCol[] = [
+      {
+        label: t.workspace.deliveredCost,
+        sub: t.workspace.deliveredCostOneCycle,
+        cell: (b) => money(totals.get(b.card.id)?.firstCycle.total),
+        win: low((b) => totals.get(b.card.id)?.firstCycle.total),
+      },
+      {
+        label: t.workspace.runningRate,
+        sub: t.workspace.runningRateSub,
+        cell: (b) => money(totals.get(b.card.id)?.everyCycleAfter?.total),
+        win: low((b) => totals.get(b.card.id)?.everyCycleAfter?.total),
+      },
+      ...(item.durationDays
+        ? [{
+            label: t.workspace.deliveredCost,
+            sub: t.workspace.overDays.replace("{n}", String(item.durationDays)),
+            cell: (b: WorkspaceBid) => money(totals.get(b.card.id)?.duration?.total),
+            win: low((b) => totals.get(b.card.id)?.duration?.total),
+          }]
+        : []),
+    ];
+
+    const html = buildCompareSheet({
+      bids: shown,
+      ar,
+      t,
+      L: (en, arr) => (ar ? arr : en),
+      title,
+      subtitle,
+      // ABSOLUTE. The sheet is written into `about:blank`, where a relative path resolves to nothing
+      // and the header would print with a broken image where the brand should be.
+      logoUrl: `${window.location.origin}/moedatech-logo.svg`,
+      perCycle,
+      grandTotal,
+    });
+
+    const w = window.open("", "_blank");
+    if (!w) {
+      setToast(t.workspace.exportPopupBlocked);
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+  }, [ar, group, item, shown, t]);
+
+  /**
+   * ── The states before there is a workspace to show ──
+   *
+   * These used to inherit the page padding `wide` supplied. `fullBleed` supplies none — the surface
+   * owns its own edges now — so each one is centred in the viewport it was handed instead of sitting
+   * flush against the top-start corner.
+   */
+  const Standalone = ({ children }: { children: React.ReactNode }) => (
+    <div className="mx-auto flex h-full w-full max-w-[560px] flex-col justify-center px-6 py-8">{children}</div>
+  );
+  /* The same wall the dashboard shows (owner, 2026-09-06): this surface, blurred, with the card on
+     it. ~~A prompt centred in an empty 560px column.~~ On a full-bleed page that was a lot of
+     nothing, and it argued for the account by asserting rather than by showing. */
+  if (status === "anon") {
+    return (
+      <div className="min-h-0 flex-1 overflow-hidden p-4">
+        <GuestWall title={t.guestWall.requestsTitle} body={t.guestWall.requestsBody} preview={<GuestRequestsPreview />} />
+      </div>
+    );
+  }
+  if (groups === null) {
+    /* The surface's own shape while it arrives: the rail of request circles, then the row of bid
+       cards under it. ~~A centred «Loading…» in an otherwise empty viewport.~~ On a full-bleed page
+       that is a lot of nothing, and it is the same picture the "you have no requests" state draws —
+       so the page's first answer was one it often had to take back. */
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex-none border-b border-border bg-surface3/60">
+          <div className={`mx-auto flex h-[96px] w-full ${PAGE_MAX} items-center gap-4 ${PAGE_X}`}>
+            {Array.from({ length: 6 }, (_, i) => (
+              <div key={i} className="flex flex-none flex-col items-center gap-1">
+                <Skeleton className="size-14 rounded-full" />
+                <Skeleton className="h-2.5 w-10" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div
+          className={`mx-auto grid w-full ${PAGE_MAX} ${PAGE_X} mt-4 grid-cols-[repeat(auto-fill,minmax(min(100%,320px),344px))] gap-5`}
+        >
+          {Array.from({ length: 3 }, (_, i) => (
+            <Skeleton key={i} className="h-[420px] rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (failed) {
+    return (
+      <Standalone>
+        <div className="text-center">
+          <p className="text-body font-semibold text-muted">{t.workspace.loadFailed}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setGroups(null);
+              setReloads((n) => n + 1);
+            }}
+            className={btn("primary", "md", { pill: true, className: "mt-3" })}
+          >
+            {t.workspace.retry}
+          </button>
+        </div>
+      </Standalone>
+    );
+  }
+  if (groups.length === 0 || !group) {
+    return (
+      <Standalone>
+        <SignInPrompt
+          icon="assignment"
+          title={t.workspace.emptyTitle}
+          body={t.workspace.emptyBody}
+          ctaLabel={t.workspace.emptyCta}
+          ctaHref="/create"
+        />
+      </Standalone>
+    );
+  }
+
+  return (
+    // ── The page ends at the fold (owner, 2026-08-25) ──────────────────────────────────────────
+    // The negative margins are gone with them: they existed to cancel the padding `wide` put around
+    // this surface, and `fullBleed` gives it none to cancel. Every band below is `flex-none`; the one
+    // that grows is the tab panel, and the only thing that scrolls is the list inside it — so the
+    // rail and the strip cannot be pushed off the top by a long column of bids.
+    /* ── The page scrolls, not the box inside it (owner, 2026-09-08) ─────────────────────────
+       ~~Every band `flex-none`, the tab panel growing into what is left, and the bids scrolling
+       inside it.~~ That is what left a 100%-zoom screen with no vertical scrollbar at all and the
+       fourth bid behind a horizontal bar. This column is the scroller now: the rail, the tabs and
+       the cards all travel with it, which is what a renter means by scrolling the page. The shell is
+       still `fullBleed`, so this scroller is exactly the viewport under the header — the header and
+       the nav stay put, and there is only ever ONE bar on screen. */
+    <div {...pin("requests-workspace")} className="flex h-full min-h-0 flex-col overflow-y-auto">
+      <RequestRail
+        tiles={tiles}
+        activeKey={resolved.groupId}
+        onPick={pickGroup}
+        onDismiss={dismissTile}
+      />
+
+
+      {/* The same cap and the same gutter every page takes — so a renter moving from /create to
+          /requests finds the content starting on the same line. */}
+      <div className={`mx-auto w-full ${PAGE_MAX} ${PAGE_X} mt-2 flex flex-col pb-8`}>
+        {/* ── The row above the panel (owner, 2026-08-27) ─────────────────────────────────────────
+            Three things, and the tabs are the middle one so they sit under the eye rather than off
+            at the leading edge.
+
+            ~~The request strip stood above this row~~ — a full-width band carrying the request code,
+            the bid count, the date raised, the picked machine as a white card, a yard ribbon, three
+            fact chips and two controls. Every one of those already had a home: the drawer states the
+            request, the bid cards state the offers, and the map states the machines. What it uniquely
+            held was the item switcher, and that moved into the context bar, which is the thing that
+            names the current item anyway.
+
+            `items-end` because the open tab has to meet the panel's top edge; the bar and the export
+            sit on that same line. */}
+        <div className="flex flex-none items-end gap-3">
+          {/* The bar and the export take equal shares of what is left, so the tabs land on the row's
+              true centre rather than wherever the bar's width happens to leave them. A spacer on one
+              side only would centre them against the export alone. */}
+          <div className="mb-1 flex flex-1 justify-start">
+            <RequestContextBar
+              group={group}
+              item={item}
+              onOpenRequest={() => drawer.open("details")}
+            />
+          </div>
+          <div className="flex flex-none items-end gap-0.5">
+            {(["cards", "compare"] as Tab[]).map((k) => {
+              const on = tab === k;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setTab(k)}
+                  aria-current={on ? "page" : undefined}
+                  /* ── One height for the row (owner, 2026-08-27) ──────────────────────────────────
+                     34px, the same `control-md` the export button and the context bar carry. The two
+                     tabs used to differ from each OTHER as well — `pt-2` against `pt-1.5` — so the
+                     open one stood a half-pixel taller than its neighbour and the row had three
+                     heights in it. Only the fill and the bottom edge change now; the box does not. */
+                  className={cx(
+                    // `control-md` sets the height; the button needs a display mode to centre in it.
+                    "control-lg relative -mb-px inline-flex items-center justify-center rounded-t-md border border-border text-meta font-semibold transition-colors",
+                    on
+                      ? "z-[2] border-b-surface bg-surface text-navy"
+                      : "z-[1] bg-surface3/70 text-muted hover:text-navy-mid",
+                  )}
+                >
+                  {k === "cards" ? t.workspace.tabCards : t.workspace.tabCompare}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mb-2 flex flex-1 items-center justify-end gap-2">
+            {/* ── «Select all» puts the whole comparison back (owner, 2026-08-25) ─────────────────
+                The export covers what the comparison covers, so putting a bid back on the table is
+                the same act as putting it back in the sheet — one concept, not two. It appears only
+                when something is actually off, because a control that clears nothing is furniture,
+                and it names the count so the renter knows what he is about to bring back. */}
+            {benched.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setBenched(new Set())}
+                className={btn("secondary", "md", { className: "transition" })}
+              >
+                <Icon name="done_all" size={14} /> {fmt(t.workspace.selectAll, { n: String(benched.size) })}
+              </button>
+            )}
+            {/* One control, named for what THIS tab exports (owner, 2026-08-26): the cards issue the
+                quotation paper, the comparison issues the table. Both are the exports the app already
+                had; only which one the button reaches changes with the tab. */}
+            {/* ── The export is not the row's main act (owner, 2026-09-08) ─────────────────────
+                It stood at `control-lg`, 44px, the tallest control this design system has and the
+                same height as the tabs beside it, for a paper the renter takes once he is done
+                reading. `control-md` (34px) is what the context bar on the other end of this row
+                wears, so the trailing cluster now matches the leading one and the tabs are the only
+                44px thing on the line, which is right: they are what the row is FOR. */}
+            <button
+              type="button"
+              disabled={(tab === "compare" ? shown : shownAll).length === 0}
+              onClick={() => (tab === "compare" ? printComparison() : void downloadQuotation())}
+              className={btn("secondary", "md", { className: "whitespace-nowrap transition" })}
+            >
+              {tab === "compare" ? t.workspace.exportComparison : t.workspace.downloadQuotation}
+              {/* The count, only once a tick narrows it. Silent while the button means "all of
+                  them", because a number there would read as a limit the renter had set. */}
+              {tab === "cards" && checkedBids.size > 0 && (
+                <span className="rounded-full bg-navy px-1.5 text-label font-semibold leading-[18px] text-white">
+                  {checkedBids.size}
+                </span>
+              )}{" "}
+              <Icon name="download" size={14} />
+            </button>
+            {/* The size filter, on the same line and at the same height. It narrows nothing already
+                on screen — it changes what the page ASKS the backend for (see `showLarger`). */}
+            <BidSizeFilter showLarger={showLarger} largerHeld={largerHeld} onChange={setShowLarger} />
+          </div>
+        </div>
+
+        <div className="flex flex-col overflow-hidden rounded-b-sm rounded-tr-sm border border-border bg-surface">
+          {/* ── Source, above whichever pane is showing (owner's reference, 2026-08-25) ───────────
+              It narrows both panes, so it belongs to neither — and it reads as a quiet row of words
+              rather than a row of pills, because it is a filter over the table, not an action on it.
+              It appears only when there is a mix to narrow: with every bid from one source, three
+              choices that change nothing are furniture. */}
+          {/* ── The source keeps the centre, whatever else is on the line (owner, 2026-08-28) ──────
+              Three children: the machines, the source, and an empty third of equal weight. The two
+              flexible sides cancel out, so the source sits on the row's true centre — under the tabs
+              — and stays there whether or not this request has more than one machine. Putting the
+              machines beside it and letting the pair centre together would have moved the source
+              every time a request had a second item.
+
+              The machines take the leading edge, directly under the context bar, which is the same
+              fact one line up: that bar names the machine being read and this row is how it changes. */}
+          <div className="flex flex-none items-center gap-x-5 border-b border-border px-3.5 py-1.5">
+              <div className="flex min-w-0 flex-1 justify-start">
+                {group && group.items.length > 1 && (
+                  <ItemTier items={group.items} activeId={resolved.itemId} onPick={pickItem} />
+                )}
+              </div>
+              <div className="flex flex-none flex-wrap items-center justify-center gap-x-5 gap-y-1.5">
+              <span className="inline-flex items-center gap-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
+                <Icon name="filter_list" size={14} /> {t.workspace.source}
+              </span>
+              {(
+                [
+                  ["all", t.workspace.sourceAll],
+                  ["app", t.workspace.sourceApp],
+                  ["offline", t.workspace.sourceOffline],
+                ] as [SourceFilter, string][]
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSource(key)}
+                  aria-current={source === key ? "true" : undefined}
+                  className={`border-b-2 pb-0.5 text-meta font-semibold transition ${
+                    source === key ? "border-brand text-navy" : "border-transparent text-muted hover:text-navy-mid"
+                  }`}
+                >
+                  {label}
+                  <span className={source === key ? "text-muted" : "text-muted/70"}> {counts[key]}</span>
+                </button>
+            ))}
+              </div>
+              {/* The third of the row that carries nothing. It exists so the middle one is the
+                  middle: without it the source would centre against the machines alone and shift
+                  every time a request had a second item. */}
+              <div className="min-w-0 flex-1" aria-hidden />
+          </div>
+
+          {/* ── Nothing on this page scrolls DOWNWARDS (owner, 2026-08-25: "i dont want scroll
+              inside the cards even") ──────────────────────────────────────────────────────────────
+              This was `overflow-y-auto`, which put a second scrollbar inside the white card the
+              moment a bid ran tall. The reference has no such thing: the bids are a ROW that runs
+              sideways, each card the full height of the pane, and the way to the fifth bid is to
+              travel right.
+
+              So the pane is `overflow-hidden` and hands its height to whichever tab is open. The
+              cards stretch to it; the comparison table keeps its own horizontal scroll, which is a
+              table's business and not a page's. */}
+          {/* ── One scroller, and it is not the table's (owner, 2026-09-04) ──────────────────────
+              The cards tab keeps the 2026-08-25 rule exactly: nothing scrolls downwards, the bids are
+              a row you travel sideways, `overflow-hidden`.
+
+              The compare tab does not. A matrix with twenty bids had TWO vertical bars — this pane's
+              and the table's own — so dragging the outer one moved nothing and the figures sat under
+              a fold with no visible edge. The table renders whole now (`CompareMatrix` is `flex-none`)
+              and this pane is the only thing that scrolls it.
+
+              ⚠️ **This is still a scroller inside the page, not the page itself.** `/requests` is
+              `fullBleed` — pinned to the viewport by the same 2026-08-25 ruling — so there is no
+              document scroll to hand the table to. Making the PAGE scroll means that page dropping
+              `fullBleed`, which is the owner's call, not this component's. */}
+          {/* Neither tab scrolls itself any more: both render whole and the column above carries
+              them. The comparison keeps its own SIDEWAYS strip, which is a table's business. */}
+          <div className="flex flex-col">
+          {tab === "cards" ? (
+            <BidCards
+              // Every bid on the item: the bench is the comparison's, not this rail's.
+              bids={shownAll}
+              checked={checkedBids}
+              unreadByBid={unreadByBid}
+              submissionsByBid={submissionsByBid}
+              durationDays={item?.durationDays ?? null}
+              startDate={item?.startDate ?? null}
+              // The same two flags the comparison reads: a leg the request kept is not a leg the
+              // supplier declined to price.
+              mobByRentee={item?.mobByRentee ?? null}
+              demobByRentee={item?.demobByRentee ?? null}
+              // So «no bids on this item» can say when that is only true of the size he asked for.
+              largerHeld={largerHeld}
+              showLarger={showLarger}
+              onShowLarger={() => setShowLarger(true)}
+              onToggle={toggleBid}
+            />
+          ) : (
+            <CompareMatrix
+              // Everything the source filter allows, benched or not — the matrix draws the bench
+              // itself, so it needs the bids it is not currently comparing.
+              bids={shownAll}
+              durationDays={item?.durationDays ?? null}
+              startDate={item?.startDate ?? null}
+              // Whose transport legs these are, off the renter's own request. Already on the item
+              // (`mobByRentee` / `demobByRentee`, from `equipmentItems[0].mobilizationByRentee`) —
+              // the matrix simply never asked for it, so the Delivery and Return columns had no way
+              // to tell "the supplier said nothing" from "it was never his to say".
+              mobByRentee={item?.mobByRentee ?? null}
+              demobByRentee={item?.demobByRentee ?? null}
+              // The files an off-platform supplier attached to the form. The cards tab already holds
+              // them, so the comparison reads the same objects rather than fetching them again — and
+              // there is no endpoint that could answer for a `link-…` id anyway.
+              submissions={submissionsByBid}
+              benched={benched}
+              onBench={benchBid}
+              ranking={ranking}
+            />
+          )}
+          </div>
+        </div>
+
+        {/* ── The suggestion bar (owner, 2026-08-25) ────────────────────────────────────────────────
+            Under the card, not in it: it is the agent's reading OF the comparison, and a panel inside
+            the table's border would read as another one of its rows. Collapsed it is a single line —
+            the agent's own words, unpadded — and it opens into the full note. Nothing appears until
+            the renter has asked for a ranking, because an empty assistant is furniture. */}
+        {/* ── The assistant, under the table (owner, 2026-09-07) ────────────────────────────────
+            ~~A one-line strip that showed the agent's sentence once a ranking existed, and a «Rank
+            with AI» button inside the terms band.~~ Both are `AiRankPanel` now: the four presets, a
+            question box, and the exchange kept on screen. It is the last section on the page, which
+            is where the owner asked for it — after the offers, not over them.
+
+            Under the card, not in it: it is the agent's reading OF the comparison, and a panel
+            inside the table's border would read as another one of its rows (owner, 2026-08-25). */}
+        {tab === "compare" && shown.length > 0 && (
+          <div className="mt-3.5 flex-none">
+            <AiRankPanel bids={shown} durationDays={item?.durationDays ?? null} ranking={ranking} onRanking={setRanking} />
+          </div>
+        )}
+      </div>
+
+      {toast && (
+        <div className="fixed inset-x-0 bottom-28 z-[70] mx-auto w-fit rounded-full bg-navy px-4 py-2 text-meta font-semibold text-white">
+          {toast}
+        </div>
+      )}
+
+      {drawerOpen && (
+        <RequestDetailsModal
+          group={group}
+          item={item}
+          link={link}
+          openShare={drawerShare}
+          openCancel={drawerCancel}
+          onClose={drawer.close}
+          // An edit or a cancellation changes the rail and the bids under it, so both are re-read
+          // rather than patched in place — the page has one source for its data and keeps it.
+          onChanged={() => {
+            setGroups(null);
+            setReloads((n) => n + 1);
+          }}
+        />
+      )}
+
+      {/* The × on a LIVE circle. Same component, same scope and same wording as the dashboard's
+          row action, so one act does not read as two - and `done` is what turns it into the tick
+          rather than dismissing in silence (2026-09-17).
+
+          ⚠️ **Done carries the reload**, never the success itself: the rail has to re-read to
+          grey the circle and put «Closed» under it, and until he has read the tick there is nothing
+          to reload FOR. The circle then stays on the rail, greyed, and a second × hides it. */}
+      {cancelling && (
+        <ConfirmCancelModal
+          ar={ar}
+          L={(en, arr) => (ar ? arr : en)}
+          busy={cancelBusy}
+          error={cancelError}
+          done={cancelled}
+          scope={{
+            kind: "all",
+            idLabel: cancelling.groupRef ?? cancelling.items[0]?.displayId ?? cancelling.id,
+            total: cancellableItems(cancelling.items).length,
+          }}
+          onClose={() => {
+            if (cancelled) {
+              setGroups(null);
+              setReloads((n) => n + 1);
+            }
+            setCancelling(null);
+            setCancelled(false);
+            setCancelError(null);
+          }}
+          onConfirm={() => void doCancel()}
+        />
+      )}
+    </div>
+  );
+}

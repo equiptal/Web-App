@@ -138,4 +138,17 @@ export interface NormalizeRequest {
    *  to its "web-app" default, and its per-caller rate limiter — which keys on this —
    *  sees all website traffic through the BFF as one caller. */
   created_by?: string;
+  /**
+   * `true` — answer from the TEXT only, for the fields this caller already has its own answers to.
+   *
+   * The web sends it on every parse; the mobile app does not send it at all, which keeps today's
+   * behaviour there (owner, 2026-08-31: *"for app i want to have a tag or something for web to use
+   * this new approach and if on app will remain as it is now"*).
+   *
+   * `/rfq/jobs` is shared between the two, and the agent's standing instruction is *"try to fill
+   * EVERY field; null is the last resort"*. That is right for mobile — it has no project pills and
+   * no work-order templates, so a default is the best answer available. On the web it overwrites a
+   * term the renter saved on their own site, while looking exactly like something they just typed.
+   */
+  evidence_only?: boolean;
 }
