@@ -357,3 +357,18 @@ export function mapTaxonomy(raw: unknown): TaxonomyNode[] {
   });
   return (arr as Raw[]).map(walk);
 }
+
+/**
+ * Top-level categories with the most stores first (owner, 2026-09-23). The backend's own order put
+ * «Warehouse Equipment» first, a pill no store in production carries. Counted off the stores'
+ * `categories`, since the taxonomy has no count; ties and empty categories keep the backend's order,
+ * and empty ones sink to the end rather than disappearing.
+ */
+export function sortByStoreCount(taxonomy: TaxonomyNode[], stores: StoreCard[]): TaxonomyNode[] {
+  const count = new Map<string, number>();
+  for (const s of stores) for (const c of s.categories) count.set(c.id, (count.get(c.id) ?? 0) + 1);
+  return taxonomy
+    .map((node, i) => ({ node, i, n: count.get(node.id) ?? 0 }))
+    .sort((a, b) => b.n - a.n || a.i - b.i)
+    .map((x) => x.node);
+}

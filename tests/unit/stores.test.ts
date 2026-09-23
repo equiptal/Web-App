@@ -8,6 +8,7 @@ import {
   mapEquipmentDetail,
   mediaUrl,
   supplierIdOf,
+  sortByStoreCount,
 } from "@/lib/contract/stores";
 import { en } from "@/lib/i18n/en";
 import { ar } from "@/lib/i18n/ar";
@@ -286,4 +287,21 @@ describe("i18n parity for the web-app/004 blocks", () => {
       expect(Object.keys(ar[b]).sort()).toEqual(Object.keys(en[b]).sort());
     });
   }
+});
+
+describe("Browse category pills: most stores first (owner, 2026-09-23)", () => {
+  const node = (id: string) => ({ id, name: id, nameAr: id, iconUrl: null, children: [] });
+  const store = (...cats: string[]) => mapStoreCard({ id: cats.join("-"), name: "s", categories: cats.map((id) => ({ id, name: id })) });
+
+  it("orders by how many stores carry each category, empty ones last and kept", () => {
+    const tree = [node("warehouse"), node("crane"), node("excavator"), node("forklift")];
+    const stores = [store("excavator", "crane"), store("excavator"), store("excavator", "forklift"), store("crane")];
+    expect(sortByStoreCount(tree, stores).map((n) => n.id)).toEqual(["excavator", "crane", "forklift", "warehouse"]);
+  });
+
+  it("keeps the backend order for ties, and for everything when there are no stores", () => {
+    const tree = [node("a"), node("b"), node("c")];
+    expect(sortByStoreCount(tree, [store("c"), store("b")]).map((n) => n.id)).toEqual(["b", "c", "a"]);
+    expect(sortByStoreCount(tree, []).map((n) => n.id)).toEqual(["a", "b", "c"]);
+  });
 });

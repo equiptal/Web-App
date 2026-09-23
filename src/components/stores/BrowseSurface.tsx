@@ -131,7 +131,8 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
         );
       })
       .catch(() => setCities([]));
-    fetch("/api/stores/taxonomy", { cache: "no-store" })
+    // `sort=stores`: the pills lead with the categories that have the most stores (see the route).
+    fetch("/api/stores/taxonomy?sort=stores", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
       .then((d: { taxonomy: TaxonomyNode[] }) => setTaxonomy(d.taxonomy ?? []))
       .catch(() => setTaxonomy([]));

@@ -134,14 +134,18 @@ export function HomeHub() {
 
      `replace`, not `push`: a page he never chose must not sit in his history for Back to return him
      to. And only once `status` has settled — acting while it still reads "loading" would bounce
-     every signed-in renter through Browse on a cold load, which is the flash this exists to avoid. */
+     every signed-in renter through Browse on a cold load, which is the flash this exists to avoid.
+
+     The QUERY rides along (owner, 2026-09-23): the marketing site links `/?signin=1`, and a bare
+     `/browse` dropped it, so the sign-in modal opened on this page and died with it on the bounce.
+     Read off `window.location` because this effect runs before the auth gate's, which strips it. */
   const [landed, setLanded] = useState(false);
   const decided = useRef(false);
   useEffect(() => {
     if (status !== "anon" || decided.current) return;
     decided.current = true;
     if (previousPath()) setLanded(true);
-    else router.replace("/browse");
+    else router.replace(`/browse${window.location.search}`);
   }, [status, router]);
 
   /* ── One block at a time (owner, 2026-09-16) ─────────────────────────────────────────────────
