@@ -7,6 +7,9 @@
 
 
 import { mapBidLiveStatus, type BidLiveStatus } from "@/lib/contract/bid-live-status";
+import { companyBrandName, companyNamePartsOf, counterpartyDisplayName } from "@/lib/contract/counterparty-name";
+import { mediaUrl } from "@/lib/contract/stores";
+import { isHiddenTermKey } from "@/lib/contract/term-visibility";
 
 export type BidStatus =
   | "PENDING"
@@ -287,6 +290,20 @@ export interface BidCard {
    */
   supplierCompanyId: string | null;
   supplierName: string;
+  /**
+   * The supplier's STORE mark, for the quotation's party box and its navy footer.
+   *
+   * 🔴 THE STORE's logo, never the supplier profile's `companyLogoKey`: that key lives under the
+   * private-documents prefix, so a public URL built from it answers 403 — and an `<img>` absorbs that
+   * as «this firm has no logo», which is a failure nobody can see. The app states the same rule where
+   * it fills this field.
+   *
+   * ⚠️ Read TOLERANTLY across the spellings the two services might land on, and through `mediaUrl`,
+   * which passes a signed http URL through and builds the public one for a bare key — the app's
+   * `S3Url.from`. Null until a projection actually carries one, and then both slots simply draw
+   * nothing, which is the app's own behaviour for a supplier with no mark.
+   */
+  supplierLogoUrl: string | null;
   verified: boolean;
   rating: number | null;
   distanceKm: number | null;
@@ -374,6 +391,10 @@ export interface BidCard {
   matchCount: number;
   conflictCount: number;
   dealRoomId: string | null;
+  /** The room's own phase (`OPEN` / `CLOSED` / `CANCELLED` / `ABANDONED`). On the wire since the app
+   *  shipped its footer band, and read by nothing here — so the bid card could not tell a live
+   *  negotiation from a closed one. `RenteeBandState` splits three ways on it. */
+  dealRoomStatus: string | null;
   expired: boolean;
   /** Free-text note the supplier attached to this bid (app: BidModel.note). */
   note: string | null;
@@ -452,9 +473,20 @@ export interface BidCard {
   };
   /** Normalized keys of terms AGREED/locked in the deal room — drives the quotation's "Agreed" badge. */
   agreedTermKeys?: string[];
+  /** The latest COUNTER's proposed value per term (getBidList `counters`).
+   *
+   *  ⚠️ The mapper has always built these to decide a term row's matched/conflict state; they are
+   *  exposed because the QUOTATION resolves every clause down the app's own ladder (locked → counter
+   *  → declared → the request's side) and a counter is the middle rung. */
+  counters?: { key: string; value: unknown; side?: string | null; at?: string | null }[];
+  /** The supplier's RAW T3 declaration map, keys as the backend sends them.
+   *
+   *  ⚠️ `declaredTerms` above is the five the card reads by name; this is all of them, because the
+   *  quotation must print every term the room holds and cannot know their names in advance. */
+  t3Declarations?: Record<string, unknown>;
   /** 014 lifecycle, server-enriched in getBidList (same source the mobile bid card reads). Drives the
    *  live deal-terms strip + overlays locked terms onto the Terms modal / quotation. */
-  lockedTerms: { key: string; value: unknown }[]; // agreed terms + their negotiated value
+  lockedTerms: { key: string; value: unknown; at?: string | null }[]; // agreed terms + their negotiated value
   unreadTerms: string[]; // term keys with a counter the renter hasn't seen
   progress: { agreed: number; total: number }; // agreed-terms meter
   lastEventAr: string | null; // last-event copy (e.g. "منذ 3 دقائق")
@@ -507,6 +539,13 @@ export interface TermRow {
    *  pending counter (counter.newValue) matches the renter's ask (→ matched) or differs (→ conflict),
    *  matching the app's `contractState` (dealRoomValue vs rentee value). Only populated on counted terms. */
   renteeValue?: string | null;
+  /** Who wrote the counter the standing value came from, and when the value last moved in the room.
+   *  App parity: `TermAttribution.counterSide` / `.updatedAt`, which the Terms panel prints under the
+   *  label as «Updated by the supplier · 12 Sep» or «Agreed in deal room · 12 Sep». `updatedAt` is a
+   *  lock's `lockedAt` on an agreed row and that counter's `occurredAt` otherwise; both are null on a
+   *  row the deal room has never touched. */
+  counterSide?: "rentee" | "supplier" | null;
+  updatedAt?: string | null;
 }
 
 const n = (v: unknown): number | null => {
@@ -578,8 +617,15 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const reqItem = reqItems[0] ?? {};
   const eq = (raw.equipment ?? {}) as Record<string, unknown>;
   const unverified = !eqVerified; // listing unverified → measurement/year/fuel forced grey
+  /* 🔴 **A HIDDEN term's deviation dies here, once.** Three readings below ask this set whether
+     the lumped operator row conflicts and what its detail line says; filtering at each reader would
+     have been three edits and a fourth one missed, and a retired term would go on painting a row red
+     over a question nobody was asked. Mirrors the app, which filters the same deviations at its own
+     parse (`marketplace_models.dart`). */
   const deviationKeys = new Set(
-    (Array.isArray(raw.deviations) ? (raw.deviations as Record<string, unknown>[]) : []).map((d) => String(d.key ?? "")),
+    (Array.isArray(raw.deviations) ? (raw.deviations as Record<string, unknown>[]) : [])
+      .map((d) => String(d.key ?? ""))
+      .filter((k) => !isHiddenTermKey(k)),
   );
 
   const reqCap = s(reqItem.capacityId);
@@ -609,13 +655,9 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   // Operator (spec 128). operator_included is CONFLICT_ELIGIBLE / Negotiable — the app moved it
   // Acknowledge → Negotiable (deal-room.service CONFLICT_ELIGIBLE_KEYS): it conflicts when the RFQ needs
   // an operator the bid omits OR on a backend-flagged deviation, and is countered in the deal room.
-  // operator_nationality is its own CONFLICT_ELIGIBLE term.
   const reqOperator = s(reqItem.operatorIncluded)?.toUpperCase() === "YES";
   const bidOperator = s(raw.operatorIncluded)?.toUpperCase() === "YES";
   const operatorIncluded: TermState = !reqOperator ? "grey" : (!bidOperator || deviationKeys.has("operator_included")) ? "conflict" : "matched";
-  const opNat = reqOperator
-    ? (s(reqItem.operatorNationality) === "restricted" ? (s(reqItem.operatorNationalityCustom) ?? "restricted") : s(reqItem.operatorNationality))
-    : null;
 
   // FAT split + fuel responsibility — request prefs map to supplier/rentee (term-matching.ts parity).
   // fat_food / fat_accommodation_transport AND fuel_responsibility are all CONFLICT_ELIGIBLE / Negotiable
@@ -631,9 +673,11 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
   const maintenance: TermState = !reqMaint ? "grey" : "matched";
 
   // Single "operator" row for the BID CARD's equipment bucket (mobile app parity): conflict on a
-  // nationality deviation or when the RFQ needs an operator the bid omits; matched when included.
-  // App parity (terms_modal.dart): the single operator term also conflicts on a missing operator cert.
-  const operator: TermState = !reqOperator ? "grey" : deviationKeys.has("operator_nationality") || deviationKeys.has("operator_certification") || !bidOperator ? "conflict" : "matched";
+  // an operator-certification deviation, or when the RFQ needs an operator the bid omits.
+  /* ~~`deviationKeys.has("operator_nationality")`.~~ Hidden term: the parse above can no longer
+     hand this set that key, and a dead clause that reads as live is how a retired term comes back
+     by accident. */
+  const operator: TermState = !reqOperator ? "grey" : deviationKeys.has("operator_certification") || !bidOperator ? "conflict" : "matched";
 
   // operator_certification & safety_certifications — CONFLICT_ELIGIBLE / Negotiable in the app
   // (term-matching.ts: "Moved Acknowledge → Negotiable"). They live in the comparison's negotiable
@@ -681,8 +725,9 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     : undefined;
   // The lumped `operator` bid-card row shows only "Conflict" with no values today. Give it the same
   // Renter/Supplier detail as the specific rows (app parity) — pick the reason that drove the conflict:
-  // a missing operator, an operator-certification deviation, or an operator-nationality deviation.
-  const opNatDeclared = s(t3.operator_nationality) ?? s(t3.operatorNationality);
+  // a missing operator, or an operator-certification deviation. (~~or a nationality deviation~~: that
+  // term is hidden product-wide and its deviation is dropped at the parse.)
+  /* ~~`opNatDeclared`, what the SUPPLIER answered.~~ Swept with `opNat` above. */
   /**
    * ── What the SUPPLIER declared, so no term can read «Didn't say» when he answered it ────────────
    * Owner, 2026-09-09: *"how can someone not say? It must say yes or no in the form, even in a bid
@@ -712,9 +757,7 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
       ? { en: "Renter: operator required · Supplier: not included", ar: "المستأجر: مطلوب مشغّل · المؤجّر: غير مشمول" }
       : deviationKeys.has("operator_certification") && opCertDetail
         ? opCertDetail
-        : deviationKeys.has("operator_nationality")
-          ? { en: `Renter: ${opNat ?? dash} · Supplier: ${opNatDeclared ?? dash}`, ar: `المستأجر: ${opNat ?? dash} · المؤجّر: ${opNatDeclared ?? dash}` }
-          : undefined;
+        : undefined;
 
   return {
     // BID-CARD buckets — mirror the mobile app's bid card exactly: Equipment 6 · Project 4. Operator is
@@ -736,7 +779,8 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     // card. Carries the full deal-room negotiable + acknowledge terms with live overlay states.
     negotiable: [
       { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded, renteeValue: reqOperator ? "yes" : null },
-      { key: "operator_nationality", labelEn: "Operator nationality", labelAr: "جنسية المشغّل", state: contractState("operator_nationality", opNat), renteeValue: opNat, value: opNatDeclared },
+      /* 🔴 ~~Operator nationality.~~ Hidden on every surface (see `term-visibility.ts`).
+         It was the comparison's own column and the bid card reads none of it. */
       { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail, renteeValue: reqOpCert, value: opDeclared },
       { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState, detail: safetyDetail, renteeValue: requiredCerts.length ? requiredCerts.join(",") : null },
       { key: "fat_food", labelEn: "Operator food", labelAr: "طعام المشغّل", state: contractState("fat_food", fatFood), renteeValue: fatFood },
@@ -825,13 +869,12 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
   // SupplierProfile). A supplier who joined by invite code has no `supplierProfile.companyName` of
   // their own, so without this they'd render under their PERSONAL name and be classified as an
   // individual, with no sign they bid on behalf of a verified company.
-  const supCompanyBrand =
-    supCompany?.isVerified === true && !supCompany.deletedAt ? s(supCompany.name) : undefined;
-  // The supplier's OWN company-name field (`supplierProfile.companyName` — what they typed in their
-  // profile), scanned across the projection shapes like the doc keys above. This is the name we display:
-  // `supplier.company.name` is the row ops created in the VERIFICATION queue, and the two drift (an ops
-  // typo / a placeholder / a legal-entity string), so the profile field is the supplier's own identity.
-  const supProfileCompanyName = profSources.map((o) => s(o.companyName) ?? s(o.company_name)).find(Boolean);
+  /* 🔴 **THE FIRM IS NAMED BY ITS REGISTRATION, and the web read neither `legalName` column.**
+     ~~`supplierProfile.companyName` first, the company row second, both gated on `isVerified`.~~ That
+     order was inverted against the backend's own (`identity-select.ts`) and the app's
+     (`counterparty_name.dart`), and the gate meant a firm nobody had approved yet read by its owner's
+     PERSONAL name on every surface. One rule now, in `counterparty-name.ts`, for both roles. */
+  const supCompanyBrand = companyBrandName(companyNamePartsOf(sup)) ?? undefined;
   // Company docs are read from the supplier's REAL verification fields projected in the bid list
   // (crNumber / vatNumber / national-address parts / localContentDocKey / sasoHeavyEquipDocKey). Show a
   // doc ONLY when its actual field is present — NEVER inferred from "verified" (a verified supplier can
@@ -889,13 +932,16 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
   // locked (agreed) term carries its negotiated value, so they overlay the Terms-modal state + the
   // request-term values + mob/demob/lead-time. `currentPrice` already carries the live negotiated rate.
   const lockedTerms = (Array.isArray(raw.lockedTerms) ? (raw.lockedTerms as Record<string, unknown>[]) : [])
-    .map((t) => ({ key: s(t.termKey) ?? "", value: t.lockedValue }))
+    .map((t) => ({ key: s(t.termKey) ?? "", value: t.lockedValue, at: s(t.lockedAt) }))
     .filter((t) => t.key);
   const unreadTerms = (Array.isArray(raw.unreadTerms) ? (raw.unreadTerms as unknown[]) : []).map(String);
-  // Pending counters WITH their proposed values (getBidList `counters: [{termKey, newValue}]`) — the
-  // deal-room overlay compares each to the rentee's ask to decide matched vs conflict (app parity).
+  /* Pending counters WITH their proposed values (getBidList `counters: [{termKey, newValue}]`) — the
+     deal-room overlay compares each to the rentee's ask to decide matched vs conflict (app parity).
+     ⚠️ **`side` and `occurredAt` are on the wire and this mapper dropped both.** The app reads them
+     (`BidCounter.side` / `.occurredAt`), and they are what lets a term row say WHO moved it and WHEN
+     rather than only what it now says. */
   const counters = (Array.isArray(raw.counters) ? (raw.counters as Record<string, unknown>[]) : [])
-    .map((c) => ({ key: s(c.termKey) ?? "", value: c.newValue }))
+    .map((c) => ({ key: s(c.termKey) ?? "", value: c.newValue, side: s(c.side), at: s(c.occurredAt) }))
     .filter((c) => c.key);
   const pm = (raw.progressMeter ?? {}) as Record<string, unknown>;
   const progress = { agreed: n(pm.agreed) ?? 0, total: n(pm.total) ?? 0 };
@@ -931,8 +977,19 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
 
   const lockedKeys = new Set(lockedTerms.map((t) => normKey(t.key)));
   const lockedValByKey = new Map(lockedTerms.map((t) => [normKey(t.key), t.value != null && t.value !== "" ? String(t.value) : null]));
+  const lockedAtByKey = new Map(lockedTerms.map((t) => [normKey(t.key), t.at ?? null]));
   const unreadKeys = new Set(unreadTerms.map(normKey));
-  const counterValByKey = new Map(counters.map((c) => [normKey(c.key), c.value != null && c.value !== "" ? String(c.value) : null]));
+  /* 🔴 **HIS counters, never hers.** `counters` carries the latest counter on a term WHICHEVER side
+     wrote it, and this overlay writes it into `value` — the column every surface reads as the
+     SUPPLIER's offer. So a renter who countered saw his own proposal reported back as the supplier's,
+     and worse: it equals his own ask by construction, so the row went GREEN as though the supplier had
+     agreed to something he has never seen. The app filters the same map to `c.side == 'supplier'` and
+     says why: a renter's suggestion must never read as the supplier's own term.
+     ⚠️ Only an EXPLICIT `rentee` is dropped. An older payload carries no side at all, and reading
+     that as hers would silently retire the whole overlay on every bid predating the field. */
+  const hisCounters = counters.filter((c) => (c.side ?? "").toLowerCase() !== "rentee");
+  const counterValByKey = new Map(hisCounters.map((c) => [normKey(c.key), c.value != null && c.value !== "" ? String(c.value) : null]));
+  const counterAtByKey = new Map(hisCounters.map((c) => [normKey(c.key), c.at ?? null]));
   // Enum-insensitive equality for the counter overlay (app parity: normalizeTermEnum) — case/underscore
   // agnostic + boolean/party synonyms (yes=true=included, no=false=excluded/not-included, renter=rentee).
   const normTok = (v: string): string => {
@@ -958,15 +1015,17 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
       const k = normKey(r.key);
       // Locked → "agreed", and carry the negotiated value so the cost responsibilities reflect what was
       // actually settled in the deal room (e.g. accepting the supplier's FAT flips the side to supplier).
-      if (lockedKeys.has(k)) return { ...r, state: "agreed" as TermState, value: lockedValByKey.get(k) ?? r.value ?? null };
+      if (lockedKeys.has(k)) return { ...r, state: "agreed" as TermState, value: lockedValByKey.get(k) ?? r.value ?? null, counterSide: null, updatedAt: lockedAtByKey.get(k) ?? null };
       // Pending counter (app parity: dealRoomValue = counter.newValue): compare to the rentee's ask —
       // equal → matched, differ → conflict. Without a rentee value to compare, fall back to "negotiating".
       const cv = counterValByKey.get(k);
       if (cv != null) {
+        // Every counter that reaches here is the supplier's, by the filter above.
+        const moved = { counterSide: "supplier" as const, updatedAt: counterAtByKey.get(k) ?? null };
         if (r.renteeValue != null && r.renteeValue !== "") {
-          return { ...r, value: cv, state: (normVal(cv) === normVal(r.renteeValue) ? "matched" : "conflict") as TermState };
+          return { ...r, ...moved, value: cv, state: (normVal(cv) === normVal(r.renteeValue) ? "matched" : "conflict") as TermState };
         }
-        return { ...r, value: cv, state: "negotiating" as TermState };
+        return { ...r, ...moved, value: cv, state: "negotiating" as TermState };
       }
       if (unreadKeys.has(k)) return { ...r, state: "negotiating" as TermState };
       return r;
@@ -980,6 +1039,21 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
   //  it reflects the latest negotiated rate and falls back to the original when there's no deal room.
   //  Prefer it; keep the locked PRICE term + the raw offer as fallbacks.
   const negRate = lockedVal((k) => k === "price");
+  /* 🔴 **THE SUPPLIER'S OWN LATEST, then acceptance, then his opening bid** (app parity,
+     `BidModel.displayPrice`). ~~`currentPrice ?? negRate ?? priceAmount`.~~ `currentPrice` is the
+     room's live rate WHOEVER moved it, so the RENTER'S OWN COUNTER rewrote the price on his own bid
+     card: he asked 16,800 against an offer of 18,400 and the card then read 16,800, as though the
+     supplier had agreed to it. A quotation is an offer from the seller to the buyer.
+     ⚠️ The `accepted` arm under it is NOT dead: a room created before the history carried its
+     proposal snapshot has no `supplierLatest`, and there acceptance is the only thing that makes the
+     room's figures safe to print.
+     ⚠️ An EMPTY `supplierLatest` is not an offer. Testing the object's PRESENCE would blank every
+     figure on a row the backend sent as `{}`, so the test is whether it carries anything at all. */
+  const supLatest = obj(raw.supplierLatest ?? raw.supplier_latest);
+  const hasSupLatest = s(supLatest.at) != null || n(supLatest.rate) != null;
+  const accepted = String(raw.status ?? "").trim().toUpperCase() === "ACCEPTED";
+  const supplierFigure = (latest: unknown, current: unknown, opening: unknown): number | null =>
+    (hasSupLatest ? n(latest) : null) ?? (accepted ? (n(current) ?? n(opening)) : n(opening));
 
   return {
     id: String(raw.id ?? ""),
@@ -993,24 +1067,26 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     // every shape that can carry it lives in `readSupplierCompanyId`, shared with `mapReceivedBids`:
     // ONE counterparty key needs one derivation, or the chat dock's anchor and its rows disagree.
     supplierCompanyId: readSupplierCompanyId(raw),
-    // Company name FIRST — the supplier's own profile field, not the verification-queue company row
-    // (nor the backend's `supplierDisplayName`, which resolves that row ahead of the profile). Falls
-    // back to the verified firm's brand, then the backend's resolved name, then the person's name.
-    // `readSupplierDisplayName` is this same precedence over the flat received-bids shape; the two
-    // must move together, or one surface names the firm while another names the member.
+    /* The registration's order, then the person — `counterparty-name.ts`, which is the backend's
+       rule and the app's. `readSupplierDisplayName` runs the SAME function over the flat
+       received-bids shape, so one surface can no longer name the firm while another names the member.
+       ⚠️ The backend's own `supplierDisplayName` sits BELOW the four columns: it resolves the
+       company row ahead of the profile, which is the order this rule inverts. */
     supplierName:
-      supProfileCompanyName ??
-      supCompanyBrand ??
-      s(raw.supplierDisplayName) ??
-      ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
+      counterpartyDisplayName({
+        ...companyNamePartsOf(sup),
+        personName: [s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" "),
+      }) ||
+      s(raw.supplierDisplayName) ||
+      "Supplier",
     verified: supVerified,
     rating: n(sup.rating) ?? n(prof.rating),
     distanceKm,
     submittedAt: s(raw.createdAt),
     validUntil: s(raw.validUntil),
-    price: n(raw.currentPrice) ?? n(negRate) ?? n(raw.priceAmount), // live deal-room rate (app parity) → locked rate → original offer (T16)
-    mobPrice: n(negMobPrice) ?? n(raw.mobPrice),
-    demobPrice: n(negDemobPrice) ?? n(raw.demobPrice),
+    price: supplierFigure(supLatest.rate, n(raw.currentPrice) ?? n(negRate), raw.priceAmount),
+    mobPrice: supplierFigure(supLatest.mobPrice, negMobPrice, raw.mobPrice),
+    demobPrice: supplierFigure(supLatest.demobPrice, negDemobPrice, raw.demobPrice),
     priceUnit: s(raw.priceUnit),
     duration: n(raw.duration),
     numberOfUnits: n(rqItem.numberOfUnits) ?? 1,
@@ -1041,7 +1117,7 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     eqVerified,
     compliance: {
       // A member of a verified firm IS a company entity, even with no company name of their own.
-      entityType: (supProfileCompanyName ?? supCompanyBrand) ? "company" : "individual",
+      entityType: supCompanyBrand ? "company" : "individual",
       activityLicense: hasCr,
       taxNumber: hasVat,
       nationalAddress: hasNationalAddr,
@@ -1055,9 +1131,17 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     supplierCity,
     supplierPhone: s(sup.phone),
     supplierEmail: s(sup.email), // not in the bid-list projection yet → null until the backend adds it
+    supplierLogoUrl:
+      mediaUrl(raw.supplierLogoUrl) ??
+      mediaUrl(raw.storeLogoUrl) ??
+      mediaUrl(obj(sup.store).logoUrl) ??
+      mediaUrl(obj(sup.store).logoKey) ??
+      mediaUrl(sup.logoUrl) ??
+      null,
     matchCount: n(raw.matchCount) ?? 0,
     conflictCount: n(raw.conflictCount) ?? 0,
     dealRoomId: s(raw.dealRoomId),
+    dealRoomStatus: s(raw.dealRoomStatus ?? raw.deal_room_status),
     expired: expired || raw.isExpired === true || raw.status === "EXPIRED",
     note: s(raw.note),
     requiredCerts,
@@ -1110,6 +1194,8 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
       fuelResponsibility: s(t3decl.fuel_responsibility),
     },
     agreedTermKeys: lockedTerms.map((t) => normKey(t.key)),
+    counters,
+    t3Declarations: t3decl,
     lockedTerms,
     unreadTerms,
     progress,
@@ -1179,17 +1265,18 @@ export function readSupplierCompanyId(raw: Record<string, unknown>): string | nu
  * dealing with; the individual who typed the bid is not a party to anything.
  */
 export function readSupplierDisplayName(raw: Record<string, unknown>): string {
+  // The SAME rule `mapBid` runs, over the flat received-bids shape: `companyNamePartsOf` reads the
+  // nested profile shapes AND the object itself, which is what the spread projections carry.
   const sup = obj(raw.supplier);
-  const company = obj(sup.company);
-  const profiles = [obj(sup.supplierProfile), sup, obj(sup.profile), obj(raw.supplierProfile), obj(raw.profile)];
-  const own = profiles.map((o) => s(o.companyName) ?? s(o.company_name)).find(Boolean);
-  // The firm's brand counts only while the firm is actually verified and alive — the same guard
-  // `mapBid` applies, so an ops-created placeholder row cannot rename a supplier.
-  const brand = company.isVerified === true && !company.deletedAt ? s(company.name) : null;
   const person = [s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ");
-  // `||` on the last step, not `??`: an absent first and last name joins to the EMPTY STRING, which
+  // `||` at every step, never `??`: an absent first and last name joins to the EMPTY STRING, which
   // `??` would keep and print as a nameless chip.
-  return own ?? brand ?? s(raw.supplierDisplayName) ?? s(raw.supplierName) ?? (person || "Supplier");
+  return (
+    counterpartyDisplayName({ ...companyNamePartsOf(sup), personName: person }) ||
+    s(raw.supplierDisplayName) ||
+    s(raw.supplierName) ||
+    "Supplier"
+  );
 }
 
 /** The bidding MEMBER, likewise read out of either shape — nested `raw.supplier.id` on the bid list,
@@ -1257,7 +1344,7 @@ export type TermBucket = "conflict" | "pending" | "matched";
 // link "operator_included" == in-app "operator"). Counting one row per GROUP keeps in-app bids at the
 // same total (operator + operator_included fold to one). Without this, off-platform bids showed
 // "Conflict 0 · Matched 0" because none of their keys matched the in-app names.
-const COUNTED_TERM_GROUP: Record<string, string> = {
+export const COUNTED_TERM_GROUP: Record<string, string> = {
   operator: "operator", operator_included: "operator",
   safety_certifications: "certs", certs: "certs",
   fuel_responsibility: "fuel",

@@ -33,6 +33,15 @@ export function PhotoPlaceholder({ className = "" }: { className?: string }) {
       onError={() => setFailed(true)}
       /* `contain` on the app's ground, never `cover`: the artwork carries words, and cropping them
          is how a placeholder starts looking like a broken photograph. */
+      /* 🔴 **INLINE, because a utility class kept LOSING** (owner, 2026-09-22, on the bid map's
+         viewer: *"make sure the images fit the circule or the side rectangle"*). A surface that
+         frames photographs writes `.mp-viewer img { object-fit: cover }` — specificity 0-1-1 against
+         a utility's 0-1-0 — so this placeholder was cropped inside it and its own words were cut
+         off, which is precisely the broken-photograph look the rule above exists to prevent.
+         ⚠️ It is the PLACEHOLDER's own invariant rather than one surface's preference, so it is
+         asserted where the artwork is, once, for every frame that ever holds it. The utility stays
+         beside it for the ordinary case and as the record of the intent. */
+      style={{ objectFit: "contain" }}
       className={`h-full w-full bg-surface2 object-contain ${className}`}
     />
   );

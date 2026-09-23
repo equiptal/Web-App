@@ -308,11 +308,13 @@ describe("the filter is a panel over the column, dismissed by an X", () => {
     }
   });
 
-  it("states the count in BOTH places, from one builder, and always against the whole offer", () => {
+  // ~~"states the count in BOTH places"~~: the line above the list is gone (owner, 2026-09-22:
+  // *"remove this 1 of 2"*). The panel's foot still states it, from the same builder.
+  it("states the count in the filter panel's foot, from one builder, against the whole offer", () => {
     // With the cards covered, the panel's foot is the only thing telling the renter what a chip just
     // cost — and the mutation to catch is a second, hand-built count that reads `view.machines.length`
     // over `view.shown`, or a denominator that quietly becomes the filtered figure.
-    expect(list.match(/countLine\(\)/g)).toHaveLength(2);
+    expect(list.match(/countLine\(\)/g)).toHaveLength(1);
     expect(list).toMatch(/num\(view\.total\)/);
     expect(list).toMatch(/num\(view\.shown\)/);
     expect(list).not.toMatch(/view\.machines\.length/);
@@ -594,7 +596,7 @@ describe("the shortfall alert is WITHDRAWN from the panel (owner, 2026-09-10)", 
   it("draws no shortfall alert", () => {
     expect(src).not.toMatch(/\{shortfall && \(/);
     expect(src).not.toMatch(/bm-short-t/);
-    expect(src).not.toMatch(/t\.bidMap\.shortfall/);
+    expect(src).not.toMatch(/t\.bidMap\.shortfall\b/);
   });
 
   it("keeps the ASK, which was never the alert's alone", () => {
@@ -759,10 +761,18 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
     expect(callbacks.sort()).toEqual([
       "canOpenMachine",
       "onCancelDraft",
+      // Closing an EMBEDDED dock (2026-09-22). It carries nothing and names no surface: the page
+      // that stood the dock in a column is the only thing that knows what closing it means, and on
+      // the map the prop is absent, so the ✕ there still keeps `setOpen(false)`.
+      "onClose",
       "onConfirmDraft",
       // Reports that the renter asked for the company's papers, and names no surface — the workspace
       // answers it with V9's panel, and the dock cannot tell it to do anything else.
       "onOpenCompanyDocs",
+      // The way to THIS bid's equipment map, for the inbox, which reaches it from nowhere else
+      // (2026-09-22). Takes nothing and returns nothing — the caller already knows which bid the
+      // dock is on, so no id crosses this boundary either.
+      "onOpenEquipment",
       "onOpenMachine",
       "onOutstandingAsks",
     ]);

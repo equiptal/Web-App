@@ -186,11 +186,14 @@ describe("it is the bid form's own shape", () => {
 
 describe("the terms step reads back as answered", () => {
   it("counts the answered terms over the asked ones", async () => {
-    // Six asked (one contract term + five item terms); `nationality` was never answered.
+    /* 🔴 **FIVE asked now, not six** (owner, 2026-09-22): `nationality` left the form's
+       own TERM_KEYS with the term itself, so it is no longer put to the supplier and no longer
+       counted against him — the ruling `fuelType` took on 2026-09-04. One contract term plus
+       four item terms, all five answered. */
     const terms = await step("Terms");
     // `findBy`, not `getBy`: the heading is drawn from the submission alone, but the COUNT needs the
     // request's form payload, which lands a tick later (and later still under the whole suite).
-    expect(await within(terms).findByText("5 / 6", {}, { timeout: 5000 })).toBeTruthy();
+    expect(await within(terms).findByText("5 / 5", {}, { timeout: 5000 })).toBeTruthy();
     expect(within(terms).getByText("answered")).toBeTruthy();
   });
 
@@ -211,12 +214,14 @@ describe("the terms step reads back as answered", () => {
     expect(within(row as HTMLElement).getByText("No")).toBeTruthy();
   });
 
-  it("leaves a term the supplier never answered as neither Yes nor No", async () => {
+  /* 🔴 ~~«leaves a term the supplier never answered as neither Yes nor No».~~ Its subject
+     was `Operator nationality`, the one term this fixture leaves unanswered, and that term is hidden
+     on every surface now (2026-09-22). The RULE it pinned — an unanswered term reads as neither —
+     is untouched and has no other unanswered term in this fixture to be shown on, so it is asserted
+     the only honest way left: the retired term draws no row at all. */
+  it("draws no row for a term retired from the form", async () => {
     const terms = await step("Terms");
-    const row = within(terms).getByText("Operator nationality").closest("div")!;
-    expect(within(row as HTMLElement).queryByText("Yes")).toBeNull();
-    expect(within(row as HTMLElement).queryByText("No")).toBeNull();
-    expect(row.textContent).toContain("—");
+    expect(within(terms).queryByText("Operator nationality")).toBeNull();
   });
 });
 

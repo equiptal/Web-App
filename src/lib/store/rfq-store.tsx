@@ -319,6 +319,7 @@ type Action =
   | { t: "PATCH_PREFERENCES"; patch: DeepPrefPatch }
   | { t: "SET_TRIAL"; isTrial: boolean }
   | { t: "SET_DIRECT"; direct: DirectTarget | null }
+  | { t: "GO_BROADCAST" }
   | { t: "SELECT_PROJECT"; project: ProjectSummary }
   | { t: "PROJECT_TYPED"; line: string | null }
   | { t: "AGENT_TYPING"; on: boolean }
@@ -942,6 +943,19 @@ export function reducer(state: RfqState, a: Action): RfqState {
         itemIndex: 0,
       };
     }
+    /**
+     * The renter answered the confirmation with «Broadcast instead» (app parity, and the app's own
+     * rule: the switch is ONE-WAY, `supplierId` and `supplierName` are nulled and nothing re-attaches
+     * a supplier to a switched request).
+     *
+     * 🔴 **It is NOT `SET_DIRECT` with null, and that is the whole reason it exists.** That case drops
+     * the draft on purpose - a request written for one firm must not be re-addressed behind the
+     * renter's back - and here the draft is exactly what he is keeping: same machine, same site, same
+     * dates, one recipient fewer. Reaching for `setDirect(null)` would wipe the request he is standing
+     * on, one press before it posts.
+     */
+    case "GO_BROADCAST":
+      return state.direct ? { ...state, direct: null } : state;
     case "SUBMIT_SUCCESS":
       return {
         ...state,
@@ -1144,6 +1158,8 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     /** mobile/016 — enter/leave trial mode for this run (set from `/create?mode=trial`). */
     setTrial: (isTrial: boolean) => dispatch({ t: "SET_TRIAL", isTrial }),
     setDirect: (direct: DirectTarget | null) => dispatch({ t: "SET_DIRECT", direct }),
+    /** «Broadcast instead» on the send confirmation: drop the one recipient, KEEP the request. */
+    goBroadcast: () => dispatch({ t: "GO_BROADCAST" }),
 
     /**
      * Post the request.
@@ -1155,10 +1171,22 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
      * pure addition; nothing about what gets created changed (owner, 2026-09-02).
      *
      * `null` on failure, so a caller can tell "nothing was posted" from "posted with no uuid".
+     *
+     * `asBroadcast` is the confirmation's «Broadcast instead» (app parity): post this DIRECT request
+     * to the whole market instead of to the one firm it was started from.
+     *
+     * ⚠️ **The flag is passed IN rather than read back off the store, and it has to be.** `getState`
+     * answers `stateRef.current`, which is written during RENDER - so a caller that dispatched
+     * `GO_BROADCAST` and called `submit()` in the same handler would still read the old `direct` and
+     * post the request to the supplier the renter had just declined. The dispatch below is for the
+     * SCREEN (the ribbon, the confirmation's own blocks); this argument is what the wire reads.
      */
-    async submit(): Promise<{ requestId: string; requestUuids: string[] } | null> {
+    async submit(opts?: { asBroadcast?: boolean }): Promise<{ requestId: string; requestUuids: string[] } | null> {
       const s = getState();
       if (!s.draft) return null;
+      /* One-way, as in the app: there is no affordance that re-attaches the supplier afterwards. */
+      if (opts?.asBroadcast && s.direct) dispatch({ t: "GO_BROADCAST" });
+      const direct = opts?.asBroadcast ? null : s.direct;
       dispatch({ t: "SUBMIT_START" });
       // A5: did the renter edit the agent's original draft? Compared here (before submit) against the
       // agentOrigin snapshot; the correction is fired AFTER a successful create — fire-and-forget, so it
@@ -1206,7 +1234,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           ...(TRIAL_REQUESTS_ENABLED && s.isTrial ? { isTrial: true } : {}),
           // Started from a store → DIRECT to that supplier (app parity). Absent for a broadcast, so a
           // normal request's payload is byte-identical to before.
-          ...(s.direct ? { direct: s.direct } : {}),
+          ...(direct ? { direct } : {}),
         });
         dispatch({
           t: "SUBMIT_SUCCESS",

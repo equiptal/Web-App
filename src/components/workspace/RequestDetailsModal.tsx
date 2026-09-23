@@ -12,13 +12,14 @@ import {
   setShareLinkLogo,
 } from "@/lib/api/client";
 import { CERT_LABEL } from "@/lib/contract/bids";
-import { cancelFailureLine, cancelRetryWorthIt, publicTaxonomyUrl, statusMeta, type RequestGroup, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
+import { cancelFailureLine, cancelRetryWorthIt, directTarget, publicTaxonomyUrl, statusMeta, type RequestGroup, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
 import { itemDetailRows, requestDetailRows, requestFieldFormatters, type Row } from "@/lib/contract/request-fields";
-import { requestActions, type WorkspaceBid } from "@/lib/contract/workspace";
+import { requestActions } from "@/lib/contract/workspace";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { ConfirmCancelModal, EditRequestModal } from "@/components/requests/RequestEditModals";
 import { ACTIONS, btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { MachineGlyph } from "@/components/MachineGlyph";
 
 /** What the share sheet needs about this request's public bid link. */
 export interface ShareLinkMeta {
@@ -49,7 +50,6 @@ export interface ShareLinkMeta {
 export function RequestDetailsModal({
   group,
   item,
-  bids,
   link,
   onClose,
   onChanged,
@@ -59,7 +59,8 @@ export function RequestDetailsModal({
   group: RequestGroup;
   /** The item in focus — the drawer lists every item and marks this one. */
   item: RequestListItem | null;
-  bids: WorkspaceBid[];
+  /* ~~`bids`.~~ It fed the count pill alone, and that row went on 2026-09-13. The drawer reads a
+     REQUEST; the offers on it are the page behind this, which is where they are acted on. */
   link: ShareLinkMeta | null;
   onClose: () => void;
   /** The request changed underneath the page: reload the rail and the bids. */
@@ -151,12 +152,37 @@ export function RequestDetailsModal({
   const fmt = (d: string | null) =>
     d ? new Date(d).toLocaleDateString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—";
 
-  const viaApp = bids.filter((b) => b.source === "app").length;
-  const offline = bids.filter((b) => b.source === "offline").length;
+  /* ~~`viaApp` / `offline` — the bid count split by source.~~ They fed the pill row that went on
+     2026-09-13; the split itself is still said, on the SOURCE filter above the cards, which is where
+     a reader acts on it. `workspace.bidsSplit` keeps its other callers. */
   const certs = subject?.requiredCerts ?? [];
   /** The request-level parameters. Read off the subject: the group copies them to every item. */
   const subjectRecord = subject ? records[subject.id] ?? null : null;
   const allParamRows = subjectRecord ? requestDetailRows(subjectRecord, ar, L) : [];
+  /**
+   * A DIRECT request names the FIRM it went to, not a category (owner, 2026-09-13: *"in case it is
+   * a direct request, instead of these pills will show the store logo and the name, «direct to Sigma
+   * store (logo)» for example"*).
+   *
+   * 🔴 **The name and the logo are not on the wire yet** - `directTarget`'s own note has the detail
+   * and the backend ask. Until they arrive this draws «Direct request» with the mark slot empty,
+   * which is still the one thing the reader needs to know and is not a category. It fills itself the
+   * day the field lands.
+   */
+  const direct = (subject?.type ?? group.type) === "DIRECT" ? directTarget(subjectRecord) : null;
+  const directChip = direct ? (
+    <span className="inline-flex flex-none items-center gap-1.5 rounded-full border border-brand/45 bg-brand-soft px-2.5 py-1 text-label font-semibold normal-case text-brand-deep">
+      {direct.logoUrl ? (
+        /* eslint-disable-next-line @next/next/no-img-element -- see `RequestRail`: an `<img>` is what
+           absorbs a 403 from the media bucket as «no artwork» rather than throwing at render. */
+        <img src={direct.logoUrl} alt="" className="size-4 flex-none rounded-full object-contain" />
+      ) : (
+        <Icon name="storefront" size={13} className="flex-none" />
+      )}
+      {direct.name ? L(`Direct to ${direct.name}`, `مباشر إلى ${direct.name}`) : L("Direct request", "طلب مباشر")}
+    </span>
+  ) : null;
+
   /* Two of these rows describe the JOB rather than its terms — how it is rented and how long a day
      runs — and the app prints them under the site, beside «extendable». Split by label because that
      is what `requestDetailRows` returns; it is one list and this is the only place that cares which
@@ -193,7 +219,7 @@ export function RequestDetailsModal({
   /** The urgency the renter chose, made readable — `FAR_FUTURE` is not a word. */
   const urgency = (() => {
     const raw = (subjectRecord as { urgency?: string | null } | null)?.urgency ?? null;
-    return raw ? raw.replace(/[_-]+/g, " ").toLowerCase().replace(/\w/g, (c) => c.toUpperCase()) : "";
+    return raw ? raw.replace(/[_-]+/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : "";
   })();
   // The Supplier OS host, not this app's origin — so no `typeof window` guard and no SSR-empty value.
   const shareUrl = bidShareUrl(group.id);
@@ -298,7 +324,28 @@ export function RequestDetailsModal({
         open
         onClose={onClose}
         size="lg"
-        title={group.locationLabel}
+        /* ── The status rides the TITLE, and the pill row is gone (owner, 2026-09-13) ──────────
+            *"i want to remove these pills, just keep the open or status of request at top in the
+            title header"*.
+            ~~Four pills under the header: status, reach, the reference, the bid count.~~ Two of them
+            repeated what was already on screen - the reference is the header's own subtitle, and the
+            bid count sits above the cards the reader is about to scroll to - and the row cost a band
+            of the dialog to say it. The STATUS is the one fact that is only here, so it comes up
+            beside the title where it is read with the request rather than after it.
+            ⚠️ And on a DIRECT request the reach is not a category but a FIRM, so it keeps a chip of
+            its own - see `directChip`. */
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            {group.locationLabel}
+            {subject && (
+              <span className="inline-flex flex-none items-center gap-1.5 rounded-full bg-navy px-2.5 py-1 text-label font-semibold normal-case text-white">
+                <span className="size-1.5 rounded-full bg-ok" />
+                {ar ? statusMeta(subject.status).ar : statusMeta(subject.status).en}
+              </span>
+            )}
+            {directChip}
+          </span>
+        }
         subtitle={group.groupRef ?? subject?.displayId ?? group.id}
         footer={
           <>
@@ -361,28 +408,6 @@ export function RequestDetailsModal({
               status, reach, reference, requested-on — above the machines.~~ Status and reach are
               CHIPS beside the title now, where the app puts them, and the reference sits with them:
               a reader checking the code is not reading a field, he is copying an identifier. */}
-          <div className="mb-3 flex flex-wrap items-center gap-1.5">
-            {subject && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-navy px-2.5 py-1 text-label font-semibold text-white">
-                <span className="size-1.5 rounded-full bg-ok" />
-                {ar ? statusMeta(subject.status).ar : statusMeta(subject.status).en}
-              </span>
-            )}
-            <span className="rounded-full bg-surface2 px-2.5 py-1 text-label font-semibold text-navy-mid">
-              {(subject?.type ?? group.type) === "DIRECT" ? L("One supplier", "مؤجّر واحد") : L("Open to the market", "مفتوح للسوق")}
-            </span>
-            <span className="keep-mono rounded-full border border-border px-2.5 py-1 text-label font-semibold text-muted">
-              {group.groupRef ?? subject?.displayId ?? group.id}
-            </span>
-            {/* How many offers came back, split by source — «4 bids» hides that three of them were
-                typed in by hand. It sat in the site section, which was never a fact about the site. */}
-            <span className="rounded-full border border-border px-2.5 py-1 text-label font-semibold text-muted">
-              {bids.length === 0
-                ? t.workspace.noBidsYet
-                : `${bids.length} · ${t.workspace.bidsSplit.replace("{app}", String(viaApp)).replace("{offline}", String(offline))}`}
-            </span>
-          </div>
-
           <div className="mb-4 grid grid-cols-2 overflow-hidden rounded-md bg-navy sm:grid-cols-4">
             {[
               [t.workspace.factPeriod, period],
@@ -417,10 +442,30 @@ export function RequestDetailsModal({
                     <div className="flex items-center gap-3 px-3 py-2.5">
                       <span className="grid h-11 w-14 flex-none place-items-center overflow-hidden rounded-sm bg-surface3">
                         {img ? (
+                          /* 🔴 **Which fit, decided by which PICTURE it is** (owner, 2026-09-22, sweeping
+                             the montage across every multi-item surface). ~~`object-cover` for
+                             both.~~ A taxonomy DRAWING carries its own transparent margin, so
+                             cropping one to a 56x44 box enlarges the margin and cuts the machine -
+                             which on a multi-item request it did once per row. A PHOTOGRAPH reaches
+                             its own edges and takes the crop. The rail's ruling of 2026-09-12 and
+                             2026-09-14, three surfaces along.
+
+                             ⚠️ **No scale here, unlike the rail's circle.** The 1.34 exists to fill a
+                             ROUND hole whose curve would otherwise show a drawing's letterbox edge;
+                             this box is a rectangle of very nearly the artwork's own 1.34:1, so
+                             `contain` already fills it and a scale would only crop again. */
                           /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={img} alt="" className="h-full w-full object-cover" />
+                          <img
+                            src={img}
+                            alt=""
+                            className={
+                              it.item?.imageIsPhoto
+                                ? "h-full w-full object-cover"
+                                : "h-full w-full object-contain"
+                            }
+                          />
                         ) : (
-                          <Icon name="precision_manufacturing" size={20} className="text-muted" />
+                          <MachineGlyph size={20} className="text-muted" />
                         )}
                       </span>
                       <div className="min-w-0 flex-1">

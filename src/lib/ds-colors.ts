@@ -68,6 +68,11 @@ export const COLORS = {
   brandSoft: "#fef1e8",
   brandFg: "#ffffff",
   gold: "#b8860b",
+  /* The taxonomy renders' own studio ground — MEASURED off the assets, not a UI colour. See its
+     note in `globals.css`; it is mirrored here only because this file must name every colour
+     `:root` defines, and no standalone document has any use for it. */
+  photoGround: "#e3ded7",
+  verified: "#2f9e5c",
   ok: "#1d9e55",
   okSoft: "#e2efe7",
   okDeep: "#1d7a45",
@@ -136,6 +141,19 @@ export const COLORS = {
   shopAmberDeep: "#b5761a",
   shopAmberSoft: "#fdf1e0",
   shopField: "#fafbfb",
+  /* ── The National Day skin ──────────────────────────────────────────────────────────────────
+     Mirrored because `ds-colors.test.ts` fails on any hex `:root` defines and this file does not —
+     the guard that stops the two copies of the palette drifting apart. Nothing in this file's three
+     surfaces (the OG image, the clipboard card, the printed quotation) wears the season today: a
+     quotation is a contract document and a pasted card lands in somebody else's inbox, and neither
+     is a place to celebrate. They are here to be reachable, and to be checked. */
+  ndGround: "#004724",
+  ndDeep: "#042d1a",
+  ndMid: "#096835",
+  ndGreen: "#005c2d",
+  ndAccent: "#d7c48a",
+  ndMint: "#e8f2ea",
+  ndInk: "#0b4e35",
 } as const;
 
 /**
@@ -198,6 +216,8 @@ export const CSS_VAR_NAME: Record<keyof typeof COLORS, string> = {
   brandSoft: "--brand-soft",
   brandFg: "--brand-fg",
   gold: "--gold",
+  photoGround: "--photo-ground",
+  verified: "--verified",
   ok: "--ok",
   okSoft: "--ok-soft",
   okDeep: "--ok-deep",
@@ -266,6 +286,13 @@ export const CSS_VAR_NAME: Record<keyof typeof COLORS, string> = {
   shopAmberDeep: "--shop-amber-deep",
   shopAmberSoft: "--shop-amber-soft",
   shopField: "--shop-field",
+  ndGround: "--nd-ground",
+  ndDeep: "--nd-deep",
+  ndMid: "--nd-mid",
+  ndGreen: "--nd-green",
+  ndAccent: "--nd-accent",
+  ndMint: "--nd-mint",
+  ndInk: "--nd-ink",
 };
 
 /**

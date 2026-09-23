@@ -1,16 +1,29 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { Dialog } from "@/components/Dialog";
 import { Dropdown } from "@/components/Dropdown";
 import { CertSelect } from "@/components/create/CertSelect";
 import type { SubtypeAttachmentOption } from "@/lib/contract/app";
 import { requestedMinYear } from "@/lib/contract/bids";
 import { SAFETY_CERTIFICATES, type SafetyCertificate } from "@/lib/contract/options";
-import { updateRequest } from "@/lib/api/client";
+import { taxName, type Taxonomy } from "@/lib/contract/taxonomy";
+import { fetchTaxonomy, updateRequest } from "@/lib/api/client";
 import { type RequestRecord } from "@/lib/contract/requests";
 import "@/components/requests/requests-proto.css";
 import { CARD_FOOTER, btn } from "@/lib/ds";
+
+/** The create flow's own picker, and it takes no store — `value`, `label`, `onChange` and nothing else. */
+const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
+
+/**
+ * The bounds `updateRequestSchema` enforces (`saudiProjectLat` / `saudiProjectLng`).
+ *
+ * A pin outside them is a 422, and this form's save ends in a bare `catch` — so without the test
+ * here the renter would press Save, watch the button settle, and be told nothing at all.
+ */
+const SAUDI_BOUNDS = { latMin: 16, latMax: 32.5, lngMin: 34.5, lngMax: 56 };
 
 /**
  * The two modals that outlived the request-detail page.
@@ -195,12 +208,27 @@ const BYWHO_OPTS: Opt[] = [{ v: "rentee", en: "Me (renter)", ar: "أنا (الم
  * The certificate list was the sharpest of it: the details modal has always PRINTED it, off the same
  * record this form reads, while this form passed it through untouched.
  *
- * ── What is stated but not edited ───────────────────────────────────────────────────────────────
- * **The site.** It is in the order because the renter expects it there, and it is READ-ONLY: the
- * canvas picks a location on a map and stores `projectLat`/`projectLng` beside the label, and a text
- * box here would edit the words while leaving the coordinates — which every distance, every map pin
- * and every supplier match is computed from — pointing at the old place. Moving a request is a
- * different act from correcting one, and it needs the picker, not a field.
+ * ── What this form may change, and the one thing it may not (owner, 2026-09-14) ─────────────────
+ * *"follow the app, all fields editable except taxonomy right"* — and the app draws that line in one
+ * place only. `bug/post-bid-request-editing.md` pin 3, enforced twice over there: `equipment_step`
+ * refuses the category picker and the ✕/+ in edit mode, and `_onEquipmentItemUpdated` copies the OLD
+ * `categoryId` and `subtypeId` back over any incoming item as the backstop. Its own comment says the
+ * rest out loud: *"every other field on the item (units, attachments, operator settings, etc.) stays
+ * freely editable"*.
+ *
+ * So the lock here is the CATEGORY and the TYPE, and nothing else:
+ *  · **SIZE is editable**, because it is in the app. `_onEquipmentItemUpdated` restores two ids and
+ *    not `capacityId`, and the capacity chooser renders on `caps.length >= 2 && !isDirect` with no
+ *    edit-mode condition at all. A 20-ton excavator becoming a 30-ton one is the same machine asked
+ *    for in a different size; changing WHAT machine it is, is not.
+ *  · **The SITE is editable**, through the create flow's own map picker.
+ *    ~~«READ-ONLY: a text box here would edit the words while leaving the coordinates.»~~ That was
+ *    true of a text box and was the wrong conclusion to draw from it: the app moves the pin in its
+ *    own wizard (`projectLat` / `projectLng` / `projectAddressLabel` all ride its edit PATCH), and
+ *    `updateRequestSchema` has always accepted the three. The picker writes all three together, so
+ *    the words and the point can never part — which is the fault that ruling was protecting against.
+ *  · Adding or removing an EQUIPMENT is not offered, which matches the app and is what this modal
+ *    already did: it edits the one fanned-out item it was opened on.
  */
 export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r: RequestRecord; ar: boolean; L: (en: string, arr: string) => string; onClose: () => void; onSaved: () => void; siblingIds?: string[] }) {
   const s = (v: unknown) => (v == null ? "" : String(v));
@@ -260,6 +288,53 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   );
   const [itemNotes, setItemNotes] = useState(s(it?.additionalNotes));
 
+  /**
+   * The SIZE, and the catalogue it is chosen from.
+   *
+   * Only the sizes under THIS item's own subtype: the type is locked, so every other branch of the
+   * taxonomy is unreachable from here and listing it would offer a pick the save would have to
+   * refuse. Off-catalogue lines have no subtype at all and get no control.
+   */
+  const [capacityId, setCapacityId] = useState(s(it?.capacityId));
+  const [taxonomy, setTaxonomy] = useState<Taxonomy | null>(null);
+  useEffect(() => {
+    if (offCatalogue || !it?.subtypeId) return;
+    let live = true;
+    fetchTaxonomy()
+      .then((tree) => live && setTaxonomy(tree))
+      .catch(() => live && setTaxonomy(null));
+    return () => {
+      live = false;
+    };
+  }, [offCatalogue, it?.subtypeId]);
+  const sizeOpts: Opt[] = useMemo(() => {
+    if (!taxonomy || !it?.subtypeId) return [];
+    const sub = taxonomy.flatMap((c) => c.subcategories).find((sc) => sc.id === it.subtypeId);
+    /* The same label in both columns: `Sel` picks by `ar`, and `taxName` has already chosen the
+       reader's language off `nameAr`. Writing the English into `en` and the Arabic into `ar` would
+       need two lookups to say one thing. */
+    return (sub?.measurements ?? []).map((m) => {
+      const n = taxName(m, ar ? "ar" : "en");
+      return { v: m.id, en: n, ar: n };
+    });
+  }, [taxonomy, it?.subtypeId, ar]);
+
+  // ── Where ──
+  /**
+   * The pin and the words it resolved to, moved together.
+   *
+   * `projectLat` / `projectLng` arrive as Prisma decimals and `mapRequestDetail` has already turned
+   * them into numbers (`coord`), so nothing here re-parses them.
+   */
+  const [lat, setLat] = useState<number | null>(r.projectLat ?? null);
+  const [lng, setLng] = useState<number | null>(r.projectLng ?? null);
+  const [addressLabel, setAddressLabel] = useState(s(r.projectAddressLabel));
+  const pinMoved = lat !== (r.projectLat ?? null) || lng !== (r.projectLng ?? null);
+  const outsideSaudi =
+    lat != null &&
+    lng != null &&
+    (lat < SAUDI_BOUNDS.latMin || lat > SAUDI_BOUNDS.latMax || lng < SAUDI_BOUNDS.lngMin || lng > SAUDI_BOUNDS.lngMax);
+
   // ── When ──
   const [startDate, setStartDate] = useState(s(r.startDate).slice(0, 10));
   const [endDate, setEndDate] = useState(s(r.endDate).slice(0, 10));
@@ -293,9 +368,17 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   const datesReversed = !!startDate && !!endDate && startDate > endDate;
 
   async function save() {
-    if (datesReversed) return;
+    if (datesReversed || outsideSaudi) return;
     setBusy(true);
     const patch: Record<string, unknown> = {};
+    /* The three move together or not at all. Sending a label without the point would leave the words
+       naming one place and every distance, pin and supplier match computed from another — which is
+       exactly why this was read-only before there was a picker here. */
+    if (lat != null && lng != null) {
+      patch.projectLat = lat;
+      patch.projectLng = lng;
+      if (addressLabel.trim()) patch.projectAddressLabel = addressLabel.trim().slice(0, 500);
+    }
     if (rentalType) patch.rentalType = rentalType;
     if (startDate) patch.startDate = new Date(`${startDate}T00:00:00Z`).toISOString();
     if (endDate) patch.endDate = new Date(`${endDate}T00:00:00Z`).toISOString();
@@ -324,7 +407,10 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
       patch.equipmentItems = [{
         ...(offCatalogue
           ? { customEquipmentName: customName.trim().slice(0, 120) }
-          : { categoryId: it!.categoryId as string, subtypeId: it!.subtypeId as string, capacityId: it!.capacityId as string }),
+          /* Category and type are read back off the RECORD and never off a control: they are the
+             one thing this form may not change (pin 3). The SIZE is the renter's, and falls back to
+             the stored one while the catalogue has not loaded. */
+          : { categoryId: it!.categoryId as string, subtypeId: it!.subtypeId as string, capacityId: capacityId || (it!.capacityId as string) }),
         numberOfUnits: Number(units) || 1,
         operatorIncluded: operator || "NO",
         fuelTypePreference: fuel || "DIESEL",
@@ -432,6 +518,11 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
             </label>
           )}
           <div className="grid grid-cols-2 gap-3">
+            {/* The app's own condition: two or more sizes under this type. One size is not a choice,
+                and a dropdown holding the only answer reads as a control that does nothing. */}
+            {sizeOpts.length >= 2 && (
+              <Sel label={L("Size", "الحجم")} value={capacityId} onChange={setCapacityId} opts={sizeOpts} />
+            )}
             <Num label={L("Quantity", "الكمية")} value={units} onChange={setUnits} min={1} />
             <Sel label={L("Operator", "المشغّل")} value={operator} onChange={setOperator} opts={OPERATOR_OPTS} />
             {withOperator && (
@@ -497,17 +588,40 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
             <textarea rows={2} className="mt-1 w-full rounded-md border border-border bg-surface2 p-3 text-body outline-0" value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} />
           </label>
 
-          {/* ── 2 · Where — stated, not edited. See the note on this component. ── */}
+          {/* ── 2 · Where — the pin, as the app edits it. See the note on this component. ── */}
           <SecH icon="place">{L("Where", "الموقع")}</SecH>
-          <p className="rounded-md border border-border bg-surface2 px-3 py-2.5 text-body text-navy">
-            {r.projectAddressLabel || L("No site on this request", "لا موقع على هذا الطلب")}
+          {/* `onResolveLabel` fires when the picker geocodes the label it was given and drops the pin
+              itself — a request made before coordinates were stored still has words, and this is what
+              turns them into a point without asking the renter to retype his own address. */}
+          <MapLocationPicker
+            value={lat != null && lng != null ? { lat, lng } : null}
+            label={addressLabel || undefined}
+            onResolveLabel={(la, ln) => {
+              setLat(la);
+              setLng(ln);
+            }}
+            onChange={(la, ln, address) => {
+              setLat(la);
+              setLng(ln);
+              if (address) setAddressLabel(address);
+            }}
+            hideAddress
+          />
+          <p className="mt-2 rounded-md border border-border bg-surface2 px-3 py-2.5 text-body text-navy">
+            {addressLabel || L("No site on this request", "لا موقع على هذا الطلب")}
           </p>
-          <p className="mt-1 text-meta text-muted">
-            {L(
-              "The site is set on the map when the request is made. Moving it changes every distance and match, so it is not edited here.",
-              "يُحدَّد الموقع على الخريطة عند إنشاء الطلب. تغييره يغيّر كل المسافات والمطابقات، لذلك لا يُعدَّل من هنا.",
-            )}
-          </p>
+          {outsideSaudi ? (
+            <p className="mt-1 text-meta font-semibold text-danger">
+              {L("That pin is outside Saudi Arabia. Move it back to save.", "هذا الموقع خارج السعودية. حرّكه داخلها لتتمكن من الحفظ.")}
+            </p>
+          ) : pinMoved ? (
+            <p className="mt-1 text-meta text-brand-deep">
+              {L(
+                "Moving the site changes which suppliers match and every distance on this request.",
+                "تغيير الموقع يغيّر المورّدين المطابقين وكل المسافات في هذا الطلب.",
+              )}
+            </p>
+          ) : null}
 
           {/* ── 3 · When ── */}
           <SecH icon="event">{L("When", "التوقيت")}</SecH>
@@ -547,7 +661,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
               {L("End date is before the start date.", "تاريخ الانتهاء يسبق تاريخ البدء.")}
             </span>
           )}
-          <button className="rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg" disabled={busy || datesReversed} onClick={save}>{busy ? L("Saving…", "جارٍ الحفظ…") : L("Save changes", "حفظ التغييرات")}</button>
+          <button className="rounded-sm bg-brand px-5 py-2.5 text-body font-semibold text-white disabled:bg-disabled-bg disabled:text-disabled-fg" disabled={busy || datesReversed || outsideSaudi} onClick={save}>{busy ? L("Saving…", "جارٍ الحفظ…") : L("Save changes", "حفظ التغييرات")}</button>
         </div>
       </div>
     </Dialog>

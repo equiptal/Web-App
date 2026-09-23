@@ -1,4 +1,5 @@
 import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
+import { SOURCE_HEADER as TAXONOMY_SOURCE_HEADER } from "@/lib/contract/taxonomy";
 import type { CancelReport, RequestListItem, RequestRecord, RequestStatus } from "@/lib/contract/requests";
 import { isCancelledStatus } from "@/lib/contract/requests";
 import type { BidCard, BidSizeCounts } from "@/lib/contract/bids";
@@ -711,11 +712,24 @@ export function captureBidEvents(events: BidEventInput[]): void {
   }
 }
 
+/**
+ * True when the catalogue on screen is the built-in stand-in rather than the live one.
+ *
+ * 🔴 Read it before believing a short TYPE list. The route falls back to a 17-subtype fixture on any
+ * failure of the agents service, and without this a broken fetch and a thin catalogue are the same
+ * picture — which is how «our catalogue is missing machines» gets reported for a network fault.
+ * A module-level flag rather than a returned pair: the tree is consumed as a bare array in half a
+ * dozen places, and only the equipment card asks this question.
+ */
+let taxonomyIsFixture = false;
+export const taxonomyFromFixture = () => taxonomyIsFixture;
+
 /** Fetch the equipment taxonomy. */
 export async function fetchTaxonomy(): Promise<Taxonomy> {
   try {
     const res = await fetch("/api/taxonomy");
     if (!res.ok) throw new ApiError("network");
+    taxonomyIsFixture = res.headers.get(TAXONOMY_SOURCE_HEADER) === "fixture";
     return (await res.json()) as Taxonomy;
   } catch (e) {
     if (e instanceof ApiError) throw e;

@@ -25,10 +25,15 @@ const REAL = process.env[FLAG];
 
 const payload = (items: EquipmentItem[]) => ({ project: confirmedProject(), items, preferences: defaultPreferences() });
 
+/**
+ * ⚠️ The DEFAULT flipped on 2026-09-14, when the backend's B1 landed: the name now rides on every
+ * line unless the environment says `=0`. So «off» is an explicit kill switch here, not an absent
+ * variable — deleting it would leave the flag ON and the case would pass for the wrong reason.
+ */
 async function adapters(on: boolean) {
   vi.resetModules();
-  if (on) process.env[FLAG] = "1";
-  else delete process.env[FLAG];
+  if (on) delete process.env[FLAG];
+  else process.env[FLAG] = "0";
   return import("@/lib/api/app-adapters");
 }
 
@@ -110,7 +115,7 @@ describe("his words survive the round trip through the taxonomy", () => {
 });
 
 describe("sending, behind the switch", () => {
-  it("OFF: today's shape — the ids alone on a matched line", async () => {
+  it("OFF (the kill switch): the ids alone on a matched line", async () => {
     const { draftToCreateRequest } = await adapters(false);
     const item = draftToCreateRequest(payload([makeItem({ customEquipment: "water tanker" })]), "7")
       .equipmentItems[0] as unknown as Record<string, unknown>;

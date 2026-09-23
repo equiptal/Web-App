@@ -105,6 +105,13 @@ export const PIN_REGISTRY = {
   "header-logo": { n: "2.1", label: "Header — logo", file: "src/components/AppShell.tsx" },
   "header-nav-slot": { n: "2.2", label: "Header — centred nav slot", file: "src/components/AppShell.tsx" },
   "header-beta": { n: "2.3", label: "Header — beta mark", file: "src/components/AppShell.tsx" },
+  /* The National Day skin's two elements on the bar (owner, 2026-09-16). Both are drawn ALL YEAR
+     and displayed only under `<html data-season="nd">`, so the overlay numbers them out of season
+     too - which is the point: a note about the seam can quote 2.4 in July. */
+  "header-season-decor": { n: "2.4", label: "Header — season backdrop (palms, dots, seam)", file: "src/components/AppShell.tsx" },
+  /* 2.5 RETIRED (2026-09-22): the header's season mark was removed (owner: *"remove this"*).
+     Never reissued — a number that has been quoted in a note must not come back meaning
+     something else, which is the `CarryForwardModal` rule of 2026-09-09. */
   "app-nav": { n: "3", label: "Nav tabs — desktop", file: "src/components/AppNav.tsx" },
   "nav-tab": { n: "3.1", label: "Nav tab — one link", file: "src/components/AppNav.tsx" },
   "app-nav-mobile": { n: "4", label: "Nav tabs — mobile", file: "src/components/AppNav.tsx" },
@@ -123,13 +130,23 @@ export const PIN_REGISTRY = {
   "browse-page": { n: "10.5", label: "Browse — banner + supplier directory", file: "src/components/stores/BrowsePage.tsx" },
   "home-hero": { n: "10.1", label: "Home — hero band", file: "src/components/home/CtaBanner.tsx" },
   "home-hero-actions": { n: "10.2", label: "Home — hero action column", file: "src/components/home/CtaBanner.tsx" },
+  /* 🔴 **10.3 is RETIRED, not renumbered** (owner, 2026-09-17). It named the ordinal mark on the
+     dashboard band; the mark is on the header bar now (2.5) and the band says nothing in words.
+     The number is left unused on the house rule the `CarryForwardModal` retirement set on
+     2026-09-09: a number that has been quoted in a note must not come back meaning something else. */
   "home-requests": { n: "10.4", label: "Home — requests + bids rail", file: "src/components/home/HomeRequests.tsx" },
   "home-bubble": { n: "10.7", label: "Home — notification bubble", file: "src/components/home/HomeNotificationBubble.tsx" },
+  "home-tabs": { n: "10.8", label: "Home — requests / suppliers / projects tabs", file: "src/components/home/HomeHub.tsx" },
   "suppliers-list": { n: "10.6", label: "My Suppliers — the list", file: "src/components/suppliers/SuppliersPage.tsx" },
   "start-request-modal": { n: "11", label: "Start-your-request modal", file: "src/components/home/StartYourRequestModal.tsx" },
 
   /* ── 15–24  create ────────────────────────────────────────────────────────────────────────── */
   "create-intake": { n: "15", label: "Create — intake screen", file: "src/components/screens/Intake.tsx" },
+  "intake-rail": { n: "15.1", label: "Intake — previous-requests rail", file: "src/components/create/RequestsRail.tsx" },
+  "intake-rail-group": { n: "15.2", label: "Intake rail — one project", file: "src/components/create/RequestsRail.tsx" },
+  "intake-rail-row": { n: "15.3", label: "Intake rail — one machine", file: "src/components/create/RequestsRail.tsx" },
+  "intake-pick-pill": { n: "15.4", label: "Intake — the chosen project and its machines, on the floor", file: "src/components/create/RequestsRail.tsx" },
+  "intake-caret": { n: "15.5", label: "Intake — Mansour, riding the caret", file: "src/components/screens/Intake.tsx" },
   "create-canvas": { n: "16", label: "Create canvas (3 columns)", file: "src/components/create/Canvas.tsx" },
   "machine-card": { n: "17", label: "Machine card", file: "src/components/create/MachineCard.tsx" },
   "machine-card-head": { n: "17.1", label: "Machine card — head row", file: "src/components/create/MachineCard.tsx" },
@@ -144,6 +161,9 @@ export const PIN_REGISTRY = {
   "equipment-tab": { n: "17.5", label: "Equipment tabs — one equipment", file: "src/components/create/EquipmentTabs.tsx" },
   "equipment-tabs-add": { n: "17.6", label: "Equipment tabs — the + that adds one", file: "src/components/create/EquipmentTabs.tsx" },
   "equipment-tab-remove": { n: "17.7", label: "Equipment tabs — the ✕ that removes one", file: "src/components/create/EquipmentTabs.tsx" },
+  "equipment-chooser-row": { n: "17.8", label: "Machine card — the escape row («Not the equipment you want?»)", file: "src/components/create/MachineCard.tsx" },
+  "equipment-chooser-panel": { n: "17.9", label: "Machine card — the equipment chooser panel", file: "src/components/create/MachineCard.tsx" },
+  "equipment-chooser-list": { n: "17.10", label: "Machine card — the chooser's catalogue list", file: "src/components/create/MachineCard.tsx" },
   "locked-for-request": { n: "16.2", label: "Create — site + schedule locked strip (with «Change»)", file: "src/components/create/Canvas.tsx" },
   "when-panel": { n: "19", label: "When panel (dates)", file: "src/components/create/WhenPanel.tsx" },
   "when-panel-head": { n: "19.1", label: "When panel — head button", file: "src/components/create/WhenPanel.tsx" },
@@ -167,10 +187,13 @@ export const PIN_REGISTRY = {
   "request-rail": { n: "26", label: "Requests rail (full-bleed band)", file: "src/components/workspace/RequestRail.tsx" },
   "rail-create-tile": { n: "26.1", label: "Rail — create tile", file: "src/components/workspace/RequestRail.tsx" },
   "rail-tiles": { n: "26.2", label: "Rail — request tiles", file: "src/components/workspace/RequestRail.tsx" },
+  "circle-art": { n: "26.4", label: "Circle — the request's machines on one ground", file: "src/components/workspace/CircleArt.tsx" },
+  "circle-zoom": { n: "26.5", label: "Circle — the zoomed view behind a double press", file: "src/components/workspace/RequestRail.tsx" },
   // 27 was the request strip, a full-width band above the tabs. It is the context bar now — the
   // location and the item, and the item switcher the strip used to carry as chips (owner, 2026-08-27).
   "item-tier": { n: "26.3", label: "Item tier — one chip per machine", file: "src/components/workspace/ItemTier.tsx" },
-  "request-context": { n: "27", label: "Request context bar (location + item)", file: "src/components/workspace/RequestContextBar.tsx" },
+  "request-context": { n: "27", label: "Request context bar (location + machines)", file: "src/components/workspace/RequestContextBar.tsx" },
+  "context-machines": { n: "27.1", label: "Context bar — the machines the request asked for", file: "src/components/workspace/RequestContextBar.tsx" },
   "request-details": { n: "28", label: "Request details modal", file: "src/components/workspace/RequestDetailsModal.tsx" },
   "bid-size-filter": { n: "28.5", label: "Bid size filter — include larger equipment", file: "src/components/workspace/BidSizeFilter.tsx" },
   "workspace-bid-cards": { n: "29", label: "Bid cards", file: "src/components/workspace/BidCards.tsx" },
@@ -189,15 +212,16 @@ export const PIN_REGISTRY = {
   "bid-map-workspace": { n: "45", label: "Bid map workspace", file: "src/components/map/BidMapWorkspace.tsx" },
   "bidmap-canvas": { n: "45.1", label: "Bid map — canvas side", file: "src/components/map/BidMapWorkspace.tsx" },
   "bidmap-panel": { n: "45.2", label: "Bid map — side panel", file: "src/components/map/BidMapWorkspace.tsx" },
+  "other-bids": { n: "45.3", label: "Bid map — «Other bids» strip in the back bar", file: "src/components/map/OtherOffers.tsx" },
   "map-canvas": { n: "46", label: "Map canvas", file: "src/components/map/MapCanvas.tsx" },
   "map-pin": { n: "46.1", label: "Map — one machine's marker", file: "src/components/map/MapCanvas.tsx" },
   /* The fleet list's own card, and the parts a restyle actually lands on. `EquipmentList`'s root is a
      fragment and cannot carry a pin (see the note at the top), so the CARD is the surface. */
   "equipment-card": { n: "47", label: "Fleet card (equipment list)", file: "src/components/map/EquipmentList.tsx" },
   "equipment-card-photo": { n: "47.1", label: "Fleet card — photo cell", file: "src/components/map/EquipmentList.tsx" },
-  "equipment-card-head": { n: "47.2", label: "Fleet card — readiness + file icon", file: "src/components/map/EquipmentList.tsx" },
+  "equipment-card-head": { n: "47.2", label: "Fleet card — readiness + «Equipment documents»", file: "src/components/map/EquipmentList.tsx" },
   "equipment-card-yard": { n: "47.3", label: "Fleet card — yard card (distance + availability)", file: "src/components/map/EquipmentList.tsx" },
-  "equipment-filter": { n: "47.5", label: "Fleet list — filter bar", file: "src/components/map/EquipmentList.tsx" },
+  "equipment-filter": { n: "47.5", label: "Fleet list — filter control (end of the count pills row)", file: "src/components/map/EquipmentList.tsx" },
   "equipment-filter-panel": { n: "47.6", label: "Fleet list — filter panel", file: "src/components/map/EquipmentList.tsx" },
   "price-footer": { n: "48", label: "Price footer", file: "src/components/map/PriceFooter.tsx" },
   "price-footer-rate": { n: "48.1", label: "Price footer — the rate", file: "src/components/map/PriceFooter.tsx" },
@@ -225,6 +249,17 @@ export const PIN_REGISTRY = {
   "equipment-documents-foot": { n: "53.1", label: "Documents tab — Download / Ask footer", file: "src/components/map/panel/EquipmentDocuments.tsx" },
   "doc-row": { n: "53.2", label: "Document row", file: "src/components/map/panel/DocRowList.tsx" },
   "deal-room": { n: "55", label: "Deal room", file: "src/components/deal-room/DealRoom.tsx" },
+  /* 🔴 **The negotiation sheet's own parts.** It is the surface the owner sends the most notes
+     about - fifteen in one batch on 2026-09-22 - and until then the whole three-step sheet answered
+     to `55`, so every note had to be resolved by quoting its visible text. */
+  "ng-sheet": { n: "55.1", label: "Negotiation sheet (3 steps)", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-head": { n: "55.2", label: "Negotiation sheet \u2014 header: supplier, machine, running total", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-price": { n: "55.3", label: "Negotiation sheet \u2014 \u2460 the price table", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-sum": { n: "55.4", label: "Negotiation sheet \u2014 \u2460 the summary block", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-terms": { n: "55.5", label: "Negotiation sheet \u2014 \u2461 the terms step", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-term-card": { n: "55.6", label: "Negotiation sheet \u2014 the open term card", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-review": { n: "55.7", label: "Negotiation sheet \u2014 \u2462 review & send", file: "src/components/deal-room/DealRoom.tsx" },
+  "ng-sheet-foot": { n: "55.8", label: "Negotiation sheet \u2014 footer: log, quotation, the acts", file: "src/components/deal-room/DealRoom.tsx" },
   "chat-card": { n: "56", label: "Chat card", file: "src/components/deal-room/ChatCard.tsx" },
   /* `ChatDock`'s root is a fragment; the DRAWER is the surface, and its four parts are what a note
      about "the chat" almost always means. */
@@ -234,10 +269,18 @@ export const PIN_REGISTRY = {
   "chat-dock-thread": { n: "57.3", label: "Chat drawer — the thread", file: "src/components/map/ChatDock.tsx" },
   "chat-dock-composer": { n: "57.4", label: "Chat drawer — composer", file: "src/components/map/ChatDock.tsx" },
   "chat-dock-draft": { n: "57.5", label: "Chat drawer — staged request card", file: "src/components/map/ChatDock.tsx" },
+  "chat-dock-event": { n: "57.6", label: "Chat drawer — negotiation event (grey pill)", file: "src/components/map/ChatDock.tsx" },
 
   /* ── 60–69  inbox, stores ─────────────────────────────────────────────────────────────────── */
   "inbox-view": { n: "60", label: "Inbox", file: "src/components/inbox/InboxView.tsx" },
+  "inbox-list": { n: "60.1", label: "Inbox — the chats column", file: "src/components/inbox/InboxView.tsx" },
+  "inbox-row": { n: "60.2", label: "Inbox — one chat row", file: "src/components/inbox/InboxView.tsx" },
+  "inbox-pane": { n: "60.3", label: "Inbox — the conversation beside the list", file: "src/components/inbox/InboxView.tsx" },
+  "inbox-pane-empty": { n: "60.4", label: "Inbox — nothing picked yet", file: "src/components/inbox/InboxView.tsx" },
   "browse-surface": { n: "61", label: "Browse stores", file: "src/components/stores/BrowseSurface.tsx" },
+  "browse-controls": { n: "61.1", label: "Browse — heading + search + city, one row", file: "src/components/stores/BrowseSurface.tsx" },
+  "browse-categories": { n: "61.2", label: "Browse — category rail", file: "src/components/stores/BrowseSurface.tsx" },
+  "browse-pager": { n: "61.3", label: "Browse — page arrows", file: "src/components/stores/BrowseSurface.tsx" },
   "store-detail": { n: "62", label: "Store detail", file: "src/components/stores/StoreDetailSurface.tsx" },
   "store-card": { n: "63", label: "Store card", file: "src/components/stores/StoreCard.tsx" },
   "store-card-equipment": { n: "64", label: "Store card (category)", file: "src/components/stores/StoreCard.tsx" },
@@ -248,12 +291,16 @@ export const PIN_REGISTRY = {
   "profile-view": { n: "70", label: "Profile", file: "src/components/profile/ProfileView.tsx" },
   "edit-profile-form": { n: "71", label: "Edit profile form", file: "src/components/profile/EditProfileForm.tsx" },
   "company-hub": { n: "72", label: "Company hub", file: "src/components/company/CompanyHub.tsx" },
+  "company-logo-modal": { n: "73", label: "Company logo dialog (from the quotation)", file: "src/components/company/CompanyLogoModal.tsx" },
   "my-company-card": { n: "74", label: "My company card", file: "src/components/company/MyCompanyCard.tsx" },
   "onboarding-shell": { n: "75", label: "Onboarding shell", file: "src/components/onboarding/OnboardingShell.tsx" },
   "onboarding-form": { n: "76", label: "Onboarding form", file: "src/components/onboarding/OnboardingForm.tsx" },
   "verification-flow": { n: "77", label: "Verification flow", file: "src/components/onboarding/VerificationFlow.tsx" },
   "auth-gate": { n: "78", label: "Sign-in / register modal", file: "src/components/onboarding/AccountModal.tsx" },
   "guest-wall": { n: "9.5", label: "Guest wall — blurred page + sign-in card", file: "src/components/common/GuestWall.tsx" },
+  /* A SIBLING at 9.6, not a child of 9.5: the registry is two levels deep and 9.5
+     is already the second. */
+  "guest-wall-season": { n: "9.6", label: "Guest wall — season chip", file: "src/components/common/GuestWall.tsx" },
   "sign-in-prompt": { n: "79", label: "Sign-in prompt", file: "src/components/common/SignInPrompt.tsx" },
 
   /* ── 90–99  primitives ────────────────────────────────────────────────────────────────────── */

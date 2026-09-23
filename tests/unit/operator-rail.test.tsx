@@ -121,39 +121,46 @@ describe("operator certificates (MREQ-AC-27)", () => {
   });
 });
 
-describe("nationality (MREQ-AC-28)", () => {
+describe("nationality is HIDDEN (owner, 2026-09-22)", () => {
   async function openMore(handle: Awaited<ReturnType<typeof rail>>) {
     await handle.run(() => screen.getByText("MORE DETAILS").closest("button")!.click());
   }
 
-  it("reveals the free-text list only under Restricted, and clears it on Any", async () => {
+  /* 🔴 **MREQ-AC-28 is WITHDRAWN on this panel**, not broken. Owner, on the app first
+     (2026-09-21: *"remove operator nationality from all surfaces now, in request, bid, deal room"*)
+     and then on the web: *"operator nationality is removed in the app, check it there and align web
+     to it"*. The app hides its own control in `equipment_step.dart` and the web now hides this one;
+     `term-visibility.ts` is the single rule, and `hidden-term-keys.test.ts` pins every surface.
+
+     ~~It revealed a free-text list under «Restricted» and cleared it on «Any».~~
+     ~~It capped that list at the contract's 100 characters.~~
+     Both described a control nobody can reach. What replaces them is the pair of rules that fail
+     SILENTLY if this is ever done carelessly: the STATE must survive, and the panel must still be
+     able to read complete. */
+  it("draws neither the choice nor the list it used to reveal", async () => {
     const handle = await rail();
     await openMore(handle);
-
-    const field = screen.getByText("NATIONALITY").closest("div")!.parentElement!;
+    expect(screen.queryByText("NATIONALITY")).toBeNull();
     expect(screen.queryByPlaceholderText("Which nationalities work for you?")).toBeNull();
-
-    await handle.run(() => within(field).getByRole("button", { name: "Restricted" }).click());
-    const input = screen.getByPlaceholderText("Which nationalities work for you?");
-    expect(input).toBeTruthy();
-
-    await handle.run(() => {
-      handle.store().actions.patchItemOperator(handle.store().state.draft!.items[0].id, { nationalityCustom: "Filipino, Indian" });
-    });
-    expect(handle.store().state.draft!.items[0].operator.nationalityCustom).toBe("Filipino, Indian");
-
-    // Back to Any — the box goes, and so does the stale list.
-    await handle.run(() => within(field).getByRole("button", { name: "Any" }).click());
-    expect(screen.queryByPlaceholderText("Which nationalities work for you?")).toBeNull();
-    expect(handle.store().state.draft!.items[0].operator.nationalityCustom).toBeNull();
   });
 
-  it("caps the free-text at the contract's 100 characters", async () => {
+  /* 🔴 **The field is still WRITTEN and still SENT.** The app keeps `_operatorNationality`
+     loaded from the item and written back by `_saveCurrentEquipment`, so editing a request created
+     before the term was hidden preserves what it holds. A "cleanup" that dropped it from the draft
+     would clear it on the next save, silently, on data the renter cannot see to restore. */
+  it("keeps the value on the draft, so an older request is not cleared by an edit", async () => {
     const handle = await rail();
+    await handle.run(() => {
+      handle.store().actions.patchItemOperator(handle.store().state.draft!.items[0].id, {
+        nationality: "restricted",
+        nationalityCustom: "Filipino, Indian",
+      });
+    });
+    expect(handle.store().state.draft!.items[0].operator.nationality).toBe("restricted");
+    expect(handle.store().state.draft!.items[0].operator.nationalityCustom).toBe("Filipino, Indian");
+    // …and it is still not drawn.
     await openMore(handle);
-    const field = screen.getByText("NATIONALITY").closest("div")!.parentElement!;
-    await handle.run(() => within(field).getByRole("button", { name: "Restricted" }).click());
-    expect(screen.getByPlaceholderText("Which nationalities work for you?").getAttribute("maxlength")).toBe("100");
+    expect(screen.queryByText("NATIONALITY")).toBeNull();
   });
 
   it("reads the night shift as words, not a bare boolean", async () => {

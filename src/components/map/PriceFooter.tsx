@@ -53,7 +53,7 @@ import { useState } from "react";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import { bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { priceFooterModel } from "@/lib/contract/price-footer";
-import { computeQuoteTotals } from "@/lib/pricing/rental";
+import { computeQuoteTotals, legDisplay } from "@/lib/pricing/rental";
 import { fmt, useT } from "@/lib/i18n";
 import { pin } from "@/lib/uiPins";
 
@@ -67,9 +67,28 @@ export interface PriceFooterProps {
   /** The request's start date — the Friday anchor for the shared rental maths. Without it the rental
    *  falls back to the raw rate, so pass it alongside `durationDays` from the same request. */
   startDate?: string | null;
+  /** Whose transport legs these are, off the request — the bid card's own two flags, so a leg the
+   *  renter kept reads «On rentee» here as it does there. */
+  /**
+   * Draw it THIN, at the top of a column rather than as the floor of one (owner, 2026-09-22, on the
+   * inbox: *"can we show him a thin price bar with the counter this price on top of the chat when he
+   * open it from the inbox as he will not see this one ... i want to have another entry point for
+   * the negotiate"*).
+   *
+   * 🔴 **A variant, never a second component.** Everything that matters here is the hand-off:
+   * `?act=counter` / `?act=accept` seeds the deal room's own `openFlow` with its own guards intact,
+   * and this file's header is explicit that re-implementing that flow would put two negotiation
+   * surfaces over one room. A slim COPY would have had to copy the hand-off with it.
+   *
+   * ⚠️ It changes the GEOMETRY and the edge it draws, and nothing else: same figures, same
+   * `canAccept` gate, same breakdown, same two acts. See `.bm-foot.is-slim`.
+   */
+  slim?: boolean;
+  mobByRentee?: boolean | null;
+  demobByRentee?: boolean | null;
 }
 
-export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooterProps) {
+export function PriceFooter({ bid, durationDays, startDate = null, slim = false, mobByRentee = null, demobByRentee = null }: PriceFooterProps) {
   const t = useT();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -169,6 +188,13 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
    * why the id is resolved here and not left to the destination: `?act=` is meaningless until the
    * room it addresses exists.
    */
+  // The bid card's rental-row label (`BidCards.tsx`), off the same figures.
+  const rentalRowLabel = totals.rentalRaw
+    ? t.workspace.rentalRowNoDuration
+    : durationDays
+      ? fmt(t.workspace.rentalRowDays, { n: num(totals.billableDays) })
+      : t.workspace.rentalRowCustom;
+
   async function handOff(act: "counter" | "accept") {
     if (busy) return;
     setBusy(true);
@@ -182,7 +208,7 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
 
 
   return (
-    <footer {...pin("price-footer")} className="bm-foot">
+    <footer {...pin("price-footer")} className={`bm-foot${slim ? " is-slim" : ""}`}>
       {/* ── The breakdown opens BELOW the bar, inside this footer (owner, 2026-08-28) ────────────
           It has been a growing bar, then a popover over the equipment list, and is now what the bid
           card and the deal room both do: the rate stays put and the arithmetic unfolds under it, in
@@ -241,34 +267,29 @@ export function PriceFooter({ bid, durationDays, startDate = null }: PriceFooter
       {expanded && (
         <div {...pin("price-footer-break")} className="bm-foot-break" role="group" aria-label={t.priceFooter.showDetails}>
           {multi && <div className="bm-foot-bhead">{t.priceFooter.perUnitHead}</div>}
+          {/* ── The BID CARD's rows, in its words (owner, 2026-09-22: *"use same price as in bid card
+              so consistent structure"*) ─────────────────────────────────────────────────────────
+              The rental row named by its days, the two legs as «Delivery to site» / «Return from
+              site» at the per-trip figure the card prints (with its «On rentee» / «Not quoted»
+              states, through the same `legDisplay`), Subtotal and VAT, then «Grand total · incl.
+              VAT». ~~«Mobilisation» / «Demobilisation» at a per-unit share, and a bare «Total».~~ */}
           <Line
-            label={t.priceFooter.rental}
+            label={rentalRowLabel}
             sub={rentalBasis}
             value={money(perUnit.rental)}
             currency={t.priceFooter.currency}
           />
-          <Line
-            label={t.priceFooter.mobilisation}
-            value={totals.mobExcluded ? t.priceFooter.excluded : money(perUnit.mob)}
-            currency={totals.mobExcluded ? undefined : t.priceFooter.currency}
-            muted={totals.mobExcluded}
-          />
-          <Line
-            label={t.priceFooter.demobilisation}
-            value={totals.demobExcluded ? t.priceFooter.excluded : money(perUnit.demob)}
-            currency={totals.demobExcluded ? undefined : t.priceFooter.currency}
-            muted={totals.demobExcluded}
-          />
+          <LegLine label={t.workspace.deliveryToSite} leg={legDisplay({ amount: bid.mobPrice, excluded: bid.mobExcluded, onRentee: mobByRentee === true })} money={money} t={t} />
+          <LegLine label={t.workspace.returnFromSite} leg={legDisplay({ amount: bid.demobPrice, excluded: bid.demobExcluded, onRentee: demobByRentee === true })} money={money} t={t} />
           <Line label={t.priceFooter.subtotal} value={money(perUnit.subtotal)} currency={t.priceFooter.currency} />
           <Line label={t.priceFooter.vat} value={money(perUnit.vat)} currency={t.priceFooter.currency} />
-          <Line label={t.priceFooter.total} value={money(perUnit.total)} currency={t.priceFooter.currency} total />
+          <Line label={t.workspace.grandTotalInclVat} value={money(perUnit.total)} currency={t.priceFooter.currency} total />
           {/* NOT per-unit × units: the transport legs carry their own negotiated counts, so the
               overall figure is `computeDealTotals`' own and never a multiplication of the block
               above it. The same rule, and the same wording, the deal room states. */}
           {multi && (
             <Line
-              label={t.priceFooter.overallTotal}
-              sub={fmt(t.priceFooter.unitsCount, { n: num(model.pricedUnits) })}
+              label={`${t.workspace.overallTotal} ${fmt(t.workspace.unitsCountLabel, { n: num(model.pricedUnits) })}`}
               value={money(totals.grand)}
               currency={t.priceFooter.currency}
               total
@@ -322,4 +343,15 @@ function Line({
       </span>
     </div>
   );
+}
+
+/** A transport leg, in the bid card's four states (`BidCards.tsx` `LegRow`). */
+function LegLine({
+  label, leg, money, t,
+}: {
+  label: string; leg: ReturnType<typeof legDisplay>; money: (n: number) => string; t: ReturnType<typeof useT>;
+}) {
+  if (leg.kind === "amount") return <Line label={label} value={money(leg.amount)} currency={t.priceFooter.currency} />;
+  const word = leg.kind === "on_rentee" ? t.workspace.onRentee : leg.kind === "excluded" ? t.priceFooter.excluded : t.workspace.notQuoted;
+  return <Line label={label} value={word} muted />;
 }

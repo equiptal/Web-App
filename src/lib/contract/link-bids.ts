@@ -493,6 +493,9 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     // same firm look like one counterparty with one chat, which off-platform offers do not have.
     supplierCompanyId: null,
     supplierName: sub.companyName || "Supplier",
+    // An off-platform submission was typed into the renter’s own supplier list, so there is no
+    // account behind it and therefore no store mark. The app draws nothing for such a party.
+    supplierLogoUrl: null,
     /**
      * The number the supplier typed into the form's «The supplier's details» step.
      *
@@ -532,6 +535,8 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
     matchCount: 0,
     conflictCount: 0,
     dealRoomId: null,
+    // An off-platform submission has no deal room at all, so no status either.
+    dealRoomStatus: null,
     expired: false,
     note: sub.notes ?? null,
     requiredCerts: reqEqCertCodes,
@@ -558,7 +563,10 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
       ].filter(Boolean) as TermRow[],
       contract: [
         c.operator != null && termRow("operator_included", "Operator", "المشغّل", c.operator, rt.operator),
-        c.nationality != null && termRow("nationality", "Operator nationality", "جنسية المشغّل", c.nationality, rt.nationality),
+        /* 🔴 ~~The nationality row.~~ hidden on every surface (see `term-visibility.ts`). Dropped at the PARSE,
+           as the app drops its own deviations, so no reader downstream has to remember. The
+           confirmation is still carried on `LinkBidConfirmations` — an older submission that
+           answered it keeps its answer, which is simply no longer drawn. */
         c.fatFood != null && termRow("fat_food", "Food (F.A.T)", "الطعام", c.fatFood, rt.fatFood),
         c.fatTransport != null && termRow("fat_transport", "Accommodation & transport", "السكن والمواصلات", c.fatTransport, rt.fatTransport),
         c.fuel != null && termRow("fuel_responsibility", "Fuel responsibility", "مسؤولية الوقود", c.fuel, rt.fuel),

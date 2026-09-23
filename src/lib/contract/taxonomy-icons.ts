@@ -69,3 +69,62 @@ export function iconForRef(
 export function reelIcons(icons: TaxonomyIcons, n = 12): string[] {
   return [...icons.values()].slice(0, n);
 }
+
+/**
+ * The drawing for a machine named in PROSE, rather than by its ids.
+ *
+ * A project TEMPLATE carries `ChartItem.label` - the category, subtype and size run into one string
+ * - and no taxonomy ids at all, so `iconForRef` cannot help it. The rail still has to draw the
+ * catalogue picture rather than a grey glyph (owner, 2026-09-17: *"use the taxonamy image not this
+ * fallback icon"*), so the name is matched against the tree.
+ *
+ * The rule is TOKEN CONTAINMENT, not equality, and it has to be: the two sides compose the same
+ * machine differently - `itemName` joins the subtype and the size with a middot, the chart runs the
+ * category in front of both - so a string compare misses every time. A node matches when every word
+ * of its own name appears in the line, and the LONGEST such node wins, so «Excavator» never beats
+ * «Crawler Excavator» for a crawler.
+ *
+ * Deliberately one-directional: the line may say more than the node (a size, a category), never
+ * less. Matching the other way round would let «Crane» answer for «Tower Crane».
+ */
+const words = (s: string): string[] =>
+  s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .split(" ")
+    .filter(Boolean);
+
+export interface NamedIcon {
+  tokens: string[];
+  url: string;
+}
+
+/** Every node that HAS a drawing, with its name broken into words. Built once per tree. */
+export function namedIcons(tree: TaxonomyNode[]): NamedIcon[] {
+  const out: NamedIcon[] = [];
+  const walk = (nodes: TaxonomyNode[]) => {
+    for (const n of nodes) {
+      if (n.iconUrl) {
+        for (const label of [n.name, n.nameAr]) {
+          const tokens = words(label ?? "");
+          if (tokens.length) out.push({ tokens, url: n.iconUrl });
+        }
+      }
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(tree);
+  // Longest first, so the most specific node is the first one that can match.
+  return out.sort((a, b) => b.tokens.length - a.tokens.length);
+}
+
+/** The drawing for one line of prose, or null when the catalogue has none for it. */
+export function iconForName(named: NamedIcon[], line: string): string | null {
+  const have = new Set(words(line));
+  if (!have.size) return null;
+  for (const n of named) {
+    if (n.tokens.every((w) => have.has(w))) return n.url;
+  }
+  return null;
+}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui";
+import { Mansour } from "@/components/Mansour";
 import { useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { fetchActivity, type ActivityCounts } from "@/lib/api/client";
@@ -146,6 +147,25 @@ export function CtaBanner() {
          The rounding goes with the gutter: a radius on a band whose corners are off-screen draws a
          notch against the header and nothing else. The COPY keeps the page's reading gutter, so
          the headline still lines up with the blocks below it. */
+      /* 🔴 **The bottom edge is a STRAIGHT LINE, and it carries no seasonal treatment at all**
+         (owner, 2026-09-17: *"make the cta of ai straight line as it was"*).
+         ~~`nd-seam`, the gold rank the header wears (2026-09-16).~~
+         ~~`nd-dune`, the kit's shallow curved cut in the page's own colour (2026-09-16).~~
+         Both were tried on this one edge and both are withdrawn. The band already carries the
+         season without touching its silhouette — the tree line and the dot field sit INSIDE it —
+         and its bottom edge is the seam between the dashboard's first band and the page under it,
+         which is a join the eye reads as structure rather than as decoration. The dune's own
+         argument was that it *"changes the silhouette of whatever sits below it"*; that turned out
+         to be the objection rather than the case for it.
+
+         ⚠️ The class is gone from this element rather than left inert: `.nd-dune` is deleted from
+         the stylesheet and `public/nd96-dune.svg` with it, so nothing here is one edit away from
+         coming back by accident.
+
+         🔴 The band is NOT recoloured and the agent is not dressed. Its ground is a photograph of a
+         site under two gradients, its one coloured word and its button are `--brand`, and the whole
+         argument of this skin is that the orange does not move. A green band here would put the
+         celebration on top of the one control the dashboard exists to offer. */
       className="relative isolate -mt-[calc(1.5rem+1px)] flex h-[160px] w-screen items-center overflow-hidden sm:-mt-[calc(1.75rem+1px)]"
       /* `calc(50% - 50vw)`, and the 50% is of the CONTAINER — the padded, capped main. That centres a
          100vw child on a container which is itself centred in the viewport, which lands the band on
@@ -208,8 +228,33 @@ export function CtaBanner() {
       />
       <span aria-hidden="true" className="absolute inset-0 -z-10 bg-navy opacity-[0.35] mix-blend-multiply" />
 
+      {/* 🔴 **THE SEASON IS OFF THIS BAND** (owner, 2026-09-22, on a screenshot of it carrying
+          palms and a dot field: *"can u remove the palms and theme here on the cta keep it as its
+          original"*).
+
+          ~~`nd-band`: the kit's eight-palm TREE LINE plus the dot lattice, on the reasoning that
+          eight palms "need room to work — it is for a splash or a role gate, not a 66 dp bar" and
+          this band is 160px and full-window.~~ That was the best surface in the app FOR the motif
+          and it is still the wrong place for it: this band exists to say ONE sentence, and a grove
+          drawn across the photograph competes with the sentence rather than framing it.
+
+          ⚠️ **This is the FOURTH treatment withdrawn from this one element**, after the gold
+          seam and the dune sweep (both 2026-09-17) and the ordinal mark. The band's own navy, its
+          photograph, its one orange word and its orange button have never changed throughout. The
+          lesson is worth keeping rather than re-learning: **the dashboard band takes no seasonal
+          decoration at all** - not on its edges, not across its face.
+
+          ⚠️ **Deleted rather than left inert**, which is the dune's own precedent: the class
+          off the element, the `.nd-band` rule out of `globals.css`, and `nd96-treeline.svg` with
+          it. An unused seasonal rule is one edit away from coming back by accident.
+
+          ⚠️ **The header is untouched and still wears the season** - its green gradient, its
+          grove and the gold Najdi seam along its bottom edge, which is the zigzag directly above
+          this band in his screenshot. He named the CTA; the bar was his own choice of home for the
+          season on 2026-09-17 and is not this change's to take. */}
+
       <div className={cx("relative mx-auto flex w-full items-center gap-6", PAGE_MAX, PAGE_X)}>
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 items-center gap-4 sm:gap-5">
           {/* A BLOCK, not a flex row: the three text nodes are one sentence, and as flex items the
               spaces between them collapse and the row's own `gap` stands in for them — which sets
               the word spacing of a headline from a layout property. Inline flow keeps the spaces
@@ -235,12 +280,82 @@ export function CtaBanner() {
               pulling Segoe UI's wider letterforms together, and applying it to a condensed face
               closes counters that are already tight. Weight 600 rather than 800 for the same
               reason — Oswald at 800 fills its own counters at this size. */}
-          <h1 className="font-hero text-display font-semibold leading-tight text-white sm:text-hero">
+          {/* ── Mansour SPEAKS the headline ───────────────────────────────────────────────────
+              Owner, 2026-09-16: *"use this kit as mansour ai agent design, make the cta
+              professional catchy and hd"*.
+
+              🔴 **He was first put between the copy and the button, and it was wrong** - seen in
+              the browser, not argued: out there he had the photograph's busiest quarter behind him,
+              the gradient is at its THINNEST on that edge (42% navy against 94% on the leading
+              one), and standing beside a control he does not belong to he read as a stray grey icon
+              rather than as anybody. He is the LEADING edge now, in front of the sentence, which is
+              the pattern this product already uses on the intake (owner, 2026-09-13: *"put mansour
+              before the question"*): the band colours one word, AI, and the thing that word names
+              is now standing in front of it.
+
+              ⚠️ **`pose="viewer"`, not `send`.** `send` looks DOWN AT A BUTTON, which is the
+              obvious choice and is wrong twice: that button is across the band now, and the row
+              mirrors in Arabic while the pose matrices do not - he would meet it in English and
+              stare into the margin in Arabic. `viewer` looks out at the reader, which is
+              direction-neutral and the catchier of the two on a banner.
+
+              ⚠️ **He is GREY, by the kit's own rule** (*"grey on purpose so he sits on any brand
+              colour"*), so the halo is what separates him from the ink rather than a decoration:
+              `--brand` at 30% falling to nothing, the same orange as the word beside him and the
+              button opposite, so the band carries ONE accent in three places and not three colours.
+
+              ⚠️ **Nothing may clip him.** The kit keeps `overflow: visible` on the svg - the sway
+              rotates the whole body and the gear teeth leave the 120x120 box - so he sits inside
+              the band's reading gutter, never against its edge where the band's own
+              `overflow-hidden` would take the teeth off on every sway.
+
+              ⚠️ Hidden below `sm`: at a phone's width the sentence and the button need the whole
+              row. 🔴 `hidden sm:grid` would draw NOTHING at any width - both are the `display`
+              property, a media query adds no specificity, and Tailwind emits `hidden` last - which
+              is exactly the bug this block shipped with for one pass. `max-sm:hidden` over a plain
+              `grid` has no ordering to lose.
+
+              `aria-hidden` throughout: he is not a control, and the button keeps its own label. */}
+          {/* ⚠️ ONE size, 104. `Mansour` writes `width` / `height` as an inline STYLE, so a
+              responsive height class on this box could never resize him - and below `sm` the box is
+              not drawn at all, which makes a second size a rule that can never apply. 104 against a
+              160px band and a 32px headline: he reads as the speaker rather than as a bullet.
+
+              🔴 **This box is a plain block, and `grid place-items-center` is what it must NOT be.**
+              It was, and the halo came out 0x0: `place-items-center` sets `justify-self` and
+              `align-self` on every grid child INCLUDING an absolutely-positioned one, which makes
+              it shrink to its own content - and a decorative span has none. Nothing needs centring
+              anyway, because the box and he are the same 104px. Measured in the browser; from the
+              source it looks like a box with a glow in it. */}
+          <div aria-hidden="true" className="relative h-[104px] w-[104px] flex-none leading-none max-sm:hidden">
+            {/* 🔴 ~~An orange radial HALO behind him~~ - deleted (owner, 2026-09-17, on a screenshot
+                of the band: *"why mansout is not clear? not hd also never use shadow in design remove
+                it around him"*).
+
+                It was argued as figure-and-ground: he is grey by the kit’s own rule and the band is
+                navy, so something had to separate them. What it actually did was bleed 30% orange
+                across his outline, which is most of why he read as soft rather than sharp - the
+                thing meant to lift him off the ink was sitting ON him. The separation is the band’s
+                job instead: he stands on the darkest end of the gradient (94% navy), which is where
+                the headline already relies on the same contrast.
+
+                ⚠️ **And it is a standing rule now**: *"never use shadow in design"*. No glow, no
+                drop-shadow, no ring behind a figure. This design system spends none anywhere else -
+                `IntercomWidget` clears the whole `--shadow-*` namespace and says why. */}
+            <Mansour size={104} pose="viewer" />
+          </div>
+
+          <h1 className="min-w-0 font-hero text-display font-semibold leading-tight text-white sm:text-hero">
             {t.home.ctaTitleBefore}
             <span className="text-brand">{t.home.ctaTitleAi}</span>
             {t.home.ctaTitleAfter}
           </h1>
-          <p className="mt-2.5 max-w-[480px] text-subhead leading-relaxed text-white/70">{t.home.ctaSubtitle}</p>
+          {/* 🔴 **The paragraph is deleted** (owner, 2026-09-16: *"remove its subtext"*), and
+              `home.ctaSubtitle` with it in both dictionaries.
+              ~~«Describe what you need in plain words. Our AI assistant matches you with the right
+              suppliers.»~~ It restated the headline in smaller type - the headline already names the
+              act and names the agent - and it was the only thing standing between the copy and the
+              160px band's own edges. What replaces it is not more words: it is the agent himself. */}
         </div>
 
         {/* Single entry into the RFQ input flow (web-app/002). */}
@@ -249,6 +364,16 @@ export function CtaBanner() {
             <Icon name="add" size={16} /> {t.home.createRequest}
           </button>
         </div>
+
+        {/* 🔴 ~~The ordinal mark stood here, on the band's trailing edge.~~ It is on the BAR
+            now, in place of the pill beside the wordmark (owner, 2026-09-17: *"remove the 96 from
+            the cta and just make this style instead of the 96 pill on header"*).
+
+            What the band keeps is everything that does not speak: the eight-palm tree line, the
+            dot field and the dune sweep cutting its bottom edge. That is the better division and
+            not merely the instruction — this band exists to say ONE sentence, and a second
+            piece of copy at the far end of it was competing with the sentence for the same
+            160px. Pin 10.3 is retired with the element rather than renumbered. */}
       </div>
     </div>
 

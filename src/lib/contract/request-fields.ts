@@ -141,7 +141,9 @@ export function itemDetailRows(it: RequestItem, ar: boolean, L: Pick): Row[] {
   return kept([
     [L("Units", "العدد"), it.numberOfUnits > 0 ? n(it.numberOfUnits) : null],
     [L("Operator", "المشغّل"), it.operatorIncluded == null ? null : it.operatorIncluded === "YES" ? L("Included", "مع مشغّل") : L("Not included", "بدون مشغّل")],
-    [L("Operator nationality", "جنسية المشغّل"), it.operatorNationality],
+    /* 🔴 ~~Operator nationality.~~ Hidden on every surface (see `term-visibility.ts`) — app parity,
+       `supplier_request_detail_page.dart` skips it with `isHiddenTermKey`. The FIELD is still
+       parsed onto the record and still sent; only this row is gone. */
     [L("Fuel", "الوقود"), enumL(it.fuelTypePreference, fuelMap)],
     [L("Diesel included", "الديزل مشمول"), yn(it.dieselIncluded)],
     [L("Delivery to site", "التوصيل للموقع"), mine(it.mobilizationByRentee)],

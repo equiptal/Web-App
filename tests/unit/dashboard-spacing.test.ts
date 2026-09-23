@@ -43,9 +43,11 @@ describe("the dashboard's own spacing", () => {
   });
 
   it("still draws the blocks in the order the owner asked for", () => {
-    // Suppliers above projects (owner, 2026-09-04) — the list he acts on, then the sites.
+    // Suppliers above projects (owner, 2026-09-04) — the list he acts on, then the sites. They are
+    // behind tabs since 2026-09-16, so the order is the order of the TABS as well as of the blocks.
     const hub = read("src/components/home/HomeHub.tsx");
-    expect(hub.indexOf("<SuppliersPage embedded />")).toBeGreaterThan(-1);
-    expect(hub.indexOf("<SuppliersPage embedded />")).toBeLessThan(hub.indexOf("<ProjectsSurface embedded />"));
+    expect(hub.indexOf("<SuppliersPage embedded")).toBeGreaterThan(-1);
+    expect(hub.indexOf("<SuppliersPage embedded")).toBeLessThan(hub.indexOf("<ProjectsSurface embedded"));
+    expect(hub).toContain('const VIEWS: View[] = ["requests", "suppliers", "projects"]');
   });
 });

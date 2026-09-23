@@ -58,7 +58,14 @@ export default function LegalPage({ params }: { params: Promise<{ key: string }>
   return (
     <AppShell title={title}>
       <PageBack fallback="/profile" />
-      <div className="w-full pb-10" dir={ar ? "rtl" : "ltr"}>
+      {/* ── The one page that caps its own CONTENT (owner, 2026-09-19) ───────────────────────
+          Every page is fluid since the app-wide cap was dropped (*"make the web resposive to fit
+          any screen size"*), which is right for a table, a rail or a grid of cards and wrong for a
+          legal document: measured at 1920, a paragraph here ran 1798px, about 250 characters a
+          line. The cap belongs to the CONTENT rather than to the page's gutter, which is exactly
+          the case `PAGE_MAX`'s own note reserves — `ch` on the prose, so it follows the reader's
+          own type size. */}
+      <div className="w-full max-w-[86ch] pb-10" dir={ar ? "rtl" : "ltr"}>
         <Section title={title} hint={doc ? `${L("Version", "الإصدار")} ${doc.version}` : undefined}>
           <div className="p-5">
             {/* A document's worth of lines, in three paragraphs — the shape of the thing arriving. */}

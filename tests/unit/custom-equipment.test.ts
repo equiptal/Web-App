@@ -115,13 +115,19 @@ describe("posting", () => {
     expect(item.customEquipmentName).toBe("floating crane barge");
   });
 
-  it("leaves an ordinary line's payload exactly as it was", async () => {
+  it("sends a matched line's ids AND his words, in separate keys", async () => {
     const { adapters } = await withFlag();
     const item = adapters.draftToCreateRequest(payload([makeItem()]), "7").equipmentItems[0] as unknown as Record<string, unknown>;
     expect(item.categoryId).toBe("cat-earth");
     expect(item.subtypeId).toBe("sub-crawler");
     expect(item.capacityId).toBe("cap-30");
-    expect("customEquipmentName" in item).toBe(false);
+    /* 🔴 Changed 2026-09-14, when `EQUIPMENT_NAME_ON_EVERY_LINE` went on (owner: *"let what is
+       detected in your own words be stored as the custom always, regardless of whether the user
+       changes it or not"*). ~~The key was absent on a matched line.~~ The backend keeps the ids and
+       the name in separate columns, and `isUndefined` still derives from the subtype alone, so a
+       name beside a match changes nothing about what the line IS. */
+    // The fixture's own `rawLabel` — his RFQ words, which is what the box shows and what is sent.
+    expect(item.customEquipmentName).toBe("30 ton digger");
   });
 
   it("sends no ids at all for a line the agent placed a CATEGORY on but no subtype", async () => {

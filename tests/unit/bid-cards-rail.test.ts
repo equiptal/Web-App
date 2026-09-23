@@ -51,6 +51,28 @@ describe("the bid cards are a sideways rail", () => {
     expect(rail).toContain("overflow-y-clip");
   });
 
+  it("starts the strip at the READING START, and never centres it", () => {
+    /**
+     * 🔴 **WITHDRAWN** (owner, 2026-09-21: *"why this cewntered? revert it back"*). It was centred
+     * two days earlier on his own pick from four options — *«why margin from left not equal to
+     * right»*, on a 1920 screen holding one bid — and the measurement behind that is still true and
+     * worth keeping, because somebody will reach for it again: the gutters WERE equal (37px left,
+     * 39px right); the CARD was not, 344px against the leading gutter with ~1480px of white after
+     * it, because `PAGE_MAX` went `max-w-none` the same day and this container grew 1360 → 1840.
+     * He has now looked at the centred strip and taken it off. A lone bid begins where every other
+     * band on the page begins, and has white after it.
+     *
+     * ⚠️ **If it is ever centred again it must be `center-safe`.** This is an `overflow-x-auto`
+     * scroller, and plain centring overflows at BOTH ends — the overflow past the start edge cannot
+     * be scrolled to, so on a request with six bids the first one becomes unreachable. The rule is
+     * asserted here rather than only in prose, so a bare `justify-center` cannot come back quietly.
+     */
+    const rail = classes.find((c) => c.includes("overflow-x-auto") && c.includes("flex"))!;
+    expect(rail).not.toContain("justify-center");
+    expect(rail).not.toContain("justify-center-safe");
+    expect(rail).not.toMatch(/\bmx-auto\b/);
+  });
+
   it("gives the card its own width back, and the row's height", () => {
     const card = classes.find((c) => c.includes("rounded-lg border bg-surface transition"));
     expect(card, "the card root").toBeTruthy();
@@ -79,5 +101,49 @@ describe("one vertical scroller, and it is the page column", () => {
        pane that clipped would cut the card off with no way to see the rest. */
     expect(classes.some((c) => c.trim() === "flex min-h-0 flex-1 flex-col overflow-y-auto")).toBe(false);
     expect(classes.filter((c) => c.includes("overflow-y-auto")).length).toBe(1);
+  });
+});
+
+/**
+ * 🔴 **The subtext is the CITY and what the bid covers** (owner, 2026-09-23, on «Supplier ·
+ * Riyadh · 8 km»: *"make it, only city and offers x units if multi unit instead of this 2 units
+ * badge"*).
+ *
+ * ~~«Supplier», the city, the distance — and a units BADGE in the pill column beneath the chat
+ * control.~~ Every row in that strip is a supplier, so the word captioned the obvious; the distance
+ * is the YARD's, which the equipment map states per machine with a «not confirmed» qualifier, so one
+ * rounded figure here claimed a precision that surface spends itself refusing.
+ *
+ * ⚠️ The count moved rather than being dropped, so the card says it ONCE - and the accepted
+ * shape came with it, because «2 of 3 units accepted» is a partial award and the green band says
+ * only THAT a bid was accepted, never how much of it.
+ */
+describe("the bid card's subtext", () => {
+  const CARD = readFileSync("src/components/workspace/BidCards.tsx", "utf8");
+  /* Comments stripped: the notes above NAME what they removed, so a bare sweep fails on its own
+     explanation - the tenth time this repo has recorded that. */
+  const CODE = CARD.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "");
+
+  it("names the city and the units, and nothing else", () => {
+    expect(CODE).toContain('{[card.supplierCity || null, unitsLine].filter(Boolean).join(" · ")}');
+  });
+
+  it("drops the «Supplier» caption and the yard's distance", () => {
+    expect(CODE).not.toContain('L("Supplier", "مؤجّر")');
+    expect(CODE).not.toContain("Math.round(card.distanceKm)");
+  });
+
+  /* The app's own gate: on a single-unit request every bid covers all of it, so the line would be
+     stating nothing. */
+  it("states the count only on a multi-unit request, and reads the OFFERED one", () => {
+    expect(CODE).toMatch(/const unitsLine =[\s\S]{0,40}card\.numberOfUnits > 1/);
+    expect(CODE).toContain("fmt(t.workspace.offersUnits, { n: String(unitsOffered) })");
+    expect(CODE).toContain("fmt(t.workspace.acceptedUnits, { accepted: String(acceptedUnits), offered: String(unitsOffered) })");
+  });
+
+  /* Deleted, not left unrendered: a component nothing imports is one edit away from coming back
+     beside the line that replaced it, and then the card states its count twice. */
+  it("has no units badge left to come back", () => {
+    expect(CODE).not.toContain("OffersUnitsBadge");
   });
 });

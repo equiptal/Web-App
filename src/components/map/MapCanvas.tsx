@@ -46,6 +46,7 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
 // which is the shape the dependency should have — the map has no business knowing how a card is made.
 import type { EquipmentCardModel } from "@/components/map/equipment-card-model";
 import { useLocale, useT } from "@/lib/i18n";
+import { COLORS } from "@/lib/ds-colors";
 import { PIN_REGISTRY, pin } from "@/lib/uiPins";
 
 export interface SitePoint {
@@ -104,6 +105,11 @@ export interface MachinePin extends MapPoint {
 const FALLBACK_CENTRE: [number, number] = [24.0, 45.0];
 const FALLBACK_ZOOM = 5;
 const SITE_ZOOM = 11;
+/** How close the opening fit may get when it frames the project AND its machines (owner, 2026-09-23:
+ *  *"more zoomed in to be close to the equipment and the project"*). ~~`SITE_ZOOM`, 11~~, which is the
+ *  right view of a SITE alone and framed a machine 7.5 km away in a whole-city view. 15 still keeps a
+ *  machine 60 km out in frame: `fitBounds` only zooms in as far as every point allows. */
+const FIT_MAX_ZOOM = 15;
 
 /**
  * Where the camera lands when a card is pressed (app parity, `kFocusZoom`).
@@ -173,13 +179,13 @@ function FitView({ site, points }: { site: SitePoint | null; points: MachinePin[
     if (points.length && site) {
       map.fitBounds(L.latLngBounds([[site.lat, site.lng], ...points.map((p) => [p.lat, p.lng] as [number, number])]), {
         padding: [80, 80],
-        maxZoom: SITE_ZOOM,
+        maxZoom: FIT_MAX_ZOOM,
         animate: false,
       });
       return;
     }
     if (points.length) {
-      map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number])), { padding: [80, 80], maxZoom: SITE_ZOOM, animate: false });
+      map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number])), { padding: [80, 80], maxZoom: FIT_MAX_ZOOM, animate: false });
       return;
     }
     if (site) map.setView([site.lat, site.lng], SITE_ZOOM, { animate: false });
@@ -633,6 +639,17 @@ function hoverBoxHtml(card: EquipmentCardModel, ar: boolean, scale: number, t: R
  * always in the DOM and the image is painted OVER it as a background, so a URL that 404s simply never
  * paints and the icon shows through. The icon is muted slate rather than the availability colour,
  * because a fallback is not a statement about availability; `map-proto.css` records the one residual.
+ *
+ * ── 🔴 The SUPPLIER'S OWN PHOTO, in a CIRCLE (owner, 2026-09-22) ──────────────────────────────────
+ * *"can we show the real equipment image of the supplier not this and show it as circle not squares
+ * like this"*. This reverses two rulings above for a machine that HAS a photo: the free-standing
+ * 94 × 74 object (2026-08-08) and AC-80's taxonomy image as the first choice. Every machine of one
+ * request drew the same stock render, so the map could not tell two of them apart, while the card
+ * beside it showed the real one.
+ *
+ * The photo is `pin.card.photo`, the SAME `heroPhotoUrl` the fleet card shows, so a marker and its
+ * card can never show two pictures of one machine. The chain is now photo → taxonomy image → icon,
+ * all three inside the circle; the background-over-icon trick still covers a URL that fails.
  */
 function machineIcon(
   pin: MachinePin,
@@ -697,6 +714,9 @@ function machineIcon(
   const art = selected
     ? "animation:dpLift .55s cubic-bezier(.34,1.4,.64,1) forwards"
     : "transform:translateY(-4px)";
+  // The machine's own photo first (owner, 2026-09-22), the request's taxonomy image after it.
+  const photo = safeImageUrl(pin.card?.photo ?? null);
+  const artSrc = photo ?? src;
 
   return L.divIcon({
     className: "", // no Leaflet default box — the marker is entirely our own markup
@@ -735,9 +755,9 @@ function machineIcon(
       // half of a shadow this app no longer has.
       `<span class="bm-pin-disc" style="background:${tint};border:2.5px solid ${ring}${selected ? ";outline:4px solid color-mix(in srgb, var(--info) 60%, transparent)" : ""}"></span>` +
       `<span class="bm-pin-shadow"></span>` +
-      `<span class="bm-pin-art" style="${art}">` +
+      `<span class="bm-pin-art${photo ? " is-photo" : ""}" style="${art}">` +
       `<span class="bm-pin-glyph material-icons-outlined">${esc(iconName)}</span>` +
-      (src ? `<span class="bm-pin-img" style="background-image:url('${src}')"></span>` : "") +
+      (artSrc ? `<span class="bm-pin-img" style="background-image:url('${artSrc}')"></span>` : "") +
       `</span>` +
       // A sibling of the object, not a child: the object carries a `filter`, which would make it the
       // containing block and drag the tick along with the lift.
@@ -768,6 +788,92 @@ function machineIcon(
         : "") +
       `</div>`,
   });
+}
+
+/**
+ * **Google's map under the canvas, the map the app shows** (owner, 2026-09-23: *"check the map on the
+ * app what does it use and use it"*, then *"why we cant use this"*).
+ *
+ * ~~Google's Map Tiles API (`createSession` + `2dtiles`) as a Leaflet `TileLayer`.~~ Tried first and
+ * refused by Google for every key we hold: the web key and the app's three answer
+ * `API_KEY_SERVICE_BLOCKED`, the fourth `SERVICE_DISABLED`. Turning that service on is a Google Cloud
+ * change nobody here can make.
+ *
+ * So the canvas uses the service the web key IS allowed: the **Maps JavaScript API**, the same one
+ * that already draws the web's location picker. `leaflet.gridlayer.googlemutant` renders a real
+ * Google map inside a Leaflet grid layer, so every marker, route and chip on this canvas stays exactly
+ * as it is. It is Google's own JS map, not scraped tiles, which keeps it within Google's terms.
+ *
+ * Returns true once Google is drawing. Until then, with no key, or on `gm_authFailure` (Google's hook
+ * for a refused key), the caller keeps the keyless Esri layer, so the canvas is never blank.
+ */
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+/** Google's roadmap, WHITE (owner, 2026-09-23: *"can't it be white"*): pale ground, white roads, no
+ *  shops or businesses competing with the machines. Colours from the palette's literal mirror, since
+ *  Google takes hex and a raw hex here would fail `palette-drift`. */
+const WHITE_MAP = [
+  { elementType: "geometry", stylers: [{ color: COLORS.surface2 }] },
+  { elementType: "labels.text.fill", stylers: [{ color: COLORS.muted }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: COLORS.surface }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: COLORS.surface }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: COLORS.border }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: COLORS.border }] },
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+];
+let mapsJs: Promise<void> | null = null;
+function loadMapsJs(ar: boolean): Promise<void> {
+  const w = window as unknown as { google?: { maps?: unknown }; gm_authFailure?: () => void };
+  if (w.google?.maps) return Promise.resolve();
+  if (!mapsJs) {
+    mapsJs = new Promise<void>((resolve, reject) => {
+      // The location picker loads the same script; a tag already on the page is waited on, not doubled.
+      const existing = document.getElementById("gmaps-js") as HTMLScriptElement | null;
+      const s = existing ?? document.createElement("script");
+      s.addEventListener("load", () => resolve());
+      s.addEventListener("error", () => reject(new Error("maps-js")));
+      if (!existing) {
+        s.id = "gmaps-js";
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_KEY)}&language=${ar ? "ar" : "en"}`;
+        s.async = true;
+        document.head.appendChild(s);
+      }
+    });
+  }
+  return mapsJs;
+}
+
+function GoogleBase({ ar, onReady }: { ar: boolean; onReady: (ok: boolean) => void }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!GOOGLE_KEY) return;
+    let live = true;
+    let layer: L.GridLayer | null = null;
+    const w = window as unknown as { gm_authFailure?: () => void };
+    const prev = w.gm_authFailure;
+    // Google calls this when it refuses the key. Drop our layer and hand the canvas back to Esri.
+    w.gm_authFailure = () => {
+      prev?.();
+      if (layer) map.removeLayer(layer);
+      if (live) onReady(false);
+    };
+    loadMapsJs(ar)
+      .then(() => import("leaflet.gridlayer.googlemutant"))
+      .then(() => {
+        if (!live) return;
+        const mk = (L.gridLayer as unknown as { googleMutant: (o: object) => L.GridLayer }).googleMutant;
+        layer = mk({ type: "roadmap", maxZoom: 19, styles: WHITE_MAP }).addTo(map);
+        layer.bringToBack();
+        onReady(true);
+      })
+      .catch(() => live && onReady(false));
+    return () => {
+      live = false;
+      w.gm_authFailure = prev;
+      if (layer) map.removeLayer(layer);
+    };
+  }, [map, ar, onReady]);
+  return null;
 }
 
 export default function MapCanvas({
@@ -807,7 +913,9 @@ export default function MapCanvas({
   itemName?: string | null;
 }) {
   const t = useT();
-  const { dir } = useLocale();
+  const { dir, locale } = useLocale();
+  // Whether Google's map is drawing under the canvas; Esri stays until it is (see `GoogleBase`).
+  const [googleOn, setGoogleOn] = useState(false);
 
   /* The project pin — `siteIcon()`, decoded lines 262–265, value for value. `[40,52]` with the anchor
      at `[20,40]`, which is the teardrop's point rather than its centre: the pin marks the spot it
@@ -867,20 +975,41 @@ export default function MapCanvas({
         inertiaDeceleration={2800}
         style={{ height: "100%", width: "100%" }}
       >
-        {/* CARTO **voyager**, not OpenStreetMap standard (`baseUrl('voyager')`, decoded 3840). Not a
-            taste choice: every colour on this canvas was judged against voyager's pale ground — the
-            `var(--muted-dark)` route, the `var(--muted-light)` leader line, the white chips and the white pin tag. On OSM
-            standard's saturated green-and-buff they all lose contrast, and the route in particular
-            disappears into the road network it is drawn over.
-
-            The attribution carries BOTH credits because voyager's terms require both: the data is
-            OpenStreetMap's, the rendering is CARTO's. */}
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          subdomains="abcd"
-          maxZoom={19}
-        />
+        {/* 🔴 ~~CARTO **voyager** (`baseUrl('voyager')`, decoded 3840), chosen because every colour on
+            this canvas was judged against its pale ground.~~ CARTO began serving its keyless tiles with
+            an «API KEY REQUIRED» watermark (seen 2026-09-22 on staging and beta; the tile itself comes
+            back watermarked from `a.basemaps.cartocdn.com`, so no deploy of ours caused or can fix it).
+            ~~OpenStreetMap standard~~ was tried the same hour and refused: its servers answer a
+            non-browser fetch with an «Access blocked» tile and their policy is for light use.
+            **Esri World Street Map** now: keyless, labelled, no watermark, and a pale ground close to
+            voyager's, so the canvas colours judged against voyager still read.
+            ⚠️ Esri's terms expect an ArcGIS account for production use, and CARTO would take a key
+            too. A keyed provider (CARTO, Esri, or Google Maps as the app uses) is the durable fix and
+            needs an account decision.
+            **Google first (2026-09-23), Esri until it is ready or if Google refuses**: `GoogleBase`
+            above, which carries Google's own logo and attribution inside its layer. */}
+        <GoogleBase ar={locale === "ar"} onReady={setGoogleOn} />
+        {/* The fallback is Esri's LIGHT GREY canvas plus its label layer (owner, 2026-09-23: *"the map
+            looks weird, can't it be white"*). ~~World Street Map~~, whose tan relief read as desert
+            under every chip. `maxNativeZoom` 16 is where the canvas's own tiles stop; above it Leaflet
+            enlarges them rather than asking for tiles that do not exist. */}
+        {!googleOn && (
+          <>
+            <TileLayer
+              key="esri-base"
+              attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, &copy; OpenStreetMap contributors'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+              maxNativeZoom={16}
+              maxZoom={19}
+            />
+            <TileLayer
+              key="esri-labels"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+              maxNativeZoom={16}
+              maxZoom={19}
+            />
+          </>
+        )}
         {/* Opposite the bid panel, which sits on the inline-START edge (owner, 2026-08-10) — so the
             buttons are top-right in English and top-left in Arabic. Being opposite is the rule, not the
             side: T41 M11's second clause is "never underneath the panel", and the panel is what moved.

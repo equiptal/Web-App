@@ -97,21 +97,38 @@ describe("the four overlay controls (MREQ-AC-16)", () => {
     expect(screen.getByRole("button", { name: "QUANTITY +" })).toBeTruthy();
   });
 
-  it("floors the quantity stepper at one (MREQ-AC-16)", async () => {
+  it("floors the quantity stepper at one, by REMOVING the − (MREQ-AC-16)", async () => {
+    /**
+     * 🔴 **The − is withdrawn at one, not disabled** (owner, 2026-09-14: *"remove the − in case it
+     * is one unit, as it is confusing, this white −"*). Its disabled skin is a pale ground, and the
+     * chip it sits on is dark - so the one control that could do nothing was the brightest thing in
+     * it. A control that cannot act is better absent than greyed, which is the ruling the equipment
+     * tab’s ✕ already follows on a one-equipment request.
+     */
     const handle = await card();
-    const minus = screen.getByRole("button", { name: "QUANTITY −" });
-    await handle.run(() => minus.click());
-    await handle.run(() => minus.click());
+    /* ⚠️ At ONE there is no − at all - which is the ruling - so the way to reach it is to count
+       up first. That is also the renter’s own path: the chip opens at one unit. */
+    expect(screen.queryByRole("button", { name: "QUANTITY −" })).toBeNull();
+    await handle.run(() => screen.getByRole("button", { name: "QUANTITY +" }).click());
+    expect(handle.store().state.draft!.items[0].quantity).toBe(2);
+
+    await handle.run(() => screen.getByRole("button", { name: "QUANTITY −" }).click());
     expect(handle.store().state.draft!.items[0].quantity).toBe(1);
-    // At the floor it is disabled rather than silently doing nothing.
-    expect(minus.hasAttribute("disabled")).toBe(true);
+    // ⚠️ Gone from the DOM, so there is nothing to disable and nothing to press.
+    expect(screen.queryByRole("button", { name: "QUANTITY −" })).toBeNull();
+    // The + is never withdrawn: nothing caps how many machines a request asks for.
+    expect(screen.getByRole("button", { name: "QUANTITY +" })).toBeTruthy();
   });
 
   it("counts up from the panel chip", async () => {
     const handle = await card();
     await handle.run(() => screen.getByRole("button", { name: "QUANTITY +" }).click());
     expect(handle.store().state.draft!.items[0].quantity).toBe(2);
-    expect(screen.getByText("×2")).toBeTruthy();
+    // ⚠️ The number ALONE (owner, 2026-09-14). The chip sits on the machine’s own photograph with
+    // a − and a + beside it, so what it counts is not in doubt - and «×2» beside «20 ton» read as
+    // part of the size.
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.queryByText("×2")).toBeNull();
   });
 });
 
@@ -403,32 +420,142 @@ describe("the option list opens where it can be read", () => {
   });
 });
 
-describe("the photograph shows the machine, not a crop of it", () => {
+describe("the whole machine is visible, and the zoom only eats the margin", () => {
   /**
-   * 🔴 Owner, 2026-09-13, on a card showing three wheels and nothing else: *"can u choose the
-   * right zoom and size of the images here"*.
+   * Owner, 2026-09-15: *"the equipment in the machine panel are so zoomed in that make the equipment
+   * not all appear"*.
    *
-   * The panel is `min-h-[450px]` and stretches to the column beside it - taller than it is wide -
-   * while a taxonomy photograph is 1408x768, ratio 1.83. `object-cover` scales to the HEIGHT and
-   * throws away more than half the width, which on a flatbed is the half with the machine on it.
+   * 🔴 **`object-cover` was wrong here, and the measurement that chose it was taken in the WRONG
+   * BOX.** It was judged on a 585x450 probe; the panel is **366x450**. At 585 the crop is 29% and
+   * the machine survives; at 366 it is **39%** and the bucket and the counterweight are both cut.
+   * A later `scale-[1.18]` on top of `cover` took it to ~48%.
    *
-   * ⚠️ **The same measurement the request rail made on 2026-09-12**, and it came out the same
-   * way: *"the crop cut the machine into an unreadable jumble"*. Recorded in both places so the
-   * next reader does not re-run the experiment.
+   * 🔴 **Re-measured at the real 366x450**, on the live asset, four fits side by side:
+   *   · `contain`           whole machine, 177px of band
+   *   · `contain` x1.2      whole machine, 122px of band   ← ships
+   *   · `contain` x1.3      whole machine, 95px, nothing to spare
+   *   · `contain` x1.4/1.5  the counterweight clips
+   *   · `cover` (x1.65)     bucket and counterweight both gone
+   * 1.3 is the ceiling for THIS render, so 1.2 leaves headroom for a machine drawn wider.
+   *
+   * ⚠️ The band is what a 1.34 landscape costs in a 0.81 portrait box. No CSS removes it: `cover`,
+   * `contain` and `scale` all clip from the same source ratio and only move WHERE the loss lands.
+   * The real fix is a square master — recorded in the change log, not achievable here.
    */
   const SRC = readFileSync("src/components/create/MachineCard.tsx", "utf8");
   const code = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const at = code.indexOf("absolute inset-0 h-full w-full");
+  const panelImg = code.slice(at - 260, at + 80);
 
-  it("Given the panel photo, Then it is contained rather than cropped", () => {
-    expect(code).toContain("object-contain");
-    expect(code).not.toContain("object-cover");
+  it("the panel photo is CONTAINED, so nothing of the machine is thrown away", () => {
+    expect(panelImg).toContain("object-contain");
+    expect(panelImg).not.toContain("object-cover");
   });
 
-  it("Given `contain`, Then the box keeps its full size", () => {
-    // ⚠️ `p-*` shrinks the box BEFORE `contain` measures it, which is what made the rail’s
-    // drawings letterbox at half size - the rail’s own note records that trap.
-    const img = code.slice(code.indexOf("object-contain") - 200, code.indexOf("object-contain") + 40);
-    expect(img).toContain("absolute inset-0 h-full w-full");
-    expect(img).not.toMatch(/\bp-\d/);
+  it("and the zoom stays at or under the measured ceiling of 1.3", () => {
+    const m = panelImg.match(/scale-\[([\d.]+)\]/);
+    expect(m).toBeTruthy();
+    expect(Number(m![1])).toBeLessThanOrEqual(1.3);
+    expect(Number(m![1])).toBeGreaterThan(1);
+  });
+
+  it("the zoom is only safe because the panel CLIPS", () => {
+    // Without `overflow-hidden` the scaled photo spills over the four chips on the corners.
+    const pAt = code.indexOf('pin("machine-card-image")');
+    expect(code.slice(pAt, pAt + 240)).toMatch(/overflow-hidden/);
+  });
+
+  it("Given a real photograph, Then the panel is painted the photograph's OWN ground", () => {
+    /**
+     * Owner, 2026-09-20: *"why the image doesnt exist for margins and padding, keep it 100% fit"*.
+     *
+     * 🔴 The image was there; what he was reading as its absence was the LETTERBOX — this panel's
+     * `surface2` showing through under the picture, with two of the four chips sitting on it. The
+     * band above is unfixable by any fit and this does not try: it paints the unfilled part the
+     * beige these renders are shot on, so there is no band left to look at.
+     *
+     * ⚠️ MEASURED off the assets — twelve samples across `crawler-excavator` and `wheel-loader`,
+     * decoded pixel by pixel, all within 4/255 of #e3ded7 — and therefore a fact about that render
+     * batch rather than a colour of ours. It lives in `globals.css` with that note.
+     */
+    const pAt = code.indexOf('pin("machine-card-image")');
+    const panel = code.slice(pAt, pAt + 260);
+    expect(panel).toContain("bg-photo-ground");
+    // 🔴 Only under a real photograph: behind the glyph fallback a beige panel with a grey drawing
+    // on it reads as a picture that failed to load, which is the state it would be imitating.
+    expect(panel).toContain('photo && !photoBroken ? "bg-photo-ground" : "bg-surface2"');
+  });
+
+  it("Given the ground colour, Then it is a TOKEN and the stylesheet carries the measurement", () => {
+    // `palette-drift` forbids a raw hex in a component, and a colour `:root` defines that `@theme`
+    // does not is a colour half the app cannot reach — so both halves are asserted.
+    const css = readFileSync("src/app/globals.css", "utf8");
+    expect(css).toContain("--photo-ground: #e3ded7;");
+    expect(css).toContain("--color-photo-ground: var(--photo-ground);");
+    expect(SRC).not.toContain("#e3ded7");
+  });
+
+  it("Given the ROW thumbnail, Then it is contained too, at its own size", () => {
+    const rowAt = code.indexOf("h-full w-full object-contain p-0.5");
+    expect(rowAt).toBeGreaterThan(0);
+    expect(code.slice(rowAt - 200, rowAt + 40)).not.toContain("absolute inset-0");
+  });
+
+  it("Given the panel, Then it matches the column beside it - between a floor and a CEILING", () => {
+    /**
+     * Two owner rulings meet on that one line, hours apart, and neither is wrong:
+     *  · *"keep it fixed at its card height"* - the catalogue panel adds ~300px to the right column
+     *    and a stretched photograph followed it to 800.
+     *  · *"make the equipment image card same height as its neighbour card"* - at a flat 450 it
+     *    ended short of an ordinary fields column and left a gap under it.
+     * ⚠️ The ceiling also bounds the BAND: the taller the panel, the more empty ground a 1.34
+     * picture leaves above and below it.
+     */
+    expect(code).toContain("min-h-[450px]");
+    expect(code).toContain("max-h-[640px]");
+    expect(code).toContain("items-stretch");
+    const pAt = code.indexOf('pin("machine-card-image")');
+    expect(code.slice(pAt, pAt + 240)).not.toMatch(/h-full/);
+  });
+});
+
+/**
+ * 🔴 **Nothing on this card may refuse to wrap at PHONE width** (owner, 2026-09-23, with a
+ * photograph of staging on his handset: the «In our catalogue» pill and the right borders of TYPE
+ * and SIZE cut off by the screen's edge).
+ *
+ * The equipment-name LABEL carried an unconditional `whitespace-nowrap`. Measured against the
+ * compiled stylesheet: it runs **328px** and cannot shrink, so with the pill beside it the card's
+ * min-content is **356px inside a 328px box** and the DOCUMENT overflows by 13px at a 360 viewport
+ * - which drags the header, the tabs and every panel sideways with it.
+ *
+ * ⚠️ **The one-line rule survives from `sm` up**, which is the 2026-09-14 ruling it came from
+ * (*"the pill dropping under the label put a third row into a block meant to read as a single
+ * field"*). That was right about the card he was looking at - a desktop one. Below `sm` the
+ * alternative is not a third row, it is the card leaving the screen.
+ *
+ * ⚠️ jsdom lays nothing out, so this reads the RULE rather than the width. The 13px is a
+ * measured fact recorded in the comment, not something a unit test can re-derive.
+ */
+describe("the card fits a phone", () => {
+  const SRC = readFileSync("src/components/create/MachineCard.tsx", "utf8");
+  /* Comments stripped: the note above the label NAMES the class it removed, so a bare sweep would
+     fail on its own explanation - the tenth time this repo has recorded that. */
+  const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+
+  it("lets the equipment-name label wrap below sm, and holds one line above it", () => {
+    expect(CODE).toContain('className="inline-flex items-center gap-2 align-middle sm:whitespace-nowrap"');
+    expect(CODE).not.toContain('className="inline-flex items-center gap-2 whitespace-nowrap align-middle"');
+  });
+
+  /* A nowrap run is only safe when it cannot outgrow its box: a short fixed string, or one with
+     `truncate` beside it so it clips instead of pushing. Every other one on this card is one of
+     those, and this case is what says so the next time one is added. */
+  it("leaves no unguarded nowrap on a run that can grow", () => {
+    for (const m of CODE.matchAll(/className=\{?["`][^"`]*whitespace-nowrap[^"`]*["`]/g)) {
+      const cls = m[0];
+      const guarded = cls.includes("sm:whitespace-nowrap") || cls.includes("truncate") || cls.includes("text-subhead");
+      expect(guarded, `unguarded nowrap: ${cls}`).toBe(true);
+    }
   });
 });

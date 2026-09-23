@@ -6,6 +6,7 @@ import { useAuthGate } from "@/components/auth/AuthGate";
 import { useT } from "@/lib/i18n";
 import { btn, CARD, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { seasonOrdinal } from "@/lib/season";
 
 /**
  * ── What a guest sees on a page that is his once he signs in (owner, 2026-09-06) ─────────────────
@@ -96,10 +97,35 @@ export function GuestWall({
           which is why the card sat high on the requests page. The height on the root does it. */}
       <div className="absolute inset-0 grid place-items-center p-4">
         <div className={cx(CARD, "w-full max-w-[380px] overflow-hidden")}>
-          <p className="border-b border-border bg-surface2 px-4 py-2.5 text-meta font-semibold text-muted-dark">
+          {/* ── The head strip wears the season (owner, 2026-09-16) ───────────────────
+              This is the app's own role gate, which is the surface the kit names for its louder
+              geometry. In season the strip takes the green gradient, the dot lattice and the
+              INTERLOCKING Najdi band along its foot — the woven rank rather than the single row of
+              spikes the long edges wear, because this strip is 40px and has to carry the season on
+              its own.
+
+              ⚠️ The height, the type and the words do not move. `bg-surface2` is a background
+              COLOUR and the season adds background IMAGES, so the two layer rather than compete and
+              the grey is what remains the instant the attribute goes.
+
+              ⚠️ The ink is an arbitrary VARIANT, not a rule in the seasonal block: `color` set
+              there would be unlayered and would beat `text-muted-dark` all year. Here both are
+              utilities, so the more specific one wins only while the attribute is on. */}
+          <p className="nd-crown flex items-center gap-2 border-b border-border bg-surface2 px-4 py-2.5 text-meta font-semibold text-muted-dark [[data-season='nd']_&]:text-white">
             {t.guestWall.join}
+            {/* The kit's PALE chip weight, which is the one for a light surface — the bar takes the
+                outlined gold. Hidden with the season, by the same stylesheet that draws it. */}
+            <span {...pin("guest-wall-season")} className="nd-chip is-pale ms-auto flex-none rounded-full px-1.5 py-px text-label font-extrabold tracking-wide">
+              <b className="font-extrabold">{seasonOrdinal()}</b>
+              {t.season.nationalDay}
+            </span>
           </p>
-          <div className="p-4">
+          <div className="relative p-4">
+            {/* One oversized palm bleeding out of the corner the reader finishes at, at 7% of the
+                flag's green. The kit: "the cheapest way to mark a single card as seasonal without
+                touching its layout or its colours" — and it touches neither. Safe only because the
+                CARD is `overflow-hidden`; without that clip the fronds would run over the page. */}
+            <span aria-hidden="true" className="nd-palm-corner" />
             <h2 className="text-subhead font-extrabold text-navy">{title}</h2>
             <p className="mt-1 text-body leading-relaxed text-muted">{body}</p>
             <button type="button" onClick={() => openAuth()} className={btn("primary", "md", { className: "mt-3.5 transition" })}>

@@ -53,6 +53,9 @@ export function CompanyHub({
   embedded = false,
   onCompany,
   onCreateCompany,
+  onViewDetails,
+  logoUrl = null,
+  onEditLogo,
 }: {
   embedded?: boolean;
   /** Reports the firm (or its absence) to the page around it — the profile prints one name, not two. */
@@ -63,6 +66,27 @@ export function CompanyHub({
    * the question «do you have a company?» is actually asked.
    */
   onCreateCompany?: () => void;
+  /**
+   * Open the company's own particulars — legal name, authority role, national ID, city, the
+   * national address and the three papers. Owned by the page for the same reason as the form:
+   * it is a layer over it.
+   *
+   * 🔴 **The two are offered on DIFFERENT conditions, and that is the app's rule rather than a
+   * preference** (`company_profile_card._verificationSection`). Anything submitted can be read:
+   * pending, verified or refused. The FORM is offered only when there is nothing on file or it
+   * came back refused — *"a supplier under review can look at what they submitted but must not
+   * send it a second time; sending again is what stacks a duplicate for the reviewer"*. A refused
+   * submission gets both presses, as it does in the app.
+   */
+  onViewDetails?: () => void;
+  /** The firm mark on file, presigned by `/api/me` (`companyLogoUrl`). */
+  logoUrl?: string | null;
+  /**
+   * Open the logo dialog. Withheld for a MEMBER, which is the app own gate
+   * (`CompanyLogoEditor.isOwner`): this card is the firm identity, and only its owners act on it.
+   * A member sees the same mark with no picker.
+   */
+  onEditLogo?: () => void;
 } = {}) {
   const t = useT();
   const c = t.company;
@@ -202,6 +226,7 @@ export function CompanyHub({
           <NoCompanyCard
             busy={busy}
             onCreate={onCreateCompany}
+            onViewDetails={onViewDetails}
             onJoin={(code, name) => setConfirm(joinSpec(code, name))}
             onError={setError}
             onAttempt={() => setError(null)}
@@ -214,6 +239,9 @@ export function CompanyHub({
           company={company}
           embedded={embedded}
           busy={busy}
+          onViewDetails={onViewDetails}
+          logoUrl={logoUrl}
+          onEditLogo={onEditLogo}
           onApprove={(m) => void run(() => approveMember(m.userId))}
           onRemove={(m) => void run(() => removeMember(m.userId))}
           onPromote={(m) => setConfirm(promoteSpec(m))}
@@ -331,6 +359,7 @@ export function CompanyHub({
 export function NoCompanyCard({
   busy,
   onCreate,
+  onViewDetails,
   onJoin,
   onError,
   onAttempt,
@@ -338,6 +367,13 @@ export function NoCompanyCard({
   busy: boolean;
   /** Absent → the create route is not drawn, and the card is the join form it has always been. */
   onCreate?: () => void;
+  /**
+   * Read what was submitted. Drawn here as well as on an active firm, because the two do not
+   * arrive together: verification is what CREATES the company, so between sending the papers and
+   * a reviewer approving them this card is the one on screen and his own submission is the one
+   * thing he can still look at.
+   */
+  onViewDetails?: () => void;
   /** Called with the code AND the firm's name, once `validate-code` confirmed both. */
   onJoin: (code: string, companyName: string) => void;
   onError: (message: string) => void;
@@ -397,6 +433,19 @@ export function NoCompanyCard({
         >
           <Icon name="verified" size={16} />
           {c.createOwnCta}
+        </button>
+      )}
+
+      {/* Under review, or sent back: the papers are still his to read. See `CompanyHub`'s own note
+          on why this press and the one above answer to different conditions. */}
+      {onViewDetails && (
+        <button
+          type="button"
+          onClick={onViewDetails}
+          className={btn("secondary", "md", { full: true, className: "mt-3 flex items-center justify-center gap-1.5 transition" })}
+        >
+          <Icon name="description" size={16} />
+          {t.profile.companyDetails}
         </button>
       )}
 
@@ -479,6 +528,43 @@ function PendingPanel({
 
 // ── States 3 & 4: active member / owner ──────────────────────────────────────
 
+/**
+ * The firm mark: its logo, or its initials while it has none.
+ *
+ * ⚠️ **`object-contain` on a SQUARE, never `cover`.** A logo is artwork with its own margins,
+ * and most of them are wordmarks: `cover` crops one to its middle third and shows a firm two
+ * letters of its own name at random. The app makes the same call for the same reason.
+ *
+ * ⚠️ **The dashed edge is drawn only for someone who can act on it.** An «add» affordance a
+ * member cannot use is a control that looks broken; a member gets the plain monogram.
+ */
+function CompanyMark({ name, logoUrl, onEdit }: { name: string; logoUrl: string | null; onEdit?: () => void }) {
+  const t = useT();
+  const p = t.verify.pile;
+  const monogram = (name || "?").trim().slice(0, 2).toUpperCase();
+  const inner = logoUrl ? (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img src={logoUrl} alt="" className="h-full w-full object-contain" />
+  ) : (
+    <span className="text-meta font-extrabold">{monogram}</span>
+  );
+  const base =
+    "grid size-9 flex-none place-items-center overflow-hidden rounded-sm border bg-surface text-brand";
+  if (!onEdit) return <span className={`${base} border-border`}>{inner}</span>;
+  const label = logoUrl ? p.logoChange : p.logoAdd;
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      title={label}
+      aria-label={label}
+      className={`${base} transition hover:border-brand ${logoUrl ? "border-border" : "border-dashed border-brand/45"}`}
+    >
+      {inner}
+    </button>
+  );
+}
+
 function ActiveCompany({
   company,
   embedded,
@@ -489,6 +575,9 @@ function ActiveCompany({
   onDemote,
   onExit,
   onCopied,
+  onViewDetails,
+  logoUrl,
+  onEditLogo,
 }: {
   company: MyCompany;
   /** Inside the profile: no masthead, and one column — the profile's own is already narrow. */
@@ -500,6 +589,10 @@ function ActiveCompany({
   onDemote: (m: CompanyMember) => void;
   onExit: () => void;
   onCopied: () => void;
+  /** Open the firm's particulars. Absent when nothing has been submitted — see `CompanyHub`. */
+  onViewDetails?: () => void;
+  logoUrl?: string | null;
+  onEditLogo?: () => void;
 }) {
   const t = useT();
   const c = t.company;
@@ -616,9 +709,18 @@ function ActiveCompany({
           this shape has to beat if the firm ever gets a page again. */}
       {embedded ? (
         <div className="flex flex-wrap items-center gap-2.5 rounded-sm border border-border bg-surface2 px-4 py-3">
-          <span className="grid size-8 flex-none place-items-center rounded-full bg-brand-soft text-brand">
-            <Icon name="business_center" size={17} />
-          </span>
+          {/* 🔴 **The firm mark, where the app puts it** (owner, 2026-09-23: *"match it"*).
+              ~~A generic `business_center` disc.~~ It said «a company» on a row that already names
+              which one, and the logo the renter uploads had nowhere on this page to be seen at
+              all: it was collected by the verification form, printed on the quotation and the bid
+              form, and invisible to the person who owns it. In the app the mark IS this avatar
+              (`company_logo_editor.dart`, in the My Company header) and tapping it is how a logo
+              is added, changed or removed. */}
+          <CompanyMark
+            name={company.name}
+            logoUrl={logoUrl ?? null}
+            onEdit={company.isOwner ? onEditLogo : undefined}
+          />
           <span className="min-w-0">
             <span className="block truncate text-body font-extrabold text-navy">{company.name}</span>
             <span className="block text-meta text-muted">{company.isOwner ? c.roleOwner : c.roleMember}</span>
@@ -645,6 +747,28 @@ function ActiveCompany({
             ) : undefined
           }
         />
+      )}
+
+      {/* 🔴 **The particulars have a door again** (owner, 2026-09-22: *"for company entity in the
+          app he can view its details and edit, use the same endpoints here"*).
+
+          ~~`CompanyDetails`, stacked open under this card.~~ Removed on 2026-09-07 because
+          stacked under his own details it made the profile a filing cabinet, and that is still
+          true; what was wrong is that it then had nowhere to be read at all. The app gives it a
+          SCREEN, reached from this row; here it is a layer, reached from this press.
+
+          ⚠️ A labelled BUTTON rather than the app's tappable row. On a phone a chevron on a row
+          is affordance enough; on a desktop card of plain facts nothing says the row is pressable,
+          and a row that silently is one is a control nobody finds. */}
+      {onViewDetails && (
+        <button
+          type="button"
+          onClick={onViewDetails}
+          className={btn("secondary", "md", { full: true, className: "mt-3 flex items-center justify-center gap-1.5 transition" })}
+        >
+          <Icon name="description" size={16} />
+          {t.profile.companyDetails}
+        </button>
       )}
 
       {/* ── Two columns, filling the page (owner, 2026-08-30) ───────────────────────────

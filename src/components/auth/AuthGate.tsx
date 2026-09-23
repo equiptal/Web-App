@@ -98,6 +98,21 @@ export function AuthGateProvider({ children }: { children: ReactNode }) {
   );
   const openAuth = useCallback((o?: OpenOpts) => requireAuth(undefined, o), [requireAuth]);
 
+  /* `?signin=1` opens the modal on arrival (owner, 2026-09-23): the marketing site's «Sign in» links
+     here, and with no /login page a URL had no other way to ask for it. Waits for the session to
+     settle so a signed-in renter is not shown the modal, and strips the parameter either way (same
+     shape as `?lang=` in i18n) so a copied link or a reload does not open it again. */
+  const signinRead = useRef(false);
+  useEffect(() => {
+    if (signinRead.current || status === "loading") return;
+    signinRead.current = true;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("signin") !== "1") return;
+    url.searchParams.delete("signin");
+    window.history.replaceState(window.history.state, "", url.toString());
+    openAuth();
+  }, [status, openAuth]);
+
   // Auth (+ register for a new account) finished → close, clear onboarding, then run the pending action.
   const onCreated = useCallback(() => {
     setOpen(false);

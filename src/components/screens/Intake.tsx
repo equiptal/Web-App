@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { ProjectChips } from "@/components/create/ProjectChips";
+import { RequestsRail, ProjectFloorChips, useRequestRail } from "@/components/create/RequestsRail";
+import { IntakeBack } from "@/components/create/CreateBack";
 import { Mansour } from "@/components/Mansour";
 import { ProjectPills } from "@/components/create/ProjectPills";
 import { warmAgentCache } from "@/lib/api/client";
@@ -76,11 +77,41 @@ function sizeOf(dataUrl: string | undefined): string {
  */
 const FIELD_TEXT = "px-5 pb-2 pt-5 text-subhead leading-relaxed";
 
+/**
+ * Mansour's size on the caret, in px.
+ *
+ * \u26a0\ufe0f ONE number, read by the element AND by the gap that keeps him off the letter just typed \u2014 a
+ * second copy is how he comes to sit half a character into the word after somebody resizes him.
+ * 22 beside 15px type: the kit sizes him from 20px up, and at the text's own size he reads as a
+ * letter in the sentence rather than as somebody standing in it.
+ */
+const MANSOUR_CARET = 22;
+
 export function Intake() {
   const t = useT();
 
   const { state, actions } = useRfq();
   const mirror = useRef<HTMLDivElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
+  const well = useRef<HTMLDivElement>(null);
+
+  /**
+   * Where Mansour stands: the insertion point, in the well's own coordinates. Null draws nothing.
+   *
+   * 🔴 **HE IS THE CARET** (owner, 2026-09-22, with a picture of the box reading «5 dump trucks in
+   * NEOM for 6 weeks» and his head sitting after the last word): *"can u show this mansour icon as our
+   * cursor when typing in the text box"*. ~~A PERCH: a fixed spot on the box's rim, held only while
+   * the AGENT typed.~~ That ruling (2026-09-13) rested on a measurement claim - *"this field is a
+   * mirrored textarea whose glyphs are transparent, there is no element to measure against"* - and
+   * the claim was FALSE about this file even then: the mirror below renders the full text at the
+   * field's own metrics, so the caret's rectangle is one `Range` away.
+   *
+   * ⚠️ The kit's own warning is the thing to respect here, not to ignore: *"a FIXED spot, not a
+   * moving one: his original complaint was that he drifted while you typed"*. Drift is LAG, so there
+   * is no transition on his position and the measurement runs in a LAYOUT effect - he is placed in
+   * the same frame as the character that moved him, and never eases toward it.
+   */
+  const [caret, setCaret] = useState<{ x: number; y: number } | null>(null);
 
   /* Split the box's text around the line the site typed — see `projectTypedLine` in the store.
      `lastIndexOf`, because the template appends: if the same machine name also appears in something
@@ -119,6 +150,10 @@ export function Intake() {
   const [rejected, setRejected] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [dragging, setDragging] = useState(false);
+  /* ⚠️ ONE hook for BOTH surfaces - the rail on the left and the chip row on the box's floor. Two
+     copies of this state would be two fetches and, worse, two answers to «which machine is chosen»,
+     which would disagree the first time either was pressed. */
+  const rail = useRequestRail();
   const fileInput = useRef<HTMLInputElement>(null);
 
   // ── The typing placeholder ──
@@ -155,6 +190,136 @@ export function Intake() {
     timer = setTimeout(tick, 400);
     return () => clearTimeout(timer);
   }, [examples, state.text.length]);
+
+  /**
+   * Measure the caret off the MIRROR, with a `Range` and no injected node.
+   *
+   * 🔴 A zero-width `<span>` at the caret offset is the usual trick and is WRONG here. The mirror
+   * wraps on `break-words`, an inline-block is an atomic inline, and one dropped between two letters
+   * is a break opportunity the textarea does not have - so the two copies of the text would wrap
+   * differently, which is the double-vision this technique fails as, and the one risk the block below
+   * already warns about. A `Range` reads the same layout and adds nothing to it.
+   *
+   * ⚠️ The rect comes off the character BEFORE the caret rather than off a collapsed range: a
+   * collapsed range at a soft wrap reports the END of the line it just left in Chrome, so he would
+   * stand off the right edge for the first letter of every wrapped line. At offset 0 there is no
+   * preceding character, so it takes the leading edge of the first one instead.
+   */
+  const place = useCallback(() => {
+    const box = well.current;
+    const mir = mirror.current;
+    const ta = field.current;
+    if (!box || !mir || !ta) return;
+    // Nothing to ride: the placeholder is not the renter's words, and standing on its first letter
+    // would read as him writing the example.
+    if (!state.text) {
+      setCaret(null);
+      return;
+    }
+    const at = Math.max(0, Math.min(ta.selectionStart ?? state.text.length, state.text.length));
+
+    /* WHICH CHARACTER he is measured against, and which side of it he stands on.
+
+       \u26a0\ufe0f Normally the one BEFORE the caret, on its trailing side - that is the letter just typed,
+       and he follows it. But when that character is a SPACE he is measured against the one AFTER
+       instead, on its leading side, so he stands IN the gap between two words rather than on top of
+       one. That is also what fixes a SOFT WRAP: the caret at the start of a wrapped line follows the
+       space that ended the line above, and anchoring to it would leave him at the end of the previous
+       line, a whole row away from where the next letter will appear. */
+    const prev = at > 0 ? state.text[at - 1] : "";
+    const useNext = (prev === "" || /\s/.test(prev)) && at < state.text.length;
+    const idx = useNext ? at : at - 1;
+    if (idx < 0) {
+      setCaret(null);
+      return;
+    }
+
+    const walker = document.createTreeWalker(mir, NodeFilter.SHOW_TEXT);
+    let seen = 0;
+    let node: Text | null = null;
+    let offset = 0;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const len = (n as Text).length;
+      // `>`, not `>=`: the character at index `idx` lives in the node that CONTAINS it, and an index
+      // sitting exactly on a boundary belongs to the node that starts there.
+      if (seen + len > idx) {
+        node = n as Text;
+        offset = idx - seen;
+        break;
+      }
+      seen += len;
+    }
+    if (!node) {
+      setCaret(null);
+      return;
+    }
+
+    const range = document.createRange();
+    /* 🔴 A DECORATION MUST NEVER TAKE THE SCREEN DOWN. jsdom implements `Range` WITHOUT
+       `getBoundingClientRect`, so this threw inside a LAYOUT effect and the whole intake failed to
+       render - two `canvas-history` cases went red on a change that only moves an icon. Anywhere
+       with no layout engine simply gets no rider, which is the honest answer there anyway. */
+    if (typeof range.getBoundingClientRect !== "function") {
+      setCaret(null);
+      return;
+    }
+    range.setStart(node, offset);
+    range.setEnd(node, offset + 1);
+    const r = range.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    // Out of the scrolled view: he would otherwise be drawn against the card's clipped edge.
+    if (!r.width && !r.height) {
+      setCaret(null);
+      return;
+    }
+    if (r.bottom < b.top || r.top > b.bottom) {
+      setCaret(null);
+      return;
+    }
+
+    /* \U0001f534 He stands BESIDE the character, never on it - half his own width plus a letter of air.
+       Centred on the insertion point his disc covered the character just typed, which is the one the
+       renter is looking at; the reference picture shows daylight between the last word and his head.
+       Seen rendered, not reasoned about.
+
+       \U0001f534 The side is decided by the RUN, not by the page. ~~`getComputedStyle(box).direction`.~~ An
+       English sentence typed into the Arabic build is an LTR run inside an RTL box, and signing the
+       gap by the box put him back on top of «tankers» - the same overlap, arrived at from the other
+       side. Seen on screen. A neutral character (a space, a digit, punctuation) carries no direction
+       of its own, so THAT is the one case the container answers. */
+    const RTL_LETTER = /[\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFE]/;
+    const LTR_LETTER = /[A-Za-z\u00C0-\u024F]/;
+    const ch = state.text[idx];
+    const rtlRun = RTL_LETTER.test(ch)
+      ? true
+      : LTR_LETTER.test(ch)
+        ? false
+        : getComputedStyle(box).direction === "rtl";
+
+    /* Half his width plus a letter of air. It keeps him off the character he follows AND off the
+       native caret, which is drawn at exactly this point (owner, 2026-09-22: *"i want it both the
+       agent icon and the cursor beside each other"*) - one number, because they stand in one place. */
+    const gap = MANSOUR_CARET / 2 + 3;
+    // The edge he hangs off: the character's trailing side when he follows it, its leading side when
+    // he is standing in the space before it. In an RTL run both are mirrored.
+    const rightSide = rtlRun === useNext;
+    const edge = rightSide ? r.right : r.left;
+    const x = edge - b.left + (rightSide ? gap : -gap);
+    setCaret({ x, y: r.top - b.top + r.height / 2 });
+  }, [state.text]);
+
+  /* A LAYOUT effect, not a passive one: he is painted in the same frame as the character that moved
+     him. Keyed on the text, which is what BOTH writers change - the renter's keystroke and the
+     agent's typewriter alike. */
+  useLayoutEffect(() => {
+    place();
+  }, [place, state.projectTypedLine]);
+
+  useEffect(() => {
+    const onResize = () => place();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [place]);
 
   // Server-side guest cap backstop: if localStorage was cleared, the client gate below lets the run
   // through but the BFF blocks it → the store sets guestLimit → open the SAME account modal (no error).
@@ -202,7 +367,36 @@ export function Intake() {
   }
 
   return (
-    <div {...pin("create-intake")} className="mx-auto w-full max-w-[880px]">
+    /* ── Two columns: his past requests, and the thing he came here to write ────────────────
+       ⚠️ `items-stretch` is what lets the rail run the full height beside a column that CENTRES its
+       own contents. The centring belongs to the work column alone; a rail told to centre would float
+       a list of projects in the middle of a tall page.
+
+       ⚠️ **780, where this column was 880.** Narrowing is half of «smaller»: a shorter box at the
+       full width reads as squashed rather than smaller. It is the one measurement here taken on
+       looks alone, so it is the first thing to put back if the two should match again. */
+    /* ── The rail is a BAND of the screen, not a card on it ────────────────────────────────────
+       Owner, 2026-09-17: *"it must be the same as side panel in the prototype as side panel on the
+       edge of the screen and feels like read panel not a card"*.
+
+       ⚠️ The shell caps its main at `PAGE_MAX` and gutters it, which is right for a page and wrong
+       for a panel: inside that column the rail floated with page ground either side of it. This row
+       breaks out to the window with `mx-[calc(50%-50vw)] w-screen`, which is symmetric and so needs
+       no mirror rule, and pulls up through the main pad so the panel starts at the top of the page.
+       The same argument the requests rail settled on 2026-09-12: a band takes ONE edge, not four. */
+    /* ⚠️ The pull-up cancels the MAIN's top padding, and nothing else has to be cancelled: on this
+       screen the shell draws no Back row (`CreateBack` registers null on the intake and the column
+       below carries `IntakeBack`), so this row is the first thing in `<main>` and the panel starts
+       directly under the 52px bar - which is what `lg:top-[52px] lg:h-[calc(100dvh-52px)]` on the
+       rail has always measured against (owner, 2026-09-19: *"the panel must fit the whole page from
+       the header till the end and dont overlap it with the back button"*). */
+    <div className="relative mx-[calc(50%-50vw)] -mt-6 flex w-screen items-stretch sm:-mt-7">
+      <RequestsRail rail={rail} />
+      {/* ⚠️ The gutter the shell was giving this content comes back HERE, on the column, so the box
+          keeps its margin while the panel keeps the edge. */}
+      <div className="flex min-w-0 flex-1 flex-col px-4 py-6 sm:px-7">
+      <IntakeBack />
+      <div {...pin("create-intake")} className="mx-auto flex w-full min-w-0 max-w-[780px] flex-1 flex-col justify-start">
       {/* ── He asks the question (owner, 2026-09-13: *"use mansour icon more in the chat intake
           somewhere, i want it to be attractive"*, then *"put mansour before the question"*) ────────
           The screen was a heading, a line and a big empty box - correct and characterless. He is
@@ -214,21 +408,17 @@ export function Intake() {
           a page; on the line itself he is the speaker. `inline-flex` with the h1 so the pair stays
           centred as one object at every width, and `flex-none` so he never squeezes when the
           question wraps on a phone. */}
-      <h1 className="flex flex-wrap items-center justify-center gap-3 text-center text-display font-extrabold leading-tight tracking-[-.02em] text-navy">
+      <h1 className="mb-7 flex flex-wrap items-center justify-center gap-3 text-center text-display font-extrabold leading-tight tracking-[-.02em] text-navy">
         <Mansour size={44} state="waiting" className="flex-none" />
         {t.intake.heading}
       </h1>
 
-      {/* ── One line, never wrapped (owner, 2026-09-13) ───────────────────────────────────────────
-          ~~`max-w-[640px]`, which broke it over two lines and hung «fill themselves in.» alone under
-          the middle of the page.~~ The cap is gone and the sentence was shortened to fit the width
-          this column actually has; at 880px the old one could not be made to fit without shrinking
-          the type, which is a worse answer to «don't wrap it».
-
-          ⚠️ `whitespace-nowrap` only from `sm` up. Below that no sentence fits on one line and
-          forcing it would push the whole DOCUMENT wider than the phone - the fault audited out of
-          three surfaces on 2026-09-08. One line where there is room, wrapped where there is not. */}
-      <p className="mb-6 mt-2 text-center text-subhead leading-relaxed text-muted sm:whitespace-nowrap">{t.intake.subheading}</p>
+      {/* 🔴 ~~The line under the question~~ — «Describe your request, or upload an RFQ…» — is
+          DELETED (owner, 2026-09-16, with the side-panel prototype). The placeholder in the box
+          already types a real request through its example, which is the same lesson said once; the
+          sentence was the second time. It had also become a layout constraint of its own — one line,
+          `sm:whitespace-nowrap`, so its LENGTH could not change freely — for a line nobody read
+          twice. `intake.subheading` is deleted from both dictionaries with it. */}
 
       {/* ── The box ──
           The whole card is the drop target, not a rectangle inside it: a renter dragging a file at
@@ -245,7 +435,19 @@ export function Intake() {
         /* `field-card` is what globals.css hangs the inset focus ring on — see the rule there. The
            card takes the brand border, every control inside it draws its own ring against its own
            edge, and neither can be clipped into a bar across the card. */
-        className={`field-card flex flex-col overflow-hidden rounded-lg border bg-surface transition focus-within:border-brand ${
+        /* `nd-seam` and `relative` — the season's one mark on the first screen a renter meets
+           (owner, 2026-09-16). Inert until `<html data-season="nd">` is written; then the gold
+           Najdi rank finishes the card's bottom edge, which is the kit's own "reads as a finished
+           edge rather than as a pattern".
+
+           ⚠️ `relative` is unconditional and safe: the two absolutely-positioned things in this
+           card (the mirror, and Mansour's perch) both sit inside the inner `relative` wrapper and
+           already measure against that. Adding it seasonally instead would move their anchor for a
+           fortnight, which is the worse of the two.
+
+           ⚠️ A seam and not the corner palm: this card's bottom-trailing corner is where the two
+           round controls are, and a palm behind them is a tint over the one row that is pressed. */
+        className={`nd-seam field-card relative flex flex-col overflow-hidden rounded-lg border bg-surface transition focus-within:border-brand ${
           dragging ? "border-brand ring-2 ring-brand/25" : "border-border"
         }`}
       >
@@ -275,7 +477,7 @@ export function Intake() {
             The mirror always renders the FULL text. When the marked line is not found — the renter
             edited it, which is exactly when it stops being the site's words — it renders everything
             in the ordinary colour, which is byte for byte what this box looked like before. */}
-        <div className="relative flex min-h-[188px] w-full flex-1">
+        <div ref={well} className="relative flex min-h-[96px] w-full flex-1">
           <div
             aria-hidden
             ref={mirror}
@@ -287,40 +489,66 @@ export function Intake() {
           </div>
 
           <textarea
+            ref={field}
             value={state.text}
             onChange={(e) => actions.setText(e.target.value)}
+            /* ⚠️ `onSelect` is the one that fires for a caret MOVE - an arrow key, a click into the
+               middle of a word, a selection - and not only for a selection, despite its name. Without
+               it he would follow typing and then stay behind the moment the renter went back to fix a
+               word. `onScroll` and `onBlur` re-place him because both change where that offset SITS. */
+            onSelect={place}
+            onFocus={place}
+            onBlur={place}
             onScroll={(e) => {
               if (mirror.current) mirror.current.scrollTop = e.currentTarget.scrollTop;
+              place();
             }}
             placeholder={typed}
             aria-label={t.intake.pasteLabel}
-            /* `text-transparent` with `caret-navy`: the mirror below draws the glyphs, this draws the
-               caret and owns every interaction. The placeholder stays visible — it is the element's
-               own, not text, so transparency does not reach it. */
+            /* `text-transparent`: the mirror below draws the glyphs, this owns every interaction.
+               The placeholder stays visible — it is the element's own, not text, so transparency does
+               not reach it.
+
+               🔴 **THE BAR IS BACK, AND MANSOUR STANDS BESIDE IT** (owner, 2026-09-22, later the
+               same day: *"i want it both the agent icon and the cursor beside each other"*).
+               ~~`caret-transparent`, chosen that morning over keeping the bar.~~ Hiding it made him
+               the ONLY insertion point, and a 22px mark cannot stand in a 4px word gap - so
+               mid-sentence he covered the letter beside him and nothing said exactly where the next
+               character would land. With the bar drawn the two split the job: the bar is the precise
+               point, he is the agent standing at it, and the gap that already kept him off the
+               letter is what keeps him off the bar. The blink comes back with it, which is also the
+               only thing that said the box was focused. */
             className={`${FIELD_TEXT} relative w-full flex-1 resize-none border-0 bg-transparent text-transparent caret-navy outline-none placeholder:text-muted/70 focus-visible:outline-none`}
           />
 
-          {/* ── Mansour, while he is the one writing (owner, 2026-09-13) ───────────────────────
-              *"use it here for typing when u select a project and it auto fills the equipment name,
-              make it like this mansour is writing it"*.
+          {/* ── Mansour, ON THE CARET (owner, 2026-09-22) ──────────────────────────────
 
-              Picking a template has typed its machine into this box, a character at a time, since
-              2026-08-31 - *"I want it shown as typed, like someone is really typing this item"*.
-              That answered HOW and left WHO unsaid, so the line still arrived from nowhere. He
-              stands on the box for the length of the run, `is-live`, and goes.
+              ~~A PERCH on the box's trailing corner, held only while the AGENT typed (2026-09-13).~~
+              He rides the insertion point now, for the renter's own words as much as for the ones a
+              template writes in - which is what the reference picture shows: a sentence the renter
+              typed, with his head immediately after the last word.
 
-              ⚠️ **A PERCH, not a caret.** The kit's own note says he leaves the box and watches
-              from a fixed spot on its rim while somebody else's words go in, *"a FIXED spot, not a
-              moving one: his original complaint was that he drifted while you typed"*. Being the
-              caret needs a measured x for every character, and this field is a mirrored textarea
-              whose glyphs are transparent - there is no element to measure against. The trailing
-              corner is a spot he never leaves.
+              ⚠️ **`translate(-50%, -50%)` on the measured point**, so what lands on the caret is his
+              CENTRE. Anchored by his corner he would sit a third of a character low and to the right
+              of every letter, which reads as a mark that has not quite caught up - the drift the kit
+              complains about, arrived at by geometry rather than by lag.
 
-              ⚠️ `pointer-events-none`: he sits over a field the renter may be typing in, and a
-              decoration that swallows a click on the text is worse than no decoration. */}
-          {state.agentTyping && (
-            <span className="pointer-events-none absolute end-3 top-2.5 z-10">
-              <Mansour size={34} state="live" />
+              ⚠️ **22px** beside 15px type: the kit sizes him from 20px up, and at the text's own size
+              he reads as a letter in the sentence rather than as somebody standing in it.
+
+              ⚠️ `is-live` whoever is writing. The kit's three states are about what he is DOING, and
+              on the caret he is doing the same thing either way.
+
+              ⚠️ `pointer-events-none`: he sits over a field the renter is typing in, and a decoration
+              that swallows a click on the text is worse than no decoration. */}
+          {caret && (
+            <span
+              {...pin("intake-caret")}
+              aria-hidden
+              className="pointer-events-none absolute z-10"
+              style={{ left: caret.x, top: caret.y, transform: "translate(-50%, -50%)" }}
+            >
+              <Mansour size={MANSOUR_CARET} state="live" />
             </span>
           )}
         </div>
@@ -335,33 +563,93 @@ export function Intake() {
             Upload keeps the row but not the lead. It is the other way in for the renter who has a
             document rather than a sentence, and it belongs at the end of the row for the same reason
             it stopped being the only thing on it. */}
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-3 px-5 pb-4 pt-1">
-          {/* ⚠️ **The sentence, then his sites** (owner, 2026-09-12: *"on the left on same row the
-              project pills with sentence «select your project» beside them"*). A bare row of place
-              names is furniture; named, it is a question with an answer already in reach. */}
-          {/* 🔴 **It is the CHIPS that draw the sentence now** (owner, 2026-09-13: *"«اختر مشروعاً» -
-              this is only shown when user have projects"*). ~~A `<span>` here, beside the strip.~~
-              `ProjectChips` returns `null` for a renter with no sites - and for a guest - so the
-              question was asked unconditionally next to nothing at all, on the first screen a renter
-              meets. Passing it IN means the one thing that knows whether there are any sites is the
-              one that decides whether to ask about them; they can no longer disagree. */}
-          {/* 🔴 **The whole width, so a row holds every chip that fits** (owner, 2026-09-13:
-              *"more project pill can fit in the row so make the max per row"*).
+        {/* ── The floor: ONE pill, or nothing at all ─────────────────────────────────────
+            🔴 **The site CHIP STRIP is gone from this row** (owner, 2026-09-16, with the side-panel
+            prototype: *"remove the pills ... just clicking on a project or a request inside it will
+            show a single pill showing project-request in one line, no other pills, just the selected
+            one"*). What it did is the rail's now: every site is in there, each with what has already
+            been hired at it, and the press applies the same defaults and the same template it always
+            did. Nothing about picking moved; only where the picking happens.
 
-              ~~`flex-1`.~~ The two round controls share this wrapping row, so they reserved their
-              own width on EVERY line of it - about 110px - and the chips wrapped as if the card were
-              that much narrower. On his screenshot the first row ended with 200px of white after it
-              and the next chip had gone to a second line that did not need to exist. The buttons
-              only ever occupy ONE line, which is why the reservation was wrong on all the others.
+            ⚠️ The row is `items-center` and does not WRAP any more. It holds at most one pill and
+            two 26px controls, so there is nothing left to push onto a second line — and the pill
+            truncates rather than growing the row, which is why it can be promised. */}
+        <div className="flex items-center gap-3 px-5 pb-4 pt-1">
+          <ProjectFloorChips rail={rail} />
 
-              ⚠️ `basis-full` sends the controls to a line of their own. That is the trade, one row
-              of height for a strip that uses the card: the sites are the thing being read here, and
-              the two icons are not. */}
-          <div className="flex w-full min-w-0 basis-full flex-wrap items-center gap-x-3 gap-y-2">
-            <ProjectChips
-              lead={<span className="flex-none text-meta font-semibold text-muted">{t.projects.chips.pick}</span>}
-            />
-          </div>
+          <span className="ms-auto flex flex-none items-center gap-2">
+
+            <button
+
+              type="button"
+
+              onClick={() => fileInput.current?.click()}
+
+              aria-label={t.intake.uploadRfq}
+
+              title={t.intake.uploadRfq}
+
+              /* 🔴 **No circle on the `+`** (owner, 2026-09-13, stating the row’s order as a
+
+                 standing rule: *"then + without circule then -> in circule"*). Two ringed controls
+
+                 side by side read as a pair of equals; they are not. The arrow SENDS - it is the act
+
+                 the whole screen exists for - and the `+` hands us a file, which is the other way in.
+
+                 The ring is what says «primary», so only one of them wears it.
+
+                 ⚠️ The 26px HIT AREA stays. A 15px glyph is not a target on a phone; what goes is
+
+                 the border and the ground, not the box. */
+
+              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full text-navy-mid transition hover:bg-surface2 hover:text-brand"
+
+            >
+
+              <Icon name="add" size={15} />
+
+            </button>
+
+
+
+            {/* ⚠️ **What holds it back is on the button itself.** The old Continue had a sentence
+
+                beside it, because a disabled button with nothing near it reads as broken. A round
+
+                control has no room for one, so the reason is its `title`: "add something" while it
+
+                is empty, and what the press will do once it is not. */}
+
+            <button
+
+              type="button"
+
+              disabled={!canStart || state.busy}
+
+              onClick={runAgent}
+
+              aria-label={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
+
+              title={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
+
+              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-brand text-brand-fg transition hover:bg-brand-press disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
+
+            >
+
+              <Icon
+
+                name={state.busy ? "hourglass_empty" : "arrow_forward"}
+
+                size={15}
+
+                className={state.busy ? "" : "rtl:scale-x-[-1]"}
+
+              />
+
+            </button>
+
+          </span>
 
           {/* ⚠️ **Two round controls, and they are the whole floor now** (owner, 2026-09-12:
               *"remove the continue button, remove upload... instead i want a circle icon for + which
@@ -393,36 +681,7 @@ export function Intake() {
               icon-only controls on 2026-09-08. It is what «the same size as the pills» means, and it
               is his call; the alternative is a 40px circle beside a 26px chip, which is what he is
               reporting. */}
-          <span className="ms-auto flex flex-none items-center gap-2">
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              aria-label={t.intake.uploadRfq}
-              title={t.intake.uploadRfq}
-              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full border border-border bg-surface text-navy-mid transition hover:border-brand hover:text-brand"
-            >
-              <Icon name="add" size={15} />
-            </button>
 
-            {/* ⚠️ **What holds it back is on the button itself.** The old Continue had a sentence
-                beside it, because a disabled button with nothing near it reads as broken. A round
-                control has no room for one, so the reason is its `title`: "add something" while it
-                is empty, and what the press will do once it is not. */}
-            <button
-              type="button"
-              disabled={!canStart || state.busy}
-              onClick={runAgent}
-              aria-label={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
-              title={canStart ? (hasDraft ? t.intake.reAnalyze : t.intake.continueLabel) : t.intake.addSomething}
-              className="grid h-[26px] w-[26px] flex-none place-items-center rounded-full bg-brand text-brand-fg transition hover:bg-brand-press disabled:cursor-not-allowed disabled:bg-disabled-bg disabled:text-disabled-fg"
-            >
-              <Icon
-                name={state.busy ? "hourglass_empty" : "arrow_forward"}
-                size={15}
-                className={state.busy ? "" : "rtl:scale-x-[-1]"}
-              />
-            </button>
-          </span>
         </div>
 
         <input ref={fileInput} type="file" multiple accept={ACCEPT_ATTR} className="hidden" onChange={(e) => onFiles(e.target.files)} />
@@ -465,6 +724,8 @@ export function Intake() {
 
       {/* Guest hit the free agent-run limit → create an account, then continue processing. */}
       <AccountModal open={showAccount} onClose={() => setShowAccount(false)} onCreated={() => { setShowAccount(false); void actions.process(); }} title={t.guest.trialTitle} subtitle={t.guest.trialSub} />
+      </div>
+      </div>
     </div>
   );
 }

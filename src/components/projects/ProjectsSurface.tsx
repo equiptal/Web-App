@@ -75,8 +75,19 @@ import type { Taxonomy } from "@/lib/contract/taxonomy";
  * The action is the PRIMARY button, not a quiet one: on an empty dashboard it is the only thing to
  * do here, and a white button beside an orange one elsewhere on the page says this matters less.
  */
-function SectionHeader({ count }: { count: number }) {
+function SectionHeader({ count, hideHeading }: { count: number; hideHeading?: boolean }) {
   const t = useT();
+  /* ── The plate and the title are the TAB now, on the dashboard (owner, 2026-09-16) ────────────
+     Both moved onto the tab that opens this block. The summary line stays, because «7 sites» beside
+     the tab's own count is the same fact twice while «You have no sites yet» is not a count at all
+     and has nowhere else to be said. */
+  if (hideHeading) {
+    return (
+      <span className="block text-meta text-muted">
+        {count > 0 ? t.projects.surface.summary.replace("{n}", String(count)) : t.projects.surface.empty}
+      </span>
+    );
+  }
   return (
     /* ~~A «New project» button on the trailing edge.~~ Removed (owner, 2026-08-31): the rail already
        ends with one, and two identical controls for one act — a heading apart — make a renter wonder
@@ -133,9 +144,19 @@ function requestUrl(id: string, door: "details" | "edit" = "details"): string {
  */
 type Chart = { project: ProjectSummary; groups: ChartGroup[]; documents: AwardDocument[] };
 
-export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
+export function ProjectsSurface({
+  embedded,
+  hideHeading,
+  onCount,
+}: { embedded?: boolean; hideHeading?: boolean; onCount?: (n: number) => void } = {}) {
   const t = useT();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
+  /* The figure the dashboard's tab row prints beside «My Projects» (2026-09-16). Reported rather
+     than fetched a second time by the page, and silent until the read lands so the tab shows a dash
+     instead of a 0 that is about to be wrong. */
+  useEffect(() => {
+    if (projects) onCount?.(projects.length);
+  }, [projects, onCount]);
   /** `version` rides along on an EDIT: the backend requires the version the form was opened on. */
   const [editing, setEditing] = useState<{
     id: string | null;
@@ -829,7 +850,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
   if (embedded && projects && projects.length === 0) {
     return (
       <section className="flex flex-col gap-3">
-        <SectionHeader count={0} />
+        <SectionHeader count={0} hideHeading={hideHeading} />
 
         {/* The board is not rendered on this branch, so the rail's *New project* is not there either
             — this row carries its own copy, in the same dashed brand outline, or a renter with no
@@ -892,7 +913,7 @@ export function ProjectsSurface({ embedded }: { embedded?: boolean } = {}) {
        is one of three on the dashboard, and padding under it is a gap between sections rather than a
        margin at the foot. `HomeHub` carries it (owner, 2026-09-05). */
     <div ref={board} className="flex flex-col gap-5">
-      <SectionHeader count={projects?.length ?? 0} />
+      <SectionHeader count={projects?.length ?? 0} hideHeading={hideHeading} />
 
       {notice && <p className="rounded-sm border border-danger/40 bg-danger/5 px-3 py-2 text-body text-danger">{notice}</p>}
 

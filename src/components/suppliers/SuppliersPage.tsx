@@ -71,11 +71,21 @@ import {
  * after remembering a tab exists. Standalone `/suppliers` stays for a direct link and for the
  * dialogs to have a page of their own.
  */
-export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
+export function SuppliersPage({
+  embedded,
+  hideHeading,
+  onCount,
+}: { embedded?: boolean; hideHeading?: boolean; onCount?: (n: number) => void } = {}) {
   const t = useT();
   const c = t.suppliers;
 
   const [rows, setRows] = useState<RenterSupplier[] | null>(null);
+  /* The figure the dashboard's tab row prints beside «My Suppliers» (2026-09-16). Reported, never
+     fetched again by the page: this is the one component that has the list. Silent while the read
+     is in flight, so the tab shows a dash rather than a 0 that is about to be wrong. */
+  useEffect(() => {
+    if (rows) onCount?.(rows.length);
+  }, [rows, onCount]);
   const [q, setQ] = useState("");
   const [pill, setPill] = useState<"all" | "vendor">("all");
   const [toast, setToast] = useState<string | null>(null);
@@ -262,14 +272,20 @@ export function SuppliersPage({ embedded }: { embedded?: boolean } = {}) {
        *"use consistent spacing between sections in the dashboard"*) — 96px of it landed between My
        Suppliers and My Projects, where the hub's own `gap-7` was the only spacing meant to be. The
        breathing room at the foot of the page belongs to the PAGE, and `HomeHub` carries it now. */
-    <div className={embedded ? "flex flex-col gap-3" : "mx-auto w-full max-w-[1560px] px-4 py-5 sm:px-6 xl:px-8"}>
+    <div className={embedded ? "flex flex-col gap-3" : "mx-auto w-full px-4 py-5 sm:px-6 xl:px-8"}>
       <header className={cx("flex flex-wrap items-center gap-3", !embedded && "mb-3")}>
-        <span className="grid h-[38px] w-[38px] flex-none place-items-center rounded-sm bg-navy text-surface">
-          <Icon name="groups" size={22} />
-        </span>
+        {/* ── The plate and the title are the TAB now, on the dashboard (owner, 2026-09-16) ──────
+            Both moved onto the tab that opens this block, so the page does not name the section
+            twice a row apart. The summary line under them stays: it carries the vendor split, which
+            the tab has no room for. */}
+        {!hideHeading && (
+          <span className="grid h-[38px] w-[38px] flex-none place-items-center rounded-sm bg-navy text-surface">
+            <Icon name="groups" size={22} />
+          </span>
+        )}
         <div className="min-w-0">
           {/* One heading level down inside the dashboard — the page already has an h1 above it. */}
-          {embedded ? (
+          {hideHeading ? null : embedded ? (
             <h2 className="text-title font-extrabold tracking-tight text-navy">{c.title}</h2>
           ) : (
             <h1 className="text-title font-extrabold tracking-tight text-navy">{c.title}</h1>

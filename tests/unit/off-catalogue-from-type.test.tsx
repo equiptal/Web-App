@@ -206,7 +206,9 @@ describe("the card offers it whatever the TYPE control already holds", () => {
    */
   it("offers no empty-state row on the TYPE control any more", () => {
     expect(typeControl).not.toContain("emptyAction=");
-    expect(src).toContain("useMyOwnName");
+    /* The door it opened is still there: it is reached from «Not the equipment you want?» →
+       «Keep my own words» → the confirmation now (owner, 2026-09-13/14). */
+    expect(src).toContain("hatchMatched");
     expect(src).toContain("setItemOffCatalogue");
   });
 

@@ -104,6 +104,7 @@ export function OnboardingForm({
   const [lastName, setLastName] = useState("");
   const [city, setCity] = useState("");
   const [jobTitle, setJobTitle] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [cities, setCities] = useState<Opt[]>(FALLBACK_CITIES);
@@ -177,6 +178,8 @@ export function OnboardingForm({
     if (lastName.trim().length < 2 || lastName.trim().length > 50) next_fe.lastName = o.errors.lastName;
     if (!city.trim()) next_fe.city = o.errors.city;
     if (!jobTitle.trim()) next_fe.jobTitle = o.errors.jobTitle;
+    // App parity (`profile_form_page._companyNameIsValid`): two characters, on the COMPLETE pass.
+    if (companyName.trim().length < 2) next_fe.companyName = o.errors.companyName;
     // Email is optional by default, required in the combined create gate, and omitted entirely when
     // showEmail is false (already collected + persisted at the phone/OTP step). When shown + present,
     // it must be a valid address.
@@ -203,6 +206,7 @@ export function OnboardingForm({
         lastName: lastName.trim(),
         city: city.trim(),
         jobTitle: jobTitle.trim(),
+        companyName: companyName.trim(),
         whatsapp: whatsapp.trim() || undefined,
       });
       setBusy(false);
@@ -231,6 +235,7 @@ export function OnboardingForm({
           lastName: lastName.trim(),
           city: city.trim(),
           jobTitle: jobTitle.trim(),
+          companyName: companyName.trim(),
             email: showEmail ? email.trim() || undefined : undefined,
           whatsapp: whatsapp.trim() || undefined,
         }),
@@ -399,16 +404,35 @@ export function OnboardingForm({
           </div>
         </div>
 
-        {/* ~~«Company name — optional».~~ Removed (owner, 2026-09-07: *"remove it from the form UI
-            now"*). It was the second of two answers to one question: a renter typed a name here at
-            signup and the FIRM he later verified carried its own, and the profile printed both. The
-            firm's record is the one the platform acts on — company-shared visibility, whose requests
-            he can see, what his bids are filed under — so the typed one had no reader left.
+        {/* 🔴 **THE COMPANY NAME IS BACK, and it is REQUIRED here** (app parity,
+            `profile_form_page.dart`, 2026-09-21).
 
-            Nothing is posted for it any more, which the backend already handles: `companyName` is
-            optional on `completeProfileSchema`, and `company.service`'s naming chain
-            (`submission.companyName → profile.companyName → companyLegalName → 'My Company'`) simply
-            falls through the middle step it used to fill. */}
+            ~~Removed on 2026-09-07 (*"remove it from the form UI now"*), on the reasoning that the
+            FIRM he later verifies carries its own name and the typed one had no reader left.~~ That
+            reasoning stopped being true on 2026-09-21, when `counterpartyDisplayName` made
+            `profile.companyName` the FOURTH rung of the one naming rule: it is what every surface
+            shows a renter by when no verified firm stands behind him. Left blank, he is listed among
+            firms under his personal name.
+
+            ⚠️ **Required on the FORM, not in the database.** `completeProfileSchema` keeps it
+            optional and nothing backfills, so the accounts that never had it keep working and are
+            asked the next time they open a profile form — which is the app's own rule, stated in the
+            same words.
+
+            ⚠️ Two characters, matching `_companyNameIsValid`. */}
+        <div>
+          <label className={labelCls}>
+            {o.companyName} <span className="text-danger">*</span>
+          </label>
+          <input
+            className={inputCls}
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            maxLength={200}
+            placeholder={o.companyNamePlaceholder}
+          />
+          {fe.companyName && <p className="mt-1 text-meta text-danger">{fe.companyName}</p>}
+        </div>
 
         <div className={`grid grid-cols-1 gap-3 ${showEmail ? "sm:grid-cols-2" : ""}`}>
           {showEmail && (

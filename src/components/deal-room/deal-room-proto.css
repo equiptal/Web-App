@@ -170,7 +170,8 @@
    Centered like `.sysev` (they are narration, not a party bubble) but a card, since they carry values. */
 /* The tone stripe is on the inline-START edge so it mirrors correctly under `dir=rtl`. */
 /* Centred, because the negotiation vocabulary is an EVENT in the room rather than either party's
-   remark — the dock reaches the same answer through `.bm-chat-event`. The dock's ceiling and no
+   remark. (The map's dock draws these as the app's grey pill since 2026-09-22, `.bm-chat-pill`; this
+   room keeps the card, because its rate card carries Accept and Counter.) The dock's ceiling and no
    margin, for the reason `.dl-rq-card` above carries. */
 .dlproto .chatcard { align-self: center; width: 86%; max-width: min(86%, 376px); margin: 0; padding: 11px 13px; background: var(--surface1); border: 1px solid var(--border); border-inline-start: 3px solid var(--border); border-radius: var(--radius-lg); }
 .dlproto .cc-head { display: flex; align-items: center; gap: 7px; }
@@ -391,193 +392,537 @@
 .dlproto .rempty { border: 1px dashed var(--border); background: color-mix(in srgb, var(--surface2) 40%, transparent); border-radius: var(--r-lg); padding: 36px; text-align: center; font-size: 13.5px; color: var(--muted); }
 
 /* ════════════════════════════════════════════════════════════════════════════════════════════
-   Negotiation sheet — quotation-paper 3-step wizard (spec §6). Scoped .qp-*; scrim class .qp-scrim
-   lives OUTSIDE .dlproto (the sheet is portaled at the document body via a fixed overlay).
+   The NEGOTIATION SHEET — the owner's `Negotiate Price Sheet Standalone.html`, which the app builds
+   from too (`counter_offer_flow/`, owner 2026-09-17: *"match it exactly with prototype for the 2
+   pages terms and price including footer, header, spacing, alignment and all"*).
+
+   ~~A quotation-"paper" on a grey desk: a zoom rail, an invoice table, a step rail across the top,
+   a two-column review.~~ That was the web's own design and it was not the app's. The prototype is a
+   phone sheet: one white header carrying the running total, a scrolling body, and a footer whose
+   centre is a `‹ step ›` switcher.
+
+   ⚠️ Every colour is a TOKEN. The prototype ships its own greys (`#EEF0F3`, `#F9FAFB`, `#111827`…)
+   and the APP keeps them privately, on the reasoning that mixing two near-identical palettes is what
+   makes a screen look almost-right. The web cannot: `palette-drift` forbids a raw hex in `src/`, and
+   the 2026-09-06 sweep tokenised this very file. Each is mapped to its nearest house token below,
+   which is the same trade every other ported prototype in this repo has made.
    ════════════════════════════════════════════════════════════════════════════════════════════ */
 .qp-scrim { position: fixed; inset: 0; z-index: 60; background: color-mix(in srgb, var(--navy-deep) 50%, transparent); display: flex; align-items: center; justify-content: center; padding: clamp(10px,3%,28px); }
 .qp-scrim .material-icons-outlined { font-family: "Material Icons Outlined"; line-height: 1; }
-.qp-sheet {--rentee: var(--action); --action:var(--brand); --success:var(--ok); --success-bg:var(--ok-soft);--danger-bg:var(--danger-soft); --warning:var(--warn);--line:var(--surface3);--paper-2:var(--surface);
-  display: flex; flex-direction: column; width: 100%; max-width: 860px; max-height: 94vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: var(--font-sans); color: var(--navy); animation: dpModal .22s ease; }
-@keyframes dpModal { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
 
-/* header — two rows */
-.qp-head { flex: 0 0 auto; }
-.qp-head-r1 { display: flex; align-items: center; gap: 14px; padding: 7px 18px 6px; border-bottom: 1px solid var(--line); }
+/* 🔴 THE SHEET TAKES THE SCREEN. ~~A 460px card floating on the scrim.~~ Owner, on the first build:
+   *"for deal room negotiation it will sit in the existing 3 styles sheet but with the new design, not
+   as a popup page"*. The three steps are a PLACE the renter goes to answer a negotiation, which is
+   what the wizard it replaced always was and what the app's own route is — a dialog over the room
+   reads as an aside, and this is the room's whole business.
+
+   ⚠️ It slides UP rather than fading in, which is what a sheet does and what the wizard did. */
+.ng-shell {
+  position: fixed; inset: 0; z-index: 61; display: flex; flex-direction: column;
+  /* 🔴 **THE DESK STAYS; the PAPER is what goes white** (owner, 2026-09-23, asked which of
+     the two readings he meant: *"keep the desk, whiten the paper"*).
+     ~~One white surface edge to edge.~~ I read *"show the sheet alll in white"* as the whole
+     screen and it removed the framing he was pointing AT - the live sheet is a white paper card
+     centred on a grey page, and without the desk there is no card. «All in white» is about what is
+     INSIDE the paper: no grey caption band, no grey term cards, no third tone.
+     ⚠️ The shell itself is the desk, so it keeps `--surface2`; `.ng-body` carries it too and
+     the CARDS are what turn white. */
+  background: var(--surface2); overflow: hidden;
+  font-family: var(--font-sans); color: var(--navy-deep);
+  animation: ngSheetUp .3s cubic-bezier(.32,.72,.3,1);
+  /* The one gutter every band answers to — the header's, the footer's and the body's cards alike. */
+  --ng-gutter: clamp(16px, 3vw, 40px);
+  /* 🔴 **THE PAPER.** Owner, 2026-09-22: *"i want the previosu 3 sheets style layout ... i
+     mean for the frame and general layout"*, pointing at `main` / `beta`, where the sheet is a
+     white PAPER centred on a grey desk under a numbered step rail.
+     ⚠️ **940, not beta's 800**, and the number is not a taste: `.ng-cmp` is already capped at
+     940 and `.ng-grow` at 820, so at this width nothing that is ALREADY capped changes size and
+     everything uncapped comes in to meet them. Importing beta's 800 would have shrunk the
+     compare card that was measured at 940 on 2026-09-22. */
+  --ng-paper: 940px;
+}
+@keyframes ngSheetUp { from { transform: translateY(100%); } to { transform: none; } }
+/* 🔴 **A PAPER COLUMN, centred on the desk** (owner, 2026-09-22, pointing at `main` / `beta`:
+   *"i want the previosu 3 sheets style layout ... for the frame and general layout"*).
+
+   🔴 **This REVERSES 2026-09-19's no-cap ruling**, which was itself a withdrawal of a 760px cap:
+   ~~*"centralize the parent cards across the screen so it has equal margin on right and on left"*~~.
+   That ruling is not wrong about margins and it never was — the gutter is still one number and the
+   margin is still equal on both edges. What it could not give is the thing he is asking for now: a
+   SHEET reads as a sheet only when it has an edge, and content running a 1900px monitor has none.
+   The desk (`.ng-body`'s grey) is what the margin becomes.
+
+   ⚠️ The HEAD and the FOOT take the same column, so the party, the rate and the footer's buttons
+   stand on the paper's own verticals rather than at the window's edges with the sheet in between. */
+.ng-inner { width: 100%; max-width: var(--ng-paper); margin-inline: auto; }
+
+/* ── header ─────────────────────────────────────────────────────────────────────────────────────
+   The running total on the leading edge, the counterparty on the trailing one. */
+/* 🔴 **THE LIVE SHEET'S HEADER METRICS** (owner, 2026-09-23: *"use same ui as live one in the
+   beta the spacing - size etc same for footer and header"*). `.qp-head-r1`, which beta and main
+   still serve: `padding: 7px 18px 6px`, `gap: 14px`, a hairline under it. The vertical padding is
+   half what this sheet had - the live header is a BAND, not a section. */
+.ng-head { flex: 0 0 auto; padding: 7px var(--ng-gutter) 6px; background: var(--surface); border-bottom: 1px solid var(--border-hair); }
+.ng-head .ng-inner { display: flex; align-items: center; gap: 14px; }
+/* The title block: 14px/800 truncating, a 10.5px/600 line under it. The live sheet's own. */
+.ng-htitle { min-width: 0; flex: 1; }
+.ng-htitle .t { font-size: 14px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ng-htitle .s { margin-top: 2px; font-size: 10.5px; font-weight: 600; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The status a settled room carries into the sheet, under the line it qualifies. */
+.ng-hnote { display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; padding: 3px 9px 3px 6px; border-radius: 999px; font-size: 10.5px; font-weight: 800; background: var(--warn-soft); color: var(--warn-deep); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
+.ng-hnote.danger { background: var(--danger-soft); color: var(--danger-deep); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+.ng-hnote .material-icons-outlined { font-size: 14px; }
+/* The total: a 9.5px caption over a 16px figure, pinned to the end. */
+.ng-htotal { flex: 0 0 auto; text-align: end; }
+.ng-htotal .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
+.ng-htotal .v { font-size: 16px; font-weight: 800; color: var(--navy); }
+.ng-htotal .v .cur { font-size: 10px; font-weight: 600; color: var(--muted); }
+.ng-htotal .v .per { font-size: 10px; font-weight: 700; color: var(--muted); }
+/* ⚠️ The ORIGINAL, struck, ahead of the figure that replaced it (note 8). */
+.ng-htotal .v .was { margin-inline-end: 6px; font-size: 12px; font-weight: 600; color: var(--muted); text-decoration: line-through; }
+/* The arithmetic behind the figure (owner, 2026-09-23: *"add details for the price as breakdonw"*). */
+.ng-htotal .bd { margin-top: 1px; font-size: 9.5px; font-weight: 600; color: var(--muted-light); }
+/* The figure sits at the trailing end, uncaptioned (app parity, 2026-09-17: "price on side and name
+   on side, not price in center"). A caption named what the bar's only number obviously is. */
+.ng-head-l { flex: 0 0 auto; min-width: 0; margin-inline-start: auto; text-align: end; }
+/* «New offer from the supplier» — drawn ONLY when the other side posted the latest round. A caption
+   that is always there names what the bar's only number obviously is. */
+.ng-new { display: flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; color: var(--warn-deep); }
+.ng-net { font-size: 19px; font-weight: 800; color: var(--navy); white-space: nowrap; }
+/* ⚠️ The ORIGINAL, struck, ahead of the figure that replaced it (item 8). Muted and a step
+   smaller, because it is the thing being moved away from rather than the number in play. */
+.ng-net .was { margin-inline-end: 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: line-through; }
+.ng-net .cur { font-size: 11px; font-weight: 600; color: var(--muted); }
+/* The billing period rides the figure, so the header states the SAME quantity the room's price bar
+   and the bid card do: a rate, not a net-incl-VAT total. */
+.ng-net .per { font-size: 11px; font-weight: 700; color: var(--muted); }
+.ng-party { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ng-who { display: flex; flex-direction: column; min-width: 0; }
+.ng-who b { font-size: 13.5px; font-weight: 700; color: var(--navy-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 320px; }
+/* The request's short code, UNDER the name and never beside it: the name is looked for first, and a
+   renter negotiating several deals with one firm has nothing else to tell the sheets apart. */
+.ng-who .ref { font-size: 10.5px; font-weight: 600; color: var(--muted-light); white-space: nowrap; }
+.ng-ava { flex: 0 0 auto; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: var(--navy); color: var(--surface); font-size: 11px; font-weight: 800; }
+.ng-x { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.ng-x:hover { background: var(--surface2); color: var(--navy); }
+/* The status a settled room carries into the sheet: cancelled, closed, or awaiting the supplier. */
+.ng-note { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 11px; font-weight: 700; color: var(--muted); }
+.ng-note.danger { color: var(--danger); }
+.ng-note .material-icons-outlined { font-size: 13px; }
+
+/* ── the step rail ─────────────────────────────────────────────────────────
+   🔴 **RESTORED from `beta` (owner, 2026-09-22).** It is the one device that makes three pages
+   read as THREE SHEETS rather than as a page that keeps replacing itself: ① Price —— ② Terms ——
+   ③ Review, each badge filling as it is passed, the bar between them turning green behind it.
+   Without it the only thing naming the step was the footer's own button, which says where you are
+   GOING and never where you are.
+
+   ⚠️ **Tokens direct — `--brand` for the step you are on, `--ok` for one you have finished.** beta
+   remapped `--action` and `--rentee` locally inside the sheet to reach the same two colours, and a
+   local remap of `--action` is exactly the drift `palette-drift` and RM3-AC-33 exist to stop: that
+   token is the bid map's ask and means one thing in this product.
+
+   ⚠️ It is `aria-hidden`: the footer's button already names the next step in words, and a rail
+   that reads out «one, Price, two, Terms» before every screen is three labels for one fact. */
+/* 🔴 **`.ng-steps` and `.ng-step` are DELETED** (owner, 2026-09-22: *"remove the 3 steps
+   process bar"*). ~~The numbered rail under the header: a badge per step, the label beside it and
+   a growing rule between.~~ Deleted rather than left inert, which is this repo's rule for a
+   withdrawn motif - an unused block is one edit away from coming back by accident. The FOOTER's
+   named press carries the step now. */
+
+/* ── body ───────────────────────────────────────────────────────────────────────────────────── */
+/* ⚠️ **The gutter is on the BAND, not on the paper column** — as it is on the head, the rail and
+   the foot. It sat on `.ng-inner` here, so this one column measured 940 of CONTENT while the other
+   three measured 940 including their padding: the body's cards stood 40px inside the header's own
+   verticals, on the one sheet whose whole point is that the bands line up. Measured at 1920:
+   1020 against 940 before, 940 across all four after. */
+/* The DESK the paper sits on (owner, 2026-09-23). The live sheet paints it `--border-mid`; this is
+   the house step nearest it, and the paper's own border is what draws the card's edge on top. */
+.ng-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-inline: var(--ng-gutter); background: var(--surface2); }
+.ng-body .ng-inner { padding: 14px 0 20px; }
+.ng-pad { padding: 0; }
+/* The white card is a CARD here, not the phone's full-bleed band: on a wide screen a band that
+   reaches both edges stops reading as one object among others. */
+.ng-card { background: var(--surface); border-radius: 10px; overflow: hidden; }
+.ng-card + .ng-card, .ng-cmp + .ng-card { margin-top: 12px; }
+.ng-card.pad { padding: 14px 16px; }
+
+/* ── the price table ────────────────────────────────────────────────────────────────────────────
+   Four columns on the prototype's own weights, the head band a shade under the paper. */
+.ng-thead, .ng-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 4px; padding: 8px 16px; }
+.ng-thead { background: var(--surface-alt); border-bottom: 1px solid var(--border-hair); }
+.ng-thead span { font-size: 10px; font-weight: 700; color: var(--muted-light); }
+.ng-thead span.c { text-align: center; }
+.ng-thead span.e { text-align: end; }
+.ng-row { position: relative; align-items: center; border-bottom: 1px solid var(--surface2); }
+.ng-row.off { opacity: .45; }
+.ng-row .lbl { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 🔴 RED, not the muted grey it inherits (owner, on the app, 2026-09-21: "a red line on them like
+   they are omitted"). A grey rule over already-faded text read as the row being disabled rather than
+   dropped. ⚠️ A leg the REQUEST assigns to the renter arrives excluded too, and reads identically —
+   which is the wanted reading: it is equally not in the supplier's offer. */
+.ng-row.off .lbl { text-decoration: line-through; text-decoration-color: var(--danger); text-decoration-thickness: 2px; }
+.ng-row .dur { text-align: center; font-size: 12px; font-weight: 600; color: var(--muted-dark); }
+.ng-row .dur .sub { display: block; font-size: 9.5px; font-weight: 600; color: var(--muted-light); }
+/* The ✕ that strikes a transport leg out, and the + that restores it. It sits on the row's START
+   edge — over the item's own name — because the END edge is the price input, and a 16px circle on top
+   of a field the renter is typing in is a control that eats the first tap meant for the number. */
+.ng-rm { position: absolute; top: 4px; inset-inline-start: 12px; display: grid; place-items: center; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 50%; font-size: 9px; line-height: 1; cursor: pointer; background: var(--danger-soft); color: var(--danger); }
+.ng-rm.on { background: var(--ok-soft); color: var(--ok); }
+/* count stepper */
+.ng-qty { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.ng-qty b { min-width: 13px; text-align: center; font-size: 12px; font-weight: 700; color: var(--navy-deep); }
+.ng-qty button { width: 18px; height: 18px; padding: 0; line-height: 1; border: 1px solid var(--border-hair); border-radius: 6px; background: var(--surface); font-size: 10px; color: var(--muted-dark); cursor: pointer; }
+.ng-qty button:disabled { color: var(--border-strong); cursor: default; }
+/* 🔴 The input's own colours ARE the state: green while the figure still matches the supplier's,
+   amber the moment it is edited. The reference line under it turns with them. */
+.ng-price input { width: 100%; max-width: 150px; margin-inline-start: auto; display: block; border: 1.5px solid var(--ok); background: color-mix(in srgb, var(--ok) 6%, var(--surface)); border-radius: 7px; padding: 4px 6px; font-size: 12px; font-weight: 700; color: var(--navy-deep); text-align: end; font-family: inherit; }
+.ng-price.edited input { border-color: var(--brand); background: var(--brand-soft); }
+.ng-price .ref { margin-top: 1px; font-size: 9.5px; text-align: end; color: var(--muted-light); }
+.ng-price.edited .ref { color: var(--warn-deep); font-weight: 700; }
+.ng-price b { display: block; text-align: end; font-size: 12.5px; font-weight: 800; color: var(--navy-deep); }
+.ng-row .out { text-align: end; font-size: 11px; font-weight: 700; color: var(--muted-light); }
+
+/* ── the summary band + the net box ───────────────────────────────────────────────────────────── */
+/* Stated ABOVE the table, so it is read before the typing rather than under it, after. */
+.ng-exvat { margin: 0; padding: 10px 16px 0; font-size: 11.5px; font-weight: 600; color: var(--muted-light); }
+.ng-sum { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; background: var(--surface2); }
+.ng-sum .item, .ng-sum .line { display: flex; justify-content: space-between; gap: 10px; }
+.ng-sum .item { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
+/* 🔴 **The factors sit BESIDE the name, not under it** (owner, 2026-09-22: *"for price put the
+   formula beside the title not below it"*). ~~`flex-direction: column`, so «2,000 × 32 × 1» was a
+   second line under «Crawler Excavator · 32 days».~~ Three rows each two lines tall made the
+   summary as tall as the table it summarises, and the formula is a GLOSS on the name rather than a
+   fact of its own.
+   ⚠️ `wrap`, so a long machine name and a three-factor formula drop rather than overflow the
+   row - which would push the figure at the far end off its own column. */
+.ng-sum .item .lbl { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
+/* The factors behind the figure, as the bid card prints them: «2,000 × 12». A row whose own numbers
+   do not multiply is the one thing a customer checks. */
+.ng-sum .item .fx { font-size: 10.5px; font-weight: 600; color: var(--muted-light); }
+/* 🔴 THE COUNT, APPLIED ONCE, AT THE END. Everything above it describes one machine. */
+.ng-overall { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; }
+.ng-overall .k { font-size: 12.5px; font-weight: 800; color: var(--navy-deep); }
+.ng-overall .v { font-size: 15px; font-weight: 800; color: var(--navy); }
+.ng-sum .item.off { opacity: .45; }
+.ng-sum .item span:last-child { color: var(--muted); }
+.ng-sum .rule { border-top: 1px solid var(--border-hair); margin: 2px 0; }
+.ng-sum .line { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ng-net-box { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 2px; padding: 10px 12px; background: var(--surface); border: 1.5px solid var(--navy); border-radius: 10px; }
+.ng-net-box .k { font-size: 13px; font-weight: 700; color: var(--navy-deep); }
+.ng-net-box .v { font-size: 18px; font-weight: 800; color: var(--navy); }
+
+/* ── a term, in its three states ─────────────────────────────────────────────────────────────────
+   Settled (a quiet strip), active (the card with the two acts), and waiting (dashed, dimmed). One
+   vocabulary for the payment term on the price sheet and every operating term on the terms sheet. */
+/* Radius 12, the app's own on every card in this flow. */
+.ng-t { margin-bottom: 6px; border-radius: 12px; }
+/* 🔴 **A SETTLED ROW IS GREEN, and RED when the renter countered** (owner, 2026-09-23:
+   *"make the red or the gree on the panel iteslf like the app"*, and the app's own settled row:
+   `color: differs ? kNegRedBg : kNegGreenBg`, `border: differs ? kNegRedBorder : kNegGreenBorder`).
+   ~~One grey strip for both.~~ The tick and the pencil were the only thing separating «I took his
+   value» from «I refused it», at 11.5px, at the end of a grey line - so a page of answered terms
+   said nothing about which way any of them went.
+   ⚠️ **The FULL soft fill here, not the pale tint the live cards wear.** A settled row holds
+   no button, so nothing has to stay readable on top of it; the live card is paler precisely
+   because its «Choose another» does. Same reason the app keeps `kNegGreenBg` and `kNegGreenTint`
+   apart. */
+.ng-t.done { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 12px; background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 20%, transparent); }
+.ng-t.done.countered { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 26%, transparent); }
+.ng-t.done .k { font-size: 12px; font-weight: 600; color: var(--muted); }
+.ng-t.done .v { font-size: 11.5px; font-weight: 700; color: var(--ok); }
+.ng-t.done .v.changed { color: var(--danger); }
+/* 🔴 **THE GROUND CARRIES THE VERDICT**, so the state reads without a word (app parity): a conflict
+   is red on sight, before anyone acts; a pending row is white; and a picker being open tints it the
+   same red, because opening «Change» is choosing to disagree. */
+.ng-t.now { padding: 8px 10px; background: var(--surface); border: 1.5px solid var(--border-hair); transition: background .15s ease, border-color .15s ease; }
+/* 🔴 **A CONFLICT is red and a PENDING term is BLUE** (owner, 2026-09-22: *"follow the app
+   ... in the ui of the terms panels and sectiosn even the colors"*; the app's own
+   `negotiate_tones.dart`, 2026-09-17: *"conflict block in red, pending in light blue"*).
+   ~~Both wore `--danger-soft`, so the one state that still needs an answer looked like the one
+   that has gone wrong.~~ The app's reasoning is the point: grey read as chrome on a grey page, so
+   pending got a ground of its own.
+   ⚠️ **`--info`, not the app's `#2F6FB3`.** `palette-drift` forbids a raw hex in `src/`, and
+   the app's file says its greys are PRIVATE to that flow and must not be imported - so this is
+   the nearest house token, which is the trade every ported prototype in this repo has made. It is
+   a slate in the ink family rather than a true blue; the app is a shade cooler.
+   🔴 **THE PANEL ITSELF CARRIES THE COLOUR, and its two steps are NOT the same value**
+   (owner, 2026-09-23: *"make the red or the gree on the panel iteslf like the app"*).
+   ~~The clash card wore `--danger-soft` flat, the exact fill the «Choose another» button wears,
+   so the button disappeared into its own card and the state read as one red slab.~~ The app's
+   own note says why it keeps two: *"the ground is PALER than kNegRedBg on purpose - the
+   «تغيير» button IS #FDECEC, and a button the same colour as the card it sits on stops looking
+   like a button"*.
+   ⚠️ **The percentages are SAMPLED from the app's hexes, not chosen.** `kNegRedTint`
+   (#FEF8F7) is the danger token at ~4% over white and `kNegRedBorder` (#F6D2CE) at ~26%;
+   `kNegBlueBg` (#EAF2FB) is ~10% with `kNegBlueBorder` (#CFE1F5) at ~20%. A pending card is a
+   full BG where a conflict card is a TINT, which is the app's own asymmetry: pending holds no
+   open menu to stay readable over.
+   🔴 **A PENDING CARD TURNS RED WHILE ITS OPTIONS ARE OPEN**, which restores the app's rule
+   and ~~withdraws this file's own of 2026-09-22 (*"`.picking` follows whichever state the card is
+   in rather than forcing red"*)~~. Owner, 2026-09-23: *"check if we dont differ on anything in
+   behaviour from the app"*. The app's reasoning is that opening the menu IS choosing to
+   disagree, so the card joins the conflict family for as long as it is open. */
+.ng-t.now.clash, .ng-t.now.pending.picking { background: color-mix(in srgb, var(--danger) 4%, var(--surface)); border-color: color-mix(in srgb, var(--danger) 26%, transparent); }
+.ng-t.now.pending { background: color-mix(in srgb, var(--info) 10%, var(--surface)); border-color: color-mix(in srgb, var(--info) 20%, transparent); }
+.ng-t.done { cursor: pointer; }
+.ng-t .acts button:disabled { opacity: .45; cursor: default; }
+/* The name has the row to itself now, so it WRAPS rather than squeezing the two values that
+   used to share it (see `.side` below). */
+.ng-t.now .h { max-width: 820px; margin-bottom: 4px; }
+.ng-t.now .h .k { font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
+/* 🔴 **THE TWO POSITIONS TAKE THEIR OWN CENTRED ROW** (owner, 2026-09-22: *"show the terms
+   values clear and bigger"*, then 2026-09-23 on «Your choice: not set · Supplier: 24 hours»:
+   *"even these make it middle and more visible"*).
+   ~~12px at the end of the name's row, `nowrap`, ellipsising before the name did.~~ Sharing a
+   row with the label meant the longer the term's NAME, the smaller its two answers - and the
+   answers are what is being decided. Full width under the name, 12.5px, values at 14px/800, and
+   it may wrap: there is no second column left to push onto a new line.
+   ⚠️ **Centred on his word**, where the app aligns it to the reading start. The two acts
+   below are centred too, so the card reads as one column rather than three alignments. */
+.ng-t.now .side { margin: 0 0 10px; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--muted-dark); }
+.ng-t.now .side b { font-size: 14px; font-weight: 800; color: var(--navy-deep); }
+/* ⚠️ The pair is CAPPED and sits at the reading end. In the prototype these are two `flex:1`
+   buttons across a phone; with the sheet's cards running the screen they became two slabs, which
+   reads as the card's main event rather than as the two answers to the line above them. */
+/* 🔴 **CENTRED** (owner, 2026-09-22: *"make the buttons of accept-choose another in the
+   center"*). ~~`margin-inline-end: auto`, which pinned the pair to the reading start.~~ They are
+   the card's two answers and neither is subordinate, so they sit under the middle of the question
+   rather than at one edge of it. The 320px cap survives - stretched across the sheet they read as
+   the card's main event rather than as the reply to the line above. */
+.ng-t .acts { display: flex; gap: 6px; max-width: 320px; margin-inline: auto; }
+/* 🔴 **BORDERED, at the app's own metrics** (owner, 2026-09-23: *"add borders to the
+   buttons"*). The app's `_btn`: an explicit `BorderSide`, radius 10, 8px of vertical padding and
+   14px/700 centred, each `Expanded` so the pair splits the row.
+   ⚠️ **The border is what lets these sit on a TINTED card at all.** Two borderless fills on
+   a red ground read as one block - which is why the app pairs every fill with its own line, and
+   why the panel tint above had to be a step paler than these. */
+.ng-t .acts button { flex: 1; border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; font-family: inherit; font-size: 14px; font-weight: 700; text-align: center; cursor: pointer; }
+.ng-t .acts .change { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 32%, transparent); color: var(--danger); }
+.ng-t .acts .take { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 34%, transparent); color: var(--ok); }
+/* 🔴 **HORIZONTAL, and always drawn** (owner, 2026-09-22: *"alwasy show other options if he
+   chose 'choose another' to be shown horizantaly not vertically"*).
+   ~~A hidden COLUMN, revealed by pressing «Choose another», capped at 320px.~~ Two faults in one
+   rule: a press that reveals three chips buys nothing, and a column made a two-option term as
+   tall as the card holding it. They wrap in a row now and the cap is gone with the column - a row
+   of chips does not read as navigation the way a full-width stack of buttons did.
+   ⚠️ `flex-wrap`, never a single line: a term with six options on a phone would otherwise
+   overflow the card. */
+/* ⚠️ No rule above them any more: the menu now REPLACES the two acts rather than standing
+   under them, so there is nothing to divide it from. Metrics are the app's `NegOptionPills`:
+   12/7 padding, a full round, 13px/700. */
+.ng-t .opts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.ng-t .opts button { border: 1px solid var(--border-hair); border-radius: 999px; padding: 7px 12px; background: var(--surface); font-family: inherit; font-size: 13px; font-weight: 700; color: var(--muted-dark); text-align: center; cursor: pointer; }
+.ng-t .opts button:hover { background: var(--surface2); }
+/* The chosen chip carries the same green the Accept button does - one colour for the position
+   you hold, across the whole card. */
+.ng-t .opts button.on { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 45%, transparent); color: var(--ok); font-weight: 700; }
+/* 🔴 ~~`.ng-t.later` — a dashed, dimmed «waiting for the one above» row for every term the walk had
+   not reached.~~ **Deleted with the app's own** (owner: *"don't show any other term except the
+   opened one"*). A placeholder is still a row to read past, and the section header's `(n/m)` count
+   carries everything those rows were saying. */
+/* Where a term's value came from, and the last move on it — the two sub-lines the web has carried
+   since the terms table. Kept: the prototype states neither, and a renter reading «24h» has no other
+   way to learn whether it is his ask, the supplier's declaration or the platform's default. */
+.ng-t .why { display: block; margin-top: 2px; font-size: 10px; font-weight: 600; color: var(--muted-light); }
+.ng-t .why .material-icons-outlined { font-size: 11px; vertical-align: -1px; }
+/* 🔴 **THE PENCIL, at the app's own 13px** (owner, 2026-09-23: *"allow edit on the terms like
+   the app too"*). ~~A ↻ button drawn inside a row that is itself the button.~~ It inherits the
+   row's own ink, so a countered row's pencil is red and an agreed one's is green - the app's
+   `final pen = Icon(Icons.edit_outlined, size: 13, color: ink)`. */
+.ng-t .pen, .ng-grow .pen { margin-inline-start: 6px; font-size: 13px; vertical-align: -2px; color: inherit; opacity: .75; }
+
+/* ── the term SECTIONS (app parity, `_SectionHeader`) ───────────────────────────────────────────
+   Each is a header BAND with its rows inside the same card — one border, one radius — so a section's
+   rows read as its body rather than as loose cards that happened to follow a heading. The header
+   carries `(resolved/total)`, which is what lets a section whose turn has not come draw its heading
+   alone and still say everything it needs to.
+
+   ⚠️ **Two strip treatments only**: «Agreed terms ✓» is the green one, everything else the grey.
+   The rest of this page is a row, so the remaining kinds take grey rather than inventing a third and
+   fourth colour. */
+/* 🔴 **THE TERMS STEP IS SIZED FOR A DESKTOP** (owner, 2026-09-22: *"for terms use same structure
+   and same languag eand same behaviour but on sizes suitable foe web"*).
+
+   ⚠️ **Structure, wording and behaviour are UNTOUCHED** — the app's six sections in the app's
+   order, its three Change labels, its open/collapse rule and its queue. He named the sizes and
+   nothing else, and the six sections were read off `counter_offer_terms_page.dart` on 2026-09-22.
+
+   ⚠️ **The row's own 820px cap is GONE**, because the paper is 940 and already caps it: two caps
+   on one row is how a row ends up narrower than the card holding it for a reason nobody can find.
+   Every figure below went up about one step — 11px→13.5 on the band, 12→13 in a row — which is the
+   difference between a phone's reading distance and a monitor's. */
+.ng-sect-title { margin: 4px 0 8px; font-size: 13.5px; font-weight: 800; color: var(--navy); }
+.ng-sect { margin-top: 12px; border: 1px solid var(--border-hair); border-radius: 10px; overflow: hidden; }
+.ng-sect-h { display: flex; align-items: center; gap: 8px; width: 100%; padding: 13px 16px; border: 0; background: var(--surface2); font-family: inherit; font-size: 13.5px; font-weight: 700; color: var(--muted); text-align: start; cursor: pointer; }
+.ng-sect-h .t { flex: 1 1 auto; min-width: 0; }
+.ng-sect-h .chev { flex: 0 0 auto; font-size: 15px; transition: transform .2s ease; }
+.ng-sect-h .chev.open { transform: rotate(-90deg); }
+.ng-sect.agreed .ng-sect-h { background: var(--ok-soft); color: var(--ok); }
+/* Breathing room INSIDE the card: without the top gap the first row's border touches the header's
+   hairline and the two read as one smudged edge. */
+.ng-sect-b { padding: 10px 14px 13px; background: var(--surface); }
+.ng-sect-b:empty { display: none; }
+.ng-grow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 5px; padding: 10px 14px; border-radius: 8px; background: var(--surface-alt); }
+.ng-grow:first-child { margin-top: 0; }
+.ng-grow.live { cursor: pointer; }
+.ng-grow.live:hover { background: var(--surface2); }
+.ng-grow .k { font-size: 13px; font-weight: 600; color: var(--muted); }
+.ng-grow .v { font-size: 13px; font-weight: 700; color: var(--muted-dark); }
+.ng-grow.agreed { background: color-mix(in srgb, var(--ok-soft) 45%, var(--surface)); }
+.ng-grow.agreed .k { color: var(--muted-dark); }
+.ng-grow.agreed .v { color: var(--ok); }
+
+/* ── the supplier's standing offer, against yours ───────────────────────────────────────────────
+   🔴 **THE APP'S 2026-09-21 MOCK.** A WHITE card, the two totals side by side across a VERTICAL
+   hairline, the gap pill riding the card's TOP EDGE, and one row per leg beneath, always open.
+
+   ~~A navy card with the pill on a horizontal rule BETWEEN the two totals, and the per-leg rows
+   behind a «gap, line by line» expander.~~ Three faults, and the mock fixes all three: the sheet
+   around it is light, so the one navy block read as a foreign panel dropped onto the page; the
+   expander cost a press to reach the only content anyone can act on; and a pill on a rule between
+   the totals made the rule look like a divider with a label rather than a measurement between two
+   ends. */
+/* 🔴 **CAPPED AND CENTRED, and that is the DESKTOP half of this port.** The app draws this on a
+   phone, where the two totals are a thumb apart and the rule between them reads as a measurement.
+   Run across a 1500px sheet they sit at opposite edges with a field of white between, and the card
+   stops being a comparison at all. Capping ONE summary card is not the column cap this sheet
+   withdrew on 2026-09-19: the bands, the table and the sections still run the width. */
+.ng-cmp { position: relative; max-width: 940px; margin: 11px auto 16px; padding: 20px 14px 6px; background: var(--surface); border: 1px solid var(--border-hair); border-radius: 14px; }
+/* Overhangs the card's top edge by half its height. The card's own border runs behind it, so the
+   pill carries one of its own or it reads as a hole punched in the edge. */
+.ng-cmp-pill { position: absolute; top: -11px; inset-inline-start: 50%; transform: translateX(-50%); border-radius: 100px; padding: 3px 12px; font-size: 11px; font-weight: 800; white-space: nowrap; background: var(--brand-soft); border: 1px solid var(--brand-soft); color: var(--brand-deep); }
+[dir="rtl"] .ng-cmp-pill { transform: translateX(50%); }
+.ng-cmp-pill.ok { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 35%, transparent); color: var(--ok); }
+.ng-cmp-duo { display: grid; grid-template-columns: 1fr 1px 1fr; align-items: stretch; }
+.ng-cmp-duo::before { content: ""; grid-column: 2; background: var(--border-hair); }
+.ng-cmp-side { grid-column: 3; text-align: center; }
+/* ⚠️ THEIRS leads and carries the emphasis: it is the figure on the table, the one being answered,
+   and in both directionalities the leading slot is read first. Mine is muted beside it — not because
+   it matters less, but because I already know it. */
+.ng-cmp-side.lead { grid-column: 1; }
+.ng-cmp-side .k { font-size: 11px; font-weight: 700; color: var(--muted-light); margin-bottom: 4px; }
+.ng-cmp-side .v { font-size: 24px; font-weight: 800; color: var(--muted); }
+.ng-cmp-side.lead .v { color: var(--navy); }
+.ng-cmp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 0; border-top: 1px solid var(--surface2); }
+.ng-cmp-row:first-of-type { margin-top: 12px; }
+.ng-cmp-row .k { flex: 0 0 auto; font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
+.ng-cmp-row .sides { flex: 1 1 auto; min-width: 0; font-size: 11.5px; color: var(--muted); text-align: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ng-cmp-row .sides .lab { color: var(--muted-light); }
+.ng-cmp-row .sides b { font-weight: 800; color: var(--navy-deep); }
+/* ⏳ while they have not answered — the delta pill says nothing in that case, so this is the only
+   signal. */
+.ng-cmp-row .sides b.wait { color: var(--warn-deep); }
+.ng-delta { flex: 0 0 auto; border-radius: 100px; padding: 2px 8px; font-size: 10.5px; font-weight: 800; background: var(--brand-soft); color: var(--brand-deep); }
+.ng-delta.ok { background: var(--ok-soft); color: var(--ok); }
+/* Did the SUPPLIER move since his own last round, and which way. Nothing at all on his first round:
+   without it the card answers "how far apart are we" and never "did he move". */
+.ng-cmp-prev { flex: 1 0 100%; text-align: end; font-size: 10.5px; font-weight: 800; }
+.ng-cmp-prev.ok { color: var(--ok); }
+.ng-cmp-prev.bad { color: var(--danger); }
+.ng-cmp-prev.flat { color: var(--muted-light); }
+
+/* ── the review step ────────────────────────────────────────────────────────────────────────────
+   Two cards, each under a NAVY header of the same shape (app parity): the price you are about to
+   send, then the terms index. */
+.ng-rcard { background: var(--surface); border-radius: 10px; overflow: hidden; margin-bottom: 12px; }
+.ng-rcard-h { display: flex; align-items: center; gap: 7px; padding: 10px 12px; background: var(--navy); color: var(--surface); font-size: 12.5px; font-weight: 800; }
+.ng-rcard-h .material-icons-outlined { font-size: 16px; }
+.ng-rcard-h .rdy { margin-inline-start: auto; font-size: 11px; font-weight: 700; color: var(--text-on-dark); }
+.ng-rbody { padding: 10px 12px; }
+.ng-rrow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 12px; }
+.ng-rrow .k { color: var(--muted); font-weight: 600; }
+.ng-rrow .v { color: var(--navy-deep); font-weight: 700; }
+.ng-rrow .v .sub { font-size: 10px; font-weight: 600; color: var(--muted-light); }
+.ng-rrow.net { margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border-hair); font-size: 13px; }
+.ng-rrow.net .v { font-size: 15px; font-weight: 800; color: var(--navy); }
+.ng-bar { display: flex; height: 6px; margin: 6px 0 8px; border-radius: 100px; overflow: hidden; background: var(--surface2); }
+.ng-bar .ok { background: var(--ok); }
+.ng-bar .df { background: var(--danger); }
+/* ⚠️ FOUR segments, not two: two left the unanswered rows invisible on the bar, which is the half
+   the reader is here to see. */
+.ng-bar .pd { background: var(--border-strong); }
+/* 🔴 ~~A legend under the bar.~~ Removed with the app's own: it was the THIRD statement of one fact —
+   the ready count is on the title row and the bar is the same numbers drawn to scale. */
+.ng-guide-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 0; border: 0; background: none; font-family: inherit; font-size: 11.5px; font-weight: 800; color: var(--muted); cursor: pointer; }
+.ng-guide-h .chev { font-size: 18px; color: var(--muted-light); transition: transform .2s ease; }
+.ng-guide-h .chev.open { transform: rotate(180deg); }
+/* The row's status as a WORD, in the bar's own colours — the app's shape, and it says in words what
+   the bar says to scale. */
+.ng-gst { font-size: 10.5px; font-weight: 800; }
+.ng-gst.locked { color: var(--muted); }
+.ng-gst.match { color: var(--ok); }
+.ng-gst.conflict { color: var(--danger); }
+.ng-gst.pending { color: var(--info); }
+/* 🔴 ~~`.ng-gcat*` — the guide grouped by category, each group its own collapsible with a count.~~
+   **Gone**: the app's guide is one flat list behind a single «Matched» toggle, and the categories
+   were a web-only layer over it. */
+.ng-gnrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; max-width: 820px; padding: 6px 8px; border-radius: 7px; background: var(--surface-alt); margin-bottom: 4px; font-size: 11.5px; }
+.ng-gnrow .k { color: var(--muted-dark); font-weight: 600; }
+.ng-badge { border-radius: 100px; padding: 2px 8px; font-size: 10px; font-weight: 800; background: var(--surface2); color: var(--muted); }
+.ng-badge.match, .ng-badge.locked { background: var(--ok-soft); color: var(--ok); }
+.ng-badge.conflict { background: var(--danger-soft); color: var(--danger); }
+/* The quotation, from step ③ (app parity: the renter reads the position back before sending it). */
+.ng-quote { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 12px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface); font-family: inherit; font-size: 12.5px; font-weight: 800; color: var(--navy); cursor: pointer; }
+.ng-quote:hover { background: var(--surface-alt); }
+.ng-ack { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 12.5px; font-weight: 600; color: var(--navy); }
+.ng-err { margin-top: 8px; font-size: 12.5px; font-weight: 700; color: var(--danger); }
+
+/* ── footer ─────────────────────────────────────────────────────────────────────────────────────
+   🔴 **EVERY STEP NAMES ITS ACTION** (owner, on the app, 2026-09-19). ~~A centred `‹ step ›`
+   switcher, with the forward action hidden in a chevron.~~ The chevron never said where it went, and
+   on the last step it fired the one irreversible act in the sheet while looking like navigation.
+
+     🕘 · [Back] · [✓ Accept, when allowed] · [Next: Terms / Review & send / Send to the supplier]
+
+   The primary grows into whatever is left, so on a desktop width it is the widest thing on the bar
+   and unmistakably the thing to press; Back and Accept size to their own words. */
+.ng-foot { flex: 0 0 auto; padding: 9px var(--ng-gutter); background: var(--surface); border-top: 1px solid var(--border-hair); }
+/* 🔴 **THE LIVE FOOTER**: `[log] [spacer] [the acts] [spacer]`, so the acts sit in the MIDDLE
+   and the references are pinned to the edge (owner, 2026-09-23). `.qp-foot`'s own metrics:
+   `padding: 9px 24px`, `gap: 10px`, a hairline over it.
+   ⚠️ The log is a LABELLED pill (`.qp-log`: bordered, 8px 12px, 12.5px/800), never a bare
+   glyph - it is the one control on the bar a reader would otherwise have to guess at. */
+.ng-foot-sp { flex: 1 1 auto; }
+.ng-foot-main { display: flex; align-items: center; gap: 10px; }
+.ng-log { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); padding: 8px 12px; font: inherit; font-size: 12.5px; font-weight: 800; color: var(--navy-mid); cursor: pointer; }
+.ng-log .material-icons-outlined { font-size: 16px; }
+.ng-foot .ng-inner { display: flex; align-items: center; gap: 8px; }
+.ng-log { flex: 0 0 auto; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface); color: var(--muted-dark); cursor: pointer; }
+.ng-back { flex: 0 0 auto; min-width: 110px; height: 44px; border: 1px solid var(--border-hair); border-radius: 12px; background: var(--surface); color: var(--navy); font-family: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
+.ng-accept { flex: 0 0 auto; height: 44px; border: 0; border-radius: 12px; padding: 0 18px; background: var(--ok); color: var(--surface); font-family: inherit; font-size: 13.5px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.ng-accept:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
+/* Navy, never the accept button's green: green on this sheet means «I take your position», and
+   sending a reply is the opposite of that. */
+.ng-primary { flex: 1 1 auto; min-width: 0; height: 44px; border: 0; border-radius: 12px; padding: 0 18px; background: var(--navy); color: var(--surface); font-family: inherit; font-size: 13.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.ng-primary:disabled { background: var(--disabled-bg); color: var(--disabled-fg); cursor: default; }
+/* ⚠️ Grey on the LAST step when there is nothing to send, and still PRESSABLE — so the press says
+   why rather than doing nothing. A button that looks live and then refuses is worse than one that
+   says up front it has nothing to do. */
+.ng-primary.blocked { background: var(--disabled-bg); color: var(--disabled-fg); }
+.ng-foot-err { margin: 8px 0 0; }
+.ng-log:hover { background: var(--surface2); }
+.ng-log .material-icons-outlined { font-size: 18px; }
+/* The chevrons are DIRECTION, so they mirror with the script. */
+/* `.ng-chev` is gone with the `‹ step ›` switcher; the footer's controls are all words now, and a
+   word needs no mirror rule. */
+
+
+/* ── the negotiation LOG, unchanged: its own modal, opened from the footer ─────────────── */
 .qp-htitle { min-width: 0; flex: 1; }
 .qp-htitle .t { font-size: 14px; font-weight: 800; color: var(--navy); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .qp-htitle .s { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }
-/* The status a settled room carries into the sheet: cancelled, closed, or awaiting the supplier.
-   It sits under the room's own line because that is what it qualifies — this room, not this step —
-   and it is the first thing a renter who pressed «counter» on a dead room needs to read. */
-.qp-hnote { display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; padding: 3px 9px 3px 6px; border-radius: 999px; font-size: 10.5px; font-weight: 800; background: var(--warn-soft); color: var(--warn-deep); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
-.qp-hnote.danger { background: var(--danger-soft); color: var(--danger-deep); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
-.qp-hnote .material-icons-outlined { font-size: 14px; }
-.qp-htotal { flex: 0 0 auto; text-align: end; }
-.qp-htotal .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
-.qp-htotal .v { font-size: 16px; font-weight: 800; color: var(--navy); font-family: var(--font-mono); direction: ltr; }
 .qp-x { flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); border-radius: 50%; cursor: pointer; }
 .qp-x .material-icons-outlined { font-size: 18px; }
-/* stepper */
-.qp-steps { display: flex; align-items: center; gap: 4px; padding: 12px 22px 14px; background: color-mix(in srgb, var(--action) 8%, white); }
-.qp-step { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.qp-step .badge { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--surface2); border: 2px solid var(--border); color: var(--muted); font-size: 14px; font-weight: 800; }
-.qp-step .lbl { font-size: 15px; font-weight: 600; color: var(--muted); }
-.qp-step.on .badge { background: var(--rentee); border-color: var(--rentee); color: var(--surface); }
-.qp-step.on .lbl { color: var(--rentee); font-weight: 800; }
-.qp-step.done .badge { background: var(--success); border-color: var(--success); color: var(--surface); }
-.qp-step.done .lbl { color: var(--success); }
-.qp-steps .bar { flex: 1 1 auto; height: 3px; border-radius: var(--radius-sm); background: var(--border); min-width: 18px; margin: 0 8px; }
-.qp-steps .bar.done { background: var(--success); }
-
-/* body — grey "desk" holding the white paper */
-.qp-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; background: var(--border-mid); padding: 18px clamp(10px,3%,26px) 26px; }
-.qp-paper { width: 800px; max-width: 100%; flex-shrink: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 28px 30px 38px; }
-.qp-paper + .qp-paper { margin-top: 16px; }
-
-/* full-screen desk sheet (§6 oldWrap): fills the viewport, slides up; the paper sits on a grey desk
-   with a side zoom rail. The centered-card .qp-sheet base is kept for the log modal. */
-.qp-sheet.qp-full { position: fixed; inset: 0; width: auto; max-width: none; max-height: none; border-radius: 0; animation: qpSheetUp .3s cubic-bezier(.32,.72,.3,1); }
-@keyframes qpSheetUp { from { transform: translateY(100%); } to { transform: none; } }
-.qp-desk { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; background: var(--surface2); }
-.qp-deskpad { min-height: 100%; display: flex; justify-content: center; align-items: flex-start; padding: 22px 0 46px; }
-.qp-zoom { position: absolute; top: 50%; inset-inline-start: 20px; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 6; }
-.qp-zoom button { width: 52px; height: 52px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--navy); font: inherit; font-size: 26px; font-weight: 800; line-height: 1; cursor: pointer; display: grid; place-items: center; padding: 0; }
-.qp-zoom button.pct { width: auto; height: auto; border-radius: var(--radius-sm); padding: 6px 9px; font-size: 11px; border-color: var(--line); }
-/* quotation head */
-.qp-qhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 14px; margin-bottom: 16px; }
-.qp-qco { display: flex; align-items: center; gap: 12px; }
-.qp-qlogo { width: 46px; height: 46px; border-radius: var(--radius-md); background: var(--navy-deep); color: var(--surface); font-weight: 800; font-size: 18px; display: grid; place-items: center; flex: 0 0 auto; }
-.qp-qcoinfo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.qp-qcoinfo b { font-size: 17px; font-weight: 800; color: var(--navy); }
-.qp-qcoinfo .ln { font-size: 11px; font-weight: 600; color: var(--muted); }
-.qp-qno { text-align: end; flex: 0 0 auto; }
-.qp-qno .lbl { font-size: 10px; font-weight: 800; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; }
-.qp-qno .num { font-size: 15px; font-weight: 800; color: var(--rentee); direction: ltr; }
-.qp-qno .sub { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 2px; }
-
-/* price table */
-.qp-sech { font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 4px 0 8px; }
-.qp-table { width: 100%; border-collapse: collapse; }
-.qp-table th { background: var(--navy); color: var(--surface); font-size: 11px; font-weight: 800; padding: 9px 10px; text-align: start; }
-.qp-table th:last-child, .qp-table td:last-child { text-align: end; }
-.qp-table td { border-bottom: 1px solid var(--line); padding: 11px 10px; font-size: 12.5px; vertical-align: middle; }
-.qp-table .lbl { font-weight: 800; color: var(--navy); }
-.qp-table .sub { font-size: 10.5px; font-weight: 600; color: var(--muted); margin-top: 2px; }
-.qp-table .tot { font-family: var(--font-mono); font-weight: 800; color: var(--navy); direction: ltr; }
-.qp-table tr.ex td { background: var(--paper-2); }
-.qp-pricebox { display: inline-flex; align-items: center; gap: 3px; background: var(--success-bg); border: 1.5px solid color-mix(in srgb, var(--ok) 50%, transparent); border-radius: var(--radius-sm); padding: 3px 9px; }
-.qp-pricebox .ic { font-size: 14px; color: var(--success); }
-.qp-price-in { width: 62px; border: 0; background: transparent; padding: 2px 0; font: inherit; font-size: 14px; font-weight: 800; text-align: end; color: var(--success); outline: 0; }
-.qp-ref { font-size: 10px; font-weight: 700; color: var(--muted); margin-top: 4px; }
-.qp-ref.changed { color: var(--warning); }
-.qp-table td.mut { color: var(--muted); }
-.qp-itemcell { display: flex; align-items: flex-start; gap: 9px; }
-.qp-legx { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--danger-bg); color: var(--danger); font-size: 12px; font-weight: 800; cursor: pointer; display: grid; place-items: center; margin-top: 1px; }
-.qp-qty { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.qp-qty .hint { font-size: 9.5px; font-weight: 700; color: var(--rentee); }
-.qp-qmatch { font-size: 10px; font-weight: 800; color: var(--success); background: var(--success-bg); border: 1px solid color-mix(in srgb, var(--ok) 44%, transparent); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
-.qp-legbtn { border: 0; background: none; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
-.qp-legbtn.cancel { color: var(--danger); } .qp-legbtn.restore { color: var(--success); }
-.qp-excluded { font-size: 12px; font-weight: 700; color: var(--muted); }
-/* العدد stepper */
-.qp-step2 { display: inline-flex; align-items: center; gap: 6px; }
-.qp-stepbtn { display: grid; place-items: center; width: 26px; height: 26px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface); color: var(--navy); font-size: 16px; font-weight: 800; cursor: pointer; }
-.qp-stepbtn:disabled { opacity: .4; cursor: default; }
-.qp-stepval { min-width: 18px; text-align: center; font-size: 14px; font-weight: 800; color: var(--navy); }
-
-/* totals + words + payment cards */
-.qp-totals { margin-top: 16px; border-top: 1.5px solid var(--border); padding-top: 10px; }
-.qp-trow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 13px; }
-.qp-trow .l { color: var(--navy-mid); font-weight: 600; } .qp-trow .v { font-family: var(--font-mono); font-weight: 700; direction: ltr; }
-/* The fixed-divisor note trailing a money figure ("· 26 working days/month") — the same muted, smaller
-   treatment `.qp-table .sub` gives it in the price table, so the two papers state it identically. */
-.qp-trow .v .sub { font-family: inherit; font-size: 10.5px; font-weight: 600; color: var(--muted); }
-.qp-trow.net { border-top: 1px solid var(--line); margin-top: 5px; padding-top: 9px; font-size: 15px; }
-.qp-trow.net .l { font-weight: 800; color: var(--navy); } .qp-trow.net .v { color: var(--success); font-weight: 800; }
-.qp-words { margin-top: 10px; background: var(--paper-2); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11.5px; font-weight: 700; color: var(--navy-mid); }
-.qp-words .k { color: var(--muted); font-weight: 800; margin-inline-end: 6px; }
-.qp-pay { margin-top: 14px; }
-.qp-pay-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
-.qp-pay-row .k { font-size: 12.5px; font-weight: 700; color: var(--navy); flex: 0 0 auto; min-width: 92px; }
-.qp-pay-row select, .qp-sel { flex: 1 1 auto; min-width: 0; height: 38px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 10px; font: inherit; font-size: 13px; font-weight: 700; color: var(--navy); background: var(--surface); outline: 0; }
-.qp-badge { flex: 0 0 auto; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-.qp-badge.match { background: var(--success-bg,var(--ok-soft)); color: var(--success); }
-.qp-badge.diff { background: var(--danger-bg,var(--danger-soft)); color: var(--danger); }
-.qp-badge.none { background: var(--info-soft); color: var(--info,var(--info)); }
-
-/* priceCompareNavy */
-.qp-compare { background: linear-gradient(135deg, var(--navy), var(--navy-deep)); color: var(--surface); border-radius: var(--radius-lg); padding: 13px 18px; margin-bottom: 14px; }
-.qp-compare .duo { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.qp-compare .side { text-align: center; flex: 1; }
-.qp-compare .side .k { font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,.7); }
-.qp-compare .side .v { font-size: 27px; font-weight: 800; font-family: var(--font-mono); direction: ltr; margin-top: 2px; line-height: 1; }
-.qp-compare .side.sup .v { color: var(--warn-amber); } .qp-compare .side.me .v { color: color-mix(in srgb, var(--action) 45%, white); }
-.qp-compare .conv { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-.qp-compare .conv .track { flex: 1; height: 3px; border-radius: var(--radius-sm); background: rgba(255,255,255,.18); }
-.qp-compare .conv .chip { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.14); white-space: nowrap; }
-.qp-compare .conv .chip.ok { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--tick-up); }
-/* per-line breakdown (app _DeltaTable parity) — collapsible, sits inside the dark compare card */
-.qp-cmp-toggle { display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; margin-top: 10px; background: none; border: 0; color: rgba(255,255,255,.82); font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer; }
-.qp-cmp-toggle .material-icons-outlined { font-size: 16px; }
-.qp-cmp-tbl { width: 100%; border-collapse: collapse; margin-top: 10px; color: var(--surface); }
-.qp-cmp-tbl th { font-size: 9.5px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: rgba(255,255,255,.6); padding: 4px 8px; text-align: end; border-bottom: 1px solid rgba(255,255,255,.16); }
-.qp-cmp-tbl th:first-child { text-align: start; }
-.qp-cmp-tbl td { font-size: 12px; font-weight: 700; font-family: var(--font-mono); direction: ltr; padding: 6px 8px; text-align: end; border-bottom: 1px solid rgba(255,255,255,.08); }
-.qp-cmp-tbl td.ln { text-align: start; font-family: inherit; color: rgba(255,255,255,.9); }
-.qp-cmp-tbl td .u { font-size: 9.5px; font-weight: 700; color: rgba(255,255,255,.55); }
-.qp-cmp-tbl td.na { color: rgba(255,255,255,.45); font-weight: 700; }
-.qp-cmp-tbl td.gap { color: var(--warn-amber); }
-
-/* classic terms table (step ②) */
-.qp-tt { width: 100%; border-collapse: collapse; }
-.qp-tt th { background: var(--navy); color: var(--surface); font-size: 11px; font-weight: 800; padding: 9px 10px; text-align: start; }
-.qp-tt td { border-bottom: 1px solid var(--line); padding: 10px; font-size: 12.5px; vertical-align: middle; }
-.qp-tt .cat td { background: color-mix(in srgb, var(--info) 8%, transparent); color: var(--navy); font-weight: 800; font-size: 11px; letter-spacing: .03em; padding: 7px 10px; }
-.qp-tt .cat.settled td { background: color-mix(in srgb, var(--ok) 10%, transparent); color: var(--success); }
-.qp-tt .lbl { font-weight: 700; color: var(--navy); }
-.qp-tt .sup { color: var(--navy-mid); }
-.qp-tt .locked td { color: var(--muted); }
-.qp-tt .locked .lbl { color: var(--navy); }
-.qp-ttbadge { display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 800; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
-.qp-ttbadge.match { background: var(--success-bg,var(--ok-soft)); color: var(--success); }
-.qp-ttbadge.conflict { background: var(--danger-bg,var(--danger-soft)); color: var(--danger); }
-.qp-ttbadge.none { background: var(--info-soft); color: var(--info,var(--info)); }
-.qp-ttbadge.locked { background: var(--surface3,var(--surface3)); color: var(--navy); }
-.qp-ttreopen { border: 0; background: none; color: var(--success); font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; margin-inline-start: 6px; }
-
-/* دليل البنود index (review) */
-.qp-guide { margin-top: 14px; border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
-.qp-guide-h { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--paper-2); font-size: 12.5px; font-weight: 800; color: var(--navy); }
-.qp-guide-bar { flex: 1 1 auto; height: 6px; border-radius: var(--radius-sm); background: var(--surface3,var(--surface3)); overflow: hidden; max-width: 160px; margin-inline-start: auto; }
-.qp-guide-bar > div { height: 100%; background: var(--success); border-radius: var(--radius-sm); }
-.qp-gcat { border-top: 1px solid var(--line); }
-.qp-gcat-h { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: color-mix(in srgb, var(--action) 8%, white); cursor: pointer; padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 800; color: var(--navy); text-align: start; }
-.qp-gcat-h.all-matched { background: var(--ok-soft); color: var(--success); }
-.qp-gcat-h .chev { margin-inline-start: auto; transition: transform .15s; }
-.qp-gcat-h .chev.open { transform: rotate(180deg); }
-.qp-grow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px; font-size: 12px; border-top: 1px solid var(--line); }
-.qp-grow.conflict { background: color-mix(in srgb, var(--danger) 6%, transparent); }
-.qp-grow.pending { background: color-mix(in srgb, var(--info) 5%, transparent); }
-.qp-grow .k { color: var(--navy); font-weight: 600; }
-
-/* summary compare badge + payment (review) */
-.qp-sumbadge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: 999px; margin-top: 10px; }
-.qp-sumbadge.match { background: var(--success-bg,var(--ok-soft)); color: var(--success); }
-.qp-sumbadge.diff { background: var(--info-soft); color: var(--rentee); }
-
-/* footer */
-.qp-foot { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 9px 24px; border-top: 1px solid var(--line); background: var(--surface); }
-.qp-foot .spacer { flex: 1 1 auto; }
+.qp-body { flex: 1 1 auto; overflow-y: auto; min-height: 0; background: var(--surface); }
+/* The log's own card. ~~`.qp-sheet` was the wizard's shell and the log modal borrowed it.~~ The
+   wizard is `.ng-shell` now, so the log carries the card it actually needs and nothing else. */
+.qp-sheet { display: flex; flex-direction: column; width: 100%; max-height: 90vh; background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; font-family: var(--font-sans); color: var(--navy); animation: dpModal .22s ease; }
+/* The negotiation LOG's own size (owner, 2026-09-23). Wide enough for a round's rate, its two
+   legs and its total on one line, and tall enough that the tabs have a body under them. */
+.qp-sheet.ng-logm { max-width: 760px; height: min(78vh, 700px); }
+.qp-head-r1 { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
 .qp-log { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); padding: 8px 12px; font: inherit; font-size: 12.5px; font-weight: 800; color: var(--navy-mid); cursor: pointer; }
-.qp-fbtn { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-md); padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 800; color: var(--navy); cursor: pointer; }
-.qp-fbtn.primary { background: var(--rentee); border-color: var(--rentee); color: var(--surface); }
-.qp-fbtn.accept { background: var(--success); border-color: var(--success); color: var(--surface); }
-.qp-fbtn:disabled { opacity: .5; cursor: not-allowed; }
-.qp-foot-main { display: flex; align-items: center; gap: 10px; }
-.qp-cch { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 900; line-height: 1; flex: 0 0 auto; background: color-mix(in srgb, var(--info) 12%, transparent); color: var(--rentee); }
-.qp-fbtn.primary .qp-cch, .qp-fbtn.accept .qp-cch { background: rgba(255, 255, 255, 0.24); color: var(--surface); }
-.qp-gate { position: absolute; bottom: 64px; inset-inline-start: 50%; transform: translateX(-50%); background: var(--danger); color: var(--surface); font-size: 11.5px; font-weight: 700; padding: 7px 12px; border-radius: var(--radius-sm); }
-
 /* activity log (📜 السجل) — real system_bot negotiation timeline */
 .qp-log-tabs { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--border,var(--border)); background: var(--surface2,var(--surface2)); }
 .qp-log-tab { border: 1px solid var(--border,var(--border)); background: var(--surface1,var(--surface)); border-radius: 100px; padding: 5px 14px; font: inherit; font-size: 12px; font-weight: 800; color: var(--muted,var(--muted)); cursor: pointer; }
@@ -585,139 +930,12 @@
 .qp-log-list { list-style: none; margin: 0; padding: 6px 0; max-height: 60vh; overflow-y: auto; }
 .qp-log-row { display: flex; align-items: flex-start; gap: 9px; padding: 10px 16px; border-bottom: 1px solid var(--line,var(--surface3)); }
 .qp-log-row:last-child { border-bottom: 0; }
+/* The band that separates one round's entries from the next. Without it ten entries read as ten
+   unrelated events and nothing said which round any of them belonged to. */
+.qp-log-round { position: sticky; top: 0; padding: 6px 16px; background: var(--surface2); font-size: 10.5px; font-weight: 800; color: var(--muted); letter-spacing: .04em; }
 .qp-log-ic { font-size: 16px; color: var(--rentee,var(--action)); flex: 0 0 auto; margin-top: 1px; }
 .qp-log-txt { flex: 1; font-size: 12.5px; font-weight: 600; color: var(--navy,var(--navy)); line-height: 1.5; }
 .qp-log-time { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; color: var(--muted,var(--muted)); white-space: nowrap; }
-
-/* ── shared auxiliary modal (region 9 modalShell): documents · reopen confirm · binding commitment ── */
-@keyframes dlFade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes dlPop { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
-.dlproto .dl-modal { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--navy-deep) 55%, transparent); animation: dlFade .18s ease; }
-.dlproto .dl-modal-card { display: flex; flex-direction: column; width: 100%; max-height: 88vh; overflow: hidden; background: var(--surface1); border-radius: var(--radius-lg); animation: dlPop .22s cubic-bezier(.22, 1, .36, 1); }
-.dlproto .dl-modal-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
-.dlproto .dl-modal-ic { width: 40px; height: 40px; border-radius: var(--radius-md); display: grid; place-items: center; flex: 0 0 auto; background: color-mix(in srgb, var(--info) 12%, transparent); color: var(--rentee); }
-.dlproto .dl-modal-ic.warn { background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--action); }
-.dlproto .dl-modal-ic.danger { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
-.dlproto .dl-modal-ic .material-icons-outlined { font-size: 22px; }
-.dlproto .dl-modal-tt { flex: 1; min-width: 0; }
-.dlproto .dl-modal-title { font-size: 15px; font-weight: 800; color: var(--navy); }
-.dlproto .dl-modal-sub { font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 1px; }
-.dlproto .dl-modal-x { width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--surface2); color: var(--muted); display: grid; place-items: center; cursor: pointer; flex: 0 0 auto; }
-.dlproto .dl-modal-x .material-icons-outlined { font-size: 18px; }
-.dlproto .dl-modal-body { padding: 18px; overflow-y: auto; }
-.dlproto .dl-modal-body.center { text-align: center; }
-.dlproto .dl-modal-msg { font-size: 13px; line-height: 1.6; color: var(--muted); }
-.dlproto .dl-modal-ack { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 14px; font-size: 13px; font-weight: 700; color: var(--navy); cursor: pointer; }
-.dlproto .dl-modal-foot { display: flex; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border); }
-.dlproto .dl-mbtn { flex: 1; border-radius: var(--radius-md); padding: 11px 16px; font: inherit; font-weight: 800; font-size: 13px; cursor: pointer; border: 1px solid var(--border); background: var(--surface1); color: var(--navy); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-.dlproto .dl-mbtn.warn { background: var(--action); border-color: var(--action); color: var(--surface); }
-.dlproto .dl-mbtn.green { background: var(--success); border-color: var(--success); color: var(--surface); }
-.dlproto .dl-mbtn:disabled { opacity: .55; cursor: not-allowed; }
-.dlproto .dl-err { margin-top: 10px; font-size: 12px; font-weight: 700; color: var(--danger); }
-/* documents modal rows */
-.dlproto .dl-docsec { margin-bottom: 16px; }
-.dlproto .dl-docsec:last-child { margin-bottom: 0; }
-.dlproto .dl-docsec-h { margin-bottom: 8px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-.dlproto .dl-docrow { display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 8px; text-decoration: none; }
-.dlproto .dl-docrow:last-child { margin-bottom: 0; }
-.dlproto .dl-docrow:hover { background: var(--surface2); }
-.dlproto .dl-docrow .ft { font-size: 22px; flex: 0 0 auto; }
-.dlproto .dl-docrow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: var(--navy); }
-.dlproto .dl-docrow .go { font-size: 20px; color: var(--info); flex: 0 0 auto; }
-.dlproto .dl-modal-note { padding: 24px 0; text-align: center; font-size: 13px; color: var(--muted); }
-
-/* ── review / summary (§6.4): address boxes + two-column (price/payment cards · navy دليل card) ── */
-.dlproto .qp-addr { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0 16px; }
-.dlproto .qp-addrbox { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; background: var(--surface1); }
-.dlproto .qp-addrbox .k { display: block; font-size: 10px; font-weight: 700; color: var(--muted); }
-.dlproto .qp-addrbox .v { display: block; font-size: 13.5px; font-weight: 800; color: var(--navy); margin-top: 2px; }
-.dlproto .qp-rgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-.dlproto .qp-rcol { display: flex; flex-direction: column; gap: 14px; }
-.dlproto .qp-rcard { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 0 16px 14px; background: var(--surface1); }
-.dlproto .qp-rcard-h { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; color: var(--navy); padding: 12px 0 10px 10px; border-inline-start: 3px solid var(--rentee); margin: 4px 0 6px; }
-.dlproto .qp-rcard-h .material-icons-outlined { font-size: 18px; color: var(--rentee); }
-/* navy دليل البنود card */
-.dlproto .qp-guide-navy { background: var(--navy-deep); color: var(--surface); border-radius: var(--radius-lg); padding: 14px 15px; display: flex; flex-direction: column; gap: 9px; }
-.dlproto .qp-gn-h { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; }
-.dlproto .qp-gn-h .material-icons-outlined { font-size: 18px; }
-.dlproto .qp-gn-h .rdy { margin-inline-start: auto; font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.72); }
-.dlproto .qp-gn-bar { height: 7px; border-radius: var(--radius-sm); overflow: hidden; display: flex; background: rgba(255, 255, 255, 0.14); }
-.dlproto .qp-gn-bar .ok { background: var(--success); } .dlproto .qp-gn-bar .df { background: var(--action); }
-.dlproto .qp-gn-legend { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: rgba(255, 255, 255, 0.82); }
-.dlproto .qp-gn-legend .d { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.dlproto .qp-gn-legend .d.ok { background: var(--success); } .dlproto .qp-gn-legend .d.df { background: var(--action); margin-inline-start: 8px; }
-.dlproto .qp-gn-review { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; font-size: 11.5px; font-weight: 800; color: color-mix(in srgb, var(--action) 45%, white); }
-.dlproto .qp-gncat { display: flex; flex-direction: column; gap: 6px; }
-.dlproto .qp-gncat-h { display: flex; align-items: center; gap: 7px; width: 100%; background: rgba(255, 255, 255, 0.94); color: var(--navy); border: 0; border-radius: var(--radius-sm); padding: 8px 11px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; text-align: start; }
-.dlproto .qp-gncat-h .cnt { margin-inline-start: auto; font-size: 10.5px; font-weight: 700; color: var(--muted); }
-.dlproto .qp-gncat-h .chev { font-size: 18px; transition: transform 0.15s; } .dlproto .qp-gncat-h .chev.open { transform: rotate(180deg); }
-.dlproto .qp-gnrow { display: flex; align-items: center; gap: 8px; padding: 7px 11px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; }
-.dlproto .qp-gnrow .k { color: rgba(255, 255, 255, 0.9); }
-.dlproto .qp-gnrow.conflict { background: color-mix(in srgb, var(--danger) 20%, transparent); }
-.dlproto .qp-gnrow.none { background: color-mix(in srgb, var(--info) 18%, transparent); }
-.dlproto .qp-gnbadge { margin-inline-start: auto; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
-.dlproto .qp-gnbadge.match { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--tick-up); }
-.dlproto .qp-gnbadge.conflict { background: color-mix(in srgb, var(--danger) 24%, transparent); color: var(--led-mnt); }
-.dlproto .qp-gnbadge.locked { background: rgba(255, 255, 255, 0.14); color: rgba(255, 255, 255, 0.75); }
-.dlproto .qp-gnbadge.none { background: color-mix(in srgb, var(--border-strong) 20%, transparent); color: color-mix(in srgb, var(--action) 45%, white); }
-
-/* page-flip between the 3 sheets (§6.1) — each step mounts a fresh .qp-paper, so this replays on every
-   السعر ⇄ الشروط ⇄ المراجعة transition. Respects reduced-motion. */
-@keyframes qpFlip {
-  0% { opacity: 0; transform: perspective(1600px) rotateY(9deg) translateY(6px); }
-  100% { opacity: 1; transform: perspective(1600px) rotateY(0deg) translateY(0); }
-}
-.dlproto .qp-paper { animation: qpFlip 0.36s cubic-bezier(0.22, 1, 0.36, 1) both; transform-origin: 50% 0%; }
-@media (prefers-reduced-motion: reduce) { .dlproto .qp-paper { animation: none; } }
-
-/* Wide tables (price + classic terms) scroll inside their own container — never widen the page. */
-.qp-scrollx { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-/* ── Mobile (≤600px) — phones. Scoped to this query so the desktop (≥600px) layout is unchanged. ── */
-@media (max-width: 600px) {
-  /* top bar — tighter; already a horizontal-scroll strip (overflow-x:auto) */
-  .dlproto .topbar { gap: 9px; padding: 9px 12px; }
-  .dlproto .tb-spacer { display: none; }
-  /* price bar — smaller hero so the top-corner status pill can't overlap the number; CTAs stretch/wrap */
-  .dlproto .price-bar { padding: 32px 14px 16px; min-height: 0; }
-  .dlproto .pb-status { top: 10px; inset-inline-end: 10px; font-size: 10px; padding: 3px 9px; }
-  .dlproto .pb-hero .n { font-size: 34px; letter-spacing: -1px; }
-  .dlproto .pb-hero .u { font-size: 14px; }
-  .dlproto .pb-btns { flex-wrap: wrap; }
-  .dlproto .pb-btn { flex: 1 1 auto; justify-content: center; }
-  /* chat — wider bubbles, tighter thread */
-  .dlproto .msg { max-width: 86%; }
-  .dlproto .thread { padding: 12px 12px 14px; }
-  /* ── negotiation sheet ── */
-  .qp-steps { padding: 10px 12px; }
-  .qp-step .lbl { font-size: 12.5px; }
-  .qp-step .badge { width: 26px; height: 26px; font-size: 12px; }
-  .qp-steps .bar { min-width: 8px; margin: 0 5px; }
-  .qp-head-r1 { padding: 7px 12px 6px; gap: 10px; }
-  .qp-deskpad { padding: 12px 10px 34px; }
-  /* paper fills the screen — force the inline zoom off (‼ beats inline) so it isn't shrunk on mobile */
-  .qp-paper { zoom: 1 !important; width: 100%; padding: 16px 14px 26px; }
-  .qp-zoom { display: none; }
-  .qp-qhead { gap: 10px; padding-bottom: 12px; margin-bottom: 12px; }
-  /* tables keep usable column widths and scroll horizontally inside .qp-scrollx */
-  .qp-scrollx .qp-table, .qp-scrollx .qp-tt { min-width: 500px; }
-  .qp-table th, .qp-table td, .qp-tt th, .qp-tt td { padding: 8px 7px; font-size: 11.5px; }
-  .qp-price-in { width: 52px; font-size: 13px; }
-  /* review — single column; address boxes stack */
-  .dlproto .qp-rgrid, .dlproto .qp-addr { grid-template-columns: 1fr; }
-  /* footer — buttons wrap and fill the row */
-  .qp-foot { flex-wrap: wrap; gap: 8px; padding: 9px 12px; }
-  .qp-foot .spacer { display: none; }
-  .qp-foot-main { flex: 1 1 auto; }
-  .qp-fbtn { flex: 1 1 auto; justify-content: center; }
-}
-
-/* deal-room/negotiation — turn cue badge + pulsing Negotiate CTA (app parity: negotiateFresh) */
-.dlproto .pb-turn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; font-size: 11.5px; font-weight: 800; color: color-mix(in srgb, var(--action) 45%, white); }
-.dlproto .pb-turn.alert { color: var(--warn-amber); }
-.dlproto .pb-btn.neg.pulse { animation: dlPulse 1.6s ease-in-out infinite; }
-@keyframes dlPulse { 0%, 100% { } 50% { outline: 6px solid color-mix(in srgb, var(--info) 0%, transparent); outline-offset: 0; } }
-
 /* deal-room/negotiation — reconstructed round history (Log modal) */
 .dlproto .qp-rounds { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .dlproto .qp-round { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 9px 11px; background: var(--surface1); }
@@ -765,7 +983,9 @@
 .dlproto .dr-menu button.danger:hover { background: var(--danger-bg); }
 
 /* Destructive confirm button, alongside `.warn` and `.green`. */
-.dlproto .dl-mbtn.danger { background: var(--danger); border-color: var(--danger); color: var(--surface); }
+/* ~~`.dl-mbtn.danger`.~~ Swept with its last caller (2026-09-22). Every dialog in this file's
+   surfaces is the app's own `Dialog` now, and its acts are `DialogButton`s, so a button skin
+   here would be a second answer to a question the design system already answers. */
 
 /* ── term provenance + last-move hint ───────────────────────────────────────────────────────────
    Two sub-label lines under a term's name: WHERE its value came from, and the last move made on it.

@@ -349,7 +349,21 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
 
             Height stays 52px: the OS's is 46, but its row carries no 34px avatar, bell and inbox,
             and shrinking those to reach parity would cost more than the six pixels are worth. */}
-        <header {...pin("app-header")} className="sticky top-0 z-30 flex h-[52px] items-center gap-3 bg-navy-deep px-4 text-white sm:px-7 relative">
+        <header {...pin("app-header")} className="nd-bar sticky top-0 z-30 flex h-[52px] items-center gap-3 bg-navy-deep px-4 text-white sm:px-7 relative">
+          {/* ── The seasonal backdrop (owner, 2026-09-16) ────────────────────────────────────────
+              Inert all year: `.nd-decor` is `display: none` until `<html data-season="nd">` is
+              written, which `layout.tsx` does between 16 September and 1 October. Under the season
+              it carries the dot lattice and the palm grove, and its `::after` draws the gold Najdi
+              seam along the bar's bottom edge — the header in the app's own screenshot.
+
+              A SPAN rather than a `::before` on the header. This bar is `sticky z-30`, so it opens a
+              stacking context: a positioned pseudo-element would paint over the logo and the tabs,
+              and at `z-index: -1` it would drop behind the header's own background and vanish. A
+              sibling that comes FIRST in the source needs no z-index at all, and the whole row after
+              it paints on top for free.
+
+              `aria-hidden`: it is weather, not information. The bar says what the app is in words. */}
+          <span {...pin("header-season-decor")} className="nd-decor" aria-hidden />
           {/* ~~The Back arrow led this row.~~ It is on the PAGE now, under the bar (owner,
               2026-08-26) — see `usePageBack` and the block at the top of `<main>`. The bar carries
               only what is true of the app on every route; back is true of one page. */}
@@ -396,6 +410,27 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
           >
             {t.shell.beta}
           </span>
+
+          {/* 🔴 ~~The season MARK — the outlined ordinal, a gold hairline and «National Day»,
+              beside the wordmark.~~ REMOVED (owner, 2026-09-22, with a picture of it: *"remove
+              this"*). It had already replaced the kit's gold PILL on 2026-09-17, which had itself
+              replaced the mark on the dashboard band — three placements in six days for one note,
+              and this is the fourth answer: the bar carries none.
+
+              ⚠️ What the season still wears on this bar is everything that is not WORDS: the
+              three-stop gradient, the dot lattice, the palm grove and the gold Najdi seam along the
+              bottom edge. That was always the better division — the bar is the product's own
+              chrome, and a caption on it is the one seasonal piece that has to be read rather than
+              merely seen.
+
+              ⚠️ `.nd-mark*` went with it, rules and all, rather than being left inert: an
+              unused seasonal block is one edit away from coming back by accident, which is exactly
+              what this log recorded when the dune sweep was deleted on 2026-09-17. Pin 2.5 is
+              RETIRED, never renumbered — a number that has been quoted must not come back meaning
+              something else.
+
+              ⚠️ `seasonOrdinal` survives and is still read by the guest wall's head strip;
+              the import here went with the markup. */}
 
           {/* ── The nav sits DEAD CENTRE of the bar, not after the title ────────────────────────────
               Absolutely placed, so it is centred on the HEADER rather than on whatever space the
@@ -590,18 +625,19 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                   type="button"
                   onClick={() => setVerifyOpen(true)}
                   aria-label={t.shell.verifyNudge}
-                  /* ── Quiet enough to sit beside a face, loud enough to be the thing to press ──
-                     ~~`uppercase tracking-[0.05em]`~~ on a solid brand ground: SHOUTED at 11px, on a
-                     navy bar where every other mark is white at reduced strength, and it read as an
-                     alert rather than as an offer. Sentence case at the same size and weight says
-                     the same word without raising its voice.
-
-                     ⚠️ The brand FILL stays. This is an action, not a note — the outlined-white
-                     treatment belongs to the marks beside the wordmark, which state a fact and are
-                     not pressed. `h-[22px]` keeps it off the bar's own edges beside a 34px circle. */
-                  className="flex h-[22px] flex-none items-center rounded-full bg-brand px-2.5 text-label font-semibold text-white transition hover:bg-brand-press"
+                  /* ── It has to read as a BUTTON, not a badge (owner, 2026-09-14) ──────────────
+                     *"verify option is not clear as cta"* — and *"i dont want to change the word but
+                     the ui"*, so the word is untouched and the treatment is what moved.
+                     🔴 At `h-[22px]` and 11px it was a CHIP beside a 34px face, and this bar is full
+                     of chips that state facts and are never pressed — the verified rosette, the tier
+                     marks. Nothing about it said «press me» except its colour.
+                     Now it is the design system's own small control: `control-sm` (30px, one step
+                     under the avatar), `text-meta`, and an arrow that says the press GOES somewhere.
+                     ⚠️ The brand FILL stays, and the radius stays `full`: it sits beside a circular
+                     avatar, and a square corner there reads as a misalignment rather than a button. */
+                  className={btn("primary", "sm", { pill: true, className: "flex-none transition" })}
                 >
-                  {t.shell.verifyNudge}
+                  <Icon name="verified" size={16} /> {t.shell.verifyNudge}
                 </button>
               )}
 
@@ -700,7 +736,9 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
           {back && (
             // `flex` across the full width rather than `inline-flex`: the bar carries a trailing slot
             // now, and the control itself stays exactly where it was, first on the line.
-            <div {...pin("page-back")} className={cx(PAGE_BACK, fullBleed && `${PAGE_X} pt-2`)}>
+            // `page-back-bar` carries no style of its own: it is the hook a surface uses to restyle its
+            // own bar (the bid map's white strip, `map-proto.css`, 2026-09-22) without a prop here.
+            <div {...pin("page-back")} className={cx("page-back-bar", PAGE_BACK, fullBleed && `${PAGE_X} pt-2`)}>
               {(() => {
                 /* ── ONE control, one word, one place (owner, 2026-09-03) ───────────────────────
                    *"There are many variations of the back button on screens, and some have two. I

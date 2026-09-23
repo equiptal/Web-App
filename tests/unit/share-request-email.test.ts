@@ -41,6 +41,11 @@ describe("shareRequestEmail", () => {
       messageId: "0100-abc",
       inSentFolder: false,
       skipped: 0,
+      /* Added 2026-09-13 so the posted tick can name WHO it reached rather than only how many.
+         The recipients are derived server-side, so an empty list means «we were not told» — which
+         is this stub's answer, and the caller then falls back to its own picks or says the count
+         alone. */
+      recipientEmails: [],
     });
     expect(calls[0].url).toBe("/api/requests/req-1/share-email");
   });

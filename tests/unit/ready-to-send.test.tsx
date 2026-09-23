@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { fireEvent, screen, within } from "@testing-library/react";
 import { ReadyToSend } from "@/components/create/ReadyToSend";
 import { BID_WINDOWS, MAINTENANCE_SLAS, PAYMENT_TERMS } from "@/lib/contract";
@@ -11,7 +12,10 @@ import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../set
  * where a stray click changes the request while the renter is checking it. So the assertions are
  * about what is editable here and what sends the renter back to the canvas.
  *
- * ── The sections moved behind «View all details» (owner, 2026-09-02) ────────────────────────────
+ * ── The sections moved behind «Details» (owner, 2026-09-02) ─────────────────────────────────────
+ *
+ * ⚠️ The button read «View all details» until 2026-09-14, when the strip became one row and its
+ * WIDTH turned into a layout constraint (*"make the button details only so it is smaller"*).
  *
  * The page now leads with a one-line summary and keeps the four sections in a dialog. Nothing about
  * them changed: same values, same pens, same export. So most of these cases open the dialog first
@@ -28,7 +32,7 @@ const review = (opts: Parameters<typeof renderCanvas>[1] = {}) =>
 
 /** Open the dialog that now holds the four review sections. */
 async function openDetails(handle: Awaited<ReturnType<typeof review>>) {
-  await handle.run(() => screen.getByRole("button", { name: /View all details/i }).click());
+  await handle.run(() => screen.getByRole("button", { name: /^Details$/i }).click());
 }
 
 describe("the screen lands at the top (owner, 2026-09-09)", () => {
@@ -59,7 +63,7 @@ describe("what suppliers will see (MREQ-AC-42)", () => {
     expect(screen.getByText("Ready to send")).toBeTruthy();
     const map = screen.getByRole("link", { name: /King Khalid International Airport/i });
     expect(map.getAttribute("href")).toMatch(/google\.com\/maps/);
-    expect(screen.getByRole("button", { name: /View all details/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Details$/i })).toBeTruthy();
   });
 
   it("summarises the site, schedule and charged days", async () => {
@@ -212,7 +216,7 @@ describe("sending, and the two buttons that are gone (owner, 2026-09-02)", () =>
     expect(screen.queryByRole("button", { name: /Send to suppliers/i })).toBeNull();
   });
 
-  it("offers a pen beside «View all details» instead of a button in an action row", async () => {
+  it("offers a pen beside «Details» instead of a button in an action row", async () => {
     // Where the hand already is: he has just read the strip, and the two controls are the two
     // things he can do about it — look closer, or change it.
     const handle = await review();
@@ -220,7 +224,7 @@ describe("sending, and the two buttons that are gone (owner, 2026-09-02)", () =>
 
     // A pen, not a labelled button: its only content is the glyph, and its name is an `aria-label`.
     expect(pen.textContent?.trim()).toBe("edit");
-    expect(pen.previousElementSibling?.textContent).toContain("View all details");
+    expect(pen.previousElementSibling?.textContent).toContain("Details");
 
     await handle.run(() => pen.click());
     expect(handle.store().state.readyToSend).toBe(false);
@@ -262,5 +266,90 @@ describe("the one-line summary (owner, 2026-09-02)", () => {
     // The dialog's own content must not be on the page behind it.
     expect(screen.queryByText("DAYS CHARGED")).toBeNull();
     expect(screen.queryByText(/ADDITIONAL NOTES/)).toBeNull();
+  });
+});
+
+/**
+ * ── The strip is ONE row, and the button rides it (owner, 2026-09-14) ───────────────────────────
+ *
+ * *"make the button details only so it is smaller, and always in one row even if request details
+ * beside it stripped — but this card must have the details with the button in one row"*.
+ *
+ * With four facts and a payment dropdown the row wrapped, so «Details» and the pen sat on a line of
+ * their own under the card they belong to. jsdom lays out no flexbox, so what is assertable is the
+ * rule that decides the row, never the row itself.
+ */
+describe("the ready strip holds its row", () => {
+  const SRC = readFileSync("src/components/create/ReadyToSend.tsx", "utf8");
+  /**
+   * The card's own element — the one carrying the facts.
+   *
+   * ⚠️ Anchored on the `<div` that OPENS it, not on `basis-[34rem]`: that string appears in the
+   * comment above the element too, and the first match is the prose. A slice that takes in an
+   * explanation of the rule instead of the rule is the trap this repo has hit twice.
+   */
+  const card = (() => {
+    const at = SRC.indexOf('<div className="flex min-w-0 flex-1 basis-[34rem]');
+    return SRC.slice(at, SRC.indexOf(">", at) + 1);
+  })();
+
+  it("does not wrap from `sm` up", () => {
+    expect(card).toMatch(/sm:flex-nowrap/);
+  });
+
+  it("still WRAPS on a phone, where one row would be a smear", () => {
+    /**
+     * ⚠️ And forcing it would push the whole DOCUMENT wider than the screen — the fault audited out
+     * of three surfaces on 2026-09-08. One row where there is room, wrapped where there is not.
+     */
+    expect(card).toMatch(/\bflex-wrap\b/);
+  });
+
+  it("the facts that may not shrink are marked", () => {
+    // A date range, a payment term or a place name clipped mid-word is not a shorter fact, it is a
+    // wrong one.
+    expect(SRC).toMatch(/<StripFact icon="calendar_month" tight>/);
+    expect(SRC).toMatch(/<StripFact tight>/);
+    expect(SRC).toMatch(/<StripFact icon="place" tight>/);
+    expect(SRC).toMatch(/tight \? "flex-none whitespace-nowrap" : "min-w-0"/);
+  });
+
+  it("the machine's NAME is never stripped", () => {
+    /**
+     * 🔴 Owner, 2026-09-14: *"make the equipment name always full appear, not stripped"*. It had
+     * `truncate`, so a long one clipped to «Crawler Excavator 20 t…» — the one thing on this strip
+     * that says WHAT he is renting.
+     */
+    const at = SRC.indexOf('<StripFact icon="inventory_2">');
+    const fact = SRC.slice(at, at + 520);
+    expect(fact).toMatch(/<span className="flex-none whitespace-nowrap">/);
+    expect(fact.slice(0, fact.indexOf("machineNote"))).not.toMatch(/truncate/);
+  });
+
+  it("its NOTE is the one thing on the card that gives way", () => {
+    /**
+     * The operator and the certificate are each stated in full in the section below, so half of this
+     * restatement costs nothing — while half a machine name costs the fact itself. Everything else
+     * on the row is `tight`.
+     */
+    const at = SRC.indexOf("machineNote && <span");
+    expect(SRC.slice(at, at + 90)).toMatch(/min-w-0 truncate/);
+  });
+
+  it("and the card CLIPS rather than widening the page", () => {
+    /**
+     * ⚠️ Load-bearing now that almost nothing may shrink: a row that cannot fit has to end at the
+     * card's own edge. Without this it would push the whole DOCUMENT wider than the screen, which is
+     * the fault audited out of three surfaces on 2026-09-08.
+     * ⚠️ Safe because `Dropdown` PORTALS its list — an `overflow-hidden` ancestor would otherwise
+     * clip the payment menu the moment it opened.
+     */
+    expect(card).toMatch(/overflow-hidden/);
+  });
+
+  it("the button group never wraps and never breaks its own label", () => {
+    const at = SRC.indexOf("ms-auto flex flex-none items-center");
+    expect(at).toBeGreaterThan(0);
+    expect(SRC.slice(at, at + 400)).toMatch(/whitespace-nowrap/);
   });
 });

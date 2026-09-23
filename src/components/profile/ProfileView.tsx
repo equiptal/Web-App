@@ -12,6 +12,9 @@ import type { RenterProfile, VerificationStatus } from "@/lib/contract/onboardin
 import { updateLanguage } from "@/lib/api/profile-client";
 import { Field, FieldGrid, MastheadPill, PageMasthead, Row, RowList, Section } from "@/components/PageSection";
 import { CompanyHub } from "@/components/company/CompanyHub";
+import { CompanyDetails } from "@/components/company/CompanyDetails";
+import { CompanyLogoModal } from "@/components/company/CompanyLogoModal";
+import { Dialog } from "@/components/Dialog";
 import { VerifyModal } from "@/components/onboarding/VerifyModal";
 import { EditProfileForm } from "./EditProfileForm";
 import { ChangePhoneModal } from "./ChangePhoneModal";
@@ -46,16 +49,24 @@ export function ProfileView() {
   const [showChangePhone, setShowChangePhone] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
-  /** The firm this account belongs to, reported up by the block below — see the Company field. */
-  const [firmName, setFirmName] = useState<string | null>(null);
   const [verifyOpen, setVerifyOpen] = useState(false);
   /**
-   * Whether this account belongs to a firm. `null` until the block below has looked.
-   *
-   * 🔴 **Three states, not two.** The verify CTA is drawn when the answer is NO, and a bare
-   * `!firmName` would answer NO while the question was still open — so a renter who already has a
-   * company would see «Add your own company» flash above his own firm on every visit.
+   * The logo dialog. Two doors: `?logo=1`, which the quotation and the deal room link to when
+   * there is no mark yet, and the mark itself on the company card, which is the app own control
+   * (`CompanyLogoEditor`) and the only one that can CHANGE or REMOVE a logo already on file.
    */
+  const [logoOpen, setLogoOpen] = useState(false);
+  /**
+   * The company's own particulars, over this page.
+   *
+   * 🔴 **Offered only once something has been SUBMITTED**, which is the app's own rule
+   * (`company_profile_card._verificationSection`, on `supplierStatus`): 1 / 2 / 3 open the
+   * read-only details, 0 has nothing to show. It reads the same two endpoints the app reads.
+   */
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  /* ~~`firmName`.~~ Swept with the rule it served: the Company row is drawn on every visit now,
+     so nothing asks whether a firm exists. Its own note argued that `null` had to mean «not
+     looked yet» rather than «no firm», which is still true of anything that asks again. */
   const [langBusy, setLangBusy] = useState(false);
 
   useEffect(() => {
@@ -73,6 +84,25 @@ export function ProfileView() {
       active = false;
     };
   }, []);
+
+  /* ── Arriving from the quotation (2026-09-23) ──────────────────────────────────────────────────
+     Its two red asks link here: `?verify=1` opens verification, `?logo=1` the logo dialog. The logo
+     dialog waits for the profile, since it sends the renter's own names with the key, and falls back
+     to verification for an unverified renter, the app's order. Read once, then dropped from the
+     address so a reload does not reopen it. */
+  useEffect(() => {
+    if (loading || typeof window === "undefined") return;
+    const q = new URLSearchParams(window.location.search);
+    const wantsLogo = q.get("logo") === "1";
+    const wantsVerify = q.get("verify") === "1";
+    if (!wantsLogo && !wantsVerify) return;
+    if (wantsLogo && profile?.tier === "verified") setLogoOpen(true);
+    else setVerifyOpen(true);
+    q.delete("logo");
+    q.delete("verify");
+    const rest = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+  }, [loading, profile?.tier]);
 
   const onSaved = (next: RenterProfile) => {
     setProfile(next);
@@ -190,6 +220,35 @@ export function ProfileView() {
       {/* ⚠️ The form, over the page he is already on. It was a route until 2026-09-12 — see
           `VerifyModal` for why it stopped being one. */}
       <VerifyModal open={verifyOpen} onClose={() => setVerifyOpen(false)} />
+      <CompanyLogoModal
+        open={logoOpen}
+        profile={profile}
+        onClose={() => setLogoOpen(false)}
+        onSaved={() => {
+          // Re-read, so the presigned mark is the one on file from now on.
+          fetch("/api/me", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d: { user?: RenterProfile } | null) => d?.user && setProfile(d.user))
+            .catch(() => {});
+        }}
+      />
+
+      {/* ⚠️ A LAYER, not a card on the page. Stacked under his own details these particulars made
+          the profile a filing cabinet, which is the whole of the 2026-09-07 removal and still true;
+          what was wrong was that they then had nowhere to be read at all. The app gives them a
+          screen of their own, and this is that screen on a page that has no routes left to give. */}
+      {detailsOpen && (
+        <Dialog
+          open
+          onClose={() => setDetailsOpen(false)}
+          size="lg"
+          icon={<Icon name="domain" size={20} className="text-brand-deep" />}
+          title={p.companyDetails}
+          padded={false}
+        >
+          <CompanyDetails />
+        </Dialog>
+      )}
 
 
       {/* ── Two columns: who you are, and how the account behaves (owner, 2026-08-30) ─────────
@@ -254,15 +313,19 @@ export function ProfileView() {
                 <Field icon="location_on" label={p.city} value={profile.city || "—"} />
                 <Field icon="work" label={p.jobTitle} value={profile.jobTitle || "—"} />
                 <Field icon="mail" label={p.email} value={profile.email || "—"} ltr />
-                {/* ── ONE name for the firm, and only where it is the only one (owner, 2026-09-07:
-                    *"how yesr test and EQ Rental, 2 names? which one"*) ──────────────────────────
-                    Two different things were printed under one word. `profile.companyName` is FREE
-                    TEXT typed at signup; the block further down names the COMPANY he actually
-                    belongs to — the record that decides what he can see and what his bids are filed
-                    under. So this row draws only when there is NO firm, where the typed value is the
-                    only thing anyone has said about his company. With a firm, the block below is the
-                    answer and repeating it here is the second name he was reading. */}
-                {!firmName && <Field icon="domain" label={p.companyName} value={profile.companyName || "—"} />}
+                {/* ── The company name is ALWAYS here, because it is always a field of this form
+                    (owner, 2026-09-22: *"first i must view all fields here, why the company name not
+                    shown"*) ───────────────────────────────────────────────────────────────────────
+                    ~~Drawn only when there was NO firm (owner, 2026-09-07: *"how yesr test and EQ
+                    Rental, 2 names? which one"*).~~ He was right that two names under one word is
+                    unreadable, and hiding one was the wrong half to fix: this grid is the read-back
+                    of the edit form beside it, so a field the form collects and the grid does not
+                    show reads as a field that failed to save.
+                    **They are two different facts and they are labelled as two now**: this is the
+                    DISPLAY name he types on his profile (the app's own words: *"display/trade
+                    company name — saved to the profile, NOT to verification"*), and the firm's
+                    block below carries the LEGAL name off the CR. Same split the app keeps. */}
+                <Field icon="domain" label={p.companyName} value={profile.companyName || "—"} />
                 <Field icon="chat" label={p.whatsapp} value={profile.whatsapp || "—"} ltr />
               </FieldGrid>
             )}
@@ -294,9 +357,17 @@ export function ProfileView() {
                     ? () => setVerifyOpen(true)
                     : undefined
                 }
-                onCompany={(co) => {
-                  setFirmName(co?.name ?? null);
-                }}
+                /* 🔴 **Whatever was submitted can be READ, and that is the app's split.** 1 / 2 / 3
+                   open the details; only 0 and 3 offer the form above, because a submission under
+                   review must not be sent a second time — *"sending again is what stacks a
+                   duplicate for the reviewer"*. A rejected one gets both, as it does in the app. */
+                onViewDetails={verification === "none" ? undefined : () => setDetailsOpen(true)}
+                /* 🔴 **The mark, and the only way to change or remove one** (owner, 2026-09-23:
+                   *"match it"*). The quotation red ask carries `!companyLogoUrl`, so before this the
+                   web could SET a logo once and never touch it again. `CompanyHub` withholds the
+                   press from a member, the app own owner gate. */
+                logoUrl={profile?.companyLogoUrl ?? null}
+                onEditLogo={() => setLogoOpen(true)}
               />
             </div>
           )}

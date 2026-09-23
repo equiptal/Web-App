@@ -34,6 +34,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**2.1** | Header — logo | `src/components/AppShell.tsx` |
 | &nbsp;&nbsp;**2.2** | Header — centred nav slot | `src/components/AppShell.tsx` |
 | &nbsp;&nbsp;**2.3** | Header — beta mark | `src/components/AppShell.tsx` |
+| &nbsp;&nbsp;**2.4** | Header — season backdrop (palms, dots, seam) | `src/components/AppShell.tsx` |
 | **3** | Nav tabs — desktop | `src/components/AppNav.tsx` |
 | &nbsp;&nbsp;**3.1** | Nav tab — one link | `src/components/AppNav.tsx` |
 | **4** | Nav tabs — mobile | `src/components/AppNav.tsx` |
@@ -47,6 +48,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | **8** | Back arrow | `src/components/AppShell.tsx` |
 | **9** | Page section | `src/components/PageSection.tsx` |
 | &nbsp;&nbsp;**9.5** | Guest wall — blurred page + sign-in card | `src/components/common/GuestWall.tsx` |
+| &nbsp;&nbsp;**9.6** | Guest wall — season chip | `src/components/common/GuestWall.tsx` |
 | **10** | Home | `src/components/home/HomeHub.tsx` |
 | &nbsp;&nbsp;**10.1** | Home — hero band | `src/components/home/CtaBanner.tsx` |
 | &nbsp;&nbsp;**10.2** | Home — hero action column | `src/components/home/CtaBanner.tsx` |
@@ -54,8 +56,14 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**10.5** | Browse — banner + supplier directory | `src/components/stores/BrowsePage.tsx` |
 | &nbsp;&nbsp;**10.6** | My Suppliers — the list | `src/components/suppliers/SuppliersPage.tsx` |
 | &nbsp;&nbsp;**10.7** | Home — notification bubble | `src/components/home/HomeNotificationBubble.tsx` |
+| &nbsp;&nbsp;**10.8** | Home — requests / suppliers / projects tabs | `src/components/home/HomeHub.tsx` |
 | **11** | Start-your-request modal | `src/components/home/StartYourRequestModal.tsx` |
 | **15** | Create — intake screen | `src/components/screens/Intake.tsx` |
+| &nbsp;&nbsp;**15.1** | Intake — previous-requests rail | `src/components/create/RequestsRail.tsx` |
+| &nbsp;&nbsp;**15.2** | Intake rail — one project | `src/components/create/RequestsRail.tsx` |
+| &nbsp;&nbsp;**15.3** | Intake rail — one machine | `src/components/create/RequestsRail.tsx` |
+| &nbsp;&nbsp;**15.4** | Intake — the chosen project and its machines, on the floor | `src/components/create/RequestsRail.tsx` |
+| &nbsp;&nbsp;**15.5** | Intake — Mansour, riding the caret | `src/components/screens/Intake.tsx` |
 | **16** | Create canvas (3 columns) | `src/components/create/Canvas.tsx` |
 | &nbsp;&nbsp;**16.1** | Create — «leave this request?» confirm | `src/components/create/CreateBack.tsx` |
 | &nbsp;&nbsp;**16.2** | Create — site + schedule locked strip (with «Change») | `src/components/create/Canvas.tsx` |
@@ -67,6 +75,9 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**17.5** | Equipment tabs — one equipment | `src/components/create/EquipmentTabs.tsx` |
 | &nbsp;&nbsp;**17.6** | Equipment tabs — the + that adds one | `src/components/create/EquipmentTabs.tsx` |
 | &nbsp;&nbsp;**17.7** | Equipment tabs — the ✕ that removes one | `src/components/create/EquipmentTabs.tsx` |
+| &nbsp;&nbsp;**17.8** | Machine card — the escape row («Not the equipment you want?») | `src/components/create/MachineCard.tsx` |
+| &nbsp;&nbsp;**17.9** | Machine card — the equipment chooser panel | `src/components/create/MachineCard.tsx` |
+| &nbsp;&nbsp;**17.10** | Machine card — the chooser's catalogue list | `src/components/create/MachineCard.tsx` |
 | **18** | Operator rail | `src/components/create/OperatorRail.tsx` |
 | &nbsp;&nbsp;**18.1** | Operator rail — head row | `src/components/create/OperatorRail.tsx` |
 | &nbsp;&nbsp;**18.2** | Operator rail — options grid | `src/components/create/OperatorRail.tsx` |
@@ -86,7 +97,10 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**26.1** | Rail — create tile | `src/components/workspace/RequestRail.tsx` |
 | &nbsp;&nbsp;**26.2** | Rail — request tiles | `src/components/workspace/RequestRail.tsx` |
 | &nbsp;&nbsp;**26.3** | Item tier — one chip per machine | `src/components/workspace/ItemTier.tsx` |
-| **27** | Request context bar (location + item) | `src/components/workspace/RequestContextBar.tsx` |
+| &nbsp;&nbsp;**26.4** | Circle — the request's machines on one ground | `src/components/workspace/CircleArt.tsx` |
+| &nbsp;&nbsp;**26.5** | Circle — the zoomed view behind a double press | `src/components/workspace/RequestRail.tsx` |
+| **27** | Request context bar (location + machines) | `src/components/workspace/RequestContextBar.tsx` |
+| &nbsp;&nbsp;**27.1** | Context bar — the machines the request asked for | `src/components/workspace/RequestContextBar.tsx` |
 | **28** | Request details modal | `src/components/workspace/RequestDetailsModal.tsx` |
 | &nbsp;&nbsp;**28.5** | Bid size filter — include larger equipment | `src/components/workspace/BidSizeFilter.tsx` |
 | **29** | Bid cards | `src/components/workspace/BidCards.tsx` |
@@ -103,13 +117,14 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | **45** | Bid map workspace | `src/components/map/BidMapWorkspace.tsx` |
 | &nbsp;&nbsp;**45.1** | Bid map — canvas side | `src/components/map/BidMapWorkspace.tsx` |
 | &nbsp;&nbsp;**45.2** | Bid map — side panel | `src/components/map/BidMapWorkspace.tsx` |
+| &nbsp;&nbsp;**45.3** | Bid map — «Other bids» strip in the back bar | `src/components/map/OtherOffers.tsx` |
 | **46** | Map canvas | `src/components/map/MapCanvas.tsx` |
 | &nbsp;&nbsp;**46.1** | Map — one machine's marker | `src/components/map/MapCanvas.tsx` |
 | **47** | Fleet card (equipment list) | `src/components/map/EquipmentList.tsx` |
 | &nbsp;&nbsp;**47.1** | Fleet card — photo cell | `src/components/map/EquipmentList.tsx` |
-| &nbsp;&nbsp;**47.2** | Fleet card — readiness + file icon | `src/components/map/EquipmentList.tsx` |
+| &nbsp;&nbsp;**47.2** | Fleet card — readiness + «Equipment documents» | `src/components/map/EquipmentList.tsx` |
 | &nbsp;&nbsp;**47.3** | Fleet card — yard card (distance + availability) | `src/components/map/EquipmentList.tsx` |
-| &nbsp;&nbsp;**47.5** | Fleet list — filter bar | `src/components/map/EquipmentList.tsx` |
+| &nbsp;&nbsp;**47.5** | Fleet list — filter control (end of the count pills row) | `src/components/map/EquipmentList.tsx` |
 | &nbsp;&nbsp;**47.6** | Fleet list — filter panel | `src/components/map/EquipmentList.tsx` |
 | **48** | Price footer | `src/components/map/PriceFooter.tsx` |
 | &nbsp;&nbsp;**48.1** | Price footer — the rate | `src/components/map/PriceFooter.tsx` |
@@ -137,6 +152,14 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**53.1** | Documents tab — Download / Ask footer | `src/components/map/panel/EquipmentDocuments.tsx` |
 | &nbsp;&nbsp;**53.2** | Document row | `src/components/map/panel/DocRowList.tsx` |
 | **55** | Deal room | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.1** | Negotiation sheet (3 steps) | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.2** | Negotiation sheet \u2014 header: supplier, machine, running total | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.3** | Negotiation sheet \u2014 \u2460 the price table | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.4** | Negotiation sheet \u2014 \u2460 the summary block | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.5** | Negotiation sheet \u2014 \u2461 the terms step | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.6** | Negotiation sheet \u2014 the open term card | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.7** | Negotiation sheet \u2014 \u2462 review & send | `src/components/deal-room/DealRoom.tsx` |
+| &nbsp;&nbsp;**55.8** | Negotiation sheet \u2014 footer: log, quotation, the acts | `src/components/deal-room/DealRoom.tsx` |
 | **56** | Chat card | `src/components/deal-room/ChatCard.tsx` |
 | **57** | Chat drawer (map) | `src/components/map/ChatDock.tsx` |
 | &nbsp;&nbsp;**57.1** | Chat drawer — identity + phase + kebab | `src/components/map/ChatDock.tsx` |
@@ -144,8 +167,16 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**57.3** | Chat drawer — the thread | `src/components/map/ChatDock.tsx` |
 | &nbsp;&nbsp;**57.4** | Chat drawer — composer | `src/components/map/ChatDock.tsx` |
 | &nbsp;&nbsp;**57.5** | Chat drawer — staged request card | `src/components/map/ChatDock.tsx` |
+| &nbsp;&nbsp;**57.6** | Chat drawer — negotiation event (grey pill) | `src/components/map/ChatDock.tsx` |
 | **60** | Inbox | `src/components/inbox/InboxView.tsx` |
+| &nbsp;&nbsp;**60.1** | Inbox — the chats column | `src/components/inbox/InboxView.tsx` |
+| &nbsp;&nbsp;**60.2** | Inbox — one chat row | `src/components/inbox/InboxView.tsx` |
+| &nbsp;&nbsp;**60.3** | Inbox — the conversation beside the list | `src/components/inbox/InboxView.tsx` |
+| &nbsp;&nbsp;**60.4** | Inbox — nothing picked yet | `src/components/inbox/InboxView.tsx` |
 | **61** | Browse stores | `src/components/stores/BrowseSurface.tsx` |
+| &nbsp;&nbsp;**61.1** | Browse — heading + search + city, one row | `src/components/stores/BrowseSurface.tsx` |
+| &nbsp;&nbsp;**61.2** | Browse — category rail | `src/components/stores/BrowseSurface.tsx` |
+| &nbsp;&nbsp;**61.3** | Browse — page arrows | `src/components/stores/BrowseSurface.tsx` |
 | **62** | Store detail | `src/components/stores/StoreDetailSurface.tsx` |
 | **63** | Store card | `src/components/stores/StoreCard.tsx` |
 | **64** | Store card (category) | `src/components/stores/StoreCard.tsx` |
@@ -154,6 +185,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | **70** | Profile | `src/components/profile/ProfileView.tsx` |
 | **71** | Edit profile form | `src/components/profile/EditProfileForm.tsx` |
 | **72** | Company hub | `src/components/company/CompanyHub.tsx` |
+| **73** | Company logo dialog (from the quotation) | `src/components/company/CompanyLogoModal.tsx` |
 | **74** | My company card | `src/components/company/MyCompanyCard.tsx` |
 | **75** | Onboarding shell | `src/components/onboarding/OnboardingShell.tsx` |
 | **76** | Onboarding form | `src/components/onboarding/OnboardingForm.tsx` |

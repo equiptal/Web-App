@@ -9,8 +9,16 @@ import { PAGE_MAX, PAGE_X } from "@/components/AppShell";
 import { Skeleton } from "@/components/Skeleton";
 import { SignInPrompt } from "@/components/common/SignInPrompt";
 import { GuestRequestsPreview, GuestWall } from "@/components/common/GuestWall";
-import { fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
-import { groupRequests, requestCodeOf, type RequestGroup } from "@/lib/contract/requests";
+import { cancelRequest, fetchAllMyRequests, fetchBids, fetchReceivedBids, fetchRequestSubmissions, fetchRequestDetail } from "@/lib/api/client";
+import {
+  cancelBlockedReason,
+  cancellableItems,
+  groupBiddingClosed,
+  groupRequests,
+  isBiddingClosed,
+  requestCodeOf,
+  type RequestGroup,
+} from "@/lib/contract/requests";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import {
   EMPTY_SELECTION,
@@ -27,6 +35,7 @@ import {
 } from "@/lib/contract/workspace";
 import { RequestRail } from "@/components/workspace/RequestRail";
 import { hiddenRequests, hideRequest } from "@/lib/access/hidden-requests";
+import { HIDE_BIDLESS_REQUESTS } from "@/lib/flags";
 import { RequestContextBar } from "@/components/workspace/RequestContextBar";
 import { ItemTier } from "@/components/workspace/ItemTier";
 import { BidCards } from "@/components/workspace/BidCards";
@@ -34,6 +43,7 @@ import { CompareMatrix } from "@/components/workspace/CompareMatrix";
 import { AiRankPanel } from "@/components/workspace/AiRankPanel";
 import { BidSizeFilter } from "@/components/workspace/BidSizeFilter";
 import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/RequestDetailsModal";
+import { ConfirmCancelModal } from "@/components/requests/RequestEditModals";
 import { computeCycleTotals } from "@/lib/contract/cycle-totals";
 import { buildCompareSheet, type SheetMoneyCol } from "@/lib/export/compare-sheet";
 import { formatSar } from "@/lib/pricing/rental";
@@ -73,6 +83,8 @@ export function RequestsWorkspace() {
   // Unread chat per bid. `fetchDealRoomUnread` is one global total for the Inbox badge; the per-bid
   // number lives on received-bids, which reads it out of Stream's own per-channel counts.
   const [unreadByBid, setUnreadByBid] = useState<Record<string, number>>({});
+  /** Each bid's supplier mark as a SIGNED link, from the received-bids list (2026-09-23). */
+  const [logoByBid, setLogoByBid] = useState<Record<string, string | null>>({});
   const [wanted, setWanted] = useState<WorkspaceSelection>(EMPTY_SELECTION);
   const [tab, setTab] = useState<Tab>("cards");
   const [source, setSource] = useState<SourceFilter>("all");
@@ -139,7 +151,22 @@ export function RequestsWorkspace() {
     };
   }, [status, reloads]);
 
-  const resolved = useMemo(() => resolveSelection(groups ?? [], bids, wanted), [groups, bids, wanted]);
+  const resolved = useMemo(() => {
+    const all = groups ?? [];
+    /* 🔴 **DEMO ONLY**, and it is what makes the rail filter below actually hold. `resolveSelection`
+       falls back to `groups[0]` — the NEWEST request — and a tile that is the page's own subject is
+       kept on the rail whatever else says otherwise. So landing on a bidless request would draw the
+       very circle `HIDE_BIDLESS_REQUESTS` exists to remove. With the flag on, the fallback chooses
+       among the requests that have bids instead.
+
+       ⚠️ Only when nothing is WANTED. A group named by the URL or by a press is resolved against the
+       whole list, so a deliberate visit to a bidless request still works and still shows its tile. */
+    const pool =
+      HIDE_BIDLESS_REQUESTS && !wanted.groupId && all.some((g) => g.totalBids > 0)
+        ? all.filter((g) => g.totalBids > 0)
+        : all;
+    return resolveSelection(pool, bids, wanted);
+  }, [groups, bids, wanted]);
   /** What is open RIGHT NOW, for the entry reader — see `appliedR`. A ref, not state: it is read
    *  inside an effect to tell an arrival from an echo, and reading it must not schedule a render. */
   const resolvedItemId = useRef<string | null>(null);
@@ -227,7 +254,14 @@ export function RequestsWorkspace() {
     if (status !== "authed") return;
     let live = true;
     fetchReceivedBids()
-      .then((r) => live && setUnreadByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.unreadCount]))))
+      .then((r) => {
+        if (!live) return;
+        setUnreadByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.unreadCount])));
+        // The supplier's mark, SIGNED, for the quotation (owner, 2026-09-23). The bid projection
+        // only holds a bare key, which the private bucket refuses; this list is where the dashboard's
+        // working avatar comes from.
+        setLogoByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.supplierLogoUrl])));
+      })
       .catch(() => {});
     return () => {
       live = false;
@@ -398,13 +432,98 @@ export function RequestsWorkspace() {
   useEffect(() => setHidden(hiddenRequests()), []);
   const hide = useCallback((key: string) => setHidden(hideRequest(key)), []);
 
-  const tiles = useMemo(
-    // A hidden request whose circle is nonetheless the one being READ stays on the rail: taking the
-    // page's own subject out from under it would leave the workspace showing a request the renter
-    // cannot see the tile for.
-    () => railTiles(groups ?? []).filter((tl) => !hidden.includes(tl.key) || tl.key === resolved.groupId),
-    [groups, hidden, resolved.groupId],
+  /* 🔴 **The × on a circle: cancel a LIVE request, hide a CLOSED one** (owner, 2026-09-22:
+     *"clicking it for active will cancel it with confirm popup same used when i cancel from the
+     request details and if it is closed then will remove it from the fleet only"*).
+
+     ⚠️ **The DECISION is here, not in the rail**, and it reads the tile's own `closed` - the
+     same `groupBiddingClosed` that drew the greyscale and the caption. The rail could not make it:
+     the confirmation has to NAME the request and cancel its items, and only this component holds
+     the group.
+
+     🔴 **A LIVE group with nothing cancellable SAYS WHY, and is never hidden.** `isCancellable`
+     is `OPEN || ACTIVE` while `groupBiddingClosed` also admits `PARTIALLY_ACCEPTED` - so a group
+     whose live items are all partially accepted reads LIVE and has no item the backend would take
+     (`REQUEST_CANCEL_NOT_ALLOWED`). Both other answers are wrong:
+       · ~~hide it~~ breaks `hidden-requests`'s own standing rule - *"only a closed group can be
+         hidden … a live request that vanished from the rail would be a request the renter cannot
+         get back to, and this store has no undo"*. It is still taking bids on its siblings.
+       · ~~draw no ×~~ leaves one circle in a row of them with no control and no reason.
+     So it takes the product's OWN answer, which already existed for this exact case:
+     `cancelBlockedReason`, written to be *"shown inline when the renter taps its disabled ×, so a
+     greyed-out control always explains itself (a tooltip wouldn't, on touch)"*.
+
+     ⚠️ **The reason is read off a LIVE item, never off the group.** The group has no status of
+     its own, and the terminal siblings are not what is blocking the cancellation - a group holding
+     one EXPIRED item and one PARTIALLY_ACCEPTED one would otherwise report the expiry, which the
+     renter can do nothing about and which is not why the × refused. */
+  const [cancelling, setCancelling] = useState<RequestGroup | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelled, setCancelled] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const dismissTile = useCallback(
+    (key: string) => {
+      const g = (groups ?? []).find((x) => x.id === key);
+      if (!g) return;
+      // Shut: the circle comes off THIS device's rail and nothing is told to the backend.
+      if (groupBiddingClosed(g.items)) {
+        hide(key);
+        return;
+      }
+      // Live, but the backend would refuse every item: say why, and leave the circle where it is.
+      if (!cancellableItems(g.items).length) {
+        const blocking = g.items.find((i) => !isBiddingClosed(i.status)) ?? g.items[0];
+        if (blocking) setToast(cancelBlockedReason(blocking.status, ar));
+        return;
+      }
+      setCancelError(null);
+      setCancelled(false);
+      setCancelling(g);
+    },
+    [ar, groups, hide],
   );
+
+  /* ⚠️ **Every cancellable item, one DELETE each** - the dashboard's own `doCancel`, because a
+     circle stands for the whole request and a fanned-out RFQ is several requests behind it. The
+     backend refuses anything that is not OPEN or ACTIVE, which is what `cancellableItems` filters.
+
+     ⚠️ `Promise.all`, so one refusal reports a failure for the batch rather than a partial
+     success nothing states. The reload after Done is what tells the renter which items really went.
+
+     ⚠️ `busy` is NOT lowered on success (`RequestEditModals`'s own rule): the act is over, and
+     a confirm button coming back to life under a tick invites a second cancellation. */
+  const doCancel = useCallback(async () => {
+    const g = cancelling;
+    if (!g || cancelBusy) return;
+    setCancelBusy(true);
+    setCancelError(null);
+    try {
+      await Promise.all(cancellableItems(g.items).map((i) => cancelRequest(i.id)));
+      setCancelled(true);
+    } catch {
+      setCancelError(ar ? "لم يتمّ الإجراء. حاول مجددًا." : "That didn’t go through. Try again.");
+    } finally {
+      setCancelBusy(false);
+    }
+  }, [ar, cancelBusy, cancelling]);
+
+  const tiles = useMemo(() => {
+    const all = railTiles(groups ?? [], ar);
+    /* A hidden request whose circle is nonetheless the one being READ stays on the rail: taking the
+       page's own subject out from under it would leave the workspace showing a request the renter
+       cannot see the tile for. The demo filter below follows the same rule, for the same reason. */
+    const kept = all.filter((tl) => !hidden.includes(tl.key) || tl.key === resolved.groupId);
+    /* 🔴 **DEMO ONLY** (owner, 2026-09-14: *"i want no bids to be hidden from requests list in
+       requests, just for demo purpose"*). `HIDE_BIDLESS_REQUESTS` is a code toggle; set it false and
+       this whole branch stands down. See the flag's own note for what it costs - chiefly that
+       `bids` here is `totalBids`, which counts APP bids and not the renter's own link submissions.
+
+       ⚠️ Guarded on at least one tile HAVING a bid: with none, every circle would go and the page
+       would fall through to «create your first request» over an account that has several. */
+    if (!HIDE_BIDLESS_REQUESTS || !kept.some((tl) => tl.bids > 0)) return kept;
+    return kept.filter((tl) => tl.bids > 0 || tl.key === resolved.groupId);
+  }, [groups, hidden, resolved.groupId, ar]);
 
   /**
    * Bids the renter has taken off the comparison. Owned here rather than inside the matrix so the
@@ -499,6 +618,8 @@ export function RequestsWorkspace() {
         .catch(() => null),
     ]);
     const u = me?.user ?? {};
+    const renteeVerified = tier === "verified";
+    const profileHref = `${window.location.origin}/profile`;
     const reqItem = (rec as unknown as { equipmentItems?: { mobilizationByRentee?: boolean | null; demobilizationByRentee?: boolean | null }[] } | null)?.equipmentItems?.[0] ?? null;
     const code = item.code ?? fetchedCode ?? item.displayId;
     const reqCode = code.replace(/[^A-Za-z0-9-]/g, "");
@@ -520,6 +641,13 @@ export function RequestsWorkspace() {
             lang: ar ? "ar" : "en",
             quotationNumber: `Q-${reqCode}-${quotationSupplierInitials(supBids[0].card.supplierName)}${si + 1}`,
             reference: code,
+            // The job's site, for the reference strip and the renter's box. The GROUP holds it
+            // ("City — Neighbourhood"), which is the short form the app prints; a request with none
+            // simply omits the pair rather than printing a blank.
+            workSite: group?.locationLabel ?? null,
+            // ABSOLUTE: the quotation opens in a blank window, where a relative path resolves to nothing.
+            sealUrl: `${window.location.origin}/moedatech-logomark.svg`,
+            supplierLogoUrl: logoByBid[supBids[0].card.id] ?? null,
             entries: supBids.map((b) => ({
               bid: b.card,
               itemLabel: itemName,
@@ -539,7 +667,16 @@ export function RequestsWorkspace() {
               nationalAddress: u.nationalAddress ?? null,
               phone: u.phone ?? null,
               email: u.email ?? null,
-              verified: tier === "verified",
+              verified: renteeVerified,
+              logoUrl: u.companyLogoUrl ?? null,
+              // The app's two asks on his own box: verify first (no company, no mark to add), then
+              // the empty logo slot. Screen only; the PDF never carries them.
+              asks: {
+                verify: renteeVerified ? null : { href: `${profileHref}?verify=1`, label: ar ? "وثّق شركتك" : "Verify your company" },
+                // Opens the logo dialog on the profile (`CompanyLogoModal`), the web's in-place upload.
+                addLogo:
+                  renteeVerified && !u.companyLogoUrl ? { href: `${profileHref}?logo=1`, label: ar ? "أضف شعارًا" : "Add a logo" } : null,
+              },
             },
           }),
         ),
@@ -547,7 +684,14 @@ export function RequestsWorkspace() {
       .join("");
 
     const dlName = quotationDownloadName(code, [code]);
-    const html = wrapQuotationPage(sections, { lang: ar ? "ar" : "en", title: dlName });
+    // No auto-print any more: the page opens as the app's preview does, with «Download PDF» and
+    // «Share» above it (owner, 2026-09-23).
+    const html = wrapQuotationPage(sections, {
+      lang: ar ? "ar" : "en",
+      title: dlName,
+      autoPrint: false,
+      tools: { download: ar ? "تنزيل PDF" : "Download PDF", share: ar ? "مشاركة" : "Share", fileName: dlName },
+    });
     // A popup-blocked `window.open` returns null and used to fail silently — a dead click. Fall back
     // to downloading the self-printing file so the quotation is never a no-op.
     const w = window.open("", "_blank");
@@ -565,7 +709,7 @@ export function RequestsWorkspace() {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  }, [ar, item, shownAll, checkedBids, fetchedCode, tier]);
+  }, [ar, item, shownAll, checkedBids, fetchedCode, tier, group?.locationLabel, logoByBid]);
 
   /**
    * ── The comparison, on paper (owner, 2026-09-09) ──────────────────────────────────────────────
@@ -697,7 +841,7 @@ export function RequestsWorkspace() {
     return (
       <div className="flex h-full min-h-0 flex-col">
         <div className="flex-none border-b border-border bg-surface3/60">
-          <div className={`mx-auto flex h-[96px] w-full max-w-[1440px] items-center gap-4 ${PAGE_X}`}>
+          <div className={`mx-auto flex h-[96px] w-full ${PAGE_MAX} items-center gap-4 ${PAGE_X}`}>
             {Array.from({ length: 6 }, (_, i) => (
               <div key={i} className="flex flex-none flex-col items-center gap-1">
                 <Skeleton className="size-14 rounded-full" />
@@ -767,8 +911,7 @@ export function RequestsWorkspace() {
         tiles={tiles}
         activeKey={resolved.groupId}
         onPick={pickGroup}
-        onShare={() => drawer.open("share")}
-        onHide={hide}
+        onDismiss={dismissTile}
       />
 
 
@@ -1024,7 +1167,6 @@ export function RequestsWorkspace() {
         <RequestDetailsModal
           group={group}
           item={item}
-          bids={bids}
           link={link}
           openShare={drawerShare}
           openCancel={drawerCancel}
@@ -1035,6 +1177,38 @@ export function RequestsWorkspace() {
             setGroups(null);
             setReloads((n) => n + 1);
           }}
+        />
+      )}
+
+      {/* The × on a LIVE circle. Same component, same scope and same wording as the dashboard's
+          row action, so one act does not read as two - and `done` is what turns it into the tick
+          rather than dismissing in silence (2026-09-17).
+
+          ⚠️ **Done carries the reload**, never the success itself: the rail has to re-read to
+          grey the circle and put «Closed» under it, and until he has read the tick there is nothing
+          to reload FOR. The circle then stays on the rail, greyed, and a second × hides it. */}
+      {cancelling && (
+        <ConfirmCancelModal
+          ar={ar}
+          L={(en, arr) => (ar ? arr : en)}
+          busy={cancelBusy}
+          error={cancelError}
+          done={cancelled}
+          scope={{
+            kind: "all",
+            idLabel: cancelling.groupRef ?? cancelling.items[0]?.displayId ?? cancelling.id,
+            total: cancellableItems(cancelling.items).length,
+          }}
+          onClose={() => {
+            if (cancelled) {
+              setGroups(null);
+              setReloads((n) => n + 1);
+            }
+            setCancelling(null);
+            setCancelled(false);
+            setCancelError(null);
+          }}
+          onConfirm={() => void doCancel()}
         />
       )}
     </div>

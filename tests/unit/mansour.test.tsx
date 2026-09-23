@@ -19,7 +19,9 @@ const SVG = readFileSync("src/components/Mansour.tsx", "utf8");
 const CSS = readFileSync("src/components/mansour.css", "utf8");
 const PROCESSING = readFileSync("src/components/screens/Processing.tsx", "utf8");
 const INTAKE = readFileSync("src/components/screens/Intake.tsx", "utf8");
-const CHIPS = readFileSync("src/components/create/ProjectChips.tsx", "utf8");
+/* The typewriter moved to the RAIL with the site strip (owner, 2026-09-16); `ProjectChips`
+   is deleted. Who raises the flag changed; the rule that it must be lowered did not. */
+const CHIPS = readFileSync("src/components/create/RequestsRail.tsx", "utf8");
 
 afterEach(cleanup);
 
@@ -109,7 +111,8 @@ describe("where he is used", () => {
      * own drawing of a real machine, and he takes it only when there is no drawing to hold — an
      * off-catalogue line, or a taxonomy that failed to load.
      */
-    expect(PROCESSING).toMatch(/<Mansour size=\{72\} state="live" \/>/);
+    // 92 since the disc grew to 172 (owner, 2026-09-23: *"make the circle of image bigger"*).
+    expect(PROCESSING).toMatch(/<Mansour size=\{92\} state="live" \/>/);
     // ⚠️ The ELEMENT, not the word: the note above that line still names the glyph it replaced, so
     // a bare search would fail on the file's own explanation of itself.
     expect(PROCESSING).not.toMatch(/<Icon name="precision_manufacturing"/);
@@ -118,7 +121,7 @@ describe("where he is used", () => {
   it("and keeps the corner whenever the ring holds a machine", () => {
     // The machine is the subject and he is the one who found it — the slot the old screen's «it is
     // running» dot used to hold, now saying WHO as well as whether.
-    expect(PROCESSING).toMatch(/<Mansour size=\{30\} state="live" \/>/);
+    expect(PROCESSING).toMatch(/<Mansour size=\{36\} state="live" \/>/);
   });
 
   it("the intake seats him BEFORE the question, on the heading's own line", () => {
@@ -135,16 +138,106 @@ describe("where he is used", () => {
     expect(h1).toMatch(/flex-none/);
   });
 
-  it("the intake perches him on the box while the template is being written", () => {
-    expect(INTAKE).toMatch(/state\.agentTyping/);
-    expect(INTAKE).toMatch(/<Mansour size=\{34\} state="live" \/>/);
+  /** The body of `place`, sliced once: four cases read it, and four `indexOf` calls is four
+   *  chances for one of them to slice nothing and pass vacuously. */
+  const placeBody = () => {
+    const at = INTAKE.indexOf("const place = useCallback");
+    expect(at).toBeGreaterThan(-1);
+    const end = INTAKE.indexOf("}, [state.text]);", at);
+    expect(end).toBeGreaterThan(at);
+    return INTAKE.slice(at, end);
+  };
+
+  /* 🔴 HE IS THE CARET (owner, 2026-09-22: *"can u show this mansour icon as our cursor when typing
+     in the text box"*). ~~A PERCH on the box's trailing corner, drawn only while `agentTyping`.~~ */
+  it("rides the insertion point, for whoever is writing", () => {
+    expect(INTAKE).toMatch(/\{caret && \(/);
+    expect(INTAKE).toMatch(/<Mansour size=\{MANSOUR_CARET\} state="live" \/>/);
+    expect(INTAKE).toMatch(/const MANSOUR_CARET = 22;/);
+    // Not gated on the agent any more: the reference picture is a sentence the RENTER typed.
+    const at = INTAKE.indexOf("{caret && (");
+    expect(INTAKE.slice(at, at + 400)).not.toMatch(/agentTyping/);
+  });
+
+  /* 🔴 He stands BESIDE the character, never on it: centred on the insertion point his disc covered
+     the character just typed, which is the one the renter is looking at.
+
+     🔴 And the side is decided by the RUN, not by the page. ~~The container's `direction`.~~ An English
+     sentence typed into the Arabic build is an LTR run inside an RTL box, and signing the gap by the
+     box put him straight back on top of the last word - the same overlap from the other side. A
+     NEUTRAL character carries no direction of its own, and that is the one case the container answers. */
+  it("keeps clear of the letter just typed, in either script", () => {
+    const body = placeBody();
+    expect(body).toMatch(/const gap = MANSOUR_CARET \/ 2 \+ 3;/);
+    expect(body).toMatch(/RTL_LETTER\.test\(ch\)/);
+    expect(body).toMatch(/LTR_LETTER\.test\(ch\)/);
+    // The container decides ONLY when the character is neutral - it is the fallback arm, never the test.
+    expect(body).toMatch(/: getComputedStyle\(box\)\.direction === "rtl"/);
+  });
+
+  /* ⚠️ A caret that follows a SPACE is measured against the character AFTER it, so he stands in the
+     gap between two words rather than on one - and so a SOFT WRAP puts him at the start of the new
+     line instead of stranding him at the end of the line above. */
+  it("stands in the space rather than on the word, and follows a wrap", () => {
+    const body = placeBody();
+    expect(body).toMatch(/const useNext = \(prev === "" \|\| \/\\s\/\.test\(prev\)\) && at < state\.text\.length;/);
+  });
+
+  /* ⚠️ His CENTRE lands on the measured point. Anchored by a corner he sits low and to the right of
+     every letter, which reads as a mark that has not caught up - the kit's own «he drifted while you
+     typed» complaint, arrived at by geometry instead of by lag. */
+  it("centres on the caret rather than hanging off it", () => {
+    const at = INTAKE.indexOf("{caret && (");
+    expect(INTAKE.slice(at, at + 400)).toMatch(/translate\(-50%, -50%\)/);
+  });
+
+  /* 🔴 **The bar STANDS BESIDE him** (owner, 2026-09-22, reversing his own pick of that morning:
+     *"i want it both the agent icon and the cursor beside each other"*). ~~`caret-transparent`, with
+     him as the only insertion point.~~ A 22px mark cannot stand in a 4px word gap, so mid-sentence he
+     covered the letter beside him and nothing said where the next character would land. The bar is
+     the precise point, he is the agent standing at it, and `gap` is what holds them apart. */
+  it("keeps the native caret, with him beside it", () => {
+    /* ⚠️ The CLASS ATTRIBUTE, not the file: the strike-through above names the withdrawn class
+       while saying it must not be there, and a bare `not.toMatch` fails on its own explanation.
+       Sixth time in this repo. */
+    const cls = INTAKE.slice(INTAKE.indexOf("${FIELD_TEXT} relative w-full"));
+    expect(cls.slice(0, cls.indexOf("`}"))).toMatch(/caret-navy/);
+    expect(cls.slice(0, cls.indexOf("`}"))).not.toMatch(/caret-transparent/);
+    // The one number that keeps him off both the letter and the bar.
+    expect(placeBody()).toMatch(/const gap = MANSOUR_CARET \/ 2 \+ 3;/);
+  });
+
+  /* ⚠️ Measured with a `Range` over the MIRROR, never with a span injected into it: the mirror wraps
+     on `break-words`, and a zero-width inline-block between two letters is a break opportunity the
+     textarea does not have - the two copies would then wrap differently, which is the double-vision
+     this whole technique fails as. */
+  it("measures the caret without adding anything to the mirror", () => {
+    expect(INTAKE).toMatch(/document\.createRange\(\)/);
+    expect(INTAKE).toMatch(/createTreeWalker/);
+    const body = placeBody();
+    expect(body).not.toMatch(/appendChild|insertBefore/);
+  });
+
+  /* ⚠️ `onSelect` fires for a caret MOVE, not only for a selection. Without it he follows typing and
+     then stays behind the moment the renter goes back to fix a word. */
+  it("follows the caret when it is moved rather than typed", () => {
+    expect(INTAKE).toMatch(/onSelect=\{place\}/);
+    expect(INTAKE).toMatch(/onFocus=\{place\}/);
+  });
+
+  /* A LAYOUT effect: he is placed in the same frame as the character that moved him. A passive one
+     paints him a frame late, which is the drift by another name. */
+  it("places him in the same frame, and never eases toward it", () => {
+    expect(INTAKE).toMatch(/useLayoutEffect\(\(\) => \{\s*place\(\);/);
+    const at = INTAKE.indexOf("{caret && (");
+    expect(INTAKE.slice(at, at + 400)).not.toMatch(/transition/);
   });
 
   it("he cannot swallow a click on the field he stands over", () => {
     // He sits above a textarea the renter may be typing in. A decoration that eats the caret is
     // worse than no decoration.
-    const at = INTAKE.indexOf("state.agentTyping");
-    expect(INTAKE.slice(at, at + 260)).toMatch(/pointer-events-none/);
+    const at = INTAKE.indexOf("{caret && (");
+    expect(INTAKE.slice(at, at + 400)).toMatch(/pointer-events-none/);
   });
 
   it("the typewriter raises and LOWERS the flag, whatever happens", () => {

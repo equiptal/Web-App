@@ -6,8 +6,60 @@ import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { PAGE_X } from "@/components/AppShell";
 import { publicTaxonomyUrl } from "@/lib/contract/requests";
-import type { RailTile } from "@/lib/contract/workspace";
+import { Dialog } from "@/components/Dialog";
+import type { RailMachine, RailTile } from "@/lib/contract/workspace";
+import { CircleArt } from "@/components/workspace/CircleArt";
 import { pin } from "@/lib/uiPins";
+import { MachineGlyph } from "@/components/MachineGlyph";
+
+/**
+ * **The circle, big** (owner, 2026-09-21: *"clicking double on the circule open the circule image
+ * big on the screen (still take me to the request clicked) but we will see the zoomed in image"*).
+ *
+ * ⚠️ It lists EVERY machine, including one whose picture never loaded: that line is still part
+ * of the request and still has a name, and a zoomed view holding fewer machines than the ITEMS tabs
+ * would repeat the montage's own compromise where there is room not to.
+ *
+ * ⚠️ **The tile is the PICTURE, on the circle's own ground**, so the two read as one thing
+ * (owner, 2026-09-22: *"the images must show like in the circule with the merged background"*).
+ * No fit and no scale: the crop and the 1.34 both exist to fill a 52px ROUND hole, and a box that
+ * takes the picture's own height has nothing to fit and nothing left to band.
+ */
+function CircleZoom({ machines, onClose }: { machines: RailMachine[]; onClose: () => void }) {
+  const { locale } = useLocale();
+  /* 🔴 **The MACHINES name the dialog, not the RFQ code** (owner, 2026-09-22: *"show their names
+     at top instead of the rfq"*). He opened it by pressing a picture, so «RFQ-00137» answered a
+     question he had not asked; what the circle holds is the thing he is looking at. */
+  const title = machines.map((m) => m.name).join(locale === "ar" ? "، " : ", ");
+  return (
+    <Dialog open onClose={onClose} size={machines.length > 1 ? "lg" : "md"} title={title}>
+      <div {...pin("circle-zoom")} className={`grid gap-4 ${machines.length > 1 ? "sm:grid-cols-2" : ""}`}>
+        {machines.map((m, i) => (
+          <figure key={`${m.id}-${i}`} className="m-0">
+            {/* ⚠️ **The same ground as the circle** (owner, same note: *"the images must show like
+                in the circule with the merged background"*). ~~A square `surface2` tile with the
+                picture contained inside it.~~ That drew grey bands above and below every machine
+                and a visible edge where the picture's own beige met them - the circle's fault, on a
+                bigger canvas. The tile is the PICTURE now: `--photo-ground` under it and the height
+                its own, so there is nothing left to band. */}
+            <span className={`grid w-full place-items-center overflow-hidden rounded-md ${m.url ? "bg-photo-ground" : "aspect-square bg-surface2"}`}>
+              {m.url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={publicTaxonomyUrl(m.url) ?? ""} alt="" className="h-auto w-full" />
+              ) : (
+                <MachineGlyph size={64} className="text-muted" />
+              )}
+            </span>
+            <figcaption className="mt-2 text-body font-semibold text-navy">
+              {m.qty > 1 && <span className="tabular text-muted-dark">{m.qty} \u00d7</span>}
+              {m.name}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </Dialog>
+  );
+}
 
 /**
  * The rail at the top of the workspace — one circle per request, newest first, and a `New` tile that
@@ -23,32 +75,58 @@ import { pin } from "@/lib/uiPins";
  * tile the renter was looking at. Which tile is being read is carried by its full opacity and its
  * navy caption, which is what carried it alongside the ring anyway.
  *
- * A closed request keeps its place until the renter takes it off himself — the × on its circle hides
- * it on this device and touches nothing else.
+ * **EVERY circle carries a ×, and what it does depends on the request** (owner, 2026-09-22:
+ * *"i want it to be on all circules instead of the share even if active"*).
+ *
+ * 🔴 ~~The badge slot held SHARE on the active tile and the × on a closed one, and the two could
+ * never both apply "because sharing invites bids, which a shut request cannot take".~~ The share
+ * badge is gone from the rail entirely - it is in the request's own drawer, which is where the
+ * expiry, the logo and the recipients live too, so a 20px circle was the poorest of the doors onto
+ * it. One slot, one control, and the state decides only what pressing it MEANS:
+ *
+ *   LIVE   → cancel the request, behind the confirmation the dashboard and the drawer already use.
+ *   CLOSED → take the circle off this device's rail. Nothing is told to the backend.
+ *
+ * ⚠️ **The rail does neither itself.** It reports the press and the workspace decides, because
+ * only the workspace holds the group the confirmation has to name and the items it has to cancel.
+ * A rail that knew how to cancel would be a second answer to «which items does this act reach».
  */
-/** Tiles whose artwork answered an error, so the next render draws the glyph instead. Keyed by tile
- *  rather than by URL because the same subtype can appear on several rows and they fail together. */
 export function RequestRail({
   tiles,
   activeKey,
   onPick,
-  onShare,
-  onHide,
+  onDismiss,
 }: {
   tiles: RailTile[];
   activeKey: string | null;
   onPick: (key: string) => void;
-  /** Share the request the rail is showing — the badge on its own tile (owner's reference). */
-  onShare?: (() => void) | null;
-  /** Take a CLOSED request's circle off this device's rail. Absent → no × is drawn. */
-  onHide?: ((key: string) => void) | null;
+  /**
+   * The × on a circle was pressed. Absent → no × is drawn at all.
+   *
+   * ⚠️ It is ONE callback for both meanings. Two - `onCancel` and `onHide` - would put the
+   * live/closed test in two places, and the day they disagreed the rail would offer to cancel a
+   * request the caption under it calls closed.
+   */
+  onDismiss?: ((key: string) => void) | null;
 }) {
   const t = useT();
   const { locale } = useLocale();
   const ar = locale === "ar";
   const scroller = useRef<HTMLDivElement>(null);
   /** Tiles whose artwork failed to load — see the note on the `<img>` below. */
+  /**
+   * Artwork that answered an error, so the next render draws the glyph instead.
+ *
+   * 🔴 **Keyed by URL.** ~~By TILE, "because the same subtype can appear on several rows and they
+   * fail together".~~ True while a tile held one picture; from 2026-09-21 a multi-item circle holds up
+   * to four, and by-tile would blank every machine in the group because one of them 403'd. By URL the
+   * same subtype failing on five rows still only costs that subtype - which is what the old note was
+   * really after - and it is the ruling the workspace's context bar and the dashboard's bid rail both
+   * already take.
+   */
   const [broken, setBroken] = useState<Set<string>>(() => new Set());
+  /** The circle a double-press opened, drawn large. Null when none is. */
+  const [zoom, setZoom] = useState<RailTile | null>(null);
 
   // Roughly three tiles a press — far enough to feel like progress, short enough to keep your place.
   const scrollBy = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * 300, behavior: "smooth" });
@@ -140,7 +218,10 @@ export function RequestRail({
       >
         {tiles.map((tile) => {
           const active = tile.key === activeKey;
-          const img = broken.has(tile.key) ? null : publicTaxonomyUrl(tile.imageUrl);
+          /* Both the single picture and the montage drop what has already failed, and they drop
+             it by URL - see the note on `broken`. */
+          const img = tile.imageUrl && broken.has(tile.imageUrl) ? null : publicTaxonomyUrl(tile.imageUrl);
+          const machines = tile.machines.map((m) => (m.url && broken.has(m.url) ? { ...m, url: null } : m));
           /* ── There is no ring (owner, 2026-08-27: "remove all outlines even grey") ───────────────
              It was three colours — brand for the one being read, green for one with bids waiting,
              grey for closed. Then it was grey alone. Now it is nothing: a row of pictures rather
@@ -157,6 +238,13 @@ export function RequestRail({
               key={tile.key}
               type="button"
               onClick={() => onPick(tile.key)}
+              /* 🔴 **A double press opens the picture AND still picks the request** (owner,
+                 2026-09-21: *"still take me to the request clicked"*). `onClick` has already fired
+                 twice by the time this runs, and picking the same request twice changes nothing -
+                 so the selection is the single press's job and this only adds the view.
+                 ⚠️ Withheld when there is nothing to enlarge: a group whose every line lost its
+                 artwork would open a dialog of grey glyphs. */
+              onDoubleClick={() => { if (machines.some((m) => m.url)) setZoom(tile); }}
               aria-current={active ? "true" : undefined}
               title={raised ? `${tile.label} · ${raised}` : tile.label}
               className={`flex max-w-[104px] flex-none flex-col items-center gap-1 text-center transition ${dim}`}
@@ -189,89 +277,60 @@ export function RequestRail({
                   got thinner. */}
               <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full border border-border bg-surface p-px">
                 <span className="relative h-[52px] w-[52px] rounded-full">
-                  <span className={`grid h-[52px] w-[52px] place-items-center overflow-hidden rounded-full bg-surface3 ${tile.closed ? "grayscale" : ""}`}>
-                    {img ? (
-                      /* ── `contain`, not `cover` (owner, 2026-08-25: "the circles must fit any icon
-                         + why some have floating icons") ──────────────────────────────────────────
-                         The taxonomy artwork is not one kind of picture. Some files are photographs
-                         that reach their own edges; others are drawings with transparent margins
-                         built in. `cover` filled the circle with the first kind by cropping it and
-                         left the second kind floating in the middle — one rule producing two
-                         different results, which is exactly what the rail looked like.
+                  {/* 🔴 **The disc is painted the PHOTOGRAPHS own ground when it holds one**
+                      (owner, 2026-09-21). That is what lets several machines merge into one
+                      picture: these renders share a single beige studio sweep, so images laid edge
+                      to edge on a disc of that colour have no boundary. On `surface3` they draw a
+                      rectangular beige band across a grey circle instead - seen at 9x, and it is
+                      the thing he was looking at.
+                      ⚠️ The glyph fallback keeps `surface3`: a beige disc carrying a grey drawing
+                      reads as a photograph that failed, which is the state it would be imitating.
+                      ⚠️ `--photo-ground` is measured off the assets and is a fact about that render
+                      batch rather than a colour of ours - see its note in `globals.css`. */}
+                  <span className={`grid h-[52px] w-[52px] place-items-center overflow-hidden rounded-full ${img ? "bg-photo-ground" : "bg-surface3"} ${tile.closed ? "grayscale" : ""}`}>
+                    {/* ── The picture, or the pictures (owner, 2026-08-25 → 2026-09-21) ─────────────
+                        The markup moved into {@link CircleArt}, which is where the one-or-many
+                        decision now lives. Nothing about the FIT changed and the reasoning behind
+                        it is worth keeping here, because it is the thing most likely to be
+                        "simplified" back into one rule:
 
-                         `contain` shows every machine whole and inset the same way, so the circles
-                         read as one set. A photograph gives up a little size for that; a drawing
-                         stops rattling around inside its ring.
+                        ── Which fit, decided by which PICTURE it is (owner, 2026-08-31) ──────────
+                        *"I want it zoomed in so it fits in a circle."* A photograph reaches its own
+                        edges, so `contain` left it as a 3:2 band across a round hole with tinted
+                        crescents above and below. `cover` fills the mask and crops the sides, which
+                        is what a photograph wants. An ICON is a drawing carrying its own transparent
+                        margin, and cropping one enlarges the margin rather than the machine - so
+                        each takes the fit it needs instead of one rule being wrong for half the
+                        catalogue. `imageIsPhoto` is what tells them apart.
 
-                         The 3px inset is geometry, not taste — do not take it out again. `contain`
-                         fits the picture inside its BOX; the mask over it is a CIRCLE, and a
-                         rectangle that fits the box still pokes out of the circle. Most of this
-                         artwork is landscape, so scaled to the full 36px width it stands about 24
-                         tall — and a 36px circle is only 27 wide at that height, so its left and
-                         right tips get cut by the round mask. That is the machine the owner saw
-                         crossing the ring (2026-08-25), and it appeared the moment the inset was
-                         removed in the name of filling more of the circle.
+                        ── The DRAWING fills its circle too (owner, 2026-09-12) ───────────────
+                        *"make sure all photos fit well in the circle, as some have squared edges and
+                        some fit well."* The drawings are WIDE, so `contain` in a 52px box drew them
+                        52×28 - a letterbox whose straight top and bottom edge showed through the
+                        round hole. That edge is the «squared» one. `p-1` made it worse by shrinking
+                        the box first; the padding is gone and the drawing is scaled to the circle's
+                        diameter.
 
-                         Inscribing a 3:2 rectangle in a circle of radius 18 gives 30 × 20, which is
-                         what a 36px box less 3px a side is. So 3 is the largest inset that shows
-                         every machine whole. Reaching further needs a bigger circle, not less
-                         padding. */
-                      /* ── A URL that fails falls back to the glyph (owner, 2026-08-31) ─────────
-                         The tile now prefers the equipment PHOTOGRAPH over the flat icon, and a
-                         photograph is the one of the two that can be absent from storage while its
-                         key is present in the row: the taxonomy's equipment objects are not
-                         public-read on staging, so the URL is well-formed and answers 403.
+                        ⚠️ **RE-MEASURED 2026-09-14: the whole catalogue is 2400×1792 (1.34:1)** - all
+                        94 illustrated nodes, one size, checked against the live tree. 1.34 survives
+                        by arithmetic rather than by luck: `contain` draws a 1.34:1 picture 52×38.8
+                        in this box, and 52 ÷ 38.8 = 1.34. Anyone re-cutting the assets must
+                        recompute it; at a SQUARE source it is 1.
+                        ⚠️ 2400×1792 for a 52px circle is ~2,100× the pixels this tile can show. The
+                        ideal source here is **square, 104×104** (52 at 2×).
+                        ⚠️ It is NOT switched to `object-cover` for drawings: tried on the live rail
+                        and the crop cut the machine into an unreadable jumble.
 
-                         Without this the circle drew a broken-image glyph — strictly worse than the
-                         icon it replaced. `onError` is the only signal available: nothing on the
-                         client can know an object is unreadable before asking for it. The backend
-                         names the same trap on its own helper: *"an `<img>` absorbs a 403 as 'no
-                         artwork'"* — which is true only where something catches it, as here. */
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={img}
-                        alt=""
-                        draggable={false}
-                        onError={(e) => { e.currentTarget.style.display = "none"; setBroken((b) => new Set(b).add(tile.key)); }}
-                        /* ── Which fit, decided by which PICTURE it is (owner, 2026-08-31) ────────
-                           *"I want it zoomed in so it fits in a circle."*
-
-                           A photograph reaches its own edges, so `contain` left it as a 3:2 band
-                           across the middle of a round hole with tinted crescents above and below —
-                           the machine tiny, the circle mostly empty. `cover` fills the mask and crops
-                           the sides, which is what a photograph wants.
-
-                           The note above still holds for the OTHER kind, and this does not reverse
-                           it: an icon is a drawing carrying its own transparent margin, and cropping
-                           one enlarges the margin rather than the machine. What changed is that the
-                           two are now distinguishable — `imageIsPhoto` is set where the payload gave
-                           an equipment photograph — so each takes the fit it needs instead of one
-                           rule being wrong for half the catalogue.
-
-                           ── The DRAWING fills its circle too (owner, 2026-09-12) ─────────────────
-                           *"make sure all photos fit well in the circle, as some have squared edges
-                           and some fit well."* Measured on staging: the taxonomy drawings are WIDE —
-                           `spider-crane.png` is 1024×559, 1.83:1, the same shape as the photographs —
-                           so `contain` inside a 52px box drew them 52×28, a letterbox with its own
-                           straight top and bottom edge showing through a round hole. That edge is the
-                           «squared» one; the photographs beside them, on `cover`, filled properly.
-                           `p-1` made it worse by shrinking the box first.
-
-                           The padding is gone and the drawing is scaled to cover the circle's
-                           diameter — 1.34 ≈ 52 ÷ 28, the exact factor that turns that letterbox into
-                           a filled round tile. It is NOT switched to `object-cover`: tried on the
-                           live rail and the crop cut the machine into an unreadable jumble, which is
-                           what the note above predicted. `contain` keeps the whole machine and the
-                           scale gives it the circle. */
-                        className={
-                          tile.imageIsPhoto
-                            ? "h-[52px] w-[52px] rounded-full object-cover"
-                            : "h-[52px] w-[52px] scale-[1.34] object-contain"
-                        }
-                      />
-                    ) : (
-                      <Icon name="precision_manufacturing" size={20} className="text-muted" />
-                    )}
+                        ⚠️ `onError` is the only signal available and it is load-bearing, not
+                        defensive: the taxonomy objects are not public-read on staging, so a
+                        well-formed URL answers 403 and an `<img>` absorbs that as «no artwork» -
+                        drawing a broken-image glyph, which is worse than the icon it replaced. */}
+                    <CircleArt
+                      machines={machines}
+                      fallback={img}
+                      fallbackIsPhoto={tile.imageIsPhoto}
+                      onBroken={(url) => setBroken((b) => new Set(b).add(url))}
+                    />
                   </span>
                   {/* ── The unit count, and nothing else (owner, 2026-08-25) ─────────────────────
                       A bid count used to sit here and outrank the units, on the reasoning that a
@@ -279,56 +338,35 @@ export function RequestRail({
                       means bids are waiting. Printing the number as well spent the tile's one badge
                       slot on something said twice, and it hid the count of machines — which the
                       ring cannot say and nothing else on the rail does. */}
-                  {/* ── Share, on the tile the page is showing (owner's reference, 2026-08-25) ──
-                      One request is being read at a time, and the link that invites bids onto it is
-                      about THAT request — so it rides its own circle rather than waiting inside the
-                      drawer. It appears on the active tile only, for the same reason. */}
-                  {/* ── Taking a finished request off the rail (owner, 2026-08-27) ──────────────
-                      A closed or expired request has nothing left to do but take up a circle. The ×
-                      hides it on this device — the request is untouched, nothing is told to the
-                      backend, and another member of the firm still sees it.
+                  {/* ── The ×, on every circle (owner, 2026-09-22) ─────────────────────────
+                      ~~Share on the active tile, × on a closed one, and a stated rule that the two
+                      could never both apply.~~ They collided anyway - both sat at `-end-1 -top-1`,
+                      so a tile that was active AND closed drew share over the ×, which is the
+                      screenshot of 2026-08-31. One slot ends that for good.
 
-                      **Only on a closed tile.** A live request that could be dismissed would be a
-                      request the renter cannot get back to, and there is no undo in the rail.
+                      ⚠️ The LABEL is the whole of what the state changes here. A live circle
+                      says «Cancel this request» and a closed one «Hide this request», and the press
+                      itself is the same: the workspace reads the same `closed` this tile drew
+                      itself with, so the label and the act cannot describe different things.
 
-                      It takes the place the share badge holds on the active tile, and the two can
-                      never both apply: sharing invites bids, which a shut request cannot take.
-
-                      ~~That last sentence was a claim, not a rule.~~ Both badges sat at the same
-                      `-end-1 -top-1`, so on a tile that was BOTH active and closed they stacked and
-                      share painted over the ✕ — the owner's screenshot, 2026-08-31: a request reading
-                      «Closed» offering to be shared for bids it can no longer receive. The share badge
-                      now carries `!tile.closed` so the rule is enforced where it is stated. */}
-                  {tile.closed && onHide && (
+                      ⚠️ `tabIndex={-1}` and a `role`, not a `<button>`: the tile IS a button and
+                      a button inside a button is invalid markup no two browsers agree on. The tile's
+                      own press is what a keyboard reaches; this is a pointer affordance. */}
+                  {onDismiss && (
                     <span
                       role="button"
                       tabIndex={-1}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onHide(tile.key);
+                        onDismiss(tile.key);
                       }}
-                      aria-label={t.workspace.hideRequest}
-                      title={t.workspace.hideRequest}
+                      aria-label={tile.closed ? t.workspace.hideRequest : t.workspace.cancelRequest}
+                      title={tile.closed ? t.workspace.hideRequest : t.workspace.cancelRequest}
+                      /* A hairline collar, like the circle's own edge - `border-2` put a 2px white
+                         ring on a 20px badge, which is a tenth of it. */
                       className="absolute -end-1 -top-1 grid h-5 w-5 cursor-pointer place-items-center rounded-full border border-surface bg-muted text-white transition hover:bg-navy"
                     >
                       <Icon name="close" size={11} />
-                    </span>
-                  )}
-                  {active && !tile.closed && onShare && (
-                    <span
-                      role="button"
-                      tabIndex={-1}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onShare();
-                      }}
-                      aria-label={t.workspace.shareRequest}
-                      title={t.workspace.shareRequest}
-                      /* A hairline collar, like the circle's own edge — `border-2` put a 2px white
-                         ring on a 20px badge, which is a tenth of it. */
-                      className="absolute -end-1 -top-1 grid h-5 w-5 place-items-center rounded-full border border-surface bg-navy text-white transition hover:bg-navy-mid"
-                    >
-                      <Icon name="ios_share" size={12} className="font-normal" />
                     </span>
                   )}
                   {/* ── Several MACHINES, or several of ONE (owner, 2026-08-26) ──────────────────
@@ -400,6 +438,16 @@ export function RequestRail({
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>
     </div>
+    {/* ⚠️ Mounted at the rail's ROOT, outside the scroller and outside the 96px band. That band is
+        `overflow-hidden`; a `position: fixed` layer escapes an overflow clip (only a transformed
+        or filtered ancestor would trap it, and this one has neither), but a dialog rendered inside
+        a horizontally scrolling strip would also travel with it, which is the real reason. */}
+    {zoom && (
+      <CircleZoom
+        machines={zoom.machines.map((m) => (m.url && broken.has(m.url) ? { ...m, url: null } : m))}
+        onClose={() => setZoom(null)}
+      />
+    )}
     </div>
   );
 }

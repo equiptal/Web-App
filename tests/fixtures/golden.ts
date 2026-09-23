@@ -198,6 +198,7 @@ export const GOLDEN = {
 export const goldenBid = (p: Partial<BidCard> = {}): BidCard => ({
   id: "gold-1",
   status: "PENDING",
+  supplierLogoUrl: null,
   supplierId: "sup-1",
   supplierCompanyId: "co-1",
   supplierName: "Acme Cranes",
@@ -232,6 +233,7 @@ export const goldenBid = (p: Partial<BidCard> = {}): BidCard => ({
   matchCount: 0,
   conflictCount: 0,
   dealRoomId: null,
+  dealRoomStatus: null,
   expired: false,
   note: null,
   requiredCerts: [],

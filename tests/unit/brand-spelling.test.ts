@@ -42,8 +42,18 @@ const EXT = /\.(ts|tsx|js|jsx|md|html|json)$/;
  * else's build, kept as the reference the map and deal room were drawn from. They carry the
  * diacritised spelling and are not ours to correct: editing them would make the reference disagree
  * with the artefact it records. Our own plan documents are NOT exempt and were fixed on 2026-09-08.
+ *
+ * 🔴 **`docs/CHANGELOG.md` is exempt, and for the same reason read the other way round.** It is
+ * the record of spellings that were CORRECTED - the 2026-09-08 and 2026-09-10 entries quote all three
+ * wrong forms in strike-through while saying they are gone - so this guard was failing on its own
+ * explanation. That is the same trap the log has now recorded eight times, and it is not fixable by
+ * rewording: an entry that cannot name what it removed does not record anything.
+ *
+ * ⚠️ It is exempt by PATH, never by widening the pattern. A rule that ignored the words
+ * wherever they sit beside a «~~» would stop catching them in a dictionary string, which is the
+ * one place they matter.
  */
-const EXEMPT = /docs[\\/]implementation-plans[\\/].*[\\/]prototype/;
+const EXEMPT = /docs[\\/](implementation-plans[\\/].*[\\/]prototype|CHANGELOG\.md$)/;
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {

@@ -248,7 +248,7 @@ describe("no view model on this surface exposes a score field (RM3-AC-29, §E)",
   it("the price footer carries no score key", () => {
     const model = priceFooterModel(
       {
-        price: 1000, priceUnit: "PER_DAY", unitsOffered: 3, agreedUnits: null,
+        price: 1000, priceUnit: "PER_DAY", unitsOffered: 3, agreedUnits: null, currentRentalUnits: null, numberOfUnits: 3,
         mobPrice: 500, demobPrice: 400, mobUnits: null, demobUnits: null,
         mobExcluded: false, demobExcluded: false, dealRoomId: null,
       },

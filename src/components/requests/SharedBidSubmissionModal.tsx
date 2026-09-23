@@ -56,11 +56,14 @@ import { CARD, cx } from "@/lib/ds";
 // system prefills it (owner, 2026-09-03, when the same chip left the item pills), so asking a
 // supplier to confirm a value nobody chose added a row and settled nothing. Still stored, still
 // matched on; simply not shown to the supplier.
-const TERM_KEYS = ["operator", "nationality", "nightShift", "fatFood", "fatTransport", "fuel", "year", "operatorCert", "equipmentCert"] as const;
+/* 🔴 `nationality` is GONE from this list (2026-09-22, app parity: `bid_form_bloc.dart`
+   skips it with `isHiddenTermKey`). A term the supplier is never shown must not be one he is
+   asked to confirm — and `bid-quality.ts` dropped it in the same pass, because a term that is
+   never put to him cannot count against his answer. Same reasoning as `fuelType`, 2026-09-04. */
+const TERM_KEYS = ["operator", "nightShift", "fatFood", "fatTransport", "fuel", "year", "operatorCert", "equipmentCert"] as const;
 type TermKey = (typeof TERM_KEYS)[number];
 const TERM_LABEL: Record<TermKey, [string, string]> = {
   operator: ["Operator", "المشغّل"],
-  nationality: ["Operator nationality", "جنسية المشغّل"],
   nightShift: ["Night shift required", "العمل الليلي مطلوب"],
   fatFood: ["Food (F.A.T)", "الطعام"],
   fatTransport: ["Accommodation & transport", "السكن والمواصلات"],

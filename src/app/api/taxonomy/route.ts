@@ -5,6 +5,7 @@ import { TAXONOMY_INCLUDE_HIDDEN } from "@/lib/flags";
 import { agentsGet } from "@/lib/api/agents-backend";
 import { nodesToTree } from "@/lib/api/app-adapters";
 import type { TaxonomyNode, TaxonomyResponse } from "@/lib/contract/app";
+import { SOURCE_HEADER } from "@/lib/contract/taxonomy";
 
 // Always fetch the live catalogue — a node/size added in the marketplace must appear in the
 // dropdowns without a redeploy. (agentsGet already sends cache:"no-store"; this pins the route
@@ -28,10 +29,23 @@ export async function GET() {
       const query = TAXONOMY_INCLUDE_HIDDEN ? "?tenant=default&includeHidden=true" : "?tenant=default";
       const data = await agentsGet<TaxonomyResponse | TaxonomyNode[]>(`/agents/taxonomy${query}`);
       const nodes = Array.isArray(data) ? data : data.nodes;
-      return NextResponse.json(nodesToTree(nodes), { status: 200 });
+      return NextResponse.json(nodesToTree(nodes), { status: 200, headers: { [SOURCE_HEADER]: "live" } });
     } catch (err) {
       console.error("[taxonomy] real fetch failed, using fixture:", err);
     }
   }
-  return NextResponse.json(TAXONOMY, { status: 200 });
+  /**
+   * 🔴 **The fallback is no longer SILENT** (owner, 2026-09-14).
+   *
+   * It answers the built-in stand-in — 6 categories, 17 subtypes — on ANY failure of the agents
+   * service, and said nothing about it. A thin catalogue and a broken fetch then look identical from
+   * the screen: the renter searches TYPE, finds nothing, and concludes we do not carry his machine.
+   * That is exactly how «why is the hidden taxonomy not in the dropdown?» was diagnosed twice before
+   * anyone thought to ask which catalogue was on screen.
+   *
+   * ⚠️ The FALLBACK ITSELF stays. Refusing outright would take the whole create flow down on a
+   * misconfigured environment, which is worse than a short list. What changes is that the answer now
+   * carries its own provenance, and the card can say so.
+   */
+  return NextResponse.json(TAXONOMY, { status: 200, headers: { [SOURCE_HEADER]: "fixture" } });
 }

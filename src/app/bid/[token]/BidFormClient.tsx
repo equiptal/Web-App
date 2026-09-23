@@ -38,12 +38,15 @@ import { equipmentIcon } from "@/components/requests/EquipImg";
 // system prefills it (owner, 2026-09-03, when the same chip left the item pills), so asking a
 // supplier to confirm a value nobody chose added a row and settled nothing. Still stored, still
 // matched on; simply not shown to the supplier.
-const TERM_KEYS = ["operator", "nationality", "nightShift", "fatFood", "fatTransport", "fuel", "year", "operatorCert", "equipmentCert"] as const;
+/* 🔴 `nationality` is GONE from this list (2026-09-22, app parity: `bid_form_bloc.dart`
+   skips it with `isHiddenTermKey`). A term the supplier is never shown must not be one he is
+   asked to confirm — and `bid-quality.ts` dropped it in the same pass, because a term that is
+   never put to him cannot count against his answer. Same reasoning as `fuelType`, 2026-09-04. */
+const TERM_KEYS = ["operator", "nightShift", "fatFood", "fatTransport", "fuel", "year", "operatorCert", "equipmentCert"] as const;
 type TermKey = (typeof TERM_KEYS)[number];
 // Term names mirror the web app's canonical labels (bids.ts negotiable terms) so renter + supplier see the same wording.
 const TERM_LABEL: Record<TermKey, [string, string]> = {
   operator: ["Operator included", "تشمل مشغّل"],
-  nationality: ["Operator nationality", "جنسية المشغّل"],
   nightShift: ["Night shift required", "العمل الليلي مطلوب"],
   fatFood: ["Operator Food", "طعام المشغّل"],
   fatTransport: ["Operator Accommodation & Transport", "سكن وتنقّل المشغّل"],
@@ -54,7 +57,7 @@ const TERM_LABEL: Record<TermKey, [string, string]> = {
 };
 // A Material glyph per term, so each term card reads at a glance.
 const TERM_ICON: Record<TermKey, string> = {
-  operator: "engineering", nationality: "public", nightShift: "bedtime", fatFood: "restaurant", fatTransport: "night_shelter",
+  operator: "engineering", nightShift: "bedtime", fatFood: "restaurant", fatTransport: "night_shelter",
   fuel: "local_gas_station", year: "event", operatorCert: "workspace_premium", equipmentCert: "verified",
 };
 // App-download links for the footer CTA (off-platform suppliers → install the app to keep getting requests).

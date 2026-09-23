@@ -34,7 +34,6 @@ const input =
   "w-full rounded-sm border border-border bg-surface px-3 py-2 text-body text-navy outline-none transition focus:border-brand";
 
 const PARTY_OPTS: Party[] = ["me", "supplier"];
-const NATIONALITY_OPTS = ["any", "restricted"] as const;
 
 /* `blankTerms` moved to `contract/work-order.ts` (2026-09-01) — the intake store needs it to answer a
    term on a request that was never started from a template, and a reducer importing a factory out of
@@ -253,13 +252,16 @@ export function TermsFields({ value, onChange }: { value: MachineTerms; onChange
 
         {value.operatorNeeded !== "no" && (
           <div className="grid gap-2.5 sm:grid-cols-3">
-            {/* ── Food, accommodation, nationality — one row, that order (owner, 2026-08-31) ─────
+            {/* ── Food and accommodation — one row (owner, 2026-08-31, then 2026-09-22) ───────
 
                 ~~Nationality alone on the first row, the two money questions below it.~~ It read as
-                the headline question and it is the least of the three: food and accommodation are
-                costs somebody pays every day the machine is on site, and nationality is a preference
-                that most renters leave at *any*. Money first, preference last, and all three fit the
-                row that was carrying one. */}
+                the headline question and it was the least of the three: food and accommodation are
+                costs somebody pays every day the machine is on site.
+
+                🔴 ~~And nationality third, on the same row.~~ The term is hidden on every
+                surface now (see `term-visibility.ts`), so the row carries the two money questions
+                that were always its point. `sm:grid-cols-3` is kept: a `CertSet` follows in the same
+                grid, and re-flowing it to two columns would move a control nobody asked about. */}
             <Pick
               label={w.fatFood}
               value={op.fatFood}
@@ -274,27 +276,10 @@ export function TermsFields({ value, onChange }: { value: MachineTerms; onChange
               labels={t.options.party}
               onPick={(v) => patchOp({ fatAccommodationTransport: v as never })}
             />
-            <Pick
-              label={w.nationality}
-              value={op.nationality}
-              options={NATIONALITY_OPTS}
-              labels={{ any: w.natAny, restricted: w.natRestricted }}
-              onPick={(v) => patchOp({ nationality: v as never })}
-            />
-
-            {/* Which nationalities — a full row of its own, and only when the answer is
-                *restricted*. Otherwise there is no question, so there is no field. */}
-            {op.nationality === "restricted" && (
-              <label className="flex flex-col gap-1 sm:col-span-3">
-                <span className="text-label font-semibold uppercase tracking-[.03em] text-muted">{w.natCustom}</span>
-                <input
-                  className={input}
-                  value={op.nationalityCustom ?? ""}
-                  placeholder={w.natCustomPlaceholder}
-                  onChange={(e) => patchOp({ nationalityCustom: e.target.value })}
-                />
-              </label>
-            )}
+            {/* ⚠️ **The STATE is KEPT** — `nationality` / `nationalityCustom` are still parsed,
+                still patched by everything else and still sent, exactly as the app keeps its own
+                loaded and written back. A project saved before the term was hidden preserves what it
+                holds instead of being cleared by the next edit. */}
 
             <CertSet
               legend={w.opCerts}

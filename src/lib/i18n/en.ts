@@ -37,6 +37,16 @@ export const en = {
     preferences: "Preferences",
     preview: "Preview",
   },
+  /* ── The seasonal skin's words ────────────────────────────────────────────────────────────────
+     One string. The chip beside the wordmark reads «96 National Day» / «96 اليوم الوطني», and the
+     ORDINAL is not in here on purpose: it is derived from the year in `season.ts`, so next
+     September reads 97 with nothing to translate.
+
+     ⚠️ Latin digits in BOTH locales — this app's rule since 2026-09-04. The Flutter kit draws «٩٦»;
+     the web does not, and `season.ts` says why beside the derivation. */
+  season: {
+    nationalDay: "National Day",
+  },
   shell: {
     home: "Home",
     /* The back control's words. It names its DESTINATION, so a renter knows where a press lands
@@ -129,7 +139,6 @@ export const en = {
     ctaTitleBefore: "Let ",
     ctaTitleAi: "our AI assistant",
     ctaTitleAfter: " find your next equipment",
-    ctaSubtitle: "Describe what you need in plain words. Our AI assistant matches you with the right suppliers.",
     uploadRfq: "Upload RFQ",
     suppliersTitle: "Most popular suppliers",
     viewAll: "View all",
@@ -178,6 +187,9 @@ export const en = {
     verifiedTitle: "You're verified",
     verifiedBody: "Your company is verified.",
     yourRequests: "My Requests",
+    /* Behind the dashboard's Requests tab, where `HomeRequests` renders NOTHING at all (2026-09-16).
+       It names the door already on screen above it rather than adding a second one. */
+    noRequestsYet: "No requests yet. Describe what you need above and we will read it for you",
     priceBids: "Price Bids",
     completedDeals: "Completed Deals",
     soon: "Coming soon",
@@ -207,10 +219,13 @@ export const en = {
     newLabel: "New",
     equipmentCount: "equipment",
     // The pill row's first pill — the shopfront view, before any category narrows the cards.
-    allCategories: "All",
-    // Beside the page title: «13 stores across Saudi Arabia».
-    storesAcross: "stores across Saudi Arabia",
-    showMore: "Show more suppliers",
+    // The leading pill on the category scroller. «All stores», never «All» (owner, 2026-09-16) —
+    // it sits beside real category names and one bare word did not say what it restores.
+    allCategories: "All stores",
+    // The ‹ › pager under the grid. Labels only — the controls draw a chevron each, so these
+    // exist for the screen reader and the tooltip (owner, 2026-09-16: 20 per page, arrows for the rest).
+    prevPage: "Previous page",
+    nextPage: "Next page",
     empty: "No suppliers match your filters.",
     error: "We couldn't load suppliers.",
     retry: "Retry",
@@ -412,6 +427,22 @@ export const en = {
       confirmSubBoth: "It reaches both of these places",
       confirmSubPost: "It reaches one place",
       confirmDoPost: "Post to Moedatech",
+      /* ── A DIRECT request reaches ONE firm (owner, 2026-09-13) ─────────────────────────────
+         «Every supplier there can bid on it» is the broadcast promise and it is false here. The
+         title is the STORE's own name; these are the fallback and the two sentences. */
+      destDirectFallback: "This supplier",
+      destDirectLine: "They will be the only supplier who can bid",
+      destDirectPosted: "It is already sent to this supplier",
+      /* ── The renter may still send it to the whole market instead (app parity, 2026-09-22) ────
+         The app's `submitConfirmSheet*` strings, word for word, because this is the same question
+         asked at the same moment and the two products must not phrase it differently. */
+      whoReceives: "Who receives it",
+      confirmSubPick: "Pick one option to confirm",
+      /* The act, while WHO it reaches is the question above the button. «Post to Moedatech» over a
+         card reading «nobody else sees it» is the dialog arguing with itself. */
+      confirmDoPostRequest: "Post the request",
+      destBroadcastInstead: "Broadcast instead",
+      destBroadcastLine: "Reach all matching suppliers in your area and compare bids",
       destMoedatech: "Moedatech",
       destShared: "Shared",
       destOutlook: "Outlook",
@@ -427,6 +458,9 @@ export const en = {
       destOutlookOff: "Outlook is not connected",
       destOutlookOffBody: "Nothing is e-mailed. Connect Outlook and your requests go out from your own address, with your suppliers in blind copy",
       confirmPostTitle: "Post this request and e-mail it?",
+      /* Nothing is e-mailed on this press: Moedatech is the only channel, or Outlook is not
+         connected. The title used to promise a mail that was never going to leave. */
+      confirmPostAloneTitle: "Post this request?",
       confirmSendTitle: "E-mail this request?",
       confirmPostLine: "Your request goes live on Moedatech, where every supplier there can bid on it",
       /* ~~«…, each in blind copy».~~ Dropped from the confirmation (owner, 2026-09-08). It is true and
@@ -481,11 +515,20 @@ export const en = {
     },
     reading: "Reading",
     heading: "How would you like to create your request?",
-    // ⚠️ ONE LINE (owner, 2026-09-13: *"make the text below as one line dont wrap it"*). It is
-    // `whitespace-nowrap` from `sm` up, so its LENGTH is now a layout constraint rather than a free
-    // choice: the old sentence was 120 characters and could not fit this column at any width the app
-    // has. Keep anything replacing it about this long, and look at it.
-    subheading: "Describe your request, or upload an RFQ. A project fills in its own defaults",
+    /* 🔴 ~~`subheading`~~ — «Describe your request, or upload an RFQ. A project fills in its own
+       defaults» — DELETED (owner, 2026-09-16, with the side-panel prototype). The placeholder in the
+       box already types a real request through its example, which is the same lesson said once; and
+       the sentence it replaced had been a layout constraint of its own («one line, don't wrap it»,
+       2026-09-13) for a line nobody needed to read twice. */
+
+    /* The rail beside the box: his own past requests, grouped by the project they were filed under.
+       `{n}` machines across `{g}` projects — both numbers, because one without the other says
+       nothing about a list you are about to scroll. */
+    rail: {
+      title: "Previous requests",
+      count: "{n} in {g}",
+      resize: "Resize the panel",
+    },
     optUploadTitle: "Write / Upload RFQ",
     optUploadDesc: "Write your request or upload a file. Your AI assistant fills the form automatically.",
     recommended: "Recommended",
@@ -1060,6 +1103,7 @@ export const en = {
       lastName: "Last name must be 2–50 characters.", // AC-02/03
       city: "Select your city.", // AC-02
       jobTitle: "Select your job title.", // AC-02
+      companyName: "Enter your company name.", // app parity: required on the complete pass
       email: "Enter a valid email address.",
       emailRequired: "A valid email address is required.",
       whatsapp: "Enter a valid Saudi mobile number.", // AC-04
@@ -1142,6 +1186,16 @@ export const en = {
       logoChange: "Change",
       logoUpload: "Upload",
       logoRemove: "Remove",
+      // The logo dialog the quotation's «Add a logo» opens (2026-09-23).
+      logoSave: "Save logo",
+      logoSaved: "Logo saved. Open the quotation again to see it on your side",
+      // The mark on the company card, and the way out of it (2026-09-23, app parity with
+      // `company_logo_editor.dart`). Its wording is the app's own, string for string.
+      logoAdd: "Add a logo",
+      logoRemoved: "Logo removed",
+      logoRemoveConfirm:
+        "Your company name will be shown instead, everywhere the logo appears. You can add a new one at any time",
+      logoNeedsProfile: "Add your name, city and job title in your profile first, then you can set a logo",
       continue: "Continue",
       confirmHeadline:
         "Not uploading the required company documents may lead to your registration being rejected",
@@ -1192,6 +1246,8 @@ export const en = {
     account: "Account",
     // Company / verification card
     companyVerifiedTitle: "Company verified",
+    /** The app's own label for both the press and the screen it opens (`companyDetails`). */
+    companyDetails: "Details",
     companyVerifiedBody: "Your company is verified. You have a trusted renter badge.",
     companyPendingTitle: "Verification in review",
     companyPendingBody: "Your company details are under review. We'll update your status here.",
@@ -1299,10 +1355,15 @@ export const en = {
     // papers live behind «Details ›» on each card and are never reached from here. The full phrases
     // survive where there is room for them: the company panel's own heading still reads «Company
     // documents», and the chip carries «Verified company on the platform» on its title.
+    //
+    // 🔴 Reversed for the documents entry (owner, 2026-09-22: *"i want the company document to be
+    // clearly company documents"*). The width it needed came back the same day: the verified chip on
+    // the map header is the tick alone now, its word on the tick's name and title, so «Company
+    // documents» fits beside the name without squeezing it.
     verifiedCompany: "Verified",
     /** The chip's full sentence, on its `title` — the prototype puts it there too. */
     verifiedCompanyWhy: "Verified company on the platform",
-    companyDocuments: "Documents",
+    companyDocuments: "Company documents",
     // V3 — the count pills. `type` is the REQUEST's own equipment type, and it agrees with the count.
     // "With the supplier" means machines that FIT this request, never his whole yard.
     // «registered», not the prototype's «لدى المورد» / "with the supplier" (owner, 2026-08-10). The
@@ -1451,7 +1512,9 @@ export const en = {
      *  this offer), and what his answer does to the colour above. */
     eqYardLine1: "The supplier has not set the yard this equipment would move from for your offer, so it might not be available. Ask him to confirm it is available for your offer",
     eqYardLine2: "When he confirms availability by setting its yard, this turns green as confirmed",
-    otherBids: "Other offers",
+    // «Other bids», sentence case (owner, 2026-09-22: *"call it other bids and dont capitalize it
+    // all"*). The strip's CSS used to uppercase it; that rule is gone too.
+    otherBids: "Other bids",
     eqYardExplainCta: "Ask the supplier",
     eqYardExplainLater: "Not now",
     // The same surface, in the state where the question is already out. It shows what was asked and
@@ -1465,6 +1528,10 @@ export const en = {
     // The dots beside the file icon: the machine's papers, scored the way the app scores them.
     eqReadinessOnFile: "{done} of {total} documents on file",
     eqOpenFile: "Open this machine's file",
+    // The card's corner control, as WORDS (owner, 2026-09-22: *"the icon of the equipment card to be
+    // equipment documents not icon"*). It sits one row under «Company documents», so the two name
+    // whose papers each one opens.
+    eqDocuments: "Equipment documents",
     eqNoPhoto: "No photo",
     eqSelect: "Show this equipment on the map",
     // RM3-AC-26 — a price and a count were given, and nothing else. No empty card furniture.
@@ -1688,6 +1755,29 @@ export const en = {
     },
   },
   workspace: {
+    /* ── the bid card's BAND (app parity, `RenteeBandState`) ───────────────────────────────
+       One caption per card, and the card's only news channel. ⚠️ `band.counterPrice` deliberately
+       repeats `priceFooter.counterPrice`: the band and the map's own footer are two surfaces saying
+       one act, and the app keeps the same word on both. */
+    band: {
+      counterPrice: "Counter this price",
+      /* A room exists and nobody has priced yet. The owner asked for the second wording explicitly:
+         there is an OFFER on the table to answer, not just a price to undercut. */
+      counterOffer: "Counter this offer",
+      awaitingSupplier: "Awaiting supplier response",
+      newCounterOffer: "New counter offer",
+      newMessage: "New message from supplier",
+      /* ⚠️ ONE caption for every ask and every resolution (app parity): the renter does not remember
+         which question he asked, and the room shows him when he opens it. It is also what makes a
+         PARTIAL answer safe to report, since the wording claims nothing about what is on file. */
+      supplierAnswered: "Supplier answered your request",
+      offerUpdated: "Supplier updated the offer",
+      awaitingConfirmation: "Awaiting supplier confirmation",
+      dealClosed: "Deal closed",
+      accepted: "Accepted",
+      withdrawn: "Withdrawn",
+      expired: "Expired",
+    },
     title: "My Requests",
     // The rail's first tile. It is an action, not a request, so it says what it makes.
     newRequest: "New",
@@ -2350,17 +2440,12 @@ export const en = {
         saveProjectOnly: "Project only",
         saveAndApply: "Save and apply to {n}",
       },
+    /* 🔴 ~~`pick` / `all` / `fewer`~~ went with `ProjectChips` (owner, 2026-09-16): the site
+       strip left the intake floor for the requests rail beside the box, and those three strings
+       named its parts. `label` and `ended` stay - the projects board and the move dialog read them. */
     chips: {
       label: "Project",
       ended: "ended",
-      /** Beside the pills on the intake floor (owner, 2026-09-12): a row of place names is
-       *  furniture until something names the question it answers. */
-      /* «a», not «your» (owner, 2026-09-12). The row is a CHOICE among his sites, and the
-         possessive claimed one of them was already his answer. */
-      pick: "Select a project",
-      all: "All projects",
-      /** The way back to two rows once «All projects» has opened the rest. */
-      fewer: "Show fewer",
     },
     pills: {
       startFrom: "start from",
@@ -2501,6 +2586,62 @@ export const en = {
          above this row, so a line that only points at them would be a caption, not a control. */
       selectFromList: "Select from our list",
       addCustomType: "Add a custom equipment type",
+      /* ── The escape, and the one panel behind it (owner, 2026-09-13/14) ──────────────────────
+         Planned against his supervisor's prototype and cut down from it: *"despite we see them as 4
+         cases, user see them in 2"*, *"the cta instead of describe so he dont feel he is writing
+         again"*, *"many extra text everywhere no need"*.
+         ⚠️ ONE sentence per state on the row, and it must never wrap — the control is sized to the
+         sentence, not the sentence to the column.
+         🔴 Their LENGTH is a layout constraint, not a free choice (owner, 2026-09-20, on a shot of
+         the row reading «Can't find the equipment you ...»): the row clips rather than wrapping, so
+         a sentence that outgrows its column does not get smaller — it disappears. ~~«Can't find the
+         equipment you want?»~~ is cut to the shorter question it was already asking, and both now
+         fit the cell at its narrowest. */
+      hatchMatched: "Not the equipment you want?",
+      hatchNoMatch: "Can't find your equipment?",
+      /* A label, not a question: the row he just pressed asked the question, and asking again a
+         centimetre below it is the extra text this pass exists to remove. */
+      panelChange: "How do you want to change it?",
+      panelWiden: "Widen the search",
+      doorSearch: "Search our catalogue",
+      doorOwn: "Keep my own words",
+      browseHeading: "{family} types in our catalogue",
+      /* ⚠️ This is the search box's PLACEHOLDER now, not a link to a second view (owner,
+         2026-09-15: *"dont keep the search as another path"*). It still says «all», because the box
+         searches the whole catalogue even while the list below it shows one family.
+         ~~`searchAny`, «Name or nickname — try “digger”, “roto”, “FLT”».~~ It belonged to the widened
+         view, which no longer exists as a place you go. */
+      searchAll: "Search all equipment",
+      searchHeading: "Search the Moedatech catalogue",
+      /* The foot of a one-family list: the rest of the catalogue is one small press away, in place,
+         rather than behind a door (owner, 2026-09-15: *"small show all in the end of the shown
+         catelogie of the same type that will show all taxonamy too"*). */
+      showAllTypes: "Show all equipment",
+      /* 🔴 The list is SHORT because the catalogue did not load, not because we do not carry the
+         machine. Without this the two are the same picture, and the renter concludes the wrong one. */
+      catalogueShort: "Our catalogue did not load, so this list is short — try again in a moment",
+      noneFound: "Nothing in the catalogue matches that",
+      useThis: "Use this",
+      currentPick: "Current",
+      whichSize: "WHICH SIZE?",
+      backStep: "← Back",
+      /* He described the machine at the intake. This is a CONFIRMATION, never a second form:
+         *"i dont want the user to write anything more here as he already described it in his input
+         before"*. */
+      willSay: "THE REQUEST WILL SAY",
+      /* Short, because it is a BUTTON (owner, 2026-09-14: *"the button must be smaller with
+         «keep my name» only, in button style"*). The sentence it used to carry is the label above the
+         field it saves. */
+      keepOwn: "Keep my name",
+      /* 🔴 ~~`savedOwn`, «Saved as your own equipment — {name}».~~ Removed by the owner on
+         2026-09-15: *"no need for saved as your own equipemtn etc just remove it and keep the
+         equipment name field look green"*. The green NAME FIELD says it, where his words are. */
+      pillInCatalogue: "In our catalogue",
+      pillNotMatched: "Not matched",
+      /* 🔴 ~~`ownType` / `ownSize`, the two flat green statements that replaced the lists.~~ Removed
+         2026-09-15: *"the type - size will stay be dropdown in case user want to select but still
+         shown green"*. The lists stay live and wear the green instead, so a renter on his own words
+         can still reach into the catalogue without opening the panel. */
       searchSizes: "Search sizes…",
       fuel: "FUEL",
       /* ── An ask, not a heading (owner, 2026-09-08) ───────────────────────────────
@@ -2568,7 +2709,9 @@ export const en = {
       notInCatalogueNote: "This one won't reach Moedatech suppliers. Share the link yourself",
       // The renter names the machine himself and the request goes out carrying his words. Prefilled
       // from what he wrote in the RFQ, so the ordinary case is a glance.
-      customEquipment: "EQUIPMENT NAME",
+      /* The prototype's own wording, and his (2026-09-14): the box says WHOSE words it holds,
+         which is the whole reason it is read-only until he asks for it. */
+      customEquipment: "EQUIPMENT NAME IN MY OWN WORDS",
       customEquipmentPlaceholder: "Name the equipment you need",
       // Small and quiet: it is the way to get the machine into the catalogue, not the way out of the
       // request. Named for what it does, not for the app it opens (owner, 2026-09-06).
@@ -2692,7 +2835,11 @@ export const en = {
       body: "Your request is ready to review. If the request needs another equipment, add it now. It uses the same site and schedule, so there is nothing to fill in twice.",
     },
     ready: {
-      viewAll: "View all details",
+      /* ⚠️ ONE WORD (owner, 2026-09-14: *"make the button details only so it is smaller"*). It
+         shares a row with four facts that must not be pushed onto a second line, so its width is a
+         layout constraint - «View all details» is 3.4x this. The pen beside it says «edit»; this one
+         only has to say what it opens. */
+      viewAll: "Details",
       detailsTitle: "The full request",
       stripDays: "days",
       stripOperator: "with operator",

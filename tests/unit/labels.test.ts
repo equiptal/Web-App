@@ -124,25 +124,39 @@ describe("the quotation prints words, not codes", () => {
   const doc = (L: (e: string, a: string) => string, isAr: boolean) =>
     buildDealRoomQuotationDoc(room, null, { name: "Yara" }, isAr, L);
 
+  /* Every value the paper states, wherever the `q3` template puts it: the reference strip, the two
+     party boxes, the items table's own description column, and the term sentences. The old document
+     kept them all in one "Rental & equipment details" card; the shape moved, the rule did not. */
+  const values = (L: (e: string, a: string) => string, isAr: boolean) => {
+    const d = doc(L, isAr);
+    return [
+      ...d.refs.map((r) => r.value),
+      ...d.supplier.rows.map((r) => r.value),
+      ...d.rentee.rows.map((r) => r.value),
+      ...d.lineItems.flatMap((l) => l.description.map((x) => x.value)),
+      ...d.clauses.map((c) => c.body),
+    ].filter(Boolean);
+  };
+
   it("states the request's enums as words in English", () => {
-    const values = doc(en, false).cards.flatMap((c) => c.rows.map((r) => r.value));
-    expect(values).toContain("Flexible");
-    expect(values).toContain("Per Job");
-    expect(values).toContain("Single Supplier");
-    expect(values).toContain("4 hours");
+    const vals = values(en, false);
+    expect(vals).toContain("Flexible");
+    expect(vals).toContain("Per Job");
+    expect(vals).toContain("Single Supplier");
+    expect(vals.join(" ")).toContain("4 hours"); // inside the breakdown sentence
   });
 
   it("states them in Arabic on an Arabic quotation, city included", () => {
-    const values = doc(ar, true).cards.flatMap((c) => c.rows.map((r) => r.value));
-    expect(values).toContain("مرن");
-    expect(values).toContain("الرياض");
-    expect(values).toContain("المؤجر");
+    const vals = values(ar, true);
+    expect(vals).toContain("مرن");
+    expect(vals).toContain("الرياض");
+    expect(vals.join(" ")).toContain("المؤجر");
   });
 
   it("prints no raw enum anywhere on the paper", () => {
     for (const isAr of [false, true]) {
-      const values = doc(isAr ? ar : en, isAr).cards.flatMap((c) => c.rows.map((r) => r.value));
-      for (const v of values) expect(v, `raw code on the quotation: ${v}`).not.toMatch(/^[A-Z][A-Z_]{3,}$/);
+      const vals = values(isAr ? ar : en, isAr);
+      for (const v of vals) expect(v, `raw code on the quotation: ${v}`).not.toMatch(/^[A-Z][A-Z_]{3,}$/);
     }
   });
 });

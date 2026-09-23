@@ -21,8 +21,9 @@ import type { TemplateOption } from "@/lib/contract/project-apply";
 
 const rows = vi.hoisted(() => ({ value: [] as ProjectSummary[] }));
 const tpls = vi.hoisted(() => ({ value: [] as TemplateOption[] }));
+const reqs = vi.hoisted(() => ({ value: [] as unknown[] }));
 /**
- * ⚠️ **This mock must carry EVERY action `ProjectChips` calls.** `applyTemplate` ends in a bare
+ * ⚠️ **This mock must carry EVERY action `RequestsRail` calls.** `applyTemplate` ends in a bare
  * `catch {}` - a template that fails to apply leaves the renter where he was, deliberately - so a
  * missing function here is not a `TypeError` in the report: the whole template silently does
  * nothing and two unrelated cases fail with «0 calls». That is exactly what `setAgentTyping` did
@@ -45,9 +46,12 @@ vi.mock("@/lib/api/client", () => ({
   listProjects: () => Promise.resolve(rows.value),
   listTemplates: () => Promise.resolve(tpls.value),
   fetchTemplateTerms: () => Promise.resolve({ fuelType: "diesel" }),
+  /* The rail's ROWS come from my-requests; the TERMS behind a press come from the chart. The two
+     are joined on the machine's name, which is what these cases are about. */
+  fetchMyRequests: () => Promise.resolve({ requests: reqs.value }),
 }));
 
-const { ProjectChips } = await import("@/components/create/ProjectChips");
+const { RequestsRail, useRequestRail } = await import("@/components/create/RequestsRail");
 const { LocaleProvider } = await import("@/lib/i18n");
 
 const site = (): ProjectSummary =>
@@ -64,16 +68,27 @@ const tpl = (machine: string | null): TemplateOption => ({
 });
 
 /**
- * Pick the template the picker offers, by the label it actually draws.
+ * Press one machine in the rail, by the name the row draws.
  *
- * `ProjectChips` labels a row `tpl.machine || tpl.ref`, which is why the DROPDOWN read correctly all
- * along — an unnamed machine falls back to the request's code there — while the line it typed did
- * not. So the row is found by whichever of the two the case under test produces.
+ * ⚠️ An UNNAMED machine reaches the rail as «—» — `itemName` ends
+ * `taxonomy || customEquipmentLabel(it) || "—"` — so that is what the row says and what this
+ * presses. It is exactly the value that must never be TYPED, which is the point of the first case.
  */
-async function pickTemplate(label: string) {
+async function pickRow(label: string) {
+  /* ⚠️ A project's machines are fetched and listed only once it is OPENED - `listTemplates` is a
+     chart read per project, so the rail does not run one for every project on mount. Pressing the
+     head is what a renter does too. */
+  const head = await screen.findByText("Wadi Hanifah");
+  fireEvent.click(head.closest("button") ?? head);
   const row = await screen.findByText(label);
   fireEvent.click(row.closest("button") ?? row);
 }
+
+/** One rail row, shaped as `my-requests` sends it. */
+const req = (name: string, qty: number) => ({
+  id: "r1", projectId: "p1", status: "OPEN",
+  item: { name, nameAr: name, qty, imageUrl: null, imageIsPhoto: false, categoryId: null },
+});
 
 beforeEach(() => {
   rows.value = [site()];
@@ -81,6 +96,8 @@ beforeEach(() => {
   store.markProjectTyped.mockClear();
   store.setAgentTyping.mockClear();
   store.useTemplate.mockClear();
+  store.selectProject.mockClear();
+  reqs.value = [];
   Object.defineProperty(HTMLElement.prototype, "offsetHeight", { configurable: true, get: () => 26 });
   Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => 26 });
   class RO { constructor(private cb: () => void) {} observe() { this.cb(); } disconnect() {} }
@@ -92,66 +109,85 @@ afterEach(() => {
   delete (globalThis as unknown as { ResizeObserver?: unknown }).ResizeObserver;
 });
 
-const draw = () => render(<LocaleProvider><ProjectChips /></LocaleProvider>);
+/* The rail takes its state from the hook the screen owns, so the harness is what `Intake` does in
+   one line: call it once, hand it down. */
+function Harness() {
+  const rail = useRequestRail();
+  return <RequestsRail rail={rail} />;
+}
 
-describe("a template whose machine has no name", () => {
+const draw = () => render(<LocaleProvider><Harness /></LocaleProvider>);
+
+describe("a machine the catalogue could not name", () => {
   it("writes NOTHING into the request box", async () => {
+    /* — is `itemName`'s last resort, and it is the «12 × null» bug wearing a different character:
+       a placeholder at one end and a machine's name by the time it reaches the agent. */
+    /* An unnamed machine LISTS by its reference, so the row is still recognisable and pressable -
+       and that reference must never reach the box. */
     tpls.value = [tpl(null)];
     draw();
-    await pickTemplate("JTR060995");
+    await pickRow("JTR060995");
     await waitFor(() => expect(store.useTemplate).toHaveBeenCalled());
-    // The four characters that reached the agent as a machine the renter had asked for.
     for (const call of store.setText.mock.calls) expect(String(call[0])).not.toContain("null");
     expect(store.setText).not.toHaveBeenCalled();
     expect(store.markProjectTyped).not.toHaveBeenCalled();
   });
 
-  it("still applies the TERMS, which are keyed on the item and not on its name", async () => {
-    tpls.value = [tpl(null)];
+  it("still applies the TERMS, which are keyed on the machine and not on its name", async () => {
+    tpls.value = [tpl("Crawler Excavator 20 ton")];
     draw();
-    await pickTemplate("JTR060995");
+    await pickRow("Crawler Excavator 20 ton");
     await waitFor(() => expect(store.useTemplate).toHaveBeenCalled());
   });
 
   it("writes the line as usual when the machine IS named", async () => {
     tpls.value = [tpl("Crawler Excavator 20 ton")];
     draw();
-    await pickTemplate("Crawler Excavator 20 ton");
+    await pickRow("Crawler Excavator 20 ton");
     await waitFor(() => expect(store.markProjectTyped).toHaveBeenCalledWith("12 × Crawler Excavator 20 ton"));
   });
 
   it("drops the count when there is only one of it", async () => {
     tpls.value = [{ ...tpl("Tower crane"), quantity: 1 }];
     draw();
-    await pickTemplate("Tower crane");
+    await pickRow("Tower crane");
     await waitFor(() => expect(store.markProjectTyped).toHaveBeenCalledWith("Tower crane"));
+  });
+
+  it("lists an unnamed machine by its REFERENCE rather than hiding it", async () => {
+    /* 🔴 The rows ARE the templates (owner, 2026-09-16: *"the behaviour will not change from
+       existing pills just ui"*), so there is no such thing as a row without one and nothing is
+       matched. What a nameless machine needs is a label to be pressed by, and the reference is it. */
+    tpls.value = [tpl(null)];
+    draw();
+    const head = await screen.findByText("Wadi Hanifah");
+    fireEvent.click(head.closest("button") ?? head);
+    expect(await screen.findByText("JTR060995")).toBeTruthy();
   });
 
   it("says the AGENT is writing it, and stops saying so", async () => {
     /**
      * Owner, 2026-09-13: *"make it like this mansour is writing it"*. The words already arrived as
      * typing (2026-08-31); what was missing was WHO. The intake draws him on the box for exactly
-     * the length of this flag - see `mansour.test.tsx`.
+     * the length of this flag — see `mansour.test.tsx`.
      */
     tpls.value = [tpl("Tower crane")];
     draw();
-    await pickTemplate("Tower crane");
+    await pickRow("Tower crane");
     await waitFor(() => expect(store.setAgentTyping).toHaveBeenCalledWith(true));
     await waitFor(() => expect(store.setAgentTyping).toHaveBeenCalledWith(false), { timeout: 3000 });
   });
 
-  it("does NOT raise him for a template with no machine to write", async () => {
-    // Nothing is typed, so nobody is typing. He would appear over a box he never touched.
+  it("does NOT raise him for a machine with no name to write", async () => {
     tpls.value = [tpl(null)];
     draw();
-    await pickTemplate("JTR060995");
+    await pickRow("JTR060995");
     await waitFor(() => expect(store.useTemplate).toHaveBeenCalled());
     /**
      * ⚠️ `not.toHaveBeenCalledWith(true)`, never `not.toHaveBeenCalled()`. The typewriter holds the
      * flag for 900ms AFTER its last character so he is seen reading the line back, and that beat
      * outlives the test that started it: an earlier case's `finally` lands here, past this file's
-     * `mockClear`, and the blunt assertion failed on a leak rather than on the rule. What this case
-     * is about is the RAISE.
+     * `mockClear`, and the blunt assertion failed on a leak rather than on the rule.
      */
     expect(store.setAgentTyping).not.toHaveBeenCalledWith(true);
   });

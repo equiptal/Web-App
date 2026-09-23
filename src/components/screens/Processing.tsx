@@ -233,7 +233,29 @@ export function ProcessingView({
           cropping one enlarges the margin rather than the machine — the requests rail's own note,
           2026-08-31. Its other rule, the 1.34 scale, belongs to a 52px circle where a letterboxed
           drawing leaves more hole than machine; at 118px there is room to simply fit it. */}
-      <span className="relative grid h-[144px] w-[144px] flex-none place-items-center">
+      {/* ── It comes TOWARD him when the machine lands (owner, 2026-09-14) ────────────────────
+          *"once he detected the equipment make the image big and zoomed in, as transition to the
+          front of user"*. The name he was reaching for is a **dolly-in** — the camera moving toward
+          the subject — which in CSS is a scale on the whole assembly rather than on the picture.
+          🔴 It MUST be the assembly, not the drawing. `object-contain` already fills the disc's
+          width at these ratios, so any lasting scale on the image pushes the machine's ends out
+          through a circle that clips them (the note on the `<img>` below measures this). Growing the
+          ring and the disc together gives the same «bigger, closer» reading and cannot clip: there
+          is simply more circle.
+          ⚠️ `motion-safe`, and the size is the resting state either way — a renter who asked for
+          less motion still gets the big machine, just without the travel. */}
+      {/* ── BIGGER and louder (owner, 2026-09-23: *"make the circle of image bigger and more visible
+          and catchy"*) ───────────────────────────────────────────────────────────────────────────
+          ~~144 / 134~~ → 184 / 172, a 4px ring, and a pale brand halo ring standing 10px outside it
+          on both states, so the circle reads from across the room. A RING, not a shadow: the owner
+          took shadows off the whole product on 2026-08-26. Every ratio the notes below measure is
+          unchanged, since the drawing's fit is relative to the disc. */}
+      <span
+        className={`relative grid h-[184px] w-[184px] flex-none place-items-center transition-transform duration-500 ease-out motion-reduce:transition-none${
+          found ? " motion-safe:scale-[1.14]" : ""
+        }`}
+      >
+        <span aria-hidden="true" className="pointer-events-none absolute -inset-[10px] rounded-full border-[6px] border-brand/10" />
         {/* ── The ring says which of the two states this is ─────────────────────────────────────
             SEARCHING: a quarter of brand turning through a pale circle — the catalogue being read.
             FOUND: the circle CLOSES, stops, and takes the full brand edge, arriving with the machine
@@ -248,12 +270,33 @@ export function ProcessingView({
           aria-hidden="true"
           className={
             found
-              ? "absolute inset-0 rounded-full border-[3px] border-brand found-ring"
-              : "absolute inset-0 rounded-full border-[3px] border-brand/15 border-t-brand motion-safe:animate-spin"
+              ? "absolute inset-0 rounded-full border-4 border-brand found-ring"
+              : "absolute inset-0 rounded-full border-4 border-brand/15 border-t-brand motion-safe:animate-spin"
           }
           style={found ? undefined : { animationDuration: "1.1s" }}
         />
-        <span className="grid h-[134px] w-[134px] place-items-center overflow-hidden rounded-full bg-surface2">
+        {/* ── WHITE under the drawing (owner, 2026-09-14) ───────────────────────────────────
+            *"i want the equipment image to fit the circle with no background appearing like a square
+            inside a circle"*.
+            🔴 The square is the FILE, not the layout. 13 of the 44 seeded taxonomy assets are
+            `.jpg`, which cannot carry alpha, so they bring their own white rectangle — and on
+            `surface2` that rectangle is visible as a square inside the circle. CSS cannot key it out
+            (measured 2026-09-08: Leaflet's transform isolates the marker, so a blend mode never
+            reaches what is behind). White is what those files' own ground IS, so on white they have
+            nothing left to show.
+            ⚠️ The real fix is still transparent PNGs in the bucket, which would fix the app too.
+            This hides it wherever the file's ground is white, which is every one of the thirteen. */}
+        {/* ── The «winner» flourish (owner, 2026-09-14: *"add any transition that makes the image
+            appear as the detected one, as winner"*) ─────────────────────────────────────────────
+            One halo, thrown outward from the disc and gone in 700ms. It is OUTSIDE the disc on
+            purpose: the disc clips, so a ripple drawn inside it would be a circle expanding into a
+            circle it can never leave.
+            ⚠️ Once, not a loop. A pulse that keeps going says «still working», which is the exact
+            opposite of what this moment means — and it is the state the spinner above just left. */}
+        {found && (
+          <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full border-2 border-brand found-halo motion-reduce:hidden" />
+        )}
+        <span className="grid h-[172px] w-[172px] place-items-center overflow-hidden rounded-full bg-surface">
           {imageUrl ? (
             /* ── A URL that fails falls back to the agent ──────────────────────────────────────
                A plain `<img>`, the same as the requests rail and for the same two reasons. The
@@ -285,12 +328,22 @@ export function ProcessingView({
                  The machine is big because the DISC is, which is the only lever that cannot clip.
                  ⚠️ The FOUND pop is on the image, not on the disc: the disc is `overflow-hidden`
                  and an animation on it would clip the overshoot to a circle that is itself growing. */
-              className={`h-full w-full object-contain${found ? " found-pop" : ""}`}
+              /* ── It FILLS the circle, as the request rail's tiles do (owner, 2026-09-14) ───
+                 *"for the square image, zoom in inside the circle to fit, like the ones in the
+                 requests line header"*. `contain` alone letterboxes: these drawings are ~1.83:1, so
+                 in a round hole they draw a wide band with the disc's own ground above and below it —
+                 which is the «square inside a circle» he has been pointing at.
+                 `scale-[1.34]` is the rail's own figure (2026-09-12, measured there: 52 ÷ 28, the
+                 factor that turns that letterbox into a filled tile). The ends crop, and that is the
+                 trade the rail already took after `object-cover` was tried on the live rail and
+                 rejected for cutting the machine into a jumble.
+                 ⚠️ Safe only because the disc is `overflow-hidden rounded-full`. */
+              className={`h-full w-full scale-[1.34] object-contain${found ? " found-pop" : ""}`}
             />
           ) : (
             /* No drawing — an off-catalogue line, or the tree failed to load. The agent holds the
                ring rather than an empty grey disc. */
-            <Mansour size={72} state="live" />
+            <Mansour size={92} state="live" />
           )}
         </span>
 
@@ -300,8 +353,8 @@ export function ProcessingView({
             This is where the old screen's green «it is running» dot sat, and it does that job with
             something that also says WHO. */}
         {imageUrl && (
-          <span className="absolute -bottom-1 -end-1 grid h-[38px] w-[38px] place-items-center rounded-full border border-border bg-surface">
-            <Mansour size={30} state="live" />
+          <span className="absolute -bottom-1 -end-1 grid h-[46px] w-[46px] place-items-center rounded-full border border-border bg-surface">
+            <Mansour size={36} state="live" />
           </span>
         )}
       </span>

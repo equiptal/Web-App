@@ -1,12 +1,51 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { usePageBack } from "@/components/AppShell";
+import { ArrowBackIcon } from "@/components/HeaderIcons";
 import { Modal } from "@/components/ui";
+import { backTarget } from "@/lib/contract/back-nav";
 import { btn } from "@/lib/ds";
 import { useT } from "@/lib/i18n";
+import { previousPath } from "@/lib/nav-trail";
 import { useRfq } from "@/lib/store/rfq-store";
 import { pin } from "@/lib/uiPins";
+
+/**
+ * Back on the INTAKE, drawn inside the work column rather than by the shell.
+ *
+ * 🔴 **Because the rail is a band of the screen** (owner, 2026-09-19: *"the panel must fit the
+ * whole page from the header till the end and dont overlap it with the back button"*). The shell
+ * draws its Back row as the first thing in `<main>`, across the page's own gutter; the intake's row
+ * breaks out to the window and pulls up through the main pad, so the panel and that row were
+ * fighting over the same band - the panel covered the control while a capped page kept the word
+ * «Back» just clear of its edge, which is the screenshot. With the cap gone (2026-09-19) the
+ * control would have disappeared under the panel completely.
+ *
+ * So on this ONE screen the shell registers nothing and the column carries the control, which is
+ * also where a reader looks for it: beside the thing it leaves, not over the panel it does not.
+ *
+ * ⚠️ It is the shell's own markup to the pixel - the arrow, the word, the same tone and the same
+ * mirror rule - because there is one Back control in this product and it must not read as two
+ * (owner, 2026-09-03: *"one consistent component reused on all screens"*).
+ */
+export function IntakeBack() {
+  const t = useT();
+  const router = useRouter();
+  const target = backTarget("/create", previousPath(), "/");
+  return (
+    <div {...pin("page-back")} className="mb-2 flex w-full items-center gap-3">
+      <button
+        onClick={() => router.push(target.href)}
+        className="inline-flex items-center gap-1.5 text-body font-semibold text-muted-dark transition hover:text-navy"
+      >
+        <ArrowBackIcon size={16} className="rtl:-scale-x-100" />
+        {t.shell.back}
+      </button>
+    </div>
+  );
+}
 
 /**
  * Back, on the create flow, steps back through the FLOW before it leaves it (owner, 2026-09-06:
@@ -60,7 +99,13 @@ export function CreateBack() {
       ? () => actions.setReadyToSend(false)
       : phase === "wizard" && draft
         ? () => setConfirmLeave(true)
-        : phase === "confirmation"
+        : /* 🔴 The INTAKE registers nothing, and draws `IntakeBack` inside its own work column
+             instead (owner, 2026-09-19) - the rail is a band of the screen and the shell's row runs
+             underneath it. Registering `null` here and rendering the control there is safe in a way
+             the 2026-09-09 trap was not: that failed because TWO components registered, and the
+             child's effect landed first. This is one registration whose value depends on the phase,
+             and the inline control registers nothing at all. */
+          phase === "confirmation" || phase === "intake"
           ? null
           : { fallback: "/" };
   usePageBack(spec);

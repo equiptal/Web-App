@@ -9,6 +9,7 @@ import { JOIN_URL } from "@/lib/config/store-links";
 // Both were written and tested for the bid list this workspace retired, and have had no caller since
 // (owner, 2026-08-25). The rules did not stop being true when their surface went away.
 import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
+import { resolveRenteeBandState, renteeBandIsDead, renteeBandShowsDelta, type RenteeBandState } from "@/lib/contract/bid-band-state";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
 import { liveRentalUnits } from "@/lib/contract/comparison";
@@ -20,6 +21,44 @@ import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmiss
 import type { LinkBidSubmission } from "@/lib/contract/link-bids";
 import { termsDial, type WorkspaceBid } from "@/lib/contract/workspace";
 import { pin } from "@/lib/uiPins";
+
+/**
+ * The band's glyph per state (app parity, `renteeBandGlyph`).
+ *
+ * ⚠️ A Record over the union, never a `switch` with a default: adding a state to
+ * `RenteeBandState` must BREAK this map rather than silently falling through to one icon, which is
+ * the whole reason the app keeps an enum both cards switch on.
+ */
+const BAND_GLYPH: Record<RenteeBandState, string> = {
+  counterThisPrice: "gavel",
+  counterThisOffer: "gavel",
+  awaitingSupplier: "schedule",
+  awaitingConfirmation: "schedule",
+  newCounterOffer: "arrow_downward",
+  newMessage: "chat_bubble_outline",
+  supplierAnswered: "chat_bubble_outline",
+  offerUpdated: "edit",
+  dealClosed: "check_circle",
+  accepted: "check_circle",
+  withdrawn: "block",
+  expired: "lock_clock",
+};
+
+/** The band's caption per state. Exhaustive for the same reason as {@link BAND_GLYPH}. */
+const BAND_LABEL = (t: ReturnType<typeof useT>, s: RenteeBandState): string => ({
+  counterThisPrice: t.workspace.band.counterPrice,
+  counterThisOffer: t.workspace.band.counterOffer,
+  awaitingSupplier: t.workspace.band.awaitingSupplier,
+  newCounterOffer: t.workspace.band.newCounterOffer,
+  newMessage: t.workspace.band.newMessage,
+  supplierAnswered: t.workspace.band.supplierAnswered,
+  offerUpdated: t.workspace.band.offerUpdated,
+  awaitingConfirmation: t.workspace.band.awaitingConfirmation,
+  dealClosed: t.workspace.band.dealClosed,
+  accepted: t.workspace.band.accepted,
+  withdrawn: t.workspace.band.withdrawn,
+  expired: t.workspace.band.expired,
+}[s]);
 
 /**
  * The Cards tab — one card per bid on the selected item, in a row that scrolls sideways.
@@ -123,7 +162,24 @@ export function BidCards({
        row, so the «Counter this price» buttons line up and a shorter card's slack sits above its
        footer. Both overflow axes are STATED — CSS computes the other from `visible` to `auto` the
        moment one scrolls, and an unstated `overflow-y` is how this repo grew a phantom vertical bar
-       three times (the bid rail, the compare matrix, the suppliers table). */
+       three times (the bid rail, the compare matrix, the suppliers table).
+
+       ── ~~The strip CENTRES what it holds.~~ WITHDRAWN (owner, 2026-09-21: *"why this
+       cewntered? revert it back"*) ─────────────────────────────────────────────────────────
+       It was centred on 2026-09-19, on his own pick from four options put to him: *«why margin from
+       left not equal to right»*, on a 1920 screen holding ONE bid. The measurement behind that is
+       still true and is worth keeping, because it is what will be reached for again — the gutters
+       WERE equal, 37px of grey left and 39px right; what was unequal was the CONTENT, a 344px card
+       against the leading gutter with ~1480px of empty white after it, because `PAGE_MAX` became
+       `max-w-none` the same morning and this container went 1360 -> 1840 while the card did not.
+       🔴 He has now looked at the centred strip and taken it back off. The card sits at the
+       READING START again, which is where every other band on this page begins, and a lone bid on a
+       wide screen simply has white after it.
+       ⚠️ **If it is ever centred again it must be `center-safe`, never a plain `justify-center`.**
+       This is an `overflow-x-auto` scroller, and centred content WIDER than its box overflows
+       equally at both ends — the overflow past the start edge cannot be scrolled to, so on a
+       request with six bids the FIRST one becomes unreachable. That is the whole reason the
+       withdrawn version carried the suffix, and it is the trap to re-read before reinstating. */
     <div
       {...pin("workspace-bid-cards")}
       className="flex items-stretch gap-5 overflow-x-auto overflow-y-clip p-3"
@@ -211,6 +267,32 @@ function BidCardTile({
     status: card.status,
   });
 
+  /* The band's one caption, resolved by the app's own ordering. ⚠️ The ordering is a PURE FUNCTION
+     in `bid-band-state.ts` and the card only maps its answer to a word, a glyph and a tone — the
+     part that can be wrong is which state wins, and that is testable without rendering anything. */
+  const bandState = resolveRenteeBandState({
+    bidStatus: card.status,
+    hasDealRoom: card.dealRoomId != null,
+    dealRoomStatus: card.dealRoomStatus,
+    deltaSide: delta?.side ?? null,
+    liveStatusKind: card.liveStatus?.kind ?? null,
+    lastCounterBy: card.lastCounterBy,
+  });
+  const bandDead = renteeBandIsDead(bandState);
+  const bandShowsDelta = renteeBandShowsDelta(bandState);
+  /** The states that report something the SUPPLIER did, so a screen reader is told rather than
+   *  having to find it. The turn states and the terminal ones announce nothing: they are the card's
+   *  resting condition, not an event. */
+  const bandIsNews = bandState === "newCounterOffer" || bandState === "newMessage"
+    || bandState === "supplierAnswered" || bandState === "offerUpdated";
+  const bandLabel = BAND_LABEL(t, bandState);
+
+  /* ⚠️ Every live state opens the SAME place — the negotiation sheet — because every one of them is
+     answered there: the counter, the terms, the log and the supplier's own last move. An ACCEPTED bid
+     opens the room READ-ONLY rather than being drawn dead: the sheet says why in its header, and a
+     renter reading «Deal closed» is asking what the deal WAS. `openCounter` is declared below, so
+     the press calls it rather than aliasing it here — a `const` alias at this point is a TDZ error. */
+
   // ── The price block, built the way the app builds it ───────────────────────────────────────────
   // Mirrors `v3_bid_card.dart` + `price_expanded_breakdown.dart`, checked against the source on
   // 2026-08-12. Every row here is PER UNIT; a multi-unit offer adds an all-units row at the foot.
@@ -289,6 +371,15 @@ function BidCardTile({
   /** The count actually taken, once a bid is accepted — the app's `agreedUnits ?? unitsOfferedCount`,
    *  which is what turns the units badge from "offers 3" into "2 of 3 accepted". Null before then. */
   const acceptedUnits = accepted ? (card.agreedUnits ?? unitsOffered) : null;
+  /** ⚠️ What the bid COVERS, for the subtext under the firm's name - `null` on a single-unit
+   *  request, where every bid covers all of it. It reads the OFFERED count, never the priced one
+   *  the totals multiply by: they are separate questions and the card keeps them apart. */
+  const unitsLine =
+    card.numberOfUnits > 1
+      ? acceptedUnits != null
+        ? fmt(t.workspace.acceptedUnits, { accepted: String(acceptedUnits), offered: String(unitsOffered) })
+        : fmt(t.workspace.offersUnits, { n: String(unitsOffered) })
+      : null;
   const submitted = card.submittedAt
     ? new Date(card.submittedAt).toLocaleString(ar ? "ar" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : null;
@@ -326,6 +417,11 @@ function BidCardTile({
    * `ensureDealRoom` throwing means no room, and no room means no sheet to open.
    */
   const openCounter = async () => {
+    /* ⚠️ **Two enforcement points that must agree**, the argument `bid-equipment-access.ts` makes
+       for the same shape: the band above is not drawn for an off-platform bid, and this refuses one
+       anyway. An entry point is not a boundary — the terms modal reaches this function too, and a
+       later caller would otherwise inherit a call that 404s in silence. */
+    if (offline) return;
     if (countering) return;
     setCountering(true);
     try {
@@ -380,17 +476,28 @@ function BidCardTile({
         </span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-subhead font-extrabold leading-[1.15] text-navy">{card.supplierName}</div>
-          {/* «Supplier · Riyadh», as the app's own card reads (owner, 2026-08-25). The city was on the
-              wire the whole time — the bid-list `supplierProfile` carries it, and `mapBid` was already
-              reading it into the composed national address. The distance keeps its place after it. */}
+          {/* 🔴 **THE CITY, AND WHAT THE BID COVERS** (owner, 2026-09-23, on «Supplier · Riyadh
+              · 8 km»: *"make it, only city and offers x units if multi unit instead of this 2 units
+              badge"*).
+              ~~«Supplier», the city, then the distance.~~ Two of the three earned nothing on a card
+              in a column of bids: every row here IS a supplier, so the word was a caption on the
+              obvious; and the distance is the YARD's, which the equipment map states per machine
+              with its own «not confirmed» qualifier - one rounded figure here implied a precision
+              about a fleet that the map spends a whole surface refusing to claim.
+              ⚠️ **The count moved here FROM the pill column** (below), so the card says it once.
+              Same gate as the badge had - `numberOfUnits > 1`, the app's own: where the renter asked
+              for one machine every bid covers all of it and the line states nothing.
+              ⚠️ **The ACCEPTED shape survives with it.** «2 of 3 units accepted» is a partial
+              award, and it is the one fact the removed badge held that nothing else on the card
+              carries - the green band says THAT it was accepted, never how much of it. */}
           <div className="truncate text-label font-semibold text-muted">
-            {L("Supplier", "مؤجّر")}
-            {card.supplierCity ? ` · ${card.supplierCity}` : ""}
-            {card.distanceKm != null ? ` · ${Math.round(card.distanceKm)} ${L("km", "كم")}` : ""}
+            {[card.supplierCity || null, unitsLine].filter(Boolean).join(" · ")}
           </div>
         </div>
         {/* ── The pill column, as the app builds it (`v3_bid_card._pillColumn`) ─────────────────
-            The control on top, the units badge under it, both against the card's trailing edge. */}
+            The chat control, against the card's trailing edge.
+            🔴 ~~The units badge sat under it.~~ Its count is in the SUBTEXT now (owner,
+            2026-09-23), so the column holds one thing again. */}
         <div className="flex flex-none flex-col items-end gap-1.5">
           {/* ~~«Not on the app», as a pill in the control's place on an off-platform card.~~ Removed
               (owner, 2026-08-31): *"it is already labeled in the card header."* It is — the header
@@ -429,7 +536,6 @@ function BidCardTile({
 
               Gated on the REQUEST being multi-unit, the app's own gate: where the renter asked for
               one machine every bid covers all of it and the badge states nothing. */}
-          {card.numberOfUnits > 1 && <OffersUnitsBadge offered={unitsOffered} accepted={acceptedUnits} />}
         </div>
       </div>
 
@@ -616,9 +722,11 @@ function BidCardTile({
       {/* The way on, at the foot of every card.
           `mt-auto` is back and now earns it: the cards are stretched to a COMMON height rather than
           to the pane, so the slack it crosses is only ever the difference between this card and the
-          fullest one. That is what puts the buttons on one line. */}
-      <div className="mt-auto flex flex-none gap-2 px-3.5 pb-3.5 pt-0.5">
-        {offline ? (
+          fullest one. That is what puts the buttons on one line.
+          ⚠️ On an ON-PLATFORM bid this row now holds NOTHING — the band below it is the way on — so
+          it collapses to the `mt-auto` spacer that keeps the bands level across a row of cards. */}
+      <div className={`mt-auto flex flex-none gap-2 px-3.5 pt-0.5 ${offline ? "pb-3.5" : ""}`}>
+        {offline && (
           <>
             {/* ── «View quote» leads, «Invite» follows (owner, 2026-09-05) ───────────────────────
                 ~~Invite was the primary and took the width; «View quote» was the small secondary.~~
@@ -698,38 +806,74 @@ function BidCardTile({
               </button>
             )}
           </>
-        ) : (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              void openCounter();
-            }}
-            disabled={countering}
-            className={btn("primary", "lg", { className: "flex-1 transition" })}
-          >
-            {/* ── The button carries the ROUND, once there has been one (owner, 2026-08-25) ────────
-                `bidCounterDelta` is the app's rule and was already written and tested; its only
-                caller was the bid list this workspace retired, so it has been deciding nothing.
-                It returns null on an unmoved bid — the backend defaults `currentPrice` to
-                `priceAmount`, so an untouched offer arrives as two equal numbers — which is exactly
-                «after the first round» without a second rule to keep in step.
-
-                The old figure is struck through and the live one follows it, so the button says what
-                pressing it continues rather than starting the conversation over. */}
-            {delta ? (
-              <span className="inline-flex items-baseline gap-1.5">
-                {t.priceFooter.counterPrice}
-                <span className="text-label font-semibold text-white/55 line-through">{formatSar(delta.from)}</span>
-                <span aria-hidden="true" className="text-label font-semibold text-white/55">→</span>
-                <span className="text-meta font-extrabold">{formatSar(delta.to)}</span>
-              </span>
-            ) : (
-              t.priceFooter.counterPrice
-            )}
-          </button>
         )}
       </div>
+
+      {/* ── the band (app parity, `NegotiateFooter` + `resolveRenteeBandState`) ─────────────────
+          🔴 **The card's NEWS CHANNEL, not just its state readout** (owner, on the app, 2026-09-21),
+          and on the renter's side the ONLY one — which is why «awaiting», «new message» and «counter
+          this price» share a slot. They are not three kinds of thing; they are one answer to "what is
+          the state of this offer, and what do I do".
+
+          ~~One orange «Counter this price», on every card, whatever had happened.~~ It said the same
+          thing over a bid the supplier had just answered, a bid waiting on him, an accepted deal and a
+          withdrawn one — twelve situations behind one sentence, and the two terminal ones invited a
+          press that cannot do anything.
+
+          ⚠️ **A live bid's action is ORANGE whatever the caption** (the app's own reversal): a quiet
+          outline for «waiting» was meant to say "not your move", but the caption says that in words,
+          and a pale bar beside a coloured one reads as disabled. Only a TERMINAL bid is drawn down,
+          and that one really is unpressable.
+
+          ⚠️ Square corners: the CARD clips this to its own radius (`overflow-hidden` on the article).
+          Rounding here too would put the corner in two places and they would drift. */}
+      {/* 🔴 **NO BAND ON AN OFF-PLATFORM BID** (owner, 2026-09-22, on a picture of one carrying
+          «Counter this price»: *"how offline bids has counter this pruce, remove"*).
+
+          It was not merely wrong to offer — it could not work. `openCounter` calls
+          `ensureDealRoom(card.id)`, and an off-platform card's id is `link-<submissionId>`: a
+          `LinkBidSubmission`, which is **not a `Bid` row**, so the call 404s and the catch swallows
+          it. The renter pressed a full-width orange bar and nothing happened, with no sign of why.
+
+          And there is nothing for the band to say on such an offer either. Every state it carries —
+          «new message», «awaiting the supplier», «offer updated», the counter itself — is a fact
+          about a DEAL ROOM, and an off-platform supplier has no account, no Stream channel and no
+          room. The card keeps the two acts that are real for him: «View quote» and «Invite to
+          Moedatech», which is the route by which he could one day be countered.
+
+          ⚠️ The whole BUTTON is withheld rather than drawn dead: `bandDead` is the terminal state
+          of a live negotiation («Deal closed»), and a grey bar saying that over an offer nobody ever
+          negotiated would be a claim about a conversation that never happened. */}
+      {!offline && (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); if (!bandDead) void openCounter(); }}
+        disabled={bandDead || countering}
+        aria-live={bandIsNews ? "polite" : undefined}
+        className={`flex flex-none items-center justify-center gap-2.5 px-3.5 py-3 text-body font-extrabold transition ${
+          bandDead ? "cursor-default bg-surface2 text-muted" : "bg-brand text-white hover:bg-brand-press"
+        }`}
+      >
+        {/* The glyph rides its own translucent disc, as the app draws it: on a saturated orange a
+            bare white outline icon has almost no edge to sit against. */}
+        <span className={`grid size-7 flex-none place-items-center rounded-full ${bandDead ? "bg-border" : "bg-white/20"}`}>
+          <Icon name={BAND_GLYPH[bandState]} size={15} />
+        </span>
+        {/* Ellipsising: the band centres its content, so an over-long caption would push the glyph
+            off the leading edge rather than simply running past the trailing one. */}
+        <span className={`min-w-0 truncate ${bandShowsDelta ? "text-meta" : "text-body"}`}>{bandLabel}</span>
+        {/* ⚠️ Never truncated and never wrapped — a cut price is a WRONG price. Forced LTR, because
+            money reads left to right in both locales and a mirrored pair says the opposite of what
+            happened. */}
+        {bandShowsDelta && delta && (
+          <span dir="ltr" className="inline-flex flex-none items-baseline gap-1.5">
+            <span className="text-label font-semibold text-white/55 line-through">{formatSar(delta.from)}</span>
+            <span aria-hidden="true" className="text-label font-semibold text-white/55">→</span>
+            <span className="text-meta font-extrabold">{formatSar(delta.to)}</span>
+          </span>
+        )}
+      </button>
+      )}
 
       {termsOpen && (
         <BidTermsModal
@@ -799,30 +943,13 @@ function LegRow({ label, amount, excluded, onRentee }: { label: string; amount: 
   );
 }
 
-/**
- * **The units badge** — the app's `_OffersUnitsBadge`, in the web card's own type scale.
- *
- * Blue and a crate while the offer is open; green and a tick once it is accepted, when it states how
- * much of the offer was actually taken rather than how much was on the table. It reports the OFFER,
- * so it stays put when the deal room negotiates the priced count down — that count is the totals'
- * business, and the note under them says when the two diverge.
- */
-function OffersUnitsBadge({ offered, accepted }: { offered: number; accepted: number | null }) {
-  const t = useT();
-  const isAccepted = accepted != null;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-sm px-2 py-0.5 text-label font-extrabold ${
-        isAccepted ? "bg-ok-soft text-ok" : "bg-info-soft text-info"
-      }`}
-    >
-      <Icon name={isAccepted ? "check_circle" : "inventory_2"} size={12} />
-      {isAccepted
-        ? fmt(t.workspace.acceptedUnits, { accepted: String(accepted), offered: String(offered) })
-        : fmt(t.workspace.offersUnits, { n: String(offered) })}
-    </span>
-  );
-}
+/* 🔴 ~~`OffersUnitsBadge` — the app's `_OffersUnitsBadge`, a pill under the chat control.~~
+   **Deleted** (owner, 2026-09-23: *"offers x units if multi unit instead of this 2 units badge"*).
+   Both of its shapes moved into the subtext under the firm's name, which is where the card's other
+   facts about the offer already live. Deleted rather than left unrendered: a component nothing
+   imports is one edit away from coming back beside the line that replaced it, and then the card
+   states its count twice. `t.workspace.offersUnits` and `acceptedUnits` survive - the subtext is
+   their only reader now. */
 
 /** One slice of a dial: a colour, and the share of the circle it holds (0–1). */
 type DialSlice = { colour: string; share: number };

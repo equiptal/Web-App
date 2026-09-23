@@ -4,11 +4,17 @@
  * rentee party. Live chat runs over GetStream (channel = streamChannelId; token via stream-token).
  */
 import { computeRentalTotal, divisorNote, rentalDivisor, VAT_RATE } from "@/lib/pricing/rental";
-import { cityLabel, urgencyLabel, rentalTypeLabel, fulfillmentLabel, termValueLabel } from "@/lib/contract/labels";
+import { cityLabel, urgencyLabel, rentalTypeLabel, fulfillmentLabel, latinDigits, termValueLabel } from "@/lib/contract/labels";
 import { partyToken } from "./labels";
+import { companyNamePartsOf, counterpartyDisplayName } from "./counterparty-name";
+import { mediaUrl } from "./stores";
 // Type-only — the deal-room quotation BUILDER lives here (pure, testable in the node suite); the
 // rendering itself stays in the shared template module.
-import type { QuotationDoc, QuotationLineItem, QuotationCard } from "@/lib/quotation/render";
+import type { QuotationDoc, QuotationLineItem, QuotationMoneyCell, QuotationPartyRow } from "@/lib/quotation/render";
+import { CLAUSE, ClauseList, extraTermClauses, resolveTerm, type TermSource as ClauseTermSource } from "@/lib/quotation/clauses";
+import { quotationLegal } from "@/lib/quotation/render";
+import { SUPPORT_EMAIL } from "@/lib/quotation/bid-quotation";
+import { HIDDEN_TERM_KEYS } from "@/lib/contract/term-visibility";
 
 export type DealRoomStatus = "OPEN" | "NEGOTIATING" | "AWAITING_SUPPLIER_CONFIRMATION" | "CLOSED" | "ABANDONED" | string;
 
@@ -18,6 +24,19 @@ export interface DealParty {
   isVerified: boolean;
   /** Contact number. Server-gated: supplier.phone is always present; rentee.phone only once CLOSED. */
   phone: string | null;
+  /**
+   * The firm's mark, from the supplier's STORE (`storeLogoKey`).
+   *
+   * 🔴 **On the wire since the room shipped (`deal-room.service.ts:1601`) and read by NOTHING here
+   * until now**, which is why the deal room's quotation printed no supplier logo at the top OR in its
+   * footer while the BID quotation printed both — one contract, two documents, and the app forbids
+   * exactly that.
+   *
+   * ⚠️ The STORE's logo, not a company one: a supplier has no separate company mark by design (the
+   * same split `companyLogoKindFor` makes on the profile), so reading a company field here would
+   * render an empty tile for a firm with a perfectly good mark on file.
+   */
+  logoUrl: string | null;
 }
 
 export type TermState = "fixed" | "soft_accepted" | "disputed" | "pending" | "agreed" | string;
@@ -97,6 +116,51 @@ export interface DealTerm {
    *  when countering a non-binary / non-price term. */
   options: { value: string; labelEn: string; labelAr: string }[];
 }
+
+/* ── A term's state as the READER meets it, not as the server last stamped it ────────────────────
+   App parity: `TermModel.bothSidesDiffer` / `.isConflicting` / `.isSettledByValues`
+   (`deal_room_models.dart:608-654`, 2026-09-21).
+
+   🔴 **The server sets `disputed` exactly ONCE**, in `buildTermsArray`, comparing the request
+   against the bid at room creation. Every later move — `counter`, `propose_update`, `reopen` —
+   writes `pending` (`deal-room.service.ts:2304`). So a clash created in round two arrived here as
+   `pending`, the sheet drew it as «Not set» with two contradictory values sitting on it, and the
+   accept gate let it through. ⚠️ Values, not timing: `disputed` says when the clash was noticed,
+   these say whether there is one now. */
+
+/** Case- and whitespace-folded, because these are enum-shaped values written by two different
+ *  producers: `NET_30` from the request and `net_30` from the bid are ONE schedule, not a
+ *  disagreement. A raw compare reports a clash the two surfaces render with the SAME label — red,
+ *  unresolvable, and blocking Accept for good. */
+const fold = (v: unknown): string => (v == null ? "" : String(v)).trim().toLowerCase();
+
+/** Both sides named a value and the two differ. */
+export function bothSidesDiffer(t: DealTerm): boolean {
+  const mine = fold(t.renteePreference);
+  const theirs = fold(t.supplierDeclared);
+  if (!mine || !theirs) return false;
+  return mine !== theirs;
+}
+
+/** Both sides named the SAME value — the mirror of {@link bothSidesDiffer}, folded the same way. */
+export function bothSidesAgree(t: DealTerm): boolean {
+  const mine = fold(t.renteePreference);
+  const theirs = fold(t.supplierDeclared);
+  if (!mine || !theirs) return false;
+  return mine === theirs;
+}
+
+/** A conflict as the reader meets it: declared at birth, or created by a later counter.
+ *  ⚠️ Excludes anything already settled — an `agreed` term is not in conflict however its two
+ *  sides once looked. */
+export const isConflictingTerm = (t: DealTerm): boolean =>
+  t.state === "disputed" || (t.state === "pending" && bothSidesDiffer(t));
+
+/** 🔴 **Nothing left to ask.** A counter that lands ON the other side's value writes `pending`,
+ *  never `agreed` — so two identical values sat in the queue asking the renter to answer a question
+ *  both parties had already answered the same way. */
+export const isSettledByValues = (t: DealTerm): boolean =>
+  t.state === "agreed" || (t.state === "pending" && bothSidesAgree(t));
 
 export interface DealRoomView {
   id: string;
@@ -264,10 +328,22 @@ function mapDoc(raw: Record<string, unknown>): DealRoomDocument {
  *  the web printing those two on the quotation while the app printed neither — one contract, two
  *  documents. */
 export const HIDDEN_DEAL_ROOM_TERM_KEYS = new Set<string>([
+  /* 🔴 The PRODUCT-WIDE set is spread in rather than restated (2026-09-22). This list
+     held `operator_nationality` of its own, and the day that term left every OTHER surface
+     too there were two places saying so - which is how one of them comes to be edited alone.
+     The keys below it are the deal room's own, hidden here and nowhere else. */
+  ...HIDDEN_TERM_KEYS,
   "PRICE", "mobilization_pricing", "demobilization_pricing",
   "fulfillment_type", "required_attachments", "mobilization_lead_time",
-  "operator_nationality", "operator_certification", "safety_certifications",
+  "operator_certification", "safety_certifications",
   "fat", "payment_method", "offer_duration",
+  /* 🔴 `overtime_rate` joined the list on 2026-09-18, matching `kHiddenDealRoomTermKeys`. The rentee is
+     no longer asked for an overtime rate (2026-08-30), so there is nothing to negotiate — the room was
+     drawing the PLATFORM DEFAULT as the rentee's own proposal and asking both sides to settle it. The
+     web already hid it on every SURFACE (2026-09-04); hiding it at the parse is what stops the
+     quotation's term sweep printing «Overtime Rate: 0x», which is the same `'0'` sentinel that once
+     reached the app's own quotation. */
+  "overtime_rate",
 ]);
 
 /** Case-insensitive membership, matching the app's `kHiddenDealRoomTermKeys.contains(k.toLowerCase())`,
@@ -589,9 +665,16 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     supplierId: n(d.supplierId),
     supplier: {
       id: n(sup.id),
-      name: s(sup.companyName) ?? s(sup.storeName) ?? ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
+      // ⚠️ The four name columns first (`counterpartyDisplayName` — the backend's own order, and the
+      // one rule every surface reads). `getDealRoom` already folds its resolved brand into
+      // `companyName`, which is one of those four, so a payload that carries only that still lands on
+      // the same answer. The STORE name sits below them and above the person.
+      name: counterpartyDisplayName(companyNamePartsOf(sup))
+        || s(sup.storeName)
+        || ([s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ") || "Supplier"),
       isVerified: sup.isVerified === true,
       phone: s(sup.phone),
+      logoUrl: mediaUrl(sup.storeLogoKey ?? sup.store_logo_key ?? sup.storeLogoUrl),
     },
     rate: n(d.lastProposedRate) ?? n(bid.priceAmount),
     mobPrice: n(d.lastProposedMobPrice) ?? n(bid.mobPrice),
@@ -624,21 +707,14 @@ export function mapDealRoom(raw: unknown): DealRoomView {
 
 // ── The deal-room quotation document ────────────────────────────────────────────────────────────────
 
-/** Cost-responsibility terms — they render in the price section (`priceExtras`), not as term rows. */
-const COST_TERM_KEYS = new Set([
-  "fuel", "maintenance", "overtime", "overtime_rate", "operator_food", "fat_food",
-  "operator_transport_accommodation", "fat_accommodation_transport", "operator_transport",
-]);
+/* ~~`COST_TERM_KEYS` (the cost-responsibility terms, drawn in a price strip) and
+   `DETAILS_OWNED_TERM_KEYS` (the four ACKNOWLEDGE terms the "Rental & equipment details" card owned).~~
+   Both were FILTERS over a document that no longer has either block: `q3` prints one numbered list, and
+   the owner's rule of 2026-09-18 is that no term the room holds may be missing from it. Deleted rather
+   than left inert — a filter nobody calls is one edit away from hiding a term again.
 
-/** Four ACKNOWLEDGE terms are not facts of their own: the backend fills them straight from the request
- *  columns the "Rental & equipment details" card already prints — `working_hours` ← workingHoursPerDay,
- *  `working_days` ← workingDaysPerWeek, `local_content` ← localContent, and `crosshire` ← **subletting**
- *  (`deal-room.service.ts`: "`subletting` in schema ↔ `crosshire` in canonical term-key map").
- *  Printing them as term rows as well put each fact on the paper twice — and the subletting one twice
- *  under two different names: "Subletting" in one card and "Crosshire" in the other, from one field.
- *  The DETAILS card owns them. Its labels carry the unit ("Working hours/day"), it uses the rentee's own
- *  word for the field, and the rest of the request's facts are already there. The term cards drop them. */
-const DETAILS_OWNED_TERM_KEYS = new Set(["working_hours", "working_days", "local_content", "crosshire"]);
+   ⚠️ The one thing they protected survives: `crosshire` IS the request's `subletting` column, and the
+   builder relabels it to the renter's own word so the fact is still printed once, under one name. */
 
 const nfQ = (v: number) => Math.round(v).toLocaleString("en-US");
 
@@ -685,7 +761,7 @@ export function buildDealRoomQuotationDoc(
 
   // EXACT same math as the live price bar, which is why `live` is threaded in rather than resolved
   // again here: the bar prices on the LATEST ROUND (app parity, `resolveLivePosition`), and a paper
-  // that re-derived from the room’s columns would print the last AGREEMENT under a heading the renter
+  // that re-derived from the room's columns would print the last AGREEMENT under a heading the renter
   // just read a counter on. Absent — or on a CLOSED room, where the agreement IS the latest position
   // — this falls through to the columns and lands on the same figures either way.
   const t = computeDealTotals(room, live ?? undefined);
@@ -693,14 +769,67 @@ export function buildDealRoomQuotationDoc(
   const unit = t.priceUnit;
   const units = t.rentalUnits;
   const days = room.periods;
-  const periodLabel = unit === "PER_WEEK" ? L("week", "أسبوع") : unit === "PER_MONTH" ? L("month", "شهر") : unit === "PER_JOB" ? L("job", "مهمة") : L("day", "يوم");
-  const dateStr = new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const dd = room.details;
+  /** `المدة` is the ADJECTIVE on the items table, which is how the design draws it. */
+  const periodAdj = unit === "PER_WEEK" ? L("Weekly", "أسبوعي") : unit === "PER_MONTH" ? L("Monthly", "شهري") : unit === "PER_JOB" ? L("Per job", "للمهمة") : L("Daily", "يومي");
+  /* ⚠️ `latinDigits`, on every date. `ar-SA` formats with ARABIC-INDIC digits, and this product prints
+     Latin ones in both locales (owner, 2026-09-04: *"the numbers should be in eng even in arabic"*). */
+  const dateStr = latinDigits(new Date().toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "long", year: "numeric" }));
   // The Quotation row's id is the only formal reference this document has, and it exists only once the
   // deal closes. A preview falls back to the request's short code — the reference the rentee already
   // knows the room by — rather than printing a blank.
   const qnum = (q?.quotationNumber ?? "").slice(0, 8).toUpperCase() || room.shortCode || "—";
-  const contractType = room.contractType;
+  const fmtDate = (v: string | null) => {
+    if (!v) return "";
+    const dt = new Date(v);
+    return isNaN(dt.getTime()) ? v : latinDigits(dt.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }));
+  };
+  const site = dd.location ? cityLabel(dd.location, L) : null;
 
+  // ── Parties ──────────────────────────────────────────────────────────────────────────────────────
+  // ONE FIELD PER LINE, and a field with no value is DROPPED rather than printed empty (app `_rows`).
+  // ⚠️ The verification TICK sits beside the party's name; it no longer stands in for a missing
+  // registration number, so a firm with a checked C.R. that is simply not on this payload prints no
+  // C.R. row at all instead of one reading «verified».
+  const partyRows = (pairs: [string, string | null | undefined][]): QuotationPartyRow[] =>
+    pairs.filter(([, v]) => (v ?? "").toString().trim().length > 0).map(([label, v]) => ({ label, value: String(v).trim() }));
+
+  // ── The items table: ONE ROW, with delivery and return as COLUMNS ────────────────────────────────
+  // ~~A numbered rental row with its two legs as indented sub-rows.~~ q3 gives each leg a column of its
+  // own; the three cell states are the whole point — a figure is a price, `–` is a leg that is not the
+  // supplier's, and «Not priced» is a leg nobody put a number on.
+  const legCell = (excluded: boolean, byRentee: boolean, price: number): QuotationMoneyCell =>
+    excluded || byRentee ? { kind: "excluded" } : price > 0 ? { kind: "amount", text: nfQ(price) } : { kind: "unpriced" };
+  const lineItems: QuotationLineItem[] = [
+    {
+      equipment: (ar ? dd.equipmentLabelAr ?? dd.equipmentLabel : dd.equipmentLabel) ?? L("Equipment", "المعدة"),
+      description: [
+        { label: L("Size", "الحجم"), value: (ar ? dd.equipmentSizeAr ?? dd.equipmentSize : dd.equipmentSize) ?? "" },
+        { label: L("Rental type", "نوع الإيجار"), value: dd.rentalType ? rentalTypeLabel(dd.rentalType, L) : "" },
+        { label: L("Fulfillment", "التنفيذ"), value: dd.fulfillment ? fulfillmentLabel(dd.fulfillment, L) : "" },
+        { label: L("Urgency", "الأولوية"), value: dd.urgency ? urgencyLabel(dd.urgency, L) : "" },
+      ],
+      units: String(units),
+      duration: periodAdj,
+      rental: rate > 0 ? { kind: "amount", text: nfQ(rate) } : { kind: "unpriced" },
+      delivery: legCell(t.mobExcluded, room.mobByRentee === true, t.mobPrice),
+      ret: legCell(t.demobExcluded, room.demobByRentee === true, t.demobPrice),
+      /* 🔴 The CHARGED DAYS, under the total. The eight-column table has no quantity column for them,
+         so without this note the one figure that explains the total (the billable days, Fridays out)
+         would be nowhere on the paper. The divisor rides with it, whether or not this particular
+         period comes out exact (app parity: `rentalPeriodSubtitle`). */
+      totalNote: [
+        unit === "PER_JOB" || t.rentalRaw ? null : `${t.billableDays} ${L("days", "يوم")}`,
+        divisorNote(unit, L),
+      ].filter(Boolean).join(" · ") || null,
+      total: nfQ(t.subtotal),
+    },
+  ];
+
+  /**
+   * A term's value for print. The KEY decides the vocabulary — an SLA term's `FOUR_HR` and a
+   * maintenance term's `SUPPLIER` are both bare strings and only the key says which is which.
+   */
   const valFmt = (v: unknown): string => {
     if (v == null || v === "") return "—";
     if (Array.isArray(v)) return v.length ? v.map(String).join(", ") : "—";
@@ -716,175 +845,158 @@ export function buildDealRoomQuotationDoc(
     return String(v);
   };
 
-  // Invoice line items (rental + delivery + return) — the SAME 6-column table as the bid-card quotation.
-  const lineItems: QuotationLineItem[] = [];
-  // Rental qty/price columns read exactly as the bid card does: the PRICE column always carries the
-  // supplier's raw quoted rate over its own period, and the QTY column carries the BILLABLE days the
-  // rate is prorated across — never the calendar duration, which charges the Fridays the total does
-  // not. Nothing prorated (PER_JOB, open-ended, no start date) shows a plain period count instead.
-  const rentalQty = unit === "PER_JOB" || t.rentalRaw
-    ? `${units}`
-    : `${t.billableDays} ${L("days", "يوم")}${units > 1 ? ` × ${units}` : ""}`;
-  lineItems.push({
-    num: 1, label: L("Rental", "الإيجار"), detail: room.supplier.name,
-    unit: periodLabel,
-    qty: rentalQty,
-    price: `${nfQ(rate)} / ${periodLabel}`,
-    // The fixed-divisor assumption behind a weekly/monthly rate, stated whether or not this particular
-    // period comes out exact (app parity: `rentalPeriodSubtitle`) — it is what turns the rate into the
-    // day count beside it.
-    totalNote: divisorNote(unit, L),
-    total: nfQ(t.rentalTotal),
-  });
-  // Mob/demob are ALWAYS shown; each honours its OWN unit count + exclusion (excluded -> "Not included",
-  // matching the price bar, which contributes 0 for an excluded leg).
-  const logiRow = (label: string, excluded: boolean, price: number, unitsN: number, lineTotal: number, byRentee: boolean): QuotationLineItem =>
-    excluded
-      ? { num: null, label, detail: L("Not included", "غير مشمول"), unit: "—", qty: "—", price: "—", total: L("Not included", "غير مشمول") }
-      : price > 0
-        ? { num: null, label, detail: room.supplier.name, unit: L("Trip", "رحلة"), qty: String(unitsN), price: nfQ(price), total: nfQ(lineTotal) }
-        : { num: null, label, detail: byRentee ? L("Arranged by the rentee", "يُرتّبه المستأجر") : L("Included", "مشمول"), unit: "—", qty: "—", price: "—", total: byRentee ? L("By rentee", "على المستأجر") : L("Included", "مشمول") };
-  lineItems.push(logiRow(L("Delivery to site", "النقل إلى الموقع"), t.mobExcluded, t.mobPrice, t.mobUnitsN, t.mobTotal, room.mobByRentee === true));
-  lineItems.push(logiRow(L("Return from site", "الإرجاع من الموقع"), t.demobExcluded, t.demobPrice, t.demobUnitsN, t.demobTotal, room.demobByRentee === true));
-
-  const cards: QuotationCard[] = [];
-  // Structured rental/equipment details (from the request item) — rows with no value are skipped.
-  // Operator/safety + cost responsibilities are NOT separate cards: they flow through the term cards +
-  // the price extras below, matching the app.
-  const dd = room.details;
-  const yn = (b: boolean | null) => (b == null ? null : b ? L("Yes", "نعم") : L("No", "لا"));
-  const fmtDate = (v: string | null) => { if (!v) return null; const dt = new Date(v); return isNaN(dt.getTime()) ? v : dt.toLocaleDateString(ar ? "ar-SA-u-ca-gregory" : "en-GB", { day: "numeric", month: "short", year: "numeric" }); };
-  const addRow = (rowsArr: { label: string; value: string }[], label: string, v: unknown) => {
-    if (v == null || v === "" || (Array.isArray(v) && !v.length)) return;
-    rowsArr.push({ label, value: Array.isArray(v) ? v.join(", ") : String(v) });
-  };
-  const detailRows: { label: string; value: string }[] = [];
-  addRow(detailRows, L("Equipment", "المعدة"), ar ? dd.equipmentLabelAr ?? dd.equipmentLabel : dd.equipmentLabel);
-  // The four rows below carry backend ENUMS, not prose. Printed raw, an Arabic quotation read
-  // «الأولوية: FAR_FUTURE» — a code on the document the two parties hold each other to. See
-  // `contract/labels.ts`; anything those maps don't know still prints as it arrived.
-  addRow(detailRows, L("Location", "الموقع"), dd.location ? cityLabel(dd.location, L) : null);
-  addRow(detailRows, L("Rental type", "نوع الإيجار"), dd.rentalType ? rentalTypeLabel(dd.rentalType, L) : null);
-  addRow(detailRows, L("Contract type", "نوع العقد"), contractType);
-  addRow(detailRows, L("Start date", "تاريخ البدء"), fmtDate(dd.startDate));
-  addRow(detailRows, L("End date", "تاريخ الانتهاء"), fmtDate(dd.endDate));
-  addRow(detailRows, L("Duration", "المدة"), days != null ? `${days} ${L("days", "يوم")}` : null);
-  // These four rows are the ONLY print of their fact — the matching ACKNOWLEDGE terms
-  // (working_hours / working_days / local_content / crosshire) are dropped from the term cards below.
-  addRow(detailRows, L("Working hours/day", "ساعات العمل/يوم"), dd.workingHoursPerDay);
-  addRow(detailRows, L("Working days/week", "أيام العمل/أسبوع"), dd.workingDaysPerWeek);
-  addRow(detailRows, L("Fulfillment", "التنفيذ"), dd.fulfillment ? fulfillmentLabel(dd.fulfillment, L) : null);
-  addRow(detailRows, L("Urgency", "الأولوية"), dd.urgency ? urgencyLabel(dd.urgency, L) : null);
-  addRow(detailRows, L("Subletting", "التأجير من الباطن"), yn(dd.subletting));
-  addRow(detailRows, L("Local content", "المحتوى المحلي"), yn(dd.localContent));
-  addRow(detailRows, L("Rental extendable", "قابل للتمديد"), yn(dd.extendable));
-  addRow(detailRows, L("Additional notes", "ملاحظات إضافية"), dd.additionalNotes);
-  if (detailRows.length) cards.push({ title: L("Rental & equipment details", "تفاصيل الإيجار والمعدة"), rows: detailRows });
-
-  /**
-   * A term's value for print. The KEY decides the vocabulary — an SLA term's `FOUR_HR` and a
-   * maintenance term's `SUPPLIER` are both bare strings and only the key says which is which.
-   *
-   * Falls through to `valFmt` for everything else, which is most of the catalogue: the free-text and
-   * numeric terms, and the booleans that `valFmt` already reads as Yes/No.
-   */
-  const termFmt = (term: DealTerm): string => {
-    const v = term.value ?? term.platformDefault;
-    return termValueLabel(term.key, v, L) ?? valFmt(v);
+  // ── Terms ────────────────────────────────────────────────────────────────────────────────────────
+  // The app's own ladder, through the shared `TermSource`. A room term carries its CURRENT position in
+  // `value`, so `declared` is every term and `locked` is the settled ones — the `agreed` state, and
+  // never `soft_accepted`, which is "nobody may act on this" rather than "both sides agreed".
+  const termByKey = new Map(room.terms.map((term) => [term.key, term]));
+  const src: ClauseTermSource = {
+    locked: new Map(room.terms.filter((term) => term.state === "agreed").map((term) => [term.key, term.value ?? term.platformDefault])),
+    counter: new Map(),
+    declared: new Map(room.terms.map((term) => [term.key, term.value ?? term.platformDefault])),
+    hidden: isHiddenDealRoomTermKey,
+    label: (key) => {
+      /* ⚠️ ONE FACT, ONE NAME. `crosshire` IS the request's `subletting` column (`deal-room.service.ts`:
+         "`subletting` in schema ↔ `crosshire` in canonical term-key map"), and the renter answered it
+         under his own word. The room's label is the backend's; this prints his. */
+      if (key === "crosshire") return L("Subletting", "التأجير من الباطن");
+      const term = termByKey.get(key);
+      return term ? (ar ? term.labelAr || term.label : term.label || term.labelAr) || key : key;
+    },
+    value: (key, v) => termValueLabel(key, v, L) ?? valFmt(v),
   };
 
-  // Price extras (app parity): overtime rate + cost-responsibility terms ("fuel -> supplier"). Read from
-  // the LIVE room only — the second loop over the snapshot's copy went with the rest of the hybrid.
-  const isCost = (k: string) => COST_TERM_KEYS.has(k);
-  const priceExtras: { label: string; value: string }[] = [];
-  // Overtime is retired, and `'0'` is the "without overtime" sentinel every request written while
-  // the field was mandatory carries. It is a TRUTHY string AND it matches the numeric test below,
-  // so this printed «سعر العمل الإضافي: 0x» onto the quotation — a rate of zero times, for a term
-  // neither side was ever asked about. The backend normalises the same four spellings away in
-  // `quotation.service.ts`; normalise here rather than dropping the line, because a quotation is a
-  // historical document and a request that genuinely agreed 1.5x must keep saying so.
-  const otRaw = (dd.overtimeRate ?? "").trim().toUpperCase();
-  const otRate = otRaw === "" || otRaw === "0" || otRaw === "WITHOUT" || otRaw === "NONE" ? null : dd.overtimeRate!;
-  if (otRate) priceExtras.push({ label: L("Overtime rate", "سعر العمل الإضافي"), value: /^\d+(\.\d+)?$/.test(otRate) ? `${otRate}x` : otRate });
-  const seenCost = new Set<string>();
-  for (const term of room.terms) {
-    if (!isCost(term.key) || seenCost.has(term.key)) continue;
-    seenCost.add(term.key);
-    priceExtras.push({ label: ar ? term.labelAr : term.label, value: termFmt(term) });
+  const partyWord = (v: string | null) => {
+    if (!v) return null;
+    const x = partyToken(v).toLowerCase();
+    if (x === "supplier") return L("the supplier", "المؤجر");
+    if (x === "renter" || x === "rentee") return L("the renter", "المستأجر");
+    return v;
+  };
+
+  const clauses = new ClauseList();
+  const eqName = (ar ? dd.equipmentLabelAr ?? dd.equipmentLabel : dd.equipmentLabel) ?? null;
+  const eqSize = (ar ? dd.equipmentSizeAr ?? dd.equipmentSize : dd.equipmentSize) ?? null;
+  if (eqName) {
+    const scope = `${units} × ${eqName}${eqSize ? ` (${eqSize})` : ""}`;
+    clauses.add(CLAUSE.scopeTitle(L), CLAUSE.scope(L, scope, days != null && days > 0 ? `${days} ${L("days", "يومًا")}` : null));
   }
+  // 🔴 The WINDOW, which the app's clause set has no sentence for and which this document used to
+  // carry in its "Rental & equipment details" card. That card is gone with the redesign, and a
+  // quotation that does not say when the machine is wanted states less than the deal contains.
+  const windowDates = [fmtDate(dd.startDate), fmtDate(dd.endDate)].filter(Boolean);
+  if (windowDates.length) clauses.add(L("Rental period", "فترة الإيجار"), windowDates.join(L(" to ", " إلى ")));
+  clauses.add(
+    CLAUSE.transportTitle(L),
+    CLAUSE.transport(
+      L,
+      !t.mobExcluded && room.mobByRentee !== true && t.mobPrice > 0,
+      !t.demobExcluded && room.demobByRentee !== true && t.demobPrice > 0,
+    ),
+  );
+  if (dd.operatorIncluded === true) {
+    // 🔴 **THE NATIONALITY IS NOT PRINTED** — same ruling as `bid-quotation.ts`, and it has to be
+    // made in BOTH: the two documents are built by two builders, and the app forbids exactly that
+    // drift (*"two rentee routes to «the quotation» must not land on two different documents"*).
+    // `operatorNationality` stays on the view and is still parsed; only the paper stops saying it.
+    const detail = (dd.operatorCerts ?? []).filter(Boolean).join(" · ");
+    clauses.add(CLAUSE.operatorTitle(L), CLAUSE.operatorIncluded(L, detail || null), "operator_included");
+  } else if (dd.operatorIncluded === false) {
+    clauses.add(CLAUSE.operatorTitle(L), CLAUSE.operatorNone(L), "operator_included");
+  }
+  const certs = (dd.equipmentCerts ?? []).filter(Boolean).join(ar ? "، " : ", ");
+  if (certs) clauses.add(CLAUSE.certsTitle(L), CLAUSE.certs(L, certs), "safety_certifications");
+  const pay = resolveTerm(src, "payment_terms");
+  if (pay) clauses.add(CLAUSE.paymentTitle(L), CLAUSE.payment(L, src.value("payment_terms", pay)), "payment_terms");
+  const sla = resolveTerm(src, "breakdown_response_sla");
+  if (sla) clauses.add(CLAUSE.breakdownTitle(L), CLAUSE.breakdown(L, src.value("breakdown_response_sla", sla)), "breakdown_response_sla");
+  const maint = partyWord(resolveTerm(src, "maintenance_responsibility"));
+  if (maint) clauses.add(CLAUSE.maintenanceTitle(L), CLAUSE.maintenance(L, maint), "maintenance_responsibility");
 
-  // Term cards, LIVE. The states mirror the rule the backend snapshots by at close
-  // (`agreed | fixed | soft_accepted`), so a closed deal prints the rows it always did — it just reads
-  // them from the room instead of from the frozen copy.
-  const termRows = (pred: (term: DealTerm) => boolean) =>
-    room.terms
-      .filter((term) => pred(term) && !isCost(term.key) && !DETAILS_OWNED_TERM_KEYS.has(term.key))
-      .map((term) => ({ label: ar ? term.labelAr : term.label, value: termFmt(term) }));
-  const agreedRows = termRows((term) => term.state === "agreed" || term.state === "soft_accepted");
-  if (agreedRows.length) cards.push({ title: L("Agreed terms", "الشروط المتفق عليها"), rows: agreedRows });
-
-  /*
-   * ~~A "Fixed terms" card, listing every `state === "fixed"` term.~~ **Removed 2026-08-19 — the app
-   * prints no such section** (`quotation_page.dart` renders `agreedTerms` and nothing else, and the
-   * server's `agreedTerms` drops fixed terms at `quotation.service.ts:893`). Verified against the app
-   * rather than inferred: the only mention of `fixedTerms` on that page is a comment noting its
-   * absence.
-   *
-   * The owner ruled on 2026-08-19 that the app decides, and this is one of the two places the web was
-   * ahead rather than behind. It is recorded here rather than silently dropped, because the reason it
-   * existed is still true: a fixed term IS part of the contract, it was accepted by the act of
-   * bidding, and a quotation that omits it states less than the deal contains. The renter can still
-   * read every fixed term in the room, on the terms step's Acknowledge section.
-   *
-   * Restoring it is these three lines and a matching change on the app — not a web-side decision.
-   */
+  // 🔴 EVERY OTHER TERM THE ROOM HOLDS (owner, 2026-09-18, on the app: *"just make sure agreed and all
+  // terms of deal room is mentioned, we will not miss anything"*). ~~Two cards, "Agreed terms" and the
+  // cost responsibilities in a price strip, each filtered.~~ A term nobody wrote a sentence for used to
+  // fall off the paper entirely — including terms the two sides had settled.
+  const extras = extraTermClauses(src, clauses.covered);
+  // The renter's own notes ride last, whichever shape the terms took (app parity).
+  const notes = (dd.additionalNotes ?? "").trim();
 
   return {
     lang,
-    title: L("Equipment rental quotation", "عرض سعر تأجير معدات"),
+    title: L("Quotation", "عرض سعر"),
+    // A terminal room says so beside the title; a live one gets NO stamp, or a reader learns to ignore
+    // the stamp and then ignores the terminal one too.
+    statusStamp:
+      room.status === "CLOSED"
+        ? { label: L("Accepted", "مقبول"), tone: "ok" }
+        : room.status === "ABANDONED"
+          ? { label: L("Cancelled", "ملغى"), tone: "muted" }
+          : null,
     quotationNumber: qnum,
     dateStr,
+    // The app's own pairs and wording; the REQUEST number rides the signature strip with the support
+    // address, because that band speaks for the platform and the navy footer speaks for the supplier.
+    refs: [
+      { label: "QUOTATION REF", value: qnum },
+      { label: L("Issue date", "تاريخ الإصدار"), value: dateStr },
+      { label: L("Work site", "موقع العمل"), value: site ?? "" },
+      { label: L("Currency", "العملة"), value: sar },
+    ],
+    requestRef: room.shortCode ?? null,
+    supportEmail: SUPPORT_EMAIL,
     supplier: {
-      label: L("Supplier", "المؤجِّر"),
+      label: ar ? "SUPPLIER / المورد" : "SUPPLIER",
       name: room.supplier.name,
-      idRows: [
-        { label: L("National Address", "العنوان الوطني"), verified: room.supplier.isVerified },
-        { label: L("CR #", "س.ت"), verified: room.supplier.isVerified },
-        { label: L("VAT #", "ض.ق.م"), verified: room.supplier.isVerified },
+      verified: room.supplier.isVerified === true,
+      logoUrl: room.supplier.logoUrl,
+      rows: partyRows([
         // Live — the deal-room payload always carries the supplier's phone; the snapshot only backstops.
-        { label: L("Phone", "الهاتف"), value: room.supplier.phone ?? q?.supplierPhone ?? null },
+        [L("Phone", "الهاتف"), room.supplier.phone ?? q?.supplierPhone ?? null],
         // SNAPSHOT-ONLY: nothing on the live room payload carries the supplier's e-mail, so a preview
         // omits the row rather than inventing one.
-        { label: L("Email", "البريد"), value: q?.supplierEmail ?? null },
-      ],
-      // Verified shows on the CR/VAT rows ("✓ Verified") — no standalone orphan party chip.
-      chips: [],
+        [L("Email", "البريد"), q?.supplierEmail ?? null],
+      ]),
     },
     rentee: {
-      label: L("Rentee", "المُستأجِر"),
+      label: ar ? "RENTER / المستأجر" : "RENTER",
       name: rentee.name,
-      idRows: [
-        { label: L("Phone", "الهاتف"), value: rentee.phone ?? q?.renteePhone ?? null },
-        { label: L("Email", "البريد"), value: rentee.email ?? q?.renteeEmail ?? null },
-      ],
-      chips: [],
+      rows: partyRows([
+        [L("Work site", "موقع العمل"), site],
+        [L("Phone", "الهاتف"), rentee.phone ?? q?.renteePhone ?? null],
+        [L("Email", "البريد"), rentee.email ?? q?.renteeEmail ?? null],
+      ]),
     },
-    logoUrl: opts?.logoUrl,
-    meta: [], // no meta strip (app parity) — reference/contract/period live in the details card
-    priceExtras,
     lineItems,
     currency: sar,
     totals: { subtotal: t.subtotal, vat: t.vat, total: t.grand },
-    cards,
-    showSigned: false,
-    // Short disclaimer instead of the full legal clause list + signed block (app parity).
+    clauses: [...clauses.out, ...extras, ...(notes ? [{ title: L("Rentee notes", "ملاحظات المُستأجِر"), body: notes }] : [])],
+    showSigned: kind === "final",
+    // The mark the caller already passes for this document, sealing the signature strip.
+    sealUrl: opts?.logoUrl ?? null,
+    footer: {
+      name: room.supplier.name,
+      phone: room.supplier.phone ?? q?.supplierPhone ?? null,
+      email: q?.supplierEmail ?? null,
+      // The SUPPLIER's mark, beside his name in the navy band — q3's own footer, and what the bid
+      // quotation has drawn all along.
+      logoUrl: room.supplier.logoUrl,
+    },
+    /**
+     * 🔴 THE SAME FIVE CLAUSES the bid quotation prints. ~~A two-sentence disclaimer, on the
+     * reasoning that this document is the shorter one.~~ The app has ONE quotation: `_TermsList`
+     * appends `quotationTcValidity` … `quotationTcESignature` whatever surface asked for it, and its
+     * deal room opens that same document by bid id rather than a second one. A sheet whose terms
+     * depend on which button opened it is two sheets.
+     *
+     * ⚠️ The DRAFT sentence stays, ahead of them, and is web-only. The app has no preview/final split
+     * on this paper; the web does, and the badge and the watermark alone do not survive being read
+     * aloud down the phone.
+     */
     legal: [
-      // A preview says so ON the paper, in the app's own words (`dealViewQuotationDraftHint`). The link
-      // label alone doesn't survive a print-out or a forward.
       ...(kind === "preview"
-        ? [L("Draft — reflects the current offer, final once the supplier confirms.", "مسودة — تعكس العرض الحالي، وتُعتمد بعد تأكيد المورد.")]
+        ? [L("Draft — reflects the current offer, final once the supplier confirms", "مسودة — تعكس العرض الحالي، وتُعتمد بعد تأكيد المورد")]
         : []),
-      L("This quotation is generated electronically via Moedatech, valid for 7 days from the issue date. Prices exclude anything not listed above; VAT at 15% applies per Saudi tax law.", "صدر هذا العرض إلكترونيًا عبر منصة معداتك، وهو ساري المفعول لمدة 7 أيام من تاريخ الإصدار. الأسعار لا تشمل ما لم يُذكر أعلاه، وتُطبَّق ضريبة القيمة المضافة بنسبة 15٪ وفقًا للنظام السعودي."),
+      ...quotationLegal(L),
     ],
   };
 }

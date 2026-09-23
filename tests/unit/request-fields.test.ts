@@ -204,7 +204,11 @@ describe("a machine's own terms", () => {
   it("carries the rest of the machine's parameters", () => {
     expect(get("Units")).toBe("2");
     expect(get("Operator")).toBe("Included");
-    expect(get("Operator nationality")).toBe("Saudi");
+    /* 🔴 ~~`expect(get("Operator nationality")).toBe("Saudi")`.~~ The term is hidden on
+       every surface (owner, 2026-09-22; see `term-visibility.ts`), so the ROW is gone while the
+       field is still parsed and still sent. Asserted the other way round below, because a row
+       that quietly came back would otherwise pass here unnoticed. */
+    expect(get("Operator nationality")).toBeUndefined();
     expect(get("Fuel")).toBe("Diesel");
     expect(get("Night shift")).toBe("Yes");
     /* A minimum manufacture YEAR, read through `requestedMinYear` and stated as one. It used to read

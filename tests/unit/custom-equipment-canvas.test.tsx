@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, screen } from "@testing-library/react";
+import { en } from "@/lib/i18n/en";
+import { ar } from "@/lib/i18n/ar";
 
 /**
  * The canvas with off-catalogue equipment ON (the default): the renter NAMES the machine the
@@ -98,7 +100,14 @@ describe("naming a machine the catalogue does not carry", () => {
     expect(gates.itemAppGaps(cleared).map((g) => g.reason)).toEqual(["gate.customEquipmentMissing"]);
   });
 
-  it("types a new name into the box", async () => {
+  it("refuses the keystroke and points at the escape instead", async () => {
+    /**
+     * 🔴 The box is READ-ONLY (owner, 2026-09-13/14): the name is the agent's output until he
+     * rejects the match, and *"if he tries to write then shake the question note - i actually want
+     * it read so he understands its use by confirming that he is using his own words"*.
+     * The gesture he will make — click, type — changes nothing in the box and moves the one row that
+     * can change it. A field that simply does nothing teaches nothing.
+     */
     const { Canvas, confirmedProject, makeAgentDraft, makeItem, renderCanvas } = await withFlag();
     const barge = makeItem({
       id: "nm1",
@@ -111,9 +120,12 @@ describe("naming a machine the catalogue does not carry", () => {
     await renderCanvas(<Canvas />, { draft: makeAgentDraft({ items: [barge], project: confirmedProject() }) });
 
     const box = screen.getByPlaceholderText("Name the equipment you need") as HTMLInputElement;
-    fireEvent.change(box, { target: { value: "split hopper barge" } });
-    expect((screen.getByPlaceholderText("Name the equipment you need") as HTMLInputElement).value).toBe("split hopper barge");
+    expect(box.readOnly).toBe(true);
+    fireEvent.keyDown(box, { key: "x" });
+    expect(box.value).toBe("floating crane barge");
+    expect(document.querySelector(".shake-error")).toBeTruthy();
   }, 20_000);
+
 
   /**
    * ⚠️ The row vanished under the renter's own hand (owner, 2026-09-06).
@@ -159,16 +171,68 @@ describe("naming a machine the catalogue does not carry", () => {
 });
 
 /**
- * ── The row offers the door the renter is NOT standing in (owner, 2026-09-13) ────────────────────
- * *"if it is clicked then in its place, with no taxonomy selected, we will write «select from our
- * list»"*.
+ * ── One escape, one panel, two doors (owner, 2026-09-13/14) ──────────────────────────────────────
  *
- * One control, two labels. On a matched line it takes the taxonomy off; on an off-catalogue line it
- * is the way back into the catalogue — and it OPENS the type list, because the lists are still on
- * screen above it and a row that merely points at them is a caption.
+ * Planned against his supervisor's prototype and cut down from it: four states became two, three
+ * doors became two, and «describe it yourself» became a CONFIRMATION, because he described the
+ * machine at the intake and *"i dont want the user to write anything more here"*.
  */
-describe("the way back into the catalogue", () => {
-  it("replaces the «send it with your own name» offer once the line is off-catalogue", async () => {
+describe("the escape, and the panel behind it", () => {
+  const open = async () => {
+    const { Canvas, confirmedProject, makeAgentDraft, makeItem, renderCanvas } = await withFlag();
+    const barge = makeItem({
+      id: "nm1",
+      rawLabel: "floating crane barge",
+      rawSize: null,
+      ref: { categoryId: null, subcategoryId: null, measurementId: null },
+      verdict: "no-match",
+      resolved: false,
+    });
+    await renderCanvas(<Canvas />, { draft: makeAgentDraft({ items: [barge], project: confirmedProject() }) });
+    return screen.getByRole("button", { name: /find your equipment/i });
+  };
+
+  it("stays on screen while its own panel is open", async () => {
+    const row = await open();
+    fireEvent.click(row);
+    // 🔴 It does NOT disappear behind its panel (owner: *"keep them shown as the prototype"*).
+    expect(screen.getByRole("button", { name: /find your equipment/i })).toBeTruthy();
+    expect(screen.getByText("Widen the search")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Search our catalogue/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Keep my own words/i })).toBeTruthy();
+  }, 20_000);
+
+  it("hands him his own words, already written, in a field he may change", async () => {
+    /**
+     * 🔴 Reversed on 2026-09-14 (owner: *"the text must be editable, why not? it must be from
+     * here"*). ~~A read-only confirmation.~~ The box on the CARD stays the agent's output; THIS is
+     * where the words become his, and it opens seeded with what he already wrote — so the ordinary
+     * case is still one press and nothing retyped.
+     */
+    const row = await open();
+    fireEvent.click(row);
+    fireEvent.click(screen.getByRole("button", { name: /Keep my own words/i }));
+
+    expect(screen.getByText("THE REQUEST WILL SAY")).toBeTruthy();
+    const fields = screen.getAllByPlaceholderText("Name the equipment you need") as HTMLInputElement[];
+    // Two boxes share that placeholder: the card's, which is read-only, and this one, which is not.
+    const editable = fields.find((f) => !f.readOnly)!;
+    expect(editable).toBeTruthy();
+    expect(editable.value).toBe("floating crane barge");
+    expect(screen.getByRole("button", { name: /Keep my name/i })).toBeTruthy();
+  }, 20_000);
+
+  it("keeps the two lists LIVE and green on his own words, and drops the «saved» strip", async () => {
+    /**
+     * Owner, 2026-09-15: *"the type - size will stay be dropdown in case user want to select but
+     * still shown green"*, and *"no need for saved as your own equipemtn etc just remove it and keep
+     * the equipment name field look green"*.
+     * 🔴 ~~Two flat green statements, «Your own equipment» and «As described», in place of the two
+     * controls, with a full-width «Saved as your own equipment — X» strip under them.~~ The
+     * statements closed the one door a renter on his own words might still want — reaching into the
+     * catalogue from the card without opening the panel — and the strip restated the name two rows
+     * above it.
+     */
     const { Canvas, confirmedProject, makeAgentDraft, makeItem, renderCanvas } = await withFlag();
     const barge = makeItem({
       id: "nm1",
@@ -180,52 +244,88 @@ describe("the way back into the catalogue", () => {
     });
     await renderCanvas(<Canvas />, { draft: makeAgentDraft({ items: [barge], project: confirmedProject() }) });
 
-    expect(screen.getByRole("button", { name: /Select from our list/i })).toBeTruthy();
-    // The two never stand together: one line cannot be offered both doors at once.
-    expect(screen.queryByRole("button", { name: /Use your custom name/i })).toBeNull();
+    // Real controls, not sentences.
+    const type = screen.getByRole("combobox", { name: "TYPE" });
+    const size = screen.getByRole("combobox", { name: "SIZE" });
+    expect(screen.queryByText("Your own equipment")).toBeNull();
+    expect(screen.queryByText("As described")).toBeNull();
+    // Green, and the NAME box with them — that is what replaced the strip.
+    const name = screen.getByPlaceholderText("Name the equipment you need");
+    for (const el of [type, size, name]) expect(el.className).toContain("bg-ok-soft");
+    /* ⚠️ SIZE is disabled (no type ⇒ no sizes) and must be green ANYWAY: the base skin's `disabled:`
+       rules would paint it grey beside a green TYPE. */
+    expect((size as HTMLButtonElement).disabled).toBe(true);
+    expect(size.className).toContain("disabled:bg-ok-soft");
+    expect(screen.queryByText(/Saved as your own equipment/i)).toBeNull();
   }, 20_000);
 
-  it("points at what the press changed — the name box and its new note pulse together", async () => {
-    const { Canvas, confirmedProject, makeAgentDraft, makeItem, renderCanvas, TAXONOMY } = await withFlag();
-    // A MATCHED line: it is the one that still carries the way out of the catalogue.
-    const matched = makeItem({ id: "m1" });
-    await renderCanvas(<Canvas />, { draft: makeAgentDraft({ items: [matched], project: confirmedProject() }) });
-    expect(TAXONOMY).toBeTruthy();
-
-    expect(document.querySelector(".attn-pulse")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Use your custom name/i }));
-
-    /* The press empties the taxonomy, stars the name box and raises the note. The pulse wraps the
-       ROW, so what is outlined is the name box together with the note beside it — the pair the press
-       created. The control itself now sits in the row BELOW, under the two lists it emptied
-       (owner, 2026-09-13). */
-    const pulsed = document.querySelector(".attn-pulse");
-    expect(pulsed).toBeTruthy();
-    expect(pulsed!.textContent).toContain("reach Moedatech suppliers");
+  it("keeps the escape row to ONE line, clipping rather than wrapping", async () => {
+    /**
+     * Owner, 2026-09-15, as a standing rule: *"dont ever wrap this not in the equipment card"*.
+     * 🔴 This reverses 2026-09-14, where the row was made to wrap on the argument that a truncated
+     * question stops being a question. He looked at the two-line row and took the clip; the whole
+     * sentence is on `title`.
+     */
+    const row = await open();
+    expect(row.className).toContain("whitespace-nowrap");
+    expect(row.className).not.toContain("min-h-");
+    expect(row.getAttribute("title")).toMatch(/find your equipment/i);
   }, 20_000);
 
-  it("is the SAME control, so it cannot drift into two rows", async () => {
-    const { readFileSync } = await import("node:fs");
-    const { resolve } = await import("node:path");
-    const src = readFileSync(resolve(process.cwd(), "src/components/create/MachineCard.tsx"), "utf8");
-    /* 🔴 **One control again** (owner, 2026-09-13: *"i want this note inlined with the size-type
-       row"*). They were split apart earlier the same day — the way OUT beside the NAME box, the way
-       BACK under the LISTS — and both are about the two lists, so both belong under them. One cell,
-       one skin, a ternary for the label and another for the press. */
-    expect(src).toContain("const ESCAPE_ROW =");
-    expect(src.match(/className={ESCAPE_ROW}/g)?.length).toBe(1);
-    expect(src).toContain("t.create.machineCard.selectFromList");
-    expect(src).toContain("t.create.machineCard.useMyOwnName");
-    /* The press opens the list by REMOUNTING the control with `defaultOpen`, which is what that
-       prop's own note prescribes — it is read once at mount, so a caller wanting it open again
-       remounts with a `key`. Without the key the counter would change and nothing would open. */
-    expect(src).toContain("key={`type-${openTypeAt}`}");
-    expect(src).toContain("defaultOpen={openTypeAt > 0}");
-    /* The pulse is cleared on a TIMER, and deliberately not on the animation ending: that event
-       never fires under `prefers-reduced-motion`, where the rule draws a standing outline and no
-       animation at all, so the outline would stay on the card for the rest of the session.
-       ⚠️ The card DOES use `onAnimationEnd` elsewhere — that is the shake's own reset — which is why
-       this reads the pulse's own line rather than sweeping the file for the word. */
-    expect(src).toContain("setTimeout(() => setPulseName(false), 1500)");
+  it("and the sentence is therefore a LAYOUT constraint, not a free choice", () => {
+    /**
+     * Owner, 2026-09-20, on a shot of the row reading «Can't find the equipment you ...»:
+     * *"always keep it not the equipment you want unless no taxonamy detected say it cant find your
+     * equipment? so it fit not clipped or stripped"*.
+     *
+     * 🔴 The clip above is the rule and is not in question; what it COSTS is that a sentence
+     * outgrowing its cell does not get smaller, it disappears. Measured in a browser at the row's
+     * narrowest — the three columns at their `minmax` minima, 454px — on the compiled stylesheet:
+     *   · «Not the equipment you want?»           149px in a 150px box — fits, and always did
+     *   · «Can't find your equipment?»             135px — fits, 14px of headroom over the above
+     *   · ~~«Can't find the equipment you want?»~~ 178px in a 150px box — **28px clipped**
+     *
+     * jsdom lays nothing out, so what is assertable is the RULE that measurement produced: the
+     * no-match question may never be longer than the matched one, which is the one already proven
+     * to fit. That survives a re-word of either; a pixel budget copied into a test would not.
+     */
+    for (const d of [en, ar]) {
+      expect(d.create.machineCard.hatchNoMatch.length).toBeLessThanOrEqual(d.create.machineCard.hatchMatched.length);
+    }
   });
+
+  it("shows the family with ONE search box over it, and the rest of the catalogue at its foot", async () => {
+    /**
+     * Owner, 2026-09-15: *"dont keep the search as another path just show equipment of same category
+     * and search bar with place holder search all equipment … it will be directly the search bar
+     * with small show all in the end of the shown catelogie of the same type"*.
+     * 🔴 ~~A «Search all equipment» LINK on the heading row, which swapped the heading, revealed the
+     * search box and widened the list in one press.~~ Three acts behind one word.
+     */
+    /* ⚠️ Opened on a MATCHED line, not the barge: with no category resolved there is no family to
+       show, the list opens WIDE on its own, and the foot press would have nothing left to reveal. */
+    const { Canvas, confirmedProject, makeAgentDraft, makeItem, renderCanvas } = await withFlag();
+    await renderCanvas(<Canvas />, {
+      draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }),
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Not the equipment you want/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Search our catalogue/i }));
+
+    // The box is simply there, and it says «all» because it searches all.
+    expect(screen.getByPlaceholderText("Search all equipment")).toBeTruthy();
+    // ...and it is no longer a press that takes him somewhere.
+    expect(screen.queryByRole("button", { name: "Search all equipment" })).toBeNull();
+    // The way to the whole catalogue is at the FOOT of the family, in place.
+    expect(screen.getByRole("button", { name: "Show all equipment" })).toBeTruthy();
+  }, 20_000);
+
+  it("asks for the SIZE on the row rather than choosing one for him", async () => {
+    const row = await open();
+    fireEvent.click(row);
+    fireEvent.click(screen.getByRole("button", { name: /Search our catalogue/i }));
+    /* Sizes differ per type, so picking the first for him is the wrong auto-fill this panel exists
+       to avoid. With no category resolved the list opens wide, so every type is offered. */
+    fireEvent.click(screen.getAllByRole("button", { name: /Use this/i })[0]);
+    expect(screen.getByText("WHICH SIZE?")).toBeTruthy();
+  }, 20_000);
 });

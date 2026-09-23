@@ -36,6 +36,13 @@ import { btn } from "@/lib/ds";
  * because this panel is a column and `object-cover` will crop anything wider from the middle, which
  * is where this photograph keeps its subject.
  *
+ * 🔴 **Superseded 2026-09-22** (owner: *"use this image exactly as it is in the sign in to look
+ * somehow like this"*, with a comp where the photograph IS the whole card). The file is his image
+ * uncropped now, 1920×1071, WebP q86. It fills the entire panel, anchored to its right edge, with no
+ * mask, no navy multiply and no top/bottom ramp: the form sits on the photograph's own dark, blurred
+ * yard, which is dark enough for white ink on its own. The 3:4 crop and the masked 62% layer below
+ * are gone with that.
+ *
  * ── What the comp has that this does not ────────────────────────────────────────────────────────
  * **The «5.0 ★★★★★ from 200+ reviews» row and its avatar stack.** Deliberately absent: we hold no
  * rating and no review count, and a number invented for a layout is a claim about the business that
@@ -75,75 +82,16 @@ export function AuthPanel({ children, toggle, trust }: AuthPanelProps) {
         )}
       </div>
 
-      {/* ── The picture (owner, 2026-08-31: blend it, do not butt it) ─────────────────────────────
-          ~~A grid column with a navy gradient painted OVER its leading edge.~~ That could never stop
-          reading as two pasted rectangles, and for a reason no gradient fixes: the column's own edge
-          is still there. A gradient over a photograph darkens the photograph; it does not remove it.
-          At the top and bottom of the panel, where the ramp had nothing dark of its own to hide, the
-          seam stayed visible as a hard vertical line.
-
-          So the photograph is MASKED instead, and it is a layer rather than a column. It reaches 62%
-          across the panel — wider than the 44% the form leaves free, so its faded half lies UNDER
-          the form's trailing edge — and its own alpha runs out before it gets there. What is left at
-          the join is the panel's navy, with no edge in it to see. The form sits above on `z-10`.
-
-          `WebkitMaskImage` alongside `maskImage`: Safari still ships the prefixed property, and an
-          unmasked photograph here is the hard seam back again rather than a small regression.
-
-          Mirrored under `rtl:` — the picture is on the other side there, so the ramp is too. */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block">
-        <div className="absolute inset-y-0 end-0 w-[62%] rtl:hidden" style={MASK_LTR}>
-          <Photo />
-        </div>
-        <div className="absolute inset-y-0 end-0 hidden w-[62%] rtl:block" style={MASK_RTL}>
-          <Photo />
-        </div>
+      {/* ── The picture: the WHOLE panel, exactly as supplied (owner, 2026-09-22) ─────────────────
+          ~~Masked into a 62% layer on the trailing edge, tinted navy, ramped top and bottom
+          (2026-08-31).~~ The photograph is the card now: `object-cover` over the full panel, anchored
+          to the right so the linkage stays in view and the blurred yard lands under the form.
+          Mirrored in Arabic, where the form is on the right, so the dark side is still under it. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 hidden overflow-hidden lg:block">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/auth-panel.webp" alt="" className="absolute inset-0 h-full w-full object-cover object-right rtl:-scale-x-100" />
       </div>
     </div>
-  );
-}
-
-/**
- * The ramp, as a MASK on the photograph rather than a gradient over it.
- *
- * Four stops, not two: alpha reaches roughly a fifth by 30% of the layer's width and is not opaque
- * until 78%, which is a long enough fade that the eye finds no boundary. A two-stop mask over the
- * same distance still shows the moment it starts.
- */
-const RAMP = "transparent 0%, rgba(0,0,0,0.06) 16%, rgba(0,0,0,0.22) 32%, rgba(0,0,0,0.62) 55%, #000 78%";
-const MASK_LTR: React.CSSProperties = {
-  maskImage: `linear-gradient(to right, ${RAMP})`,
-  WebkitMaskImage: `linear-gradient(to right, ${RAMP})`,
-};
-const MASK_RTL: React.CSSProperties = {
-  maskImage: `linear-gradient(to left, ${RAMP})`,
-  WebkitMaskImage: `linear-gradient(to left, ${RAMP})`,
-};
-
-/**
- * The photograph and the two things sitting on it.
- *
- * Both live INSIDE the masked wrapper, so they fade out with it — an overlay outside the mask would
- * paint its own rectangle across the join, which is the seam again in a different colour.
- */
-function Photo() {
-  return (
-    <>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/auth-panel.webp" alt="" className="absolute inset-0 h-full w-full object-cover" />
-      {/* The same flat multiply the home band uses, so the two photographs sit at one depth. */}
-      <span className="absolute inset-0 bg-navy-deep opacity-30 mix-blend-multiply" />
-      {/* Top and bottom, where the panel's corners are: the photograph is brightest at its own edges
-          and a lit strip running into a rounded navy corner is what made the old version look like a
-          window cut in the panel. */}
-      <span
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(180deg, color-mix(in srgb, var(--navy-deep) 62%, transparent) 0%, transparent 18%, transparent 82%, color-mix(in srgb, var(--navy-deep) 62%, transparent) 100%)",
-        }}
-      />
-    </>
   );
 }
 

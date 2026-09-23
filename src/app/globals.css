@@ -94,9 +94,41 @@
   --brand-fg: #ffffff;
   --gold: #b8860b;           /* the mark's own colour — not a UI state, and not in the OS set */
 
+  /* ── The taxonomy photographs' own studio ground ─────────────────────────────────────────────
+     NOT a UI colour and not in the OS set: it is the beige those renders are shot on, so that the
+     machine-card panel has nothing to letterbox against and the picture reads as filling it.
+
+     🔴 MEASURED, not picked (owner, 2026-09-20: *"why the image doesnt exist for margins and
+     padding, keep it 100% fit"*). Twelve samples — four corners and two edge midpoints of two
+     assets from the batch, `crawler-excavator` and `wheel-loader`, decoded and read pixel by pixel:
+     every one lands between #e1dcd5 and #e6dfd7, a spread of 4/255 per channel. This is their mean.
+
+     ⚠️ It is a property of the ASSET BATCH, not of this design system, so it belongs to whoever
+     re-cuts those renders. If the masters are ever re-shot on a different ground — or given
+     transparency, which is the real fix and would retire this — re-measure it or delete it. */
+  --photo-ground: #e3ded7;
+
   /* ── Status ──────────────────────────────────────────────────────────────────────────────────
      Three tiers each, and the same fill/text split the brand has: `--warn` fills at 2.97:1 and
      `--warn-deep` is the amber that may carry text. */
+  /* 🔴 **THE VERIFIED BADGE'S GREEN, and it was never DECLARED** (owner, 2026-09-22, on a
+     picture of a BLACK tick beside a company name: *"make it green"*).
+     The theme block below mirrored `--color-verified` and `VerifiedMark` filled its rosette
+     with `var(--verified)`, but no `:root` ever defined it — so the whole chain resolved to an
+     invalid value, `fill` fell back to its initial BLACK, and the badge rendered as a dark blob
+     on every surface that draws it.
+     ⚠️ **It is NOT `--ok`.** That is the app's «this went well» and a badge that drifted with a
+     status colour would stop being a badge — `VerifiedMark`'s own header says so. This is the
+     value `--shop-ok` already carried under the comment *"the verified tick"*, so the storefront's
+     tick and this one are one green rather than two.
+     🔴 **The comment above may not contain the theme directive's own name**, for the reason this
+     one found the hard way: `ds-colors.test.ts` reads `:root` by slicing to the FIRST occurrence of
+     it, so a mention inside a comment truncates the block and every token after it reads as
+     undefined. 46 colours went missing over one word in prose.
+     ⚠️ `ds-colors.test.ts` walks every colour `:root` defines and requires `ds-colors.ts` to
+     name it, which is why that mirror moved in the same edit — and why a token declared in
+     neither slipped through unnoticed for as long as it did. */
+  --verified: #2f9e5c;
   --ok: #1d9e55;             /* OS `success` */
   --ok-soft: #e2efe7;        /* OS `success-bg` */
   --ok-deep: #1d7a45;        /* OS `success-ink` */
@@ -197,6 +229,30 @@
   --shop-amber-soft: #fdf1e0; /* the size chip's ground */
   --shop-field: #fafbfb;      /* the search field, the one surface that is not white */
 
+  /* ── The National Day skin (owner, 2026-09-16) ───────────────────────────────────────────────
+     A SEASON, not a repaint. These seven are ADDITIVE: they are declared all year and painted only
+     under `[data-season="nd"]`, which `layout.tsx` writes between 16 September and 1 October. No
+     token above this block changes value while the season runs — `--brand` in particular stays
+     #f97316, because this app already spends green on `--ok` («it happened») and a celebration
+     borrowing the success colour would give one colour two meanings on the same screen.
+
+     The values are the Flutter kit's own, so the two products celebrate in the same green. */
+  /* 🔴 **A STEP DARKER, all of them** (owner, 2026-09-22: *"can u make the all greens color
+     of the national day theme more darker? a little bit"*). Each channel at 85% of the kit's own
+     value, so the HUE is untouched and only the depth moves — the flag's green read bright against
+     this product's navy chrome, which is the one thing the season must not fight.
+     ⚠️ Every one of them is a GROUND under white text, so darker is strictly safer: the bar's
+     contrast goes up, never down. `--nd-mint` is deliberately NOT moved — it is the pale chip's
+     ground on a LIGHT surface, near-white by design, and darkening it would make the one quiet
+     weight in the kit read as a second solid chip. */
+  --nd-ground: #004724;      /* the bar's ground — the kit's `nd-ground`, darkened */
+  --nd-deep: #042d1a;        /* the gradient's dark corner */
+  --nd-mid: #096835;         /* the gradient's light corner */
+  --nd-green: #005c2d;       /* the flag's green: a solid chip, the corner ribbon */
+  --nd-accent: #d7c48a;      /* pale gold — the Najdi seam, the chip's figure, the hairline */
+  --nd-mint: #e8f2ea;        /* the pale chip's ground, for a LIGHT surface */
+  --nd-ink: #0b4e35;         /* the pale chip's ink, AA on `--nd-mint` — darker only helps it */
+
   /* ── Disabled ────────────────────────────────────────────────────────────────────────────────
      A state with its own colours rather than a faded copy of another one. `opacity: .5` over an
      orange or red fill produced a muddy tint nobody chose, and landed around 2.1:1 against white
@@ -257,6 +313,16 @@
   --color-brand-soft: var(--brand-soft);
   --color-brand-fg: var(--brand-fg);
   --color-gold: var(--gold);
+  --color-photo-ground: var(--photo-ground);
+  /* The National Day skin. Mirrored here for the same reason every other token is: a colour
+     `:root` defines and `@theme` does not is a colour half the app cannot reach. */
+  --color-nd-ground: var(--nd-ground);
+  --color-nd-deep: var(--nd-deep);
+  --color-nd-mid: var(--nd-mid);
+  --color-nd-green: var(--nd-green);
+  --color-nd-accent: var(--nd-accent);
+  --color-nd-mint: var(--nd-mint);
+  --color-nd-ink: var(--nd-ink);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-ok-deep: var(--ok-deep);
@@ -722,6 +788,16 @@ body {
   60% { transform: scale(1.12); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
 }
+/* The winner's halo: one ring thrown off the disc as the machine lands, and gone. Outside the
+   disc, which clips; and ONCE, because a repeating pulse reads as «still searching». */
+@keyframes found-halo {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+.found-halo {
+  animation: found-halo 0.7s ease-out both;
+}
+
 @keyframes found-ring {
   0% { transform: scale(0.86); opacity: 0.35; }
   60% { transform: scale(1.06); opacity: 1; }
@@ -784,3 +860,262 @@ body {
 .legal-doc a { color: var(--brand-deep); text-decoration: underline; text-underline-offset: 2px; }
 .legal-doc hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
 .legal-doc blockquote { margin: 0 0 12px; padding-inline-start: 12px; border-inline-start: 2px solid var(--border); color: var(--muted-dark); }
+
+/* ══ The category rail on Browse ════════════════════════════════════════════════════════════════
+   A slim scrollbar for the horizontal strip of category pills (owner, 2026-09-16: *"make it thinner
+   and nicer"*). The browser's default bar is ~15px of chrome under a 28px row, so the furniture was
+   half the height of the thing it scrolled.
+
+   ⚠️ **`overflow-x: auto` STAYS on the element** — this styles the bar, it does not remove it. A
+   hidden bar on a strip that really does overflow is a row whose rest is unreachable on a trackpad
+   with no shift-scroll, which is the fault the dropdown list met on 2026-09-13.
+
+   ⚠️ Firefox takes `scrollbar-width`/`scrollbar-color` and ignores the pseudo-elements; WebKit takes
+   the pseudo-elements and ignores those two. Both are stated, so neither engine falls back to the
+   default bar.                                                                                   */
+.shop-rail { scrollbar-width: thin; scrollbar-color: var(--shop-line) transparent; }
+.shop-rail::-webkit-scrollbar { height: 6px; }
+.shop-rail::-webkit-scrollbar-track { background: transparent; }
+.shop-rail::-webkit-scrollbar-thumb { background: var(--shop-line); border-radius: 999px; }
+.shop-rail:hover::-webkit-scrollbar-thumb { background: var(--shop-ink-4); }
+
+
+/* ════════════════════════════════════════════════════════════════════════════════════════════════
+   THE NATIONAL DAY SKIN
+
+   Owner, 2026-09-16: *"can i do a national day version that stay until 1-10 and it is another
+   design theme not replacing ours so maybe just a flag"*, with the Flutter decor kit and a
+   screenshot of the app's own green header as the reference.
+
+   Everything below is scoped under `[data-season="nd"]`, which `layout.tsx` writes on `<html>`
+   between 16 September and 1 October (Asia/Riyadh). Out of season not one of these rules matches,
+   nothing above this block is overridden, and `/nd96-palms.svg` is never fetched.
+
+   🔴 **Nothing here redefines a token.** The season paints by ADDING marks to named hosts, never by
+   moving `--brand`, `--navy-deep` or `--ok` under everyone's feet. That is the whole difference
+   between a second theme and a repaint, and it is why «turn it off» is one attribute.
+
+   ⚠️ **The hosts carry their class ALL YEAR** — `.nd-bar` on the header, `.nd-decor` on its
+   backdrop span, `.nd-seam` on the dashboard band. A component that branched on the date in JS
+   would either mismatch on hydration (the server knows the date, the client re-reads it) or paint
+   navy first and flip green a frame later. An unstyled class costs nothing; a flicker on every
+   cold load for a fortnight is what it buys.
+   ════════════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* ── The bar ─────────────────────────────────────────────────────────────────────────────────────
+   `bg-navy-deep` sets a background-COLOUR, so the gradient goes on top as a background-IMAGE and the
+   navy stays underneath as the fallback the moment the season ends. The kit's own three stops. */
+[data-season="nd"] .nd-bar {
+  background-image: linear-gradient(to bottom left, var(--nd-deep) 0%, var(--nd-ground) 46%, var(--nd-mid) 100%);
+}
+
+/* ── The backdrop: the dot lattice, then the grove ───────────────────────────────────────────────
+   A real child rather than a `::before`, and deliberately. The header is `sticky z-30`, so it opens
+   a stacking context; a positioned pseudo-element would either paint OVER the logo and the tabs
+   (z-index auto, later in paint order than its non-positioned siblings) or, at `z-index: -1`, drop
+   behind the header's own background and disappear. A sibling span with the content after it in the
+   source needs no z-index at all.
+
+   The dots are 1px at 10% white on a 20px lattice — the campaign deck's own texture, and what stops
+   a flat green bar reading as a colour swatch. The grove is the file, anchored bottom and cropped by
+   `cover`, so the trunks run off the bar's own edge the way the app's do. */
+.nd-decor { display: none; }
+[data-season="nd"] .nd-decor {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    url("/nd96-palms.svg"),
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.1) 1px, transparent 1.6px);
+  background-repeat: no-repeat, repeat;
+  background-position: center bottom, 0 0;
+  background-size: cover, 20px 20px;
+}
+
+/* ── The Najdi seam ──────────────────────────────────────────────────────────────────────────────
+   One rank of gold triangles along a bottom edge — 6px tall at a 12px pitch, the kit's own numbers.
+
+   The SHAPE is a mask and the COLOUR is `--nd-accent`, rather than a gold triangle baked into a data
+   URI: a colour written inside an encoded SVG is a colour no token can reach and no sweep can find,
+   which is exactly the drift `palette-drift.test.ts` exists to catch. The mask carries black because
+   a mask reads alpha and luminance, never hue.
+
+   Both prefixes are stated: WebKit still wants `-webkit-mask` on the older Safari this product is
+   opened on. */
+[data-season="nd"] .nd-decor::after,
+[data-season="nd"] .nd-seam::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 6px;
+  background: var(--nd-accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 6'%3E%3Cpath d='M0 0h12L6 6z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 12px 6px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 6'%3E%3Cpath d='M0 0h12L6 6z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 12px 6px;
+}
+/* The seam is drawn by the host, so the host has to be a containing block. The header already is
+   (`relative`); the dashboard band is stated here rather than in a class on the element, because a
+   `relative` added to that band all year would change what its own absolute children measure
+   against. `.nd-seam` is inert out of season for the same reason. */
+[data-season="nd"] .nd-seam { position: relative; }
+
+/* ── The season chip ─────────────────────────────────────────────────────────────────────────────
+   🔴 ~~Outlined gold on the green bar, beside «Beta».~~ The bar wears the MARK now (owner,
+   2026-09-17), and this skin is left holding only the weight it is actually good at: `is-pale`, on
+   a light surface, which is the role gate's head strip.
+
+   The base rule is kept rather than folded into `.nd-chip.is-pale` because the kit ships the chip
+   in two weights and the second one — solid green on a dark ground — is still the right answer the
+   day a light card needs a louder mark. What it must not be again is a second outlined pill an inch
+   from «Beta», where two pills read as a pair of controls. */
+.nd-chip { display: none; }
+[data-season="nd"] .nd-chip {
+  align-items: center;
+  gap: 4px;
+}
+
+/* 🔴 **A width rule for a seasonal host belongs HERE, never as a utility on the element**, and
+   this is the one thing about this skin that was measured rather than reasoned about.
+
+   Tailwind emits its utilities inside `@layer utilities`; this block is UNLAYERED. Unlayered CSS
+   beats layered CSS outright, whatever the specificity and whatever the order — so
+   `[data-season="nd"] .nd-chip { display: inline-flex }` overrode
+   `.max-sm\:hidden { @media (width < 40rem) { display: none } }` at EVERY width, and the pill it
+   was written for would have ridden the phone bar all season. It typechecks, it lints, it looks
+   right on a laptop, and it is only visible at 392px in a real browser.
+
+   Same family as the `hidden md:grid` fault of 2026-09-16 and the `rounded-full` one of 2026-09-12:
+   two rules for one property, and the loser is decided somewhere the call site cannot see.
+
+   The pill is gone and the MARK carries that rule now (`@media (width >= 40rem)`, above). The chip
+   has no width rule left, because the only thing wearing it is a card's head strip, which is the
+   same shape at every width. 40rem is `sm`, read off the compiled sheet rather than assumed. */
+[data-season="nd"] .nd-chip { display: inline-flex; }
+
+/* ── The pale chip, for a LIGHT surface ───────────────────────────────────────────
+   The kit ships the chip in two weights and says which is for which: pale on a light surface, solid
+   on a dark one. The bar takes the outlined gold; a card's own head strip takes this. The ordinal
+   keeps the flag's green against the mint, which is the kit's own pairing. */
+[data-season="nd"] .nd-chip.is-pale {
+  border-color: transparent;
+  background: var(--nd-mint);
+  color: var(--nd-ink);
+}
+[data-season="nd"] .nd-chip.is-pale b { color: var(--nd-green); }
+
+/* ── The tree line, for the dashboard band ────────────────────────────────────────
+   Eight palms of varying height, which is the piece the kit says needs room — "for a splash or a
+   role gate, not a 66 dp bar". The band is 160px and full-window, which is that room; the header
+   keeps the four cut-off trees, which is what the kit says a bar should have.
+
+   ⚠️ **`-z-10`, and it must come AFTER the band's own layers in source.** The photograph, the two
+   gradients and the multiply are all at exactly that depth, so a decoration declared before them
+   paints underneath and is invisible. That is the CTA halo's fault of 2026-09-16, and the reason
+   this span sits last among the band's `-z-10` children rather than first. */
+/* 🔴 **`.nd-band` is DELETED** (owner, 2026-09-22: *"remove the palms and theme here on the
+   cta keep it as its original"*). ~~The eight-palm tree line and the dot lattice, across the
+   dashboard band.~~ Fourth treatment withdrawn from that element, after the gold seam, the dune
+   sweep and the ordinal mark: **the band takes no seasonal decoration at all**, on its edges or
+   across its face. `public/nd96-treeline.svg` went with the rule - an unused seasonal rule is one
+   edit away from returning by accident, and its own artwork is what makes that cheap. */
+
+/* 🔴 ~~The season MARK on the bar — `.nd-mark`, `.nd-mark-fig`, `.nd-mark-rule`,
+   `.nd-mark-sub`: the outlined ordinal, a 1x14 gold hairline and a small caption, laid out as a row
+   for a 52px bar.~~ REMOVED (owner, 2026-09-22: *"remove this"*, on a picture of it).
+
+   Deleted rather than left inert, the same ruling the dune sweep took below on 2026-09-17: an
+   unused seasonal rule is one edit away from coming back by accident, and the strike-through
+   carries the reasoning without carrying the code.
+
+   ⚠️ Two things worth keeping out of it, because both were learned the hard way:
+     · the width rule belonged HERE and never as a `max-sm:hidden` on the element — Tailwind emits
+       its utilities inside `@layer utilities` and this block is unlayered, so the season's own
+       `display` wins at every width. That trap outlives this mark and applies to the next one.
+     · `-webkit-text-stroke` is the only way to outline text, so an outlined figure always needs a
+       filled fallback under an `@supports`, never a guessed value.
+
+   The bar still wears the season in everything that is not words: the gradient, the dot lattice,
+   the palm grove and the gold Najdi seam. */
+
+/* 🔴 ~~The dune sweep — a shallow curved cut, in the page's own colour, along the dashboard band's
+   bottom edge.~~ WITHDRAWN (owner, 2026-09-17: *"make the cta of ai straight line as it was"*), and
+   deleted rather than left inert, `public/nd96-dune.svg` with it.
+
+   Worth keeping the reason, because the kit still ships the motif and someone will reach for it
+   again: it is the one piece here that changes a SILHOUETTE rather than adding a mark inside a box,
+   and this band's bottom edge is a structural join — the first band of the dashboard meeting the
+   page. A curve there reads as the layout having moved, not as a season. The band wears its season
+   on the inside instead (`.nd-band`, above).
+
+   Two edges were tried on it and both are gone; the band's bottom is a straight line. */
+
+/* ── The corner palm ────────────────────────────────────────────────────────
+   "The cheapest way to mark a single card as seasonal without touching its layout or its colours."
+   One oversized palm bleeding out of the trailing-bottom corner at 7% of the flag's green — a mask,
+   so the same file marks a white card in green and would mark a navy one in white.
+
+   `inset-inline-end` rather than `right`, so it leaves from the corner the reader finishes at in
+   both scripts. The host must clip it; a card that does not would let the fronds run over the page. */
+.nd-palm-corner { display: none; }
+[data-season="nd"] .nd-palm-corner {
+  display: block;
+  position: absolute;
+  /* NEGATIVE, so the tree is CUT by the card's edge rather than standing politely inside it
+     - the kit's word is «bleeding», and a palm with air on both sides of it is a sticker.
+     Logical properties, so it leaves from the corner the reader finishes at in both scripts. */
+  inset-block-end: -14px;
+  inset-inline-end: -34px;
+  /* 🔴 **142x124, and the first cut was 220x190 — measured, not guessed.** A palm taller
+     than its host shows the middle of its own trunk and none of its crown, so a card body of
+     about 100px got a pale vertical smudge rather than a tree. Seen in a browser; from the
+     source it reads as «oversized», which is what the kit asks for and what the kit's own
+     150px canvas could afford. The crown is the recognisable half, so the box is sized to put
+     the crown in the corner.
+     ⚠️ A HOST TALLER than this can take it back up; anything shorter has to come down again.
+     The rule is that the palm fits inside the box it bleeds out of. */
+  width: 142px;
+  height: 124px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--nd-green) 10%, transparent);
+  -webkit-mask: url("/nd96-corner-palm.svg") no-repeat center / contain;
+  mask: url("/nd96-corner-palm.svg") no-repeat center / contain;
+}
+
+/* ── The Najdi BAND, the interlocking rank ───────────────────────────────────────
+   The kit's louder seam: a second rank inverted into the gaps, "so it reads as a woven band rather
+   than a row of spikes". One mask, two triangles per 24px tile — the gold one pointing up from the
+   bottom, the dark one down from the top, which is what makes it interlock.
+
+   It is used where the strip is SHORT and has to carry the whole season on its own; the long edges
+   (the bar, and the band before it took the dune) keep the quiet single rank. */
+[data-season="nd"] .nd-crown::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 7px;
+  background: var(--nd-accent);
+  pointer-events: none;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 7'%3E%3Cpath d='M0 7h12L6 0zM12 7h12L18 0z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 24px 7px;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 7'%3E%3Cpath d='M0 7h12L6 0zM12 7h12L18 0z' fill='%23000'/%3E%3C/svg%3E") repeat-x 0 0 / 24px 7px;
+}
+
+/* ── A card's head strip, in season ──────────────────────────────────────────────
+   The strip keeps its height and its type; what changes is the ground under it — the kit's gradient,
+   the dot lattice, and the woven band along its foot. `!important` is not needed and not used: the
+   strip's own `bg-surface2` is a background-COLOUR and these are background-IMAGES, so the two
+   layer rather than compete, and the colour is what remains the moment the season ends. */
+[data-season="nd"] .nd-crown {
+  position: relative;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.1) 1px, transparent 1.6px),
+    linear-gradient(to bottom left, var(--nd-deep) 0%, var(--nd-ground) 46%, var(--nd-mid) 100%);
+  background-repeat: repeat, no-repeat;
+  background-size: 20px 20px, cover;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────────────────────────
+   Nothing in this skin animates, and that is a decision rather than an omission: the kit's confetti
+   is not carried here. It would fire over the dashboard's own «your request is posted» tick, which
+   is the one moment on this product that is allowed to celebrate something. */

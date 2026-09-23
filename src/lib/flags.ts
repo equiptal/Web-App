@@ -73,19 +73,57 @@ export const HELP_MANUAL_ENABLED = process.env.NEXT_PUBLIC_HELP_MANUAL === "1";
 export const TRIAL_REQUESTS_ENABLED: boolean = false;
 
 /**
+ * HIDE_BIDLESS_REQUESTS — keep requests with NO bids off the rail on `/requests`.
+ *
+ * 🔴 **FOR A DEMO, AND IT IS MEANT TO COME BACK OFF** (owner, 2026-09-14: *"i want no bids to be
+ * hidden from requests list in requests, just for demo purpose"*). A code toggle for the reason
+ * `TRIAL_REQUESTS_ENABLED` is one: it is a product decision, not a per-environment one. Set it to
+ * `false` and the rail is exactly what it was - there is nothing else to undo.
+ *
+ * 🔴 **Not a behaviour to keep.** A live request with no offers yet is precisely when the renter
+ * still has things to do with it - share the link, chase a supplier, edit the terms, cancel it - and
+ * the rail is his only route to all four. The existing ✕ dismissal is deliberately gated on CLOSED
+ * for that reason (`hidden-requests.ts`), and this flag goes around that rule rather than changing
+ * it, so the rule stays stated where it belongs.
+ *
+ * ⚠️ **It reads `totalBids`, which counts APP bids only.** A request whose offers all arrived
+ * through the renter's own shared link has `bidCount: 0` on every item and is hidden by this flag
+ * even though it has offers - the same blind spot the dashboard rail was fixed for on 2026-09-05.
+ * Counting them would need one `fetchRequestSubmissions` per group, which is not a thing to add for
+ * a demo; it is written down instead.
+ *
+ * ⚠️ The rail never empties: if NO request has a bid the flag stands down and every circle is drawn,
+ * because a blank workspace would render the «create your first request» empty state over an account
+ * that has several.
+ */
+export const HIDE_BIDLESS_REQUESTS: boolean = false;
+
+/**
  * EQUIPMENT_NAME_ON_EVERY_LINE — send the renter's own words beside the taxonomy, not instead of it.
  *
- * OFF until `backend-agents` ships **B1**, and this is not caution, it is a measured consequence:
- * `getBidFormPreview` computes `hasCustomEquipment` as *any line carries a name*, and the Supplier OS
- * suppresses its ENTIRE app handoff on that flag — the QR dialog and «Go To App». The moment every
- * line carries a name, that flag is true for every request in the product and every bid link loses
- * its QR. B1 re-derives the flag from the undefined predicate instead; this switch is thrown after it.
+ * ON by default since 2026-09-14 (owner: *"let what [is] detected in your own words [be] stored as
+ * the custom always, regardless [of whether the] user change[s] it or not"*).
  *
- * With it off, the payload keeps today's shape — ids OR a name — and every other part of this change
- * (the card, the reading rule, the gate) is already live and safe, because none of them touches the
- * wire.
+ * 🔴 It was held OFF for two days, and not out of caution: `getBidFormPreview` computed
+ * `hasCustomEquipment` as *any line carries a name*, and the Supplier OS suppresses its ENTIRE app
+ * handoff on that flag — the QR dialog and «Go To App». With a name on every line that flag would
+ * have been true for every request in the product.
+ * **B1 has landed** (`Moedatech-App@342ab77f`): it derives the flag from the undefined predicate
+ * instead, and with `every` rather than `some`, so the handoff is suppressed only when NOTHING in a
+ * link can be answered in the app. The switch is thrown after it, as planned.
+ *
+ * ⚠️ **It needs that backend DEPLOYED, not merely committed.** Against an older `agents` the QR
+ * disappears from every bid link in the product, and the response is cached for 300s, so a rollback
+ * outlives its own deploy by five minutes.
+ *
+ * ⚠️ What is sent is **his** words — `customEquipment ?? rawLabel` — never the catalogue name the
+ * box happens to show on a line he added by hand. Storing our own name back into his column would
+ * be circular, and it is the one field that is supposed to say what HE calls the machine.
+ *
+ * `=0` is the kill switch, the same shape as `CUSTOM_EQUIPMENT_ENABLED`: it restores the old payload
+ * — ids OR a name — for an environment whose backend is older than B1.
  */
-export const EQUIPMENT_NAME_ON_EVERY_LINE = process.env.NEXT_PUBLIC_EQUIPMENT_NAME_EVERY_LINE === "1";
+export const EQUIPMENT_NAME_ON_EVERY_LINE = process.env.NEXT_PUBLIC_EQUIPMENT_NAME_EVERY_LINE !== "0";
 
 /**
  * Does the renter's own catalogue include HIDDEN nodes?
@@ -107,3 +145,24 @@ export const EQUIPMENT_NAME_ON_EVERY_LINE = process.env.NEXT_PUBLIC_EQUIPMENT_NA
  * is a product decision that lands in one deploy, not a per-environment setting.
  */
 export const TAXONOMY_INCLUDE_HIDDEN = true;
+
+/**
+ * NATIONAL_DAY_ENABLED — the Saudi National Day skin: the green header with its palm grove, dot
+ * lattice and gold Najdi seam, the season chip beside the wordmark, and the seam along the
+ * dashboard band. `src/lib/season.ts` holds the window and the ordinal.
+ *
+ * ON by default, and **the flag is not what turns it on** — the DATE is. The theme is up between
+ * 16 September and 1 October (Asia/Riyadh) and is gone by itself on the 1st, which is what the
+ * owner asked for: *"stay until 1-10"*. This flag is the kill switch OVER that window, for taking
+ * it down early or holding it off one environment without editing the dates.
+ *
+ * 🔴 **It does not repaint the brand.** Green is chrome only; `--brand` stays #f97316 and every CTA
+ * with it (owner, 2026-09-16). The reason is written at the head of `season.ts`: this app already
+ * spends green on `--ok`, and a celebration sharing the success colour is a colour saying two
+ * things at once.
+ *
+ * `=0` is the kill switch, the same shape as `CUSTOM_EQUIPMENT_ENABLED`. Build-time, like every
+ * NEXT_PUBLIC_ variable: rebuild the branch after changing it. The window itself is evaluated at
+ * REQUEST time, in the root layout, so a build that ships before the 16th still turns green on it.
+ */
+export const NATIONAL_DAY_ENABLED = process.env.NEXT_PUBLIC_NATIONAL_DAY !== "0";

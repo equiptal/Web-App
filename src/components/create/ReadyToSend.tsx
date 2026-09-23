@@ -182,19 +182,33 @@ export function ReadyToSend() {
       <div className="mb-3.5 flex flex-wrap items-center gap-x-4 gap-y-2">
         <h1 className="flex-none text-display font-extrabold text-navy">{t.create.ready.title}</h1>
 
-        <div className="flex min-w-0 flex-1 basis-[34rem] flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-border bg-surface px-4 py-2.5">
+        {/* ── ONE row, and the facts give way rather than the button (owner, 2026-09-14) ──────
+            *"always in one row even if request details beside it stripped, but this card must have
+            the details with the button in one row"*.
+            ~~`flex-wrap`.~~ With four facts and a payment dropdown the button group wrapped onto a
+            line of its own, so «Details» and the pen sat under the card they belong to.
+            `sm:flex-nowrap` holds the row together and the two LONG facts - the address and the
+            machine - truncate into whatever is left; the short ones are `flex-none` and never
+            squeeze (see `StripFact`).
+            ⚠️ It still WRAPS below `sm`. Four facts and two controls on one line of a phone is not a
+            row, it is a smear - and forcing it would push the whole document wider than the screen,
+            the fault audited out of three surfaces on 2026-09-08. */}
+        <div className="flex min-w-0 flex-1 basis-[34rem] flex-wrap items-center gap-x-4 gap-y-2 overflow-hidden rounded-sm border border-border bg-surface px-4 py-2.5 sm:flex-nowrap">
         {/* A green dot for «this is ready», the same mark the panels use on the canvas. */}
         <span aria-hidden className="size-2 flex-none rounded-full bg-ok" />
 
         {mapHref && place && (
-          <StripFact icon="place">
+          <StripFact icon="place" tight>
             {/* The real link (owner, 2026-09-02). An address a renter cannot press is an address
-                they retype into another tab to check. */}
+                they retype into another tab to check.
+                ⚠️ It does NOT truncate any more (owner, 2026-09-14: *"other fields no"*). `shortSite`
+                has already cut it to the text before the first comma, so what is left is the place's
+                own name — and half a place name is a different place. */}
             <a
               href={mapHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="truncate underline decoration-border underline-offset-2 hover:text-brand"
+              className="whitespace-nowrap underline decoration-border underline-offset-2 hover:text-brand"
             >
               {shortSite(place)}
             </a>
@@ -202,19 +216,29 @@ export function ReadyToSend() {
         )}
 
         {project.timing.startDate && project.timing.endDate && (
-          <StripFact icon="calendar_month">
+          /* `tight`: a date range half-drawn is not a shorter date range, it is a wrong one. It holds
+             its width and the address beside it gives way instead. */
+          <StripFact icon="calendar_month" tight>
             {fmtDate(project.timing.startDate)} → {fmtDate(project.timing.endDate)}
             {charged.known && <span className="text-muted"> · {num(charged.chargedDays)} {t.create.ready.stripDays}</span>}
           </StripFact>
         )}
 
         {first && (
+          /* ── The machine's NAME is never stripped; its note is (owner, 2026-09-14) ───────────
+             *"make the equipment name always full appear, not stripped - but details after it like
+             operator, cert might be stripped, but other fields no"*.
+             ~~Both the name and the note truncated~~, so on a long name the row clipped «Crawler
+             Excavator 20 t…» — the one thing on this strip that says WHAT he is renting. The note is
+             the only shrinkable element on the whole card now: it is a restatement (the operator and
+             the certificate are each stated in full in the section below), so half of it costs
+             nothing, while half a machine name costs the fact itself. */
           <StripFact icon="inventory_2">
-            <span className="truncate">
+            <span className="flex-none whitespace-nowrap">
               {first.equipment}
               {first.size ? ` ${first.size}` : ""} ×{num(first.qty)}
             </span>
-            {machineNote && <span className="truncate text-muted">· {machineNote}</span>}
+            {machineNote && <span className="min-w-0 truncate text-muted">· {machineNote}</span>}
             {items.length > 1 && (
               <span className="flex-none font-semibold text-brand">+{num(items.length - 1)}</span>
             )}
@@ -230,7 +254,7 @@ export function ReadyToSend() {
             thing on the strip he can still change, so it reads as the strip's last word rather than
             as a third fact about the site. A star said nothing about payment, and there is no glyph
             that would: the control names itself. */}
-        <StripFact>
+        <StripFact tight>
           <Dropdown
             tone="pill"
             /* The field NAMES ITSELF, chosen or not (owner, 2026-09-03). `placeholder` only shows
@@ -250,7 +274,9 @@ export function ReadyToSend() {
         </StripFact>
 
         <span className="ms-auto flex flex-none items-center gap-1.5">
-          <button type="button" onClick={() => setDetails(true)} className={btn("secondary", "sm")}>
+          {/* ⚠️ `whitespace-nowrap`: the group is `flex-none`, but a two-word label inside it would
+              still break over two lines and take the card's height with it. */}
+          <button type="button" onClick={() => setDetails(true)} className={btn("secondary", "sm", { className: "whitespace-nowrap" })}>
             {t.create.ready.viewAll}
           </button>
           {/* ── Editing lives HERE now (owner, 2026-09-02) ────────────────────────────────────
@@ -505,10 +531,20 @@ export function ReadyToSend() {
             </>
           }
         >
+          {/* ── Name the number, and name the way out that costs nothing ──────────────────────────
+             ~~"Basic accounts can post a limited number of requests."~~ True, and it left him with
+             one move: verify, which is a company errand he may not be able to run today. The cap is
+             on LIVE requests, not lifetime (`createRequest.ts`: OPEN / ACTIVE / PARTIALLY_ACCEPTED),
+             so closing one frees a slot immediately, and that is the half he could act on and was
+             never told.
+
+             ⚠️ The «3» is `BASIC_TIER_REQUEST_LIMIT` in `backend-agents/.../createRequest.ts`. It is
+             written out here the way the app writes it (`requestLimitMessage`), so if that constant
+             moves, this sentence and the app's both have to move with it. */}
           <p className="text-body leading-relaxed text-muted">
             {L(
-              "Basic accounts can post a limited number of requests. Get verified to post unlimited requests and unlock the rest of the marketplace.",
-              "تستطيع الحسابات الأساسية إرسال عدد محدود من الطلبات. وثّق حسابك لإرسال طلبات بلا حدود.",
+              "You have 3 active requests, which is the limit on a basic account. Close or finish one to free a slot, or get verified to post as many as you like",
+              "لديك 3 طلبات نشطة، وهذا هو الحد الأقصى للحساب الأساسي. أغلق أحد الطلبات لتحرير مكان، أو وثّق حسابك لإرسال طلبات بلا حدود",
             )}
           </p>
         </Dialog>
@@ -531,9 +567,17 @@ export function ReadyToSend() {
  * said nothing about payment terms, and a mark that does not name its subject is a shape the reader
  * has to decode before reading the thing beside it (owner, 2026-09-02).
  */
-function StripFact({ icon, children }: { icon?: string; children: React.ReactNode }) {
+/**
+ * One fact on the ready strip.
+ *
+ * ⚠️ `tight` marks the ones that may NOT shrink (owner, 2026-09-14, when the row became `nowrap`):
+ * a date range or a payment term clipped mid-word is not a shorter fact, it is a wrong one. The two
+ * that CAN give way - the address and the machine - keep `min-w-0` and truncate, which is what lets
+ * the button stay on the row without the card growing a second line.
+ */
+function StripFact({ icon, children, tight }: { icon?: string; children: React.ReactNode; tight?: boolean }) {
   return (
-    <span className="flex min-w-0 items-center gap-1.5 border-border ps-4 text-body text-navy first-of-type:ps-0 sm:border-s sm:first-of-type:border-s-0">
+    <span className={`flex items-center gap-1.5 border-border ps-4 text-body text-navy first-of-type:ps-0 sm:border-s sm:first-of-type:border-s-0 ${tight ? "flex-none whitespace-nowrap" : "min-w-0"}`}>
       {icon && <Icon name={icon} size={14} className="flex-none text-muted" />}
       {children}
     </span>

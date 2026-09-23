@@ -12,8 +12,11 @@ export default function InboxPage() {
   const { locale } = useLocale();
   const { status } = useSession();
   const ar = locale === "ar";
+  // `fullBleed`: the inbox is TWO COLUMNS pinned to the viewport, like the map surface — the list
+  // scrolls on its own and the conversation's composer sits on the floor of its pane rather than
+  // under the fold (owner, 2026-09-22).
   return (
-    <AppShell title={t.shell.inbox}>
+    <AppShell title={t.shell.inbox} fullBleed>
       <PageBack fallback="/" />
       {status === "anon" ? (
         <SignInPrompt

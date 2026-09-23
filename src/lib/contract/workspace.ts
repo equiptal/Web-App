@@ -10,7 +10,7 @@
  */
 
 import { bucketBidTerms, type BidCard, type TermRow } from "./bids";
-import type { RequestGroup, RequestListItem } from "./requests";
+import { groupBiddingClosed, type RequestGroup, type RequestListItem } from "./requests";
 
 /** Where a bid came from. The filter above the tabs switches between these. */
 export type BidSource = "app" | "offline";
@@ -25,6 +25,18 @@ export interface WorkspaceBid {
 }
 
 /** One circle in the top rail. */
+/** One machine of a group, as the rail's circle and its zoomed view need it. */
+export interface RailMachine {
+  /** The fanned-out request's own id — so the zoomed view can say which line it belongs to. */
+  id: string;
+  /** What to call it. The group's own wording, already localised by the caller. */
+  name: string;
+  url: string | null;
+  isPhoto: boolean;
+  /** Units asked for on that line. */
+  qty: number;
+}
+
 export interface RailTile {
   /** The group's id — what a selection stores. */
   key: string;
@@ -55,6 +67,20 @@ export interface RailTile {
   /** True when `imageUrl` is a PHOTOGRAPH rather than a drawn icon — the two need opposite fits
    *  inside a round mask. See `RequestListItem.item`. */
   imageIsPhoto: boolean;
+  /**
+   * EVERY machine in the group, in the group's own order, for the circle's montage and for the
+   * picture it opens (owner, 2026-09-21: *"cant we make the multi item take multi equipmet images
+   * small in this circule?"*).
+   *
+   * ⚠️ `imageUrl` above is the FIRST of these that has a picture, and it stays: a one-machine
+   * request is the ordinary case and drawing it through the montage code would be a grid of one.
+   * Both are derived in the same pass, so they cannot describe different machines.
+   *
+   * ⚠️ A line whose picture never loaded is kept here WITH a null `url`. It is still a machine the
+   * request asked for, it still has a name, and the zoomed view names it — dropping it would make
+   * the montage disagree with the ITEMS tabs about how many machines this request holds.
+   */
+  machines: RailMachine[];
   /** Greyed and captioned in the rail; still selectable, because its bids are still worth reading. */
   closed: boolean;
 }
@@ -70,22 +96,50 @@ export interface WorkspaceSelection {
 export const EMPTY_SELECTION: WorkspaceSelection = { groupId: null, itemId: null, bidId: null };
 
 /**
- * A request whose bidding is over. `EXPIRED` and `FORCE_EXPIRED` are included deliberately: to the
- * renter reading the rail they are the same fact — nothing more will arrive here.
+ * **A rail circle is shut exactly when the navy context bar says so** (owner, 2026-09-22, on a
+ * tile drawing full colour and a share badge under a bar reading CLOSED).
+ *
+ * 🔴 ~~`CLOSED_STATUSES` = {CLOSED, HUB_CLOSED, EXPIRED, FORCE_EXPIRED}, plus `isClosedRequest`
+ * and `isClosedGroup` over it.~~ That was a DENYLIST, and `groupBiddingClosed` - which the bar, the
+ * dashboard's «Closes» column and every cancel affordance already read - is an ALLOWLIST of the
+ * LIVE statuses ({OPEN, ACTIVE, PARTIALLY_ACCEPTED}). So `CANCELLED`, `ABANDONED` and `ACCEPTED`
+ * were shut to the bar and live to the circle above it: full colour, no «Closed» caption, and a
+ * share badge inviting bids the request can no longer take.
+ *
+ * ⚠️ **The two agree on the four the denylist named**, which is why this stood for a month: a
+ * request that EXPIRES reads the same either way, and it is a CANCELLATION that parts them.
+ *
+ * ⚠️ The 2026-08-31 ruling «the share badge carries `!tile.closed` so the rule is enforced
+ * where it is stated» was therefore only ever true for four statuses. One predicate makes it true
+ * for all of them - and the badge itself is gone (owner, 2026-09-22), so the rule it guarded is
+ * now the CIRCLE's own greyscale and caption.
  */
-const CLOSED_STATUSES = new Set(["CLOSED", "HUB_CLOSED", "EXPIRED", "FORCE_EXPIRED"]);
 
-export function isClosedRequest(status: string): boolean {
-  return CLOSED_STATUSES.has(status.toUpperCase());
-}
-
-/** A group is closed only when every request in it is — one live item keeps the project live. */
-export function isClosedGroup(group: RequestGroup): boolean {
-  return group.items.length > 0 && group.items.every((i) => isClosedRequest(i.status));
+/**
+ * **Every machine of one group, in the order it was asked for** (owner, 2026-09-22: *"for multi
+ * item, make sure all mutli items requests are designed in this way"*).
+ *
+ * 🔴 Lifted out of `railTiles` because the rail stopped being the only surface that stands
+ * for a whole request: the workspace's context bar draws the same montage. Two derivations of
+ * «which machines does this request hold» is how the bar and the tile above it come to name
+ * different machines for one request, and NOTHING would fail when they did.
+ *
+ * ⚠️ A line whose picture never loaded is KEPT, with a null `url`. It is still a machine the
+ * request asked for, it still has a name, and both callers draw the name - dropping it would make
+ * the montage disagree with the ITEMS strip about how many machines this request holds.
+ */
+export function railMachines(group: RequestGroup, ar = false): RailMachine[] {
+  return group.items.map((i) => ({
+    id: i.id,
+    name: (ar ? i.item?.nameAr || i.item?.name : i.item?.name) ?? i.displayId,
+    url: i.item?.imageUrl ?? null,
+    isPhoto: i.item?.imageIsPhoto ?? false,
+    qty: i.item?.qty ?? 1,
+  }));
 }
 
 /** The rail, in the order `groupRequests` produced (newest first). */
-export function railTiles(groups: RequestGroup[]): RailTile[] {
+export function railTiles(groups: RequestGroup[], ar = false): RailTile[] {
   return groups.map((g) => ({
     key: g.id,
     // The RFQ code is the group's own name; a lone request has none and answers to its REQ id.
@@ -94,12 +148,17 @@ export function railTiles(groups: RequestGroup[]): RailTile[] {
     items: g.items.length,
     units: g.totalUnits,
     bids: g.totalBids,
-    // One lookup for both, so the flag can never describe a different item's picture than the URL.
+    // One lookup for all three, so the flag can never describe a different item's picture than the
+    // URL, and the montage can never disagree with the single picture it replaces.
     ...(() => {
       const withPic = g.items.find((i) => i.item?.imageUrl)?.item ?? null;
-      return { imageUrl: withPic?.imageUrl ?? null, imageIsPhoto: withPic?.imageIsPhoto ?? false };
+      return {
+        imageUrl: withPic?.imageUrl ?? null,
+        imageIsPhoto: withPic?.imageIsPhoto ?? false,
+        machines: railMachines(g, ar),
+      };
     })(),
-    closed: isClosedGroup(g),
+    closed: groupBiddingClosed(g.items),
   }));
 }
 

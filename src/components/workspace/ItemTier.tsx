@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Icon } from "@/components/ui";
 import { useLocale, useT } from "@/lib/i18n";
 import type { RequestListItem } from "@/lib/contract/requests";
 import { cx, POPOVER } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { MachineGlyph } from "@/components/MachineGlyph";
 
 /** Three names, then «+n». A fourth pushes the row wider than the machine names it is naming. */
 const SHOWN = 3;
@@ -82,7 +82,7 @@ export function ItemTier({
           the source look like the row's only control. `precision_manufacturing` is the machine glyph
           this workspace already uses for an item (`RequestDetailsModal`), at the same 14px. */}
       <span className="inline-flex flex-none items-center gap-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
-        <Icon name="precision_manufacturing" size={14} /> {t.workspace.itemsInRequest}
+        <MachineGlyph size={14} /> {t.workspace.itemsInRequest}
       </span>
 
       {shown.map((it) => {
