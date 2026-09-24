@@ -128,6 +128,27 @@ describe("identifying a renter", () => {
     expect(payload.user_hash).toBe("a".repeat(64));
   });
 
+  /**
+   * The session hands over a NEW user object for the same person (the tier heal, a refresh) while
+   * the identity request is in flight. The effect's cleanup used to cancel that request's answer,
+   * and the re-run saw the id already asked for and did not ask again — so the first boot, which
+   * waits for that answer, never came and the bubble opened nothing (prod, 2026-09-24).
+   */
+  it("still boots when the session object is replaced mid-request", async () => {
+    let answer!: (v: unknown) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise((r) => (answer = r))),
+    );
+    session.value = { status: "authed", user };
+    const view = render(<IntercomWidget />);
+    session.value = { status: "authed", user: { ...user } };
+    view.rerender(<IntercomWidget />);
+    answer({ ok: true, json: async () => identity() });
+    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
+    expect(lastPayload().user_id).toBe("42");
+  });
+
   it("shuts the anonymous messenger down when a visitor signs in on the page", async () => {
     session.value = { status: "anon", user: null };
     const view = await renderWith(identity());

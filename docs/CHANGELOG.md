@@ -7,6 +7,16 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-24 - The support bubble did nothing for a signed-in renter (regression of the entry below).**
+  The identity fetch was cancelled by its effect's cleanup whenever the session handed over a new
+  `user` object for the same person, and the re-run returned early (same id, already asked). The
+  answer was dropped; with the first boot now WAITING on it, Intercom was never booted and `show` had
+  nothing to open. Before, the same dropped answer only left the messenger anonymous, which hid it.
+  Now the answer is kept unless `serverFor` moved to another user. Reproduced first in a test (no
+  boot at all), which now passes. Files: `src/components/support/IntercomWidget.tsx`,
+  `tests/unit/intercom-widget.test.tsx`. ⚠️ A boot that WAITS must never depend on an answer a
+  cleanup can drop.
+
 - **2026-09-24 - Signed-in renters reached support as an anonymous lead; the messenger now waits for the
   identity and boots once.** The widget booted anonymous at once, then `shutdown` + `boot` when
   `/api/support/intercom` answered. Measured on prod: the identity landed at 1102 ms, Intercom's script
