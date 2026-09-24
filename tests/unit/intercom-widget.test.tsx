@@ -68,6 +68,9 @@ const LIFECYCLE = new Set(["boot", "shutdown", "update"]);
 const lifecycle = () => commands().filter((c) => LIFECYCLE.has(c as string));
 
 /** The payload of the last lifecycle call — the one describing the messenger as it now stands. */
+/** The payload of the last `boot`: the start itself, which the email update follows. */
+const bootPayload = () => (calls().filter((c) => c[0] === "boot").pop()?.[1] ?? {}) as Record<string, unknown>;
+
 const lastPayload = () => {
   const last = calls().filter((c) => LIFECYCLE.has(c[0] as string)).pop();
   return (last?.[1] ?? {}) as Record<string, unknown>;
@@ -122,8 +125,8 @@ describe("identifying a renter", () => {
   it("waits for the identity, then boots identified once", async () => {
     session.value = { status: "authed", user };
     await renderWith(identity());
-    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
-    const payload = lastPayload();
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "update"]));
+    const payload = bootPayload();
     expect(payload.user_id).toBe("42");
     expect(payload.user_hash).toBe("a".repeat(64));
   });
@@ -134,6 +137,20 @@ describe("identifying a renter", () => {
    * and the re-run saw the id already asked for and did not ask again — so the first boot, which
    * waits for that answer, never came and the bubble opened nothing (prod, 2026-09-24).
    */
+  /**
+   * The identifying boot never carries the email, as the app's `loginIdentifiedUser` never does; it
+   * follows in its own `update`. On prod the boot with `user_id` + `email` was answered 403 and the
+   * renter stayed an anonymous lead (2026-09-24).
+   */
+  it("boots with the user id and NO email, then sends the email in its own update", async () => {
+    session.value = { status: "authed", user };
+    await renderWith(identity());
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "update"]));
+    expect(bootPayload()).toMatchObject({ user_id: "42", name: "Yara", phone: "+966501234567" });
+    expect(bootPayload()).not.toHaveProperty("email");
+    expect(lastPayload()).toEqual({ email: "yara@moedatech.net" });
+  });
+
   it("still boots when the session object is replaced mid-request", async () => {
     let answer!: (v: unknown) => void;
     vi.stubGlobal(
@@ -145,8 +162,8 @@ describe("identifying a renter", () => {
     session.value = { status: "authed", user: { ...user } };
     view.rerender(<IntercomWidget />);
     answer({ ok: true, json: async () => identity() });
-    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
-    expect(lastPayload().user_id).toBe("42");
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "update"]));
+    expect(bootPayload().user_id).toBe("42");
   });
 
   /**
@@ -157,10 +174,10 @@ describe("identifying a renter", () => {
   it("falls back to anonymous when a press on an identified messenger shows nothing", async () => {
     session.value = { status: "authed", user };
     const { getByRole } = await renderWith(identity());
-    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "update"]));
     await userEvent.click(getByRole("button", { name: "Support" }));
     // Nothing in this test fires `onShow`, which is exactly the refused boot.
-    await waitFor(() => expect(lifecycle()).toEqual(["boot", "update", "shutdown", "boot"]), { timeout: 3500 });
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "update", "update", "shutdown", "boot"]), { timeout: 3500 });
     expect(lastPayload()).not.toHaveProperty("user_id");
     expect(commands().at(-1)).toBe("show");
   }, 8000);
@@ -168,13 +185,13 @@ describe("identifying a renter", () => {
   it("stays identified when the messenger does show", async () => {
     session.value = { status: "authed", user };
     const { getByRole } = await renderWith(identity());
-    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "update"]));
     // Fire every registered `onShow` handler, as the real client does when the panel opens.
     for (const c of calls()) if (c[0] === "onShow") (c[1] as () => void)();
     await userEvent.click(getByRole("button", { name: "Support" }));
     for (const c of calls()) if (c[0] === "onShow") (c[1] as () => void)();
     await new Promise((r) => setTimeout(r, 2300));
-    expect(lifecycle()).toEqual(["boot", "update"]);
+    expect(lifecycle()).toEqual(["boot", "update", "update"]);
   }, 8000);
 
   it("shuts the anonymous messenger down when a visitor signs in on the page", async () => {
@@ -184,15 +201,15 @@ describe("identifying a renter", () => {
     session.value = { status: "authed", user };
     view.rerender(<IntercomWidget />);
     // A second `boot` over a live anonymous session does not promote it — it kills it.
-    await waitFor(() => expect(lifecycle()).toEqual(["boot", "shutdown", "boot"]));
-    expect(lastPayload().user_id).toBe("42");
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "shutdown", "boot", "update"]));
+    expect(bootPayload().user_id).toBe("42");
   });
 
   it("boots identified WITHOUT a signature, as the mobile app does", async () => {
     session.value = { status: "authed", user };
     await renderWith(identity({ userHash: null, verified: false }));
-    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
-    const payload = lastPayload();
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "update"]));
+    const payload = bootPayload();
     expect(payload.user_id).toBe("42");
     // Omitted, never null: Intercom reads the key's PRESENCE, so a null reads as a failed signature.
     expect(payload).not.toHaveProperty("user_hash");

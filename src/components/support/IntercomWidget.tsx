@@ -338,7 +338,19 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     // already does in the other direction, a few lines up.
     if (mode.current === "anon") api("shutdown");
     const booting = mode.current !== "user";
-    api(booting ? "boot" : "update", payload);
+    /**
+     * 🔴 **The EMAIL goes in a separate `update`, never in the identifying boot** (2026-09-24, prod).
+     *
+     * The boot carrying `user_id` + `email` was answered `403 forbidden` on `/messenger/web/ping`
+     * with Messenger Security OFF for web and no `user_hash` sent, and the renter stayed an anonymous
+     * lead. The app never hit it because it logs in with the user id ALONE (`loginIdentifiedUser`)
+     * and sends the email afterwards in `updateUser`. Most likely cause, not yet confirmed: the email
+     * already belongs to a different contact, which Intercom will not let an unsigned request claim.
+     * Same order as the app, so a refused email costs the email only, never the identity.
+     */
+    const { email, ...identifying } = payload as Record<string, unknown>;
+    api(booting ? "boot" : "update", identifying);
+    if (email) api("update", { email });
     if (booting) watchShow(api);
     mode.current = "user";
     identity.current = wanted;

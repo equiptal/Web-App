@@ -7,6 +7,16 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-24 - The identifying Intercom boot no longer carries the email; it follows in its own
+  `update`, as the app does.** Measured on prod: the boot with `user_id` + `email` got `403 forbidden`
+  on `/messenger/web/ping` (`error.list`, code `forbidden`), with Messenger Security OFF for web and NO
+  `user_hash` sent (Amplify has no `INTERCOM_IDENTITY_SECRET`, and `amplify.yml` would not copy one
+  into `.env.production` anyway). The app never hit it: `loginIdentifiedUser` sends the user id alone
+  and `updateUser` sends the email after. ⚠️ The cause is NOT confirmed: most likely the email already
+  belongs to a different Intercom contact, which an unsigned request may not claim. If the 403 stays
+  with the email gone, the email was not it. Files: `src/components/support/IntercomWidget.tsx`,
+  `tests/unit/intercom-widget.test.tsx`.
+
 - **2026-09-24 - The bubble always opens: a press not followed by Intercom's `onShow` within 2 s falls
   back to an anonymous messenger and shows it.** After #106/#107 booted signed-in renters identified
   from the start, a press still opened nothing on prod. Leading cause, NOT confirmed: identity
