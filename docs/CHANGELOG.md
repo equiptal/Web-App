@@ -7,6 +7,28 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-24 - Web side of the Intercom context ticket: support sees who, what and where.** Adds
+  `platform: "web-rentee"` (anonymous boot too), `side`, `is_guest`, `company_id` / `company_role` and
+  Intercom's company record, `registered_at`, `requests_total` / `requests_open` and the newest
+  non-trial request's id, status and offers, plus `last_screen` / `last_object_type` / `last_object_id`
+  sent right before the messenger opens. Four owner calls against the ticket: ids go as TEXT (a company
+  id is a UUID, a request id a code, not the numbers the ticket assumed); `company_role` is the product's
+  `owner | member`, not `staff`; `last_request_status` is the backend's own value (`ACCEPTED`), not the
+  ticket's unmapped words; `side` is sent BESIDE `user_type`, which mobile still sends. Anything the
+  server could not answer is omitted, never null or 0. Files: `src/app/api/support/intercom/route.ts`,
+  `src/lib/support/intercom.ts`, `src/components/support/IntercomWidget.tsx`, `tests/unit/intercom*.ts*`.
+  ⚠️ Intercom fixes an attribute's type on its first write, so the mobile app must send these ids as
+  text too. ⚠️ One person is one Intercom contact, so `platform` is only right if BOTH clients write it:
+  the mobile app sends `mobile-ios` / `mobile-android` from its build of the same day, and an older app
+  build leaves `web-rentee` on a renter who once used the web. ⚠️ Request counts are
+  COMPANY-WIDE for a member (that is what `my-requests` returns). `last_error` is a request post the
+  backend refused (`post_request: E8009`) within the last minute: the web has no profile gate like the
+  app's `action_blocked_by_profile`, so the refused post is its equivalent (`rfq-store.tsx`).
+  `registered_at` and `test_account` come from `profile-status` (`/users/me` was never confirmed to carry
+  `createdAt`), `last_request_notified` from the backend's new `suppliersNotified` on each `my-requests`
+  row, and the company card's `created_at` from the new `company.createdAt`: all three are backend
+  additions on Moedatech-App `staging` the same day, and each is OMITTED while the backend lacks it.
+
 - **2026-09-23 - Browse's category pills lead with the categories that have the most stores.**
   Owner: *"what is this warehouse category from where? i want the stores categoris to show the ones
   that have greatest number of stores at begiiing"*. The pills were the backend taxonomy in its own

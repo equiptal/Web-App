@@ -35,6 +35,12 @@ const identity = (over: Partial<IntercomServerIdentity> = {}): IntercomServerIde
   email: "yara@moedatech.net",
   phone: "+966501234567",
   company: null,
+  companyId: null,
+  companyRole: null,
+  companyCreatedAt: null,
+  registeredAt: null,
+  testAccount: null,
+  requests: null,
   userHash: "a".repeat(64),
   verified: true,
   ...over,
@@ -152,6 +158,21 @@ describe("the launcher", () => {
     const { getByRole } = await renderWith(null);
     await userEvent.click(getByRole("button", { name: "Support" }));
     expect(commands()).toContain("show");
+  });
+
+  it("tells support where the renter was, BEFORE the messenger opens", async () => {
+    const { getByRole } = await renderWith(null);
+    await userEvent.click(getByRole("button", { name: "Support" }));
+    const cmds = commands();
+    const at = cmds.lastIndexOf("update");
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(cmds.lastIndexOf("show"));
+    expect(calls()[at][1]).toMatchObject({ last_screen: "/", last_object_type: "none", last_object_id: null });
+  });
+
+  it("marks even an anonymous visitor as the web", async () => {
+    await renderWith(null);
+    expect(lastPayload().platform).toBe("web-rentee");
   });
 
   it("follows the writing direction, as every other floating control does", async () => {

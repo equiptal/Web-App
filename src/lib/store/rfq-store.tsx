@@ -40,6 +40,7 @@ import { blankTerms, type MachineTerms } from "@/lib/contract/work-order";
 import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
 import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
+import { noteSupportError } from "@/lib/support/intercom";
 
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
 
@@ -1258,6 +1259,8 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           e instanceof ApiError
             ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status, details: e.details }
             : null;
+        // So a renter who opens support within the minute arrives with the refusal attached.
+        noteSupportError(`post_request: ${detail?.backendCode ?? (e instanceof ApiError ? e.kind : "unknown")}`);
         dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
         return null;
       }

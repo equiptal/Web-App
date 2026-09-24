@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { buildIntercomPayload, intercomEmail, intercomName, INTERCOM_APP_ID } from "@/lib/support/intercom";
+import {
+  buildIntercomPayload,
+  intercomEmail,
+  intercomName,
+  INTERCOM_APP_ID,
+  noteSupportError,
+  recentSupportError,
+} from "@/lib/support/intercom";
+import { chatContext } from "@/components/support/IntercomWidget";
 
 /**
  * Parity with the app's `buildIntercomUserPayload` (`intercom_service.dart`).
@@ -57,6 +65,7 @@ describe("buildIntercomPayload", () => {
       tier: "verified",
       locale: "ar",
       device_os: "web",
+      platform: "web-rentee",
       app_version: "1.4.0",
     });
   });
@@ -67,10 +76,89 @@ describe("buildIntercomPayload", () => {
     expect(guest.tier).toBe("guest");
   });
 
+  it("carries the support context the server answered (Intercom context ticket)", () => {
+    const full = buildIntercomPayload({
+      user,
+      locale: "en",
+      appVersion: "1.0.0",
+      server: {
+        userId: "42", name: "Yara F", email: null, phone: "+966501234567", company: "Acme",
+        companyId: "c0ffee00-0000-4000-8000-000000000001", companyRole: "owner", companyCreatedAt: 1735689600,
+        registeredAt: 1767225600, testAccount: false,
+        requests: { total: 7, open: 2, last: { id: "req-1", status: "ACCEPTED", offers: 3, notified: 12 } },
+        userHash: null, verified: false,
+      },
+    });
+    expect(full).toMatchObject({
+      side: "rentee",
+      is_guest: false,
+      test_account: false,
+      company_id: "c0ffee00-0000-4000-8000-000000000001",
+      company_role: "owner",
+      registered_at: 1767225600,
+      requests_total: 7,
+      requests_open: 2,
+      last_request_id: "req-1",
+      last_request_status: "ACCEPTED",
+      last_request_offers: 3,
+      last_request_notified: 12,
+      company: { company_id: "c0ffee00-0000-4000-8000-000000000001", name: "Acme", created_at: 1735689600 },
+    });
+  });
+
+  it("omits last_request_notified on a backend that does not send it, rather than reading it as 0", () => {
+    const p = buildIntercomPayload({
+      user, locale: "en", appVersion: "1.0.0",
+      server: {
+        userId: "42", name: null, email: null, phone: null, company: null, companyId: null, companyRole: null,
+        companyCreatedAt: null, registeredAt: null, testAccount: null,
+        requests: { total: 1, open: 1, last: { id: "req-1", status: "OPEN", offers: 0, notified: null } },
+        userHash: null, verified: false,
+      },
+    });
+    expect(p).toHaveProperty("last_request_offers", 0);
+    expect(p).not.toHaveProperty("last_request_notified");
+    expect(p).not.toHaveProperty("test_account");
+  });
+
+  it("OMITS what the server could not answer, rather than sending null or zero", () => {
+    for (const k of ["company_id", "company_role", "company", "registered_at", "requests_total", "requests_open", "last_request_id"]) {
+      expect(payload).not.toHaveProperty(k);
+    }
+    const none = buildIntercomPayload({
+      user, locale: "en", appVersion: "1.0.0",
+      server: {
+        userId: "42", name: null, email: null, phone: null, company: null, companyId: null, companyRole: null,
+        companyCreatedAt: null, registeredAt: null, testAccount: null,
+        requests: { total: 0, open: 0, last: null }, userHash: null, verified: false,
+      },
+    });
+    // No requests at all IS a fact worth sending; a last request that does not exist is not.
+    expect(none).toMatchObject({ requests_total: 0, requests_open: 0 });
+    expect(none).not.toHaveProperty("last_request_id");
+  });
+
   it("takes a richer name and email when a caller has them", () => {
     const rich = buildIntercomPayload({ user, locale: "en", appVersion: "1.0.0", name: "Yara F", email: "yara@moedatech.net" });
     expect(rich.name).toBe("Yara F");
     expect(rich.email).toBe("yara@moedatech.net");
+  });
+});
+
+describe("chatContext", () => {
+  it("names the request open in the workspace", () => {
+    expect(chatContext("/requests", "?r=cm1abc&g=x")).toEqual({ last_screen: "/requests", last_object_type: "request", last_object_id: "cm1abc", last_error: null });
+  });
+
+  it("names the bid, the equipment and the store from their routes", () => {
+    expect(chatContext("/bids/b-9/equipment", "")).toMatchObject({ last_object_type: "bid", last_object_id: "b-9" });
+    expect(chatContext("/equipment/e-4", "")).toMatchObject({ last_object_type: "equipment", last_object_id: "e-4" });
+    expect(chatContext("/stores/s-2", "")).toMatchObject({ last_object_type: "store", last_object_id: "s-2" });
+  });
+
+  it("says none, and clears the id, on a screen with no object", () => {
+    expect(chatContext("/requests", "")).toEqual({ last_screen: "/requests", last_object_type: "none", last_object_id: null, last_error: null });
+    expect(chatContext("/deal-room/d-1", "")).toMatchObject({ last_screen: "/deal-room/d-1", last_object_type: "none" });
   });
 });
 
@@ -96,6 +184,12 @@ describe("buildIntercomPayload with the server's identity", () => {
     email: "yara@moedatech.net",
     phone: "+966501234567",
     company: "Al-Faisal Contracting Est.",
+    companyId: null,
+    companyRole: null,
+    companyCreatedAt: null,
+    registeredAt: null,
+    testAccount: null,
+    requests: null,
     userHash: "a".repeat(64),
     verified: true,
   };
@@ -147,5 +241,13 @@ describe("buildIntercomPayload with the server's identity", () => {
     expect(p.name).toBe("User 42");
     expect(p.email).toBe("966501234567@moedatech.app");
     expect("user_hash" in p).toBe(false);
+  });
+});
+
+describe("last_error", () => {
+  it("carries a refusal for one minute, then lets it go", () => {
+    noteSupportError("post_request: E8009", 1_000);
+    expect(recentSupportError(1_000 + 59_000)).toBe("post_request: E8009");
+    expect(recentSupportError(1_000 + 61_000)).toBeNull();
   });
 });

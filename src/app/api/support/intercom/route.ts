@@ -1,6 +1,10 @@
 import { createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
-import { withAuthedBackend } from "@/lib/api/app-backend-authed";
+import { withAuthedBackend, type AuthedCall } from "@/lib/api/app-backend-authed";
+import { agentsGet } from "@/lib/api/agents-backend";
+import type { MyCompanyPayload } from "@/lib/contract/company";
+import { extractRequestList, type RequestRecord } from "@/lib/contract/requests";
+import type { IntercomServerIdentity } from "@/lib/support/intercom";
 
 /**
  * GET /api/support/intercom — who the messenger should say this person is.
@@ -35,6 +39,76 @@ interface BackendMe {
   supplierProfile?: { companyName?: string | null } | null;
 }
 
+/**
+ * The two `GET /users/me/profile-status` fields support needs. `accountCreatedAt` is read HERE
+ * rather than off `/users/me`, which was never confirmed to carry `createdAt`; `isTestAccount` is the
+ * backend's internal/QA list (`constants/test-accounts.ts`). Both are absent on an older backend.
+ */
+interface BackendStatus {
+  accountCreatedAt?: string | null;
+  isTestAccount?: boolean;
+}
+
+/**
+ * `GET /marketplace/my-requests`, unwrapped: newest first (`createdAt desc`), company-wide for a
+ * member, with the full count in `total` and the still-open count in `summary.activeRequests`
+ * (OPEN | ACTIVE | PARTIALLY_ACCEPTED, `rentee.service.ts`).
+ */
+interface BackendMyRequests {
+  data?: RequestRecord[];
+  total?: number;
+  summary?: { activeRequests?: number };
+}
+
+/**
+ * The support context an agent reads beside the chat (Intercom context ticket, 2026-09-24).
+ *
+ * Each half is fetched on its own and fails on its own: support must still know WHO this is when the
+ * requests or the company call is down, so a failure there answers null rather than failing the route.
+ */
+async function supportContext(
+  call: AuthedCall,
+  userId: number,
+): Promise<Pick<IntercomServerIdentity, "companyId" | "companyRole" | "companyCreatedAt" | "requests" | "registeredAt" | "testAccount">> {
+  const [company, requests, status] = await Promise.all([
+    agentsGet<MyCompanyPayload>(`/agents/companies/me?userId=${userId}`).catch(() => null),
+    // A handful, not one: a TRIAL (the app's demo request) can be the newest, and it is not what the
+    // renter is asking about. `/api/me/requests` drops them for the same reason.
+    call<BackendMyRequests>("/marketplace/my-requests?limit=5").catch(() => null),
+    call<BackendStatus>("/users/me/profile-status").catch(() => null),
+  ]);
+  const last = requests ? extractRequestList(requests).find((r) => r.isTrial !== true) ?? null : null;
+  const notified = (last as { suppliersNotified?: unknown } | null)?.suppliersNotified;
+  return {
+    companyId: company?.company?.id ?? null,
+    companyRole: company?.membership?.role ?? null,
+    companyCreatedAt: unixSeconds(company?.company?.createdAt),
+    requests: requests
+      ? {
+          total: typeof requests.total === "number" ? requests.total : 0,
+          open: requests.summary?.activeRequests ?? 0,
+          last: last
+            ? {
+                id: last.id,
+                status: last.status,
+                offers: last.bidCount ?? 0,
+                // Absent on a backend older than 2026-09-24, and then OMITTED rather than read as 0.
+                notified: typeof notified === "number" ? notified : null,
+              }
+            : null,
+        }
+      : null,
+    registeredAt: unixSeconds(status?.accountCreatedAt),
+    testAccount: typeof status?.isTestAccount === "boolean" ? status.isTestAccount : null,
+  };
+}
+
+/** Unix SECONDS: Intercom types a date attribute by its first value, and milliseconds would stick. */
+function unixSeconds(iso: string | null | undefined): number | null {
+  const t = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(t) ? null : Math.floor(t / 1000);
+}
+
 export async function GET(req: Request) {
   return withAuthedBackend(req, async (call) => {
     const me = await call<BackendMe>("/users/me");
@@ -48,10 +122,11 @@ export async function GET(req: Request) {
       email: me.email ?? null,
       phone: me.phone ?? null,
       company: me.companyName ?? me.supplierProfile?.companyName ?? null,
+      ...(await supportContext(call, me.id)),
       // Hex, and over the id alone — Intercom's own rule. Never logged: the digest is a credential
       // for this identity, and a support conversation is not the place to leak one.
       userHash: secret ? createHmac("sha256", secret).update(userId).digest("hex") : null,
       verified: Boolean(secret),
-    });
+    } satisfies IntercomServerIdentity);
   });
 }

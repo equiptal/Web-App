@@ -31,6 +31,8 @@ import {
   buildIntercomPayload,
   INTERCOM_API_BASE,
   INTERCOM_APP_ID,
+  INTERCOM_PLATFORM,
+  recentSupportError,
   type IntercomServerIdentity,
 } from "@/lib/support/intercom";
 
@@ -57,10 +59,38 @@ declare global {
  */
 export function openSupportMessenger(): void {
   try {
+    window.Intercom?.("update", chatContext(window.location.pathname, window.location.search));
     window.Intercom?.("show");
   } catch {
     /* the messenger is not up; nothing to raise and nothing to report */
   }
+}
+
+/**
+ * **Where the renter was when he asked for help**, sent right before the messenger opens (Intercom
+ * context ticket, 2026-09-24). An agent reads it beside the chat instead of asking «which request?».
+ *
+ * `last_object_type` keeps to the ticket's vocabulary (`request` | `bid` | `equipment` | `store` |
+ * `none`), so the deal room reads as `none` with its route still in `last_screen`. The id is TEXT:
+ * every id on these routes is a UUID or a code, not the number the ticket assumed. On a screen with
+ * no object the id is sent as null, so the previous chat's id does not stay on the contact.
+ */
+export function chatContext(pathname: string, search: string): Record<string, string | null> {
+  const seg = pathname.split("/").filter(Boolean);
+  const r = new URLSearchParams(search).get("r");
+  const [type, id] =
+    seg[0] === "requests" && r ? ["request", r]
+    : seg[0] === "bids" && seg[1] ? ["bid", seg[1]]
+    : seg[0] === "equipment" && seg[1] ? ["equipment", seg[1]]
+    : seg[0] === "stores" && seg[1] ? ["store", seg[1]]
+    : ["none", null];
+  return {
+    last_screen: pathname || "/",
+    last_object_type: type,
+    last_object_id: id ? decodeURIComponent(id) : null,
+    // Null when nothing was refused in the last minute, so an old refusal does not stay on the contact.
+    last_error: recentSupportError(),
+  };
 }
 
 /**
@@ -196,6 +226,8 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
       api_base: INTERCOM_API_BASE,
       alignment: dir === "rtl" ? "left" : "right",
       language_override: locale,
+      // On the anonymous boot too: a visitor who never signs in must still read as the web.
+      platform: INTERCOM_PLATFORM,
       // Intercom's blue circle is hidden and `Launcher` below takes its place, so the web reaches
       // support through the same orange bubble the app does. `alignment` still stands: the messenger
       // PANEL reads it, and it has to open on the side the bubble it came from sits on.
@@ -406,7 +438,7 @@ function Launcher({ unread }: { unread: number }) {
       moved.current = false;
       return;
     }
-    window.Intercom?.("show");
+    openSupportMessenger();
   }, []);
 
   if (!INTERCOM_APP_ID) return null;
