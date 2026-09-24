@@ -169,10 +169,16 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
   const [server, setServer] = useState<IntercomServerIdentity | null>(null);
   /** Which user `server` describes, so a sign-out or an account switch cannot inherit it. */
   const serverFor = useRef<number | null>(null);
+  /**
+   * The user id whose identity request has FINISHED, answered or failed. Until it matches the
+   * signed-in user, the messenger is not booted at all — see the boot effect.
+   */
+  const [settledFor, setSettledFor] = useState<number | null>(null);
 
   useEffect(() => {
     if (status !== "authed" || !user) {
       setServer(null);
+      setSettledFor(null);
       serverFor.current = null;
       return;
     }
@@ -187,6 +193,8 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
         if (alive && serverFor.current === user.id) setServer(data);
       } catch {
         /* Support must not be the thing that breaks when a fetch does. The launcher stays, anonymous. */
+      } finally {
+        if (alive && serverFor.current === user.id) setSettledFor(user.id);
       }
     })();
     return () => {
@@ -234,9 +242,24 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
       hide_default_launcher: true,
     };
 
-    // Still asking who this is — boot anonymous rather than waiting. Support is most useful to the
-    // person who cannot get in, and that person never reaches `authed`.
-    //
+    /**
+     * 🔴 **A signed-in renter's FIRST boot waits for his identity** (2026-09-24, verified on prod).
+     *
+     * It used to boot anonymous at once and swap to the identity when the server answered: `shutdown`
+     * then `boot`. On web.moedatech.net the identity landed at 1102 ms and Intercom's script at
+     * 1160 ms, so all three calls sat in the snippet's queue and the real client kept the anonymous
+     * boot. Every signed-in renter reached support as a nameless lead («Grey Joystick»), with no
+     * error anywhere. Waiting costs ~1 s of launcher on a page load and removes the swap entirely.
+     *
+     * Only while `mode` is null, i.e. nothing is booted yet. A renter who signs in on a page that
+     * already has the anonymous messenger running still gets `shutdown` + `boot` below, and by then
+     * the real client is loaded, so nothing is queued. A visitor who never signs in (`anon`) is not
+     * held at all: support is most useful to the person who cannot get in. `loading` is not held
+     * either: the layout hands `SessionProvider` its `initialUser`, so a signed-in renter starts
+     * `authed` and never passes through it.
+     */
+    if (mode.current === null && status === "authed" && user && settledFor !== user.id) return;
+
     if (status === "loading" || !user || !server) {
       // The locale and the direction are IN the key, not just in the dependency array. `base` reads
       // both, so both have to be able to invalidate it — see the note on `identity`.
@@ -271,7 +294,7 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     api(mode.current === "user" ? "update" : "boot", payload);
     mode.current = "user";
     identity.current = wanted;
-  }, [status, user, locale, dir, appVersion, server]);
+  }, [status, user, locale, dir, appVersion, server, settledFor]);
 
   return <Launcher unread={unread} />;
 }
