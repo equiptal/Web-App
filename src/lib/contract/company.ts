@@ -34,6 +34,8 @@ export interface CompanyIdentity {
   isVerified: boolean;
   /** Non-null ONLY for an active owner of a verified company — the backend decides, not the client. */
   inviteCode: string | null;
+  /** When the firm was created. Additive on the backend (2026-09-24); absent on an older one. */
+  createdAt?: string | null;
 }
 
 export interface CompanyMembership {

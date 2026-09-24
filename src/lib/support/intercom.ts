@@ -15,6 +15,8 @@
  * | name, email, phone | phone; name and email only as the app's own fallbacks (see below) |
  * | `user_type` — from `active_role` | always `rentee`: this whole surface is the renter's |
  * | `app_version` / `app_build` / `device_os` | `device_os: "web"` and the app version |
+ * | (no `platform` yet) | `platform: "web-rentee"`, the `X-Client-Platform` value |
+ * | (not yet) | `side`, `is_guest`, company id/role/record, request counts (context ticket, 2026-09-24) |
  * | `locale`, `tier`, `account_created_at` | locale and tier; no created-at on the session |
  *
  * The web's `RenterUser` is `{ id, phone, tier }` — no name, no email, no created-at — so `name` and
@@ -62,8 +64,62 @@ export interface IntercomServerIdentity {
   email: string | null;
   phone: string | null;
   company: string | null;
+  /** The company's UUID, as TEXT: the ticket asked for a number, but a company id is a UUID. */
+  companyId: string | null;
+  /** The product's own values, `owner` | `member` (the ticket's `staff` is not a role that exists). */
+  companyRole: string | null;
+  /** The company's creation, Unix seconds, for Intercom's company `created_at`. */
+  companyCreatedAt: number | null;
+  /** `profile-status.accountCreatedAt` in Unix seconds, null when the backend did not send it. */
+  registeredAt: number | null;
+  /** The backend's internal/QA flag. Null when an older backend does not send it. */
+  testAccount: boolean | null;
+  /**
+   * The renter's requests, company-wide for a member (that is the list `my-requests` answers).
+   * Null when the call failed, so a failure does not tell support «0 requests».
+   */
+  requests: {
+    total: number;
+    open: number;
+    /** The newest non-trial request. `status` is the backend's own value (`OPEN`, `ACCEPTED`, ...). */
+    last: {
+      id: string;
+      status: string;
+      offers: number;
+      /** Suppliers it was sent to; null on a backend that does not send it yet. */
+      notified: number | null;
+    } | null;
+  } | null;
   userHash: string | null;
   verified: boolean;
+}
+
+/**
+ * Which client the chat came from, in the backend's `X-Client-Platform` vocabulary
+ * (`mobile-ios` | `mobile-android` | `web-rentee` | `supplier-os`), so an agent reads one set of
+ * values everywhere. A literal rather than `CLIENT_PLATFORM_HEADER`: that module is server-only.
+ * Sent on the anonymous boot too, so a visitor who never signs in still reads as the web.
+ */
+export const INTERCOM_PLATFORM = "web-rentee";
+
+/**
+ * **The last refused action, for `last_error`** (Intercom context ticket, 2026-09-24).
+ *
+ * The ticket asks for «the last blocked action, if one fired in the last minute». The web has no
+ * profile gate of its own, as the app's `action_blocked_by_profile` is, so the web's equivalent is a
+ * request the backend refused to post: the case a renter most often writes to support about, with
+ * the backend code support needs (`E8009` is the request limit).
+ */
+let lastRefusal: { reason: string; at: number } | null = null;
+const REFUSAL_WINDOW_MS = 60_000;
+
+export function noteSupportError(reason: string, now = Date.now()): void {
+  lastRefusal = { reason, at: now };
+}
+
+/** The refusal if it happened in the last minute, else null: an old one would mislead the agent. */
+export function recentSupportError(now = Date.now()): string | null {
+  return lastRefusal && now - lastRefusal.at <= REFUSAL_WINDOW_MS ? lastRefusal.reason : null;
 }
 
 /**
@@ -121,11 +177,52 @@ export function buildIntercomPayload(args: {
     phone,
     // `active_role` 1 on the app. There is no supplier surface on the web to be anything else.
     user_type: "rentee",
+    // The same fact under the ticket's name, which the inbox routing rules read. `user_type` stays:
+    // the mobile app sends it, and dropping it would blank the field for every web contact.
+    side: "rentee",
+    // Only a signed-in renter reaches this payload, and signing in means he registered.
+    is_guest: false,
     tier: user.tier,
     locale,
     device_os: "web",
+    platform: INTERCOM_PLATFORM,
     app_version: appVersion,
     ...(server?.company ? { company_name: server.company } : {}),
+    // Absent values are OMITTED, not sent as null or 0: Intercom types an attribute by its first
+    // value, and a null company or a zero for a failed call would tell support something untrue.
+    ...(server?.companyId ? { company_id: server.companyId } : {}),
+    ...(server?.companyRole ? { company_role: server.companyRole } : {}),
+    ...(server?.registeredAt != null ? { registered_at: server.registeredAt } : {}),
+    ...(server?.testAccount != null ? { test_account: server.testAccount } : {}),
+    ...(server?.requests
+      ? {
+          requests_total: server.requests.total,
+          requests_open: server.requests.open,
+          ...(server.requests.last
+            ? {
+                last_request_id: server.requests.last.id,
+                last_request_status: server.requests.last.status,
+                last_request_offers: server.requests.last.offers,
+                ...(server.requests.last.notified != null
+                  ? { last_request_notified: server.requests.last.notified }
+                  : {}),
+              }
+            : {}),
+        }
+      : {}),
+    /**
+     * Intercom's COMPANY record, so every renter under one firm groups on one card. Keyed on the
+     * company's UUID, the same value as `company_id` above.
+     */
+    ...(server?.companyId
+      ? {
+          company: {
+            company_id: server.companyId,
+            ...(server.company ? { name: server.company } : {}),
+            ...(server.companyCreatedAt != null ? { created_at: server.companyCreatedAt } : {}),
+          },
+        }
+      : {}),
     /**
      * Identity verification, when the workspace has it configured.
      *
