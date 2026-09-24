@@ -7,6 +7,17 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-24 - Signed-in renters reached support as an anonymous lead; the messenger now waits for the
+  identity and boots once.** The widget booted anonymous at once, then `shutdown` + `boot` when
+  `/api/support/intercom` answered. Measured on prod: the identity landed at 1102 ms, Intercom's script
+  at 1160 ms, so all three calls sat in the snippet's queue and the real client kept the anonymous boot.
+  The route itself was fine (200, user 46, name). Support saw «Grey Joystick», a Lead with no phone, and
+  no error fired anywhere; it predates the context ticket. Now a signed-in renter's FIRST boot is held
+  until the identity request finishes (answered or failed); visitors and a sign-in mid-page keep the old
+  path. Files: `src/components/support/IntercomWidget.tsx`, `tests/unit/intercom-widget.test.tsx`.
+  ⚠️ Why the old order looked right: in tests and on a slow network the script loads first, and the
+  swap works. It fails exactly when the identity is FAST.
+
 - **2026-09-24 - Web side of the Intercom context ticket: support sees who, what and where.** Adds
   `platform: "web-rentee"` (anonymous boot too), `side`, `is_guest`, `company_id` / `company_role` and
   Intercom's company record, `registered_at`, `requests_total` / `requests_open` and the newest

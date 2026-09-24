@@ -112,20 +112,37 @@ describe("booting before anyone is identified", () => {
 });
 
 describe("identifying a renter", () => {
-  it("shuts the anonymous messenger down before booting identified", async () => {
+  /**
+   * A signed-in renter is booted ONCE, already identified — never anonymous first.
+   *
+   * The old anonymous-then-swap sequence (`boot`, `shutdown`, `boot`) was queued in the snippet stub
+   * whenever the identity beat Intercom's script, and the real client kept the anonymous boot: on
+   * prod, 2026-09-24, every signed-in renter reached support as a nameless lead.
+   */
+  it("waits for the identity, then boots identified once", async () => {
     session.value = { status: "authed", user };
     await renderWith(identity());
-    // A second `boot` over a live anonymous session does not promote it — it kills it.
-    await waitFor(() => expect(lifecycle()).toEqual(["boot", "shutdown", "boot"]));
+    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
     const payload = lastPayload();
     expect(payload.user_id).toBe("42");
     expect(payload.user_hash).toBe("a".repeat(64));
   });
 
+  it("shuts the anonymous messenger down when a visitor signs in on the page", async () => {
+    session.value = { status: "anon", user: null };
+    const view = await renderWith(identity());
+    expect(lifecycle()).toEqual(["boot"]);
+    session.value = { status: "authed", user };
+    view.rerender(<IntercomWidget />);
+    // A second `boot` over a live anonymous session does not promote it — it kills it.
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "shutdown", "boot"]));
+    expect(lastPayload().user_id).toBe("42");
+  });
+
   it("boots identified WITHOUT a signature, as the mobile app does", async () => {
     session.value = { status: "authed", user };
     await renderWith(identity({ userHash: null, verified: false }));
-    await waitFor(() => expect(lifecycle()).toEqual(["boot", "shutdown", "boot"]));
+    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
     const payload = lastPayload();
     expect(payload.user_id).toBe("42");
     // Omitted, never null: Intercom reads the key's PRESENCE, so a null reads as a failed signature.
