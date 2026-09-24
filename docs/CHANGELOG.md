@@ -7,6 +7,16 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-24 - The bubble always opens: a press not followed by Intercom's `onShow` within 2 s falls
+  back to an anonymous messenger and shows it.** After #106/#107 booted signed-in renters identified
+  from the start, a press still opened nothing on prod. Leading cause, NOT confirmed: identity
+  verification switched on for WEB in Intercom (it is per platform; the app's unsigned logins show
+  names, so it is off for iOS/Android), and this build signs nothing (`INTERCOM_IDENTITY_SECRET` unset
+  in Amplify). A refused boot fires no callback, so the press is the first thing that can notice.
+  Files: `src/components/support/IntercomWidget.tsx`, `tests/unit/intercom-widget.test.tsx`.
+  ⚠️ While verification stays on for web, every signed-in renter falls back to ANONYMOUS: the real fix
+  is the dashboard setting or the secret, not this code.
+
 - **2026-09-24 - The support bubble did nothing for a signed-in renter (regression of the entry below).**
   The identity fetch was cancelled by its effect's cleanup whenever the session handed over a new
   `user` object for the same person, and the re-run returned early (same id, already asked). The

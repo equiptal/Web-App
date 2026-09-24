@@ -58,12 +58,38 @@ declare global {
  * still in flight — rather than throwing at a renter who pressed a support link.
  */
 export function openSupportMessenger(): void {
+  const pressedAt = Date.now();
   try {
     window.Intercom?.("update", chatContext(window.location.pathname, window.location.search));
     window.Intercom?.("show");
   } catch {
     /* the messenger is not up; nothing to raise and nothing to report */
   }
+  // The bubble must open, identified or not — see `fallbackToAnonymous`.
+  window.setTimeout(() => {
+    if (lastShownAt < pressedAt) fallbackToAnonymous?.();
+  }, SHOW_TIMEOUT_MS);
+}
+
+/**
+ * **The bubble always opens** (2026-09-24, prod: a press on the bubble did nothing).
+ *
+ * Once a signed-in renter's messenger was booted IDENTIFIED from the start (#106/#107), a press
+ * stopped opening anything. The workspace accepts anonymous boots and — most likely — refuses an
+ * unsigned identified one (identity verification for web; this build signs nothing, as the app
+ * does). A refused boot fires no callback and leaves the same DOM as a healthy one, so it cannot be
+ * detected up front; a press that is not followed by Intercom's `onShow` can. When that happens the
+ * messenger is torn down and booted anonymous for the rest of the visit, and shown: the renter reaches
+ * support either way, identified whenever the workspace allows it.
+ */
+let lastShownAt = 0;
+let fallbackToAnonymous: (() => void) | null = null;
+const SHOW_TIMEOUT_MS = 2000;
+
+function watchShow(api: IntercomFn): void {
+  api("onShow", () => {
+    lastShownAt = Date.now();
+  });
 }
 
 /**
@@ -145,6 +171,8 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
   const identity = useRef<string | null>(null);
   /** Anonymous or identified, which decides `update` against `shutdown` + `boot`. Null before either. */
   const mode = useRef<"anon" | "user" | null>(null);
+  /** An identified messenger failed to open on a press: stay anonymous for this visit. */
+  const refused = useRef(false);
   /** Intercom's unread count. Held HERE, not in `Launcher` — see the effect below. */
   const [unread, setUnread] = useState(0);
   /**
@@ -264,7 +292,19 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
      */
     if (mode.current === null && status === "authed" && user && settledFor !== user.id) return;
 
-    if (status === "loading" || !user || !server) {
+    // A press that did not open an identified messenger: anonymous for the rest of this visit.
+    fallbackToAnonymous = () => {
+      if (mode.current !== "user") return;
+      refused.current = true;
+      api("shutdown");
+      api("boot", base);
+      watchShow(api);
+      mode.current = "anon";
+      identity.current = `anon:${locale}:${dir}`;
+      api("show");
+    };
+
+    if (refused.current || status === "loading" || !user || !server) {
       // The locale and the direction are IN the key, not just in the dependency array. `base` reads
       // both, so both have to be able to invalidate it — see the note on `identity`.
       const wanted = `anon:${locale}:${dir}`;
@@ -273,7 +313,9 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
       // conversation stays attached to the next person at this browser. `mode`, not the key, decides
       // that: two anonymous keys differing only by language are the same messenger in a new language.
       if (mode.current === "user") api("shutdown");
-      api(mode.current === "anon" ? "update" : "boot", base);
+      const booting = mode.current !== "anon";
+      api(booting ? "boot" : "update", base);
+      if (booting) watchShow(api);
       mode.current = "anon";
       identity.current = wanted;
       return;
@@ -295,7 +337,9 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     // Intercom's documented switch is teardown then boot, and it is what the sign-OUT path
     // already does in the other direction, a few lines up.
     if (mode.current === "anon") api("shutdown");
-    api(mode.current === "user" ? "update" : "boot", payload);
+    const booting = mode.current !== "user";
+    api(booting ? "boot" : "update", payload);
+    if (booting) watchShow(api);
     mode.current = "user";
     identity.current = wanted;
   }, [status, user, locale, dir, appVersion, server, settledFor]);

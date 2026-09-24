@@ -149,6 +149,34 @@ describe("identifying a renter", () => {
     expect(lastPayload().user_id).toBe("42");
   });
 
+  /**
+   * The bubble must open. An identified boot the workspace refuses shows nothing and says nothing;
+   * a press not followed by Intercom's `onShow` falls back to an anonymous messenger and shows it
+   * (prod, 2026-09-24: the bubble did nothing once renters were booted identified).
+   */
+  it("falls back to anonymous when a press on an identified messenger shows nothing", async () => {
+    session.value = { status: "authed", user };
+    const { getByRole } = await renderWith(identity());
+    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
+    await userEvent.click(getByRole("button", { name: "Support" }));
+    // Nothing in this test fires `onShow`, which is exactly the refused boot.
+    await waitFor(() => expect(lifecycle()).toEqual(["boot", "update", "shutdown", "boot"]), { timeout: 3500 });
+    expect(lastPayload()).not.toHaveProperty("user_id");
+    expect(commands().at(-1)).toBe("show");
+  }, 8000);
+
+  it("stays identified when the messenger does show", async () => {
+    session.value = { status: "authed", user };
+    const { getByRole } = await renderWith(identity());
+    await waitFor(() => expect(lifecycle()).toEqual(["boot"]));
+    // Fire every registered `onShow` handler, as the real client does when the panel opens.
+    for (const c of calls()) if (c[0] === "onShow") (c[1] as () => void)();
+    await userEvent.click(getByRole("button", { name: "Support" }));
+    for (const c of calls()) if (c[0] === "onShow") (c[1] as () => void)();
+    await new Promise((r) => setTimeout(r, 2300));
+    expect(lifecycle()).toEqual(["boot", "update"]);
+  }, 8000);
+
   it("shuts the anonymous messenger down when a visitor signs in on the page", async () => {
     session.value = { status: "anon", user: null };
     const view = await renderWith(identity());
