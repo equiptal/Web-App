@@ -499,11 +499,9 @@ export function Canvas() {
      * last press of the whole request, and refusing it in order to open a panel nothing is missing
      * from reads as a fault in the button rather than as an invitation.
      *
-     * 🔴 **The cost, stated: on a ONE-equipment request nothing forces the rail open any more.**
-     * Such a request has no «Next equipment», so that renter can finish having never seen the
-     * panel — the exact hole 2026-09-09 was written to close, re-opened for the single-item case at
-     * the owner’s word. The operator’s food, accommodation, nationality and certificate are all
-     * priced off it.
+     * ~~🔴 The cost: on a ONE-equipment request nothing forces the rail open any more.~~ Closed on
+     * 2026-09-24: the first equipment's «Next» (the way on to the site) now holds on an unopened
+     * rail too, and every request has a first equipment.
      */
     /* Everything is answered, so the only thing left to decide is whether there is another machine.
        That is the one moment the question is worth asking, and it is where the standing
@@ -769,6 +767,14 @@ export function Canvas() {
               if (equipmentGaps.length > 0) {
                 shakeNow("equipment");
                 shakeNext();
+                return;
+              }
+              /* The operator rail, never opened, holds this press too (owner, 2026-09-24): the shake
+                 opens it, and the next press goes on to the site. Whether the site and dates came from
+                 a project makes no difference: the rail is this machine's, not the project's. Opened
+                 and closed again by the renter is fine (owner, same day). */
+              if (itemId && !railSeen.has(itemId) && !railOpen) {
+                shakeRail();
                 return;
               }
               openSection("where");

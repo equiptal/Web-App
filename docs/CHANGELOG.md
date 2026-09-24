@@ -7,6 +7,15 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-24 - An UNOPENED operator rail holds the first equipment's «Next» as well as «Next equipment».**
+  Owner: *"if operator closed in the request create form, it must be shaked when user clicks next
+  even if it is from the project settings"*. That «Next» (the way on to the site) never checked the
+  rail, so a one-equipment request could skip it entirely: the hole the 2026-09-13 entry left open.
+  The press opens and shakes the rail; the next press goes on. Same test as «Next equipment»: never
+  opened on this machine (`railSeen`). Opened and closed again is fine, at the owner's word
+  (*"if it was opened and closed then fine"*); a first draft that shook on «closed now» was dropped.
+  «Review & send» still does not hold, as ruled on 2026-09-13.
+  Files: `src/components/create/Canvas.tsx`, `tests/unit/operator-rail-unseen.test.tsx`.
 - **2026-09-24 - Signed-in renters reached support as an anonymous lead; the messenger now waits for the
   identity and boots once.** The widget booted anonymous at once, then `shutdown` + `boot` when
   `/api/support/intercom` answered. Measured on prod: the identity landed at 1102 ms, Intercom's script
