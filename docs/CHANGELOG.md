@@ -7,6 +7,18 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-24 - ROOT CAUSE of the anonymous web chats: the workspace enforces Intercom identity
+  verification for WEB, and this build never signed.** Supplier OS measured it on 2026-09-03
+  (`intercom-messenger.tsx`: an identified boot without `user_hash` is 403'd on the ping, for ANY
+  user_id; anonymous 200s). The «Messenger Security: Off» panel is Intercom's NEWER setting and does
+  not govern it; the older HMAC verification does, signed with the workspace's Unified Secret. The web
+  already signs (`/api/support/intercom`, HMAC-SHA256 hex of the user id, the same as OS) but
+  `INTERCOM_IDENTITY_SECRET` was never set, AND `amplify.yml` did not copy it into `.env.production`, so
+  even a secret set in Amplify would not have reached the server. Fixed the copy; the secret must be
+  added in Amplify (branch `main`) and a build run. Files: `amplify.yml`, `.env.example`. ⚠️ The two
+  entries below diagnosed the cause wrongly (the email; «verification is off»): the email split and the
+  anonymous fallback stay as harmless hardening, not as the fix.
+
 - **2026-09-24 - The identifying Intercom boot no longer carries the email; it follows in its own
   `update`, as the app does.** Measured on prod: the boot with `user_id` + `email` got `403 forbidden`
   on `/messenger/web/ping` (`error.list`, code `forbidden`), with Messenger Security OFF for web and NO
