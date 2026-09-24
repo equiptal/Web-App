@@ -184,22 +184,26 @@ export function IntercomWidget({ appVersion = "web" }: { appVersion?: string }) 
     }
     if (serverFor.current === user.id) return;
     serverFor.current = user.id;
-    let alive = true;
+    const askedFor = user.id;
+    /**
+     * ⚠️ No cleanup flag. `user` is a new OBJECT whenever the session re-stamps the same person, and
+     * a cleanup that cancelled this answer left the re-run returning early above (same id, already
+     * asked): the answer was dropped and nothing ever asked again. With the first boot waiting on it,
+     * that meant no messenger at all (prod, 2026-09-24). `serverFor` is the guard that matters: a
+     * sign-out or an account switch changes it, and the answer then belongs to nobody.
+     */
     void (async () => {
       try {
         const res = await fetch("/api/support/intercom", { cache: "no-store" });
         if (!res.ok) return; // no identity to add — the anonymous messenger stands
         const data = (await res.json()) as IntercomServerIdentity;
-        if (alive && serverFor.current === user.id) setServer(data);
+        if (serverFor.current === askedFor) setServer(data);
       } catch {
         /* Support must not be the thing that breaks when a fetch does. The launcher stays, anonymous. */
       } finally {
-        if (alive && serverFor.current === user.id) setSettledFor(user.id);
+        if (serverFor.current === askedFor) setSettledFor(askedFor);
       }
     })();
-    return () => {
-      alive = false;
-    };
   }, [status, user]);
 
   useEffect(() => {
