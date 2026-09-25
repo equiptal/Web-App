@@ -7,7 +7,20 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
-- **2026-09-24 - ROOT CAUSE of the anonymous web chats: the workspace enforces Intercom identity
+- **2026-09-26 - ACTUAL root cause of the anonymous web chats: Intercom's Messenger API was switched
+  OFF.** Intercom → Settings → Channels → Messenger → Install → «For users with logins» → «Enable the
+  Messenger API». Off, the web Messenger accepts anonymous visitors only and answers EVERY identified
+  boot `403 forbidden` on `/messenger/web/ping`, signed or not, with any key (proved by a probe page on
+  the web.moedatech.net origin with a fake user: anonymous 200; unsigned, `user_hash` and JWT all 403
+  with two different keys; all 200 once the owner switched it on). The ping reply itself said
+  `identity_verification_ready: false`, `messenger_security_enabled: false`. The app was unaffected
+  (mobile SDK). ⚠️ The entry below, the Supplier OS 2026-09-03 note it relied on, and the «trusted
+  domains» idea were all WRONG: verification is not enforced, and the trusted-domains list was blank.
+  The secret in Amplify is harmless and accepted; the email split and the anonymous fallback stay as
+  hardening. ⚠️ Identity verification is still OFF for web, so a page can claim any user_id; turning
+  it on is safe now (the web already signs), but Supplier OS must set its key first.
+
+- **2026-09-24 - (WRONG, see above) ROOT CAUSE of the anonymous web chats: the workspace enforces Intercom identity
   verification for WEB, and this build never signed.** Supplier OS measured it on 2026-09-03
   (`intercom-messenger.tsx`: an identified boot without `user_hash` is 403'd on the ping, for ANY
   user_id; anonymous 200s). The «Messenger Security: Off» panel is Intercom's NEWER setting and does
