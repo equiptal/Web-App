@@ -91,16 +91,9 @@ Confirm to me: `<repo>#<number> is at Implementing — proceeding to plan. (Epic
 
 **Do not invent acceptance criteria.** If something needed for implementation isn't covered by `acceptance.md`, surface it under "Open questions" in the plan — never silently fill in.
 
-## Step 6 — Cut the epic branch, then generate the implementation plan
+## Step 6 — Generate the implementation plan
 
-First, **cut the epic branch** — interface §2's one-branch-per-epic + one-final-PR model, but cut off **`staging`** (the team's integration branch), not `main`:
-
-```bash
-git checkout staging && git pull
-git checkout -b <product>/<NNN-slug>   # the spec branch name without the `spec/` prefix
-```
-
-Name it exactly the epic ID `<product>/<NNN-slug>` (e.g. spec branch `spec/mobile/016-foo` → your branch `mobile/016-foo`). **All** impl tickets for this epic land on this **one** branch and ship in **one** final PR — never a branch or PR per ticket. The `plan.md` / `tickets.md` docs you write below are committed here too. If the card isn't an epic tracker (no derivable epic id), branch off `staging` named for the `<card-id>` instead.
+**Never create a branch** (owner, 2026-09-26: *"dont create branches per feature or per fix"*). Work on the branch that is already checked out, and leave the changes in the working tree until I say commit.
 
 Compute `<card-id>` as `<repo>-<number>` (e.g., `moedatech-specs-47`).
 
@@ -408,7 +401,7 @@ Once I tell you to wrap up:
 - Recap what shipped (files touched, tests added).
 - List any AC still flagged Partial/Not-met that I accepted to defer — and remind me to file follow-up issues for them.
 - **Re-read `plan.md` Open questions section. List every still-🟡 item under a `## Pending before ship` heading**, with the action required for each (e.g., "Q1 🟡 — Awab to confirm editorial default category list", "Q6 🟡 — awaiting `[SPEC?]` reply on <impl-issue-or-epic-tracker URL>"). These block shipping or UAT — I need to chase them before opening the ship PR.
-- Remind me to open the **one** ship PR for the epic branch **into `staging`** (`gh pr create --base staging`) with, in the body: **`Closes #<impl-ticket>` for every impl ticket** (so they auto-close on merge) **and `Part of equiptal/moedatech-specs#<number>`** for the epic (reference only). **Never `Closes` the epic tracker** (interface §4, §7) — the epic stays open and closes on the spec side at `Completed`. On merge into `staging`, automation advances the epic to `UAT needed`.
+- Remind me to open the **one** ship PR for the epic **into `staging`** (`gh pr create --base staging`) with, in the body: **`Closes #<impl-ticket>` for every impl ticket** (so they auto-close on merge) **and `Part of equiptal/moedatech-specs#<number>`** for the epic (reference only). **Never `Closes` the epic tracker** (interface §4, §7) — the epic stays open and closes on the spec side at `Completed`. On merge into `staging`, automation advances the epic to `UAT needed`.
 - **The UAT report is opened automatically — verify it landed, don't open it.** When the ship PR merges and the epic flips to `UAT needed`, the **UAT-report reconciler** (a GitHub Action in `moedatech-specs`, cron every ~30 min, idempotent) opens the `uat-report` sub-issue (`Card type: UAT report`, `Status: UAT needed`, assignee `yfa245`) with the AC checklist from `acceptance.md`. **You don't open it** (that's the spec side — `workflows/uat.md`) and you no longer ask the PM to open it by hand. The May-2026 failure mode (epic at `UAT needed`, no report, shipped with ACs failing) is what the reconciler now prevents. Your job is just to **confirm it landed**: after merge, check the epic tracker's sub-issues for a `uat-report` child. If one is there → note it in this summary and stop. If it's still missing after ~30 min (reconciler not yet wired, or its run failed), fall back to the old handoff — post a one-line comment on the **epic tracker** `@`-mentioning the tracker's author (else `@awabmoedaetch`): _"Implementation merged to staging; epic is at UAT needed but no `uat-report` sub-issue opened yet — please open it / check the reconciler, then run the AC walk (`acceptance.md`)."_ Show me the comment text first; post on my approval. Either way, surface the report's state as an explicit action item so it isn't dropped.
 - Stop. Do not move the project card.
 

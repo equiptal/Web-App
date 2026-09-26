@@ -158,4 +158,23 @@ describe("the operator rail, never opened", () => {
     await handle.run(() => press(/Review & send/).click());
     expect(screen.getByText("Anything else on this request?")).toBeTruthy();
   });
+
+  /**
+   * Owner, 2026-09-26: *"it is now opened again for operator with no"*. Machine 1's rail, opened by
+   * its own shake, used to carry over to machine 2: one rail instance, its `expanded` seeded only on
+   * mount. Now keyed per machine, and the shake is dropped on the way.
+   */
+  it.each([
+    ["after a normal pause", 600],
+    ["on a fast second press", 0],
+  ])("machine 2 with no operator starts CLOSED %s", async (_label, pause) => {
+    const handle = await renderCanvas(<Canvas />, { draft: twoNoOperator(), prepare: answered(["a0", "a1"]) });
+
+    await handle.run(() => press(/Next equipment/).click());
+    if (pause) await handle.run(() => new Promise((r) => setTimeout(r, pause)));
+    await handle.run(() => press(/Next equipment/).click());
+
+    expect(handle.store().state.itemIndex).toBe(1);
+    expect(strip()).not.toBeNull();
+  });
 });

@@ -251,7 +251,7 @@ Stop. **Do not move the project card.**
 - **Never auto-fix.** Always pause at Step 6 and let the user decide per AC. Partial usually means the AC was misread, not that more code is needed.
 - **Never move the card status.** `UAT needed → … → Completed` is manual on the spec side, after QA / PM sign-off and the release ship (interface §4, §7).
 - **Never `Closes` the epic tracker from this command** (interface §4, §7) — the epic stays open and closes on the spec side at `Completed`, not via any PR here. Fix PRs from this command reference it with `Part of` / `Refs` only.
-- **Cut UAT fixes on a branch off `staging`** (the team's integration branch) — don't develop directly on `staging`. UAT fixes ride the epic's single final PR where the epic branch is still open; otherwise cut a fix branch off `staging`.
+- **Never create a branch** (owner, 2026-09-26). UAT fixes go on the branch already checked out and stay in the working tree until I say commit.
 - **Don't touch prod** — read or write — without explicit per-operation approval (per user pref). Default any DB lookup needed during the audit to staging.
 - The audit and any updated plan/tickets/uat-check files are committed to the repo. Stage them in the fix PR.
 - Don't mock external services in tests if the AC implies a real integration path — see `CLAUDE.md`.

@@ -405,5 +405,5 @@ Once I tell you to wrap up:
 - For bugs in unspecced areas: state the expected behavior explicitly in the plan (Given/When/Then). If the expected behavior is itself ambiguous, surface it under **Open questions** so Step 9 can resolve it (ask me, or raise `[SPEC?]` if it's actually a spec gap). Don't guess.
 - **If a bug reveals the spec itself was wrong** (not just the code): fix the **code** in the bug, then raise the **`[SPEC?]` signal** (`@`-mention the affected epic tracker's author, `spec-input-needed` label). The spec owner opens a separate Change request to fix the spec — you never edit `moedatech-specs` (interface §5).
 - If diagnosis points to a deeper issue than the ticket scope, surface it in **Out of scope** and ask whether to expand or leave it for a follow-up.
-- **Cut a fix branch off `staging`** (the team's integration branch) — one branch + one PR for the fix, don't develop directly on `staging`. (Exception: a `Production` hotfix you deploy straight off the prod branch — stay where the user already is.)
+- **Never create a branch** (owner, 2026-09-26). Work on the branch already checked out and leave the fix in the working tree until I say commit.
 - Plan and tickets files are committed (under `docs/`). Stage them in the fix PR.

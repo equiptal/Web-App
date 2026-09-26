@@ -444,6 +444,9 @@ export function Canvas() {
         shakeRail();
         return;
       }
+      /* The rail's shake is THIS machine's. Still raised (a press inside `SHAKE_MS`), it would reach
+         the next machine's rail on mount and open it, since a shake opens the rail. */
+      setShakingRail(false);
       // Straight there, with its panel open. No modal in between (owner, 2026-09-09).
       actions.goItem(index + 1);
       actions.openSection("equipment");
@@ -721,7 +724,11 @@ export function Canvas() {
         (state.activeSection === "equipment" ? (
           <div ref={equipmentRef as React.Ref<HTMLDivElement>} className="mb-3.5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
             <MachineCard item={item} gaps={equipmentGaps} shaking={shaking} tried={tried} onCollapse={() => collapse("equipment")} />
-            <OperatorRail item={item} shaking={shakingRail} onOpenState={onRailOpenState} />
+            {/* `key` per machine (owner, 2026-09-26: *"it is now opened again for operator with no"*).
+                Without it the rail is ONE instance across machines, and its local `expanded` (seeded
+                from the item's answer only on mount) carried machine 1's open panel onto machine 2
+                even when machine 2 said «no» — and, being open, it could never shake there. */}
+            <OperatorRail key={item.id} item={item} shaking={shakingRail} onOpenState={onRailOpenState} />
           </div>
         ) : (
           <button

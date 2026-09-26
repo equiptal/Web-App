@@ -7,6 +7,15 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-26 - Each machine's operator rail opens or closes on THAT machine's answer.** Owner: *"it
+  is now opened again for operator with no"*. `<OperatorRail>` had no `key`, so it was one instance
+  across machines: its local `expanded` is seeded from `operatorNeeded` only on mount, and machine 1's
+  open panel (opened by its own shake on «Next equipment») stayed open on machine 2 even when machine
+  2 said «no». Open, it could never shake there either. Now `key={item.id}`, and `advance` drops
+  `shakingRail` before `goItem`, because a shake still raised inside `SHAKE_MS` reached the new rail on
+  mount and opened it (a shake opens the rail). Reproduced first; both cases are in the test.
+  Files: `src/components/create/Canvas.tsx`, `tests/unit/operator-rail-unseen.test.tsx`.
+
 - **2026-09-26 - An UNOPENED operator rail holds the first equipment's «Next» (re-landed on `main`).**
   Owner: *"now operator show no if request project has it no but why not shaking?"*. The 2026-09-24
   fix was committed on `fix/intercom-identify-race` (`4a262e44`) and never reached `main`, so on

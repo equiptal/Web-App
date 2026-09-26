@@ -140,5 +140,5 @@ Stop.
 - **Don't move the project card.** This command never touches `Status`. The fix PR's merge (with `Closes`) closes the issue; status walks are manual.
 - **Don't skip the regression test.** If the bug is real, a test should have caught it. Add one.
 - **Don't touch prod.** Default any DB lookups during the audit to staging. Ask before any prod read or write.
-- **Cut a fix branch off `staging`** (the team's integration branch) — one branch + one PR for the fix, don't develop directly on `staging`.
+- **Never create a branch** (owner, 2026-09-26). Work on the branch already checked out and leave the fix in the working tree until I say commit.
 - If the audit points to a deeper issue than the bug's scope, surface it in the Step 6 audit under **Risk** and ask whether to expand the fix or file a follow-up issue. Don't silently widen.
