@@ -36,7 +36,6 @@ import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import { Dropdown } from "@/components/Dropdown";
 import { shortSite } from "@/lib/contract/project";
-import { leftTheSite, projectTitle } from "@/lib/contract/project";
 
 export function ReadyToSend() {
   const t = useT();
@@ -45,11 +44,6 @@ export function ReadyToSend() {
   const L = (e: string, a: string) => (ar ? a : e);
   const router = useRouter();
   const { state, actions } = useRfq();
-  /* The same question the location panel asks, from the same helper — two answers to "is this still
-     the site's place?" would eventually disagree, and this one is the last word before sending. */
-  const unfiled = state.project && state.draft
-    ? leftTheSite(state.project.location, state.draft.project.location)
-    : false;
   const [showLimit, setShowLimit] = useState(false);
   /** Everything the strip summarises, in the sections it came from. */
   const [details, setDetails] = useState(false);
@@ -476,26 +470,10 @@ export function ReadyToSend() {
           card below now, so a paragraph describing them sat above the thing itself. A coach mark on
           that card does the pointing, once, and can be dismissed. */}
 
-      {/* ── What this send will NOT do (owner, 2026-08-31) ────────────────────────────────────────
-          *"changing location will not be able to be part of the selected project beside the confirm
-          button so user know it is not included"*.
-
-          Beside the button rather than up in the summary table, because this is the last moment the
-          renter can change their mind and the summary is a thing they have already read past. Red,
-          not amber: amber is this app's «check this», and there is nothing to check — the request
-          will not be filed, and the only two answers are to accept that or go back and move the pin.
-
-          It says the site's name. *"Not part of the project"* invites the question «which one?» from
-          a renter who has three. */}
-      {unfiled && (
-        <div className="mb-3.5 flex items-start gap-3 rounded-sm border border-danger/40 bg-danger-soft px-4 py-3">
-          <Icon name="error_outline" size={18} className="mt-0.5 flex-none text-danger" />
-          <p className="text-body leading-relaxed text-danger">
-            <b className="font-semibold">{t.create.wherePanel.unfiledShort}</b>
-            <span> — {t.create.wherePanel.unfiledNote.replace("{project}", projectTitle(state.project!))}</span>
-          </p>
-        </div>
-      )}
+      {/* ~~«Different location: not in the project», in red beside the send (owner, 2026-08-31).~~
+          Removed (owner, 2026-09-26: *"dont show this info on the review and summary only on the
+          location panel itself will show conflict"*). The location panel's head still says it, in
+          red, on the line with the address that caused it. */}
 
       {/* ── No action row (owner, 2026-09-02) ────────────────────────────────────────────────
           It carried «Back to editing» and «Send to suppliers». Both are gone: editing is the pen

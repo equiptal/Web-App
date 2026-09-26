@@ -7,6 +7,23 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-26 - «Different location: not in the project» is shown only on the location panel, not on «Ready to send».**
+  Owner: *"dont show this info on the review and summary only on the location panel itself will show
+  conflict"*. Reverses the 2026-08-31 red banner beside the send. The panel head keeps its red short
+  label. `unfiledNote` (en + ar) had no other reader and is deleted.
+  Files: `src/components/create/ReadyToSend.tsx`, `src/lib/i18n/{en,ar}.ts`.
+
+- **2026-09-26 - A project's «no operator» now reaches a short line, so the rail opens only when there is an operator.**
+  Owner: *"if the project has no operator then why it is opened always?"*. A project routes a short
+  line to Tier 0, which built its item from `newManualItem` and so seeded `operatorNeeded: "yes"`.
+  That seed sat in the agent snapshot, `applyMachineTerms` read it as the renter's own words
+  (`agentSet("yes")`), and the project's answer was skipped. Tier 0 now leaves it unstated (as Tier 1
+  already did), and PROCESS_SUCCESS folds anything still unstated after the merge to «no», the full
+  path's reading of silence. Reproduced first with a reducer test that got «yes» for a «no» project.
+  Files: `src/lib/agent/quick-draft.ts`, `src/lib/store/rfq-store.tsx`,
+  `tests/unit/operator-from-project.test.ts`.
+  ⚠️ `newManualItem`'s «yes» is still right for a line added by hand; do not change it to fix this.
+
 - **2026-09-26 - ACTUAL root cause of the anonymous web chats: Intercom's Messenger API was switched
   OFF.** Intercom → Settings → Channels → Messenger → Install → «For users with logins» → «Enable the
   Messenger API». Off, the web Messenger accepts anonymous visitors only and answers EVERY identified

@@ -2751,12 +2751,8 @@ export const en = {
     },
     wherePanel: {
       unfiledShort: "different location: not in the project",
-      /* ── It no longer ends nowhere (owner, 2026-09-08) ─────────────────────────────────────
-         ~~"...so this request will not be part of it. Move the pin back to file it there."~~ That
-         second sentence read as «otherwise it is filed under nothing», which was true until the
-         post began filing a moved request under a project of its own. Saying the outcome is the
-         point: he is not losing a project, he is starting a second one. */
-      unfiledNote: "This is a different place from {project}, so it gets a project of its own. Move the pin back to keep it in {project}",
+      /* ~~`unfiledNote`, the long sentence.~~ Its only reader was the red banner on «Ready to send»,
+         removed 2026-09-26 (owner: *"only on the location panel itself will show conflict"*). */
       searchPlaceholder: "Search a place, or paste a Maps link / coordinates",
       dragHint: "Drag the map, or drop a pin where the equipment goes",
       confirm: "This is the right spot",

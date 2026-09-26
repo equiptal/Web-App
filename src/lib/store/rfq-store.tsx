@@ -454,9 +454,16 @@ export function reducer(state: RfqState, a: Action): RfqState {
       /* The template, after the project and under the same rule: a line whose text said "with
          operator" keeps what the agent read. It copies terms only — never the equipment, which
          always comes from what the renter typed. */
-      const draft: RfqDraft = state.templateTerms
+      const merged: RfqDraft = state.templateTerms
         ? { ...applyMachineTerms(withProject, state.templateTerms, origin).draft, projectId: withProject.projectId, workOrderGroupId: withProject.workOrderGroupId, projectFields: withProject.projectFields, touchedFields: withProject.touchedFields }
         : withProject;
+      /* The fast lanes leave the operator NOT STATED when the line says nothing, so the project's
+         answer can land above. Whatever is still unstated is the full path's own reading of
+         silence (`agent-adapters.ts`, `toItem`): no operator. Without this a silent line with no
+         project term kept `null`, which the review table prints as a blank label. */
+      const draft: RfqDraft = merged.items.some((i) => i.operatorNeeded == null)
+        ? { ...merged, items: merged.items.map((i) => (i.operatorNeeded == null ? { ...i, operatorNeeded: "no" } : i)) }
+        : merged;
 
       return {
         ...state,

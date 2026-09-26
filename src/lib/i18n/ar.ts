@@ -2142,7 +2142,6 @@ export const ar: Dictionary = {
     },
     wherePanel: {
       unfiledShort: "موقع مختلف: خارج المشروع",
-      unfiledNote: "هذا مكان مختلف عن {project}، لذلك سيكون له مشروع خاص به. أرجع المؤشر لإبقائه في {project}",
       searchPlaceholder: "ابحث عن مكان، أو الصق رابط خرائط / إحداثيات",
       dragHint: "حرّك الخريطة، أو ضع دبوساً حيث ستذهب المعدّة",
       confirm: "هذا هو المكان الصحيح",

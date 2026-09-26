@@ -132,7 +132,14 @@ export function quickResultToDraft(
       rawLabel: match.subcategoryName,
       rawSize: match.measurementName,
       quantity: match.quantity,
-    } as EquipmentItem,
+      /* NOT STATED, not `newManualItem`'s «yes» (owner, 2026-09-26: *"if the project has no
+         operator then why it is opened always?"*). Tier 0 reads no operator off the line, but the
+         seed sat in the agent snapshot and `applyMachineTerms` took it for the renter's words, so
+         the project's answer never landed and the rail opened on every project request. Same
+         silence as Tier 1's `operatorOf`; PROCESS_SUCCESS folds whatever the project leaves unset
+         to «no». */
+      operatorNeeded: null,
+    } as unknown as EquipmentItem,
   ]));
 }
 
