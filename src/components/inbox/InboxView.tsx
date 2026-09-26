@@ -6,7 +6,7 @@ import { useLocale } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { ChatDock } from "@/components/map/ChatDock";
 import { PriceFooter } from "@/components/map/PriceFooter";
-import { fetchBidDetail, fetchReceivedBids, fetchMyRequests, fetchRequestSubmissions, fetchStreamToken } from "@/lib/api/client";
+import { fetchBidDetail, fetchReceivedBids, fetchMyRequests, fetchStreamToken } from "@/lib/api/client";
 import { leaseStream } from "@/lib/chat/stream-connection";
 import { readInboxChatSummaries } from "@/lib/chat/inbox-chat-summary";
 import type { BidCard } from "@/lib/contract/bids";
@@ -34,8 +34,8 @@ import "@/components/map/map-proto.css";
  * and a time stamp, and carries a red unread pill. All four are new here and are the app's own
  * rules, ported in `contract/inbox-chat.ts` and `chat/inbox-chat-summary.ts`.
  *
- * 🔴 **The GROUPING stays the web's** (owner's pick of three): RFQ code and site, then equipment
- * type, then the rows. The app groups by subtype alone because a phone has no room for two levels;
+ * 🔴 **The GROUPING stays the web's** (owner's pick of three): the request's site (its code was
+ * dropped 2026-09-26), then equipment type, then the rows. The app groups by subtype alone because a phone has no room for two levels;
  * this list is a 360px column beside a conversation and it survives an account with many requests.
  *
  * ⚠️ **NOT merged in: off-platform submissions.** They arrive through the renter's own shared link
@@ -86,8 +86,6 @@ export function InboxView() {
   // requestId → requestGroupId, from `my-requests` (same source the requests page groups by). Lets the
   // inbox cluster a multi-item RFQ's fan-out siblings without any received-bids backend change.
   const [groupMap, setGroupMap] = useState<Map<string, string>>(new Map());
-  // group key → RFQ short code (RFQ-NNNNN), fetched per group (same source the requests page uses).
-  const [groupRefs, setGroupRefs] = useState<Map<string, string>>(new Map());
   /** dealRoomId → its last line of conversation. Empty until Stream answers, and empty for ever if
    *  Stream is unreachable: the rows then keep the equipment subtitle, which is the pre-chat row. */
   const [chats, setChats] = useState<Map<string, InboxChatSummary>>(new Map());
@@ -148,32 +146,8 @@ export function InboxView() {
     return () => { active = false; };
   }, []);
 
-  /**
-   * Each group's RFQ short code, through one representative request per group — the same source the
-   * requests page reads.
-   *
-   * ⚠️ Keyed on the GROUPS rather than on the bids, so a poll that changes nothing about which
-   * requests are on screen re-fetches none of these.
-   */
-  const repKey = useMemo(() => {
-    const reps = new Map<string, string>();
-    for (const b of bids ?? []) {
-      const gKey = groupMap.get(b.request.id) ?? b.request.groupId ?? b.request.id ?? b.bidId;
-      if (!reps.has(gKey) && b.request.id) reps.set(gKey, b.request.id);
-    }
-    return [...reps].map(([g, r]) => `${g}:${r}`).join("|");
-  }, [bids, groupMap]);
-  useEffect(() => {
-    if (!repKey) return;
-    let active = true;
-    Promise.all(
-      repKey.split("|").map((pair) => {
-        const [gKey, rid] = pair.split(":");
-        return fetchRequestSubmissions(rid).then((s) => [gKey, s.groupRef] as const).catch(() => [gKey, null] as const);
-      }),
-    ).then((pairs) => active && setGroupRefs(new Map(pairs.filter((p): p is readonly [string, string] => !!p[1]))));
-    return () => { active = false; };
-  }, [repKey]);
+  /* ~~Each group's RFQ short code, one `fetchRequestSubmissions` per group.~~ Its only reader was the
+     code badge on the group header, removed 2026-09-26 (owner: *"in inbox remove the request id"*). */
 
   /**
    * ── The last line of every conversation, in one pass (the app's `InboxChatSummaryReader`) ──────
@@ -296,14 +270,14 @@ export function InboxView() {
   // Two-level grouping: RFQ group (fan-out `requestGroupId`, falling back to the individual request
   // until the backend projects it) → equipment type (subtype) → bid rows.
   type Sub = { key: string; label: string; rows: InboxBid[] };
-  type Grp = { key: string; label: string; code: string | null; subs: Map<string, Sub>; count: number };
+  type Grp = { key: string; label: string; subs: Map<string, Sub>; count: number };
   const groups = new Map<string, Grp>();
   for (const b of shown) {
     const gKey = groupMap.get(b.request.id) ?? b.request.groupId ?? b.request.id ?? b.bidId;
-    const gLabel = b.request.location || b.request.displayId || b.request.shortCode || L("Request", "طلب");
-    const gCode = b.request.displayId ?? b.request.shortCode ?? null;
+    // The site, else a plain word: the request's id is not shown here (owner, 2026-09-26).
+    const gLabel = b.request.location || L("Request", "طلب");
     let g = groups.get(gKey);
-    if (!g) { g = { key: gKey, label: gLabel, code: gCode, subs: new Map(), count: 0 }; groups.set(gKey, g); }
+    if (!g) { g = { key: gKey, label: gLabel, subs: new Map(), count: 0 }; groups.set(gKey, g); }
     const tKey = b.equipmentType.id || b.request.id || b.bidId;
     const tLabel = b.equipmentType.name || b.request.equipmentSummary || L("Equipment", "معدة");
     let sub = g.subs.get(tKey);
@@ -421,16 +395,13 @@ export function InboxView() {
       )}
       {[...groups.values()].map((g) => (
         <div key={g.key} className="mb-4">
-          {/* Level 1 — the RFQ group: the short code first (RFQ-NNNNN when available, else the REQ-
-              code, the same fallback as the requests page), then the site. */}
-          {(() => { const code = groupRefs.get(g.key) ?? g.code; return (
-            <div className="mb-1.5 flex items-center gap-1.5 px-0.5 text-meta font-extrabold text-navy">
-              <Icon name="folder_open" size={14} />
-              {code && <span className="flex-none rounded-sm bg-navy px-1.5 py-0.5 text-label font-extrabold text-white">{code}</span>}
-              <span className="min-w-0 flex-1 truncate text-muted">{g.label}</span>
-              <span className="flex-none text-label font-semibold text-muted">{g.count}</span>
-            </div>
-          ); })()}
+          {/* Level 1 — the RFQ group, by its site. ~~The short code first (RFQ-NNNNN, else REQ-).~~
+              Removed (owner, 2026-09-26: *"in inbox remove the request id"*). */}
+          <div className="mb-1.5 flex items-center gap-1.5 px-0.5 text-meta font-extrabold text-navy">
+            <Icon name="folder_open" size={14} />
+            <span className="min-w-0 flex-1 truncate text-muted">{g.label}</span>
+            <span className="flex-none text-label font-semibold text-muted">{g.count}</span>
+          </div>
           {[...g.subs.values()].map((sub) => (
             <div key={sub.key} className="mb-2 ms-1 border-s-2 border-border ps-2">
               {/* Level 2 — equipment type */}

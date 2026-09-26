@@ -368,6 +368,8 @@ export function ProfileView() {
                    press from a member, the app own owner gate. */
                 logoUrl={profile?.companyLogoUrl ?? null}
                 onEditLogo={() => setLogoOpen(true)}
+                /* The last step of the naming rule, for a firm with no real name on file. */
+                personName={fullName}
               />
             </div>
           )}

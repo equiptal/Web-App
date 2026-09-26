@@ -7,6 +7,28 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-26 - Inbox drops the request code; «My Company» is no longer read as a firm's name.**
+  Owner: *"in inbox remove the request id … why the chats show the user name while the chat header
+  show the company name also why some show «My company»"*. (1) The group header's RFQ/REQ code badge
+  is gone, and with it the per-group `fetchRequestSubmissions` that fed it; the header falls back to
+  «Request», not to the id. (2) `counterparty-name.ts` now skips the backend's placeholder
+  (`companies.name = 'My Company'` on a firm nobody named yet; admin already treats it and «Unknown»
+  as empty in `patchSupplierDocs.ts`), so the rule is legal name → company name → person. The
+  renter's OWN firm on the profile (`CompanyHub`) read `company.name` raw; it now runs the same rule,
+  with the profile's full name as the last step. Checked the rest: the placeholder is written ONLY
+  to `companies.name` (backend `company.service.ts`), never to `supplierProfile.companyName`, so
+  surfaces fed by `/api/me` or profile-status `companyName` cannot show it; store names are typed.
+  ⚠️ **The person-name-in-the-list report is NOT explained yet.** `bidRepository.findByRentee`
+  (`/marketplace/received-bids`) does select `supplierProfile` but not `company` (checked on
+  `origin/staging`), and a first diagnosis blamed that. WRONG as stated: the app's inbox reads the
+  SAME endpoint (`supplierDisplayName`) and the owner reports it correct, and the web runs the same
+  order over the same fields, so the two should agree. Suspects not yet checked: web and app on
+  different backends/databases, a stale web deploy, or two different bids. Needs the live payload.
+  The backend resolver also still returns «My Company» (admin-only placeholder handling).
+  Files: `src/components/inbox/InboxView.tsx`, `src/lib/contract/counterparty-name.ts`,
+  `src/components/company/CompanyHub.tsx`, `src/components/profile/ProfileView.tsx`,
+  `tests/unit/counterparty-name-placeholder.test.ts`.
+
 - **2026-09-26 - Each machine's operator rail opens or closes on THAT machine's answer.** Owner: *"it
   is now opened again for operator with no"*. `<OperatorRail>` had no `key`, so it was one instance
   across machines: its local `expanded` is seeded from `operatorNeeded` only on mount, and machine 1's

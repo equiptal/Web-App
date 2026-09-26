@@ -43,6 +43,22 @@ const clean = (v: unknown): string | null => {
   return t === "" ? null : t;
 };
 
+/**
+ * **A firm's name that is not a name** (owner, 2026-09-26: *"why some show «My company»"*).
+ *
+ * The backend creates a `Company` row before the renter or supplier has named it, and fills
+ * `companies.name` with the literal «My Company» (`company.service.ts`, `seed.name || 'My Company'`)
+ * until a verified CR replaces it. The admin side already treats it as empty
+ * (`patchSupplierDocs.ts`, `COMPANY_NAME_PLACEHOLDERS = ['My Company', 'Unknown']`). Read as a name
+ * it outranked the person, so a stranger's offer arrived from «My Company». Same set, same reading:
+ * nothing is known, fall through to the next level.
+ */
+const COMPANY_NAME_PLACEHOLDERS = new Set(["my company", "unknown"]);
+const firmName = (v: unknown): string | null => {
+  const t = clean(v);
+  return t && !COMPANY_NAME_PLACEHOLDERS.has(t.toLowerCase()) ? t : null;
+};
+
 /** The four name columns, however a given payload spells them. */
 export interface CompanyNameParts {
   /** `companies.legalName` */
@@ -63,10 +79,10 @@ export interface CompanyNameParts {
  * alone and gets the same answer.
  */
 export function companyBrandName(p: CompanyNameParts): string | null {
-  return clean(p.companyLegalName)
-    ?? clean(p.profileLegalName)
-    ?? clean(p.companyName)
-    ?? clean(p.profileCompanyName);
+  return firmName(p.companyLegalName)
+    ?? firmName(p.profileLegalName)
+    ?? firmName(p.companyName)
+    ?? firmName(p.profileCompanyName);
 }
 
 /**

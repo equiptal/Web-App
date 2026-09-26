@@ -22,6 +22,7 @@ import {
   type CompanyResult,
 } from "@/lib/api/company-client";
 import type { CompanyMember, MyCompany } from "@/lib/contract/company";
+import { companyBrandName } from "@/lib/contract/counterparty-name";
 import { btn, cx } from "@/lib/ds";
 import { SkeletonFields, SkeletonRows, SkeletonSection } from "@/components/Skeleton";
 import { pin } from "@/lib/uiPins";
@@ -56,6 +57,7 @@ export function CompanyHub({
   onViewDetails,
   logoUrl = null,
   onEditLogo,
+  personName = null,
 }: {
   embedded?: boolean;
   /** Reports the firm (or its absence) to the page around it — the profile prints one name, not two. */
@@ -87,6 +89,8 @@ export function CompanyHub({
    * A member sees the same mark with no picker.
    */
   onEditLogo?: () => void;
+  /** The signed-in person, the LAST step of the naming rule (see `named` below). */
+  personName?: string | null;
 } = {}) {
   const t = useT();
   const c = t.company;
@@ -138,6 +142,17 @@ export function CompanyHub({
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * The firm as the panels DRAW it: its name by the one naming rule (owner, 2026-09-26: *"first show
+   * legal company name, if not exist fallback to company name, if not exist then to user name"*).
+   * ~~`company.name` as stored.~~ An unnamed firm's row holds the backend's placeholder «My Company»,
+   * which `companyBrandName` reads as no name. Only the NAME is swapped; every panel below reads
+   * `name` for display alone.
+   */
+  const named = company
+    ? { ...company, name: companyBrandName({ companyLegalName: company.legalName, companyName: company.name }) || personName?.trim() || "" }
+    : null;
 
   const flash = (message: string) => {
     setToast(message);
@@ -233,10 +248,10 @@ export function CompanyHub({
           />
         </div>
       ) : !company.isActive ? (
-        <PendingPanel company={company} busy={busy} onCancel={() => setConfirm(cancelJoinSpec())} />
+        <PendingPanel company={named!} busy={busy} onCancel={() => setConfirm(cancelJoinSpec())} />
       ) : (
         <ActiveCompany
-          company={company}
+          company={named!}
           embedded={embedded}
           busy={busy}
           onViewDetails={onViewDetails}
