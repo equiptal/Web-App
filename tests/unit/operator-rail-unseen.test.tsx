@@ -113,6 +113,39 @@ describe("the operator rail, never opened", () => {
     expect(handle.store().state.itemIndex).toBe(1);
   });
 
+  it("holds the first equipment's «Next» too, so a ONE-equipment request cannot skip it", async () => {
+    /**
+     * Owner, 2026-09-24: *"if operator closed in the request create form, it must be shaked when
+     * user clicks next even if it is from the project settings"*. The single-item hole the
+     * 2026-09-13 ruling left open is closed on this press, not on «Review & send».
+     */
+    const handle = await renderCanvas(<Canvas />, { draft: noOperator(), prepare: answered(["a0"]) });
+    const next = () =>
+      screen.getAllByRole("button").find((b) => /^Next(?! equipment)/.test(b.textContent?.trim() ?? ""))!;
+
+    expect(strip()).not.toBeNull();
+    await handle.run(() => next().click());
+    // Refused: still on the machine, and the rail is now open in front of the renter.
+    expect(handle.store().state.activeSection).toBe("equipment");
+    expect(strip()).toBeNull();
+    expect(panel()).not.toBeNull();
+
+    await handle.run(() => next().click());
+    expect(handle.store().state.activeSection).not.toBe("equipment");
+  });
+
+  it("does NOT shake when the renter opened it and then closed it", async () => {
+    // Owner, 2026-09-24: *"if it was opened and closed then fine"*. Seen once is seen.
+    const handle = await renderCanvas(<Canvas />, { draft: twoNoOperator(), prepare: answered(["a0", "a1"]) });
+
+    await handle.run(() => (strip() as HTMLElement).click());
+    await handle.run(() => (panel()!.querySelector("button[aria-label]") as HTMLElement).click());
+    expect(strip()).not.toBeNull();
+
+    await handle.run(() => press(/Next equipment/).click());
+    expect(handle.store().state.itemIndex).toBe(1);
+  });
+
   it("does not shake an item whose agent already asked for an operator", async () => {
     // The rail opens on mount for such an item, so it has been seen. The shared fixture is this
     // case, which is why the rest of the canvas suite never meets the pass at all.

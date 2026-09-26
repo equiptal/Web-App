@@ -7,6 +7,17 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-26 - An UNOPENED operator rail holds the first equipment's «Next» (re-landed on `main`).**
+  Owner: *"now operator show no if request project has it no but why not shaking?"*. The 2026-09-24
+  fix was committed on `fix/intercom-identify-race` (`4a262e44`) and never reached `main`, so on
+  `main` the first equipment's «Next» (the way on to the site) still skipped the rail: a
+  one-equipment request never shook it. Same change, applied from that commit: the press opens and
+  shakes a rail never opened on this machine (`railSeen`); the next press goes on. Opened and closed
+  again is fine. «Review & send» still does not hold (2026-09-13).
+  Files: `src/components/create/Canvas.tsx`, `tests/unit/operator-rail-unseen.test.tsx`.
+  ⚠️ Visible now because the rail finally starts CLOSED on a «no operator» project (entry below);
+  before that it opened on mount and counted as seen, so nothing had to shake.
+
 - **2026-09-26 - «Different location: not in the project» is shown only on the location panel, not on «Ready to send».**
   Owner: *"dont show this info on the review and summary only on the location panel itself will show
   conflict"*. Reverses the 2026-08-31 red banner beside the send. The panel head keeps its red short
