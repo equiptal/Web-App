@@ -12,29 +12,12 @@ import {
   validateCompanyPileFile,
   type PileSession,
 } from "@/lib/api/company-pile";
-import { CompanyIdentityModal, type AuthorityRole, type CompanyIdentity } from "./CompanyIdentityModal";
 import { CompanyDocsConfirmDialog } from "./CompanyDocsConfirmDialog";
 import type { VerificationStatus } from "@/lib/contract/onboarding";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 
 const ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
-
-// Fixed company-city list — mirrors the mobile app's 11-item dropdown exactly (value + EN/AR label).
-// Values are the canonical English strings the app/back-end store, so web + mobile submissions match.
-const VERIFY_CITIES: { value: string; en: string; ar: string }[] = [
-  { value: "Riyadh", en: "Riyadh", ar: "الرياض" },
-  { value: "Jeddah", en: "Jeddah", ar: "جدة" },
-  { value: "Dammam", en: "Dammam", ar: "الدمام" },
-  { value: "Mecca", en: "Mecca", ar: "مكة المكرمة" },
-  { value: "Medina", en: "Medina", ar: "المدينة المنورة" },
-  { value: "Khobar", en: "Khobar", ar: "الخبر" },
-  { value: "Tabuk", en: "Tabuk", ar: "تبوك" },
-  { value: "Abha", en: "Abha", ar: "أبها" },
-  { value: "Jizan", en: "Jizan", ar: "جازان" },
-  { value: "Hail", en: "Hail", ar: "حائل" },
-  { value: "Other", en: "Other", ar: "أخرى" },
-];
 
 interface DocsOnFile {
   submitted: boolean;
@@ -51,15 +34,28 @@ interface DocsOnFile {
  * and RelayPanel's classifier + operators work out what each file is. The web asks only for what no
  * document can answer — authority role, and optionally national ID, city and a logo.
  *
- * Submitting is two calls, and the split matters:
- *   1. identity → `/api/verification/submit` (no document keys — that absence is what tells the
- *      backend this is a pile), which opens the verification and flips the renter to pending;
- *   2. the pile → presign, PUT each file, complete.
+ * 🔴 **ONE call, and it is the pile (2026-09-27).** Submitting used to be two:
+ * `/api/verification/submit` first, which opened the platform's verification case and flipped the
+ * renter to pending, and only then the upload. The two were independent, so the first landing while
+ * the second died left a renter reading "under review" for ever with no documents behind them and
+ * an operator looking at an empty case. Seven live accounts were in that state on 2026-09-26.
  *
- * ⚠️ **A failed upload must never navigate or re-read the status.** Step 1 has already flipped
- * `supplierStatus` to 1, so re-reading it renders the pending panel and the retry — which reuses the
- * presign session to re-send only the files that failed — becomes unreachable. Everything about the
- * failure path here is in service of keeping this screen mounted.
+ * RelayPanel opens the case itself now, from its own `/complete`, once every byte is confirmed in
+ * storage (`PATCH /agents/suppliers/{id}/verification {action:'open'}`). So there is nothing to send
+ * but the files.
+ *
+ * ⚠️ **No typed fields either.** The identity modal asked for a role, a national ID, a city and a
+ * logo. Nothing gates on the role, and Relay reads the city off the National Address and the
+ * owner's ID off the Commercial Registration, so it was a form standing between a renter and the
+ * only thing this screen does.
+ *
+ * ⚠️ **The basic-tier gate did NOT go with it.** It used to sit on the identity call; it now sits
+ * on the presign, which refuses a guest `403 TIER_INSUFFICIENT` before a single byte moves. The
+ * redirect below is the friendly half of the same rule, not the whole of it.
+ *
+ * ⚠️ **A failed upload must never navigate or re-read the status.** Less dangerous than it was
+ * (nothing has flipped `supplierStatus` by then any more) but still wrong: re-reading mid-failure
+ * throws away the presign session the retry needs to re-send only the files that failed.
  */
 export function VerificationFlow() {
   const t = useT();
@@ -81,23 +77,12 @@ export function VerificationFlow() {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Presign session + "identity already accepted", both kept across a retry. Refs rather than state:
-  // they are read inside the submit path and must never trigger a render of their own.
+  // Presign session, kept across a retry. A ref rather than state: it is read inside the submit
+  // path and must never trigger a render of its own.
   const sessionRef = useRef<PileSession | undefined>(undefined);
-  const identityDoneRef = useRef(false);
 
-  const [identity, setIdentity] = useState<CompanyIdentity | null>(null);
-  const [askIdentity, setAskIdentity] = useState(false);
   const [askConfirm, setAskConfirm] = useState(false);
 
-  // Prefill + state, read once on mount.
-  const [prefill, setPrefill] = useState<{
-    role?: AuthorityRole | null;
-    nationalId?: string | null;
-    companyCity?: string | null;
-    companyLogoKey?: string | null;
-    companyLogoUrl?: string | null;
-  }>({});
   /**
    * What the reviewer said, for a renter who is here because their last attempt was refused. Read
    * ONCE, like the app does: submitting flips the profile to pending, so re-reading it mid-flow would
@@ -132,20 +117,8 @@ export function VerificationFlow() {
         };
         setStatus(d.status);
         if (d.status === "rejected" && d.rejectionReason?.trim()) setRejectionReason(d.rejectionReason.trim());
-        const s = d.submission;
-        if (s) {
-          const role =
-            s.authorityRole === "owner" || s.authorityRole === "manager" || s.authorityRole === "employee"
-              ? s.authorityRole
-              : null;
-          setPrefill({
-            role,
-            nationalId: s.nationalId,
-            companyCity: s.companyCity,
-            companyLogoKey: s.companyLogoKey,
-            companyLogoUrl: s.companyLogoUrl,
-          });
-        }
+        // The submission's typed fields used to prefill the identity modal. The modal is gone
+        // (2026-09-27) and nothing else reads them, so they are no longer unpacked here.
       } catch {
         setStatus("none");
       }
@@ -225,44 +198,11 @@ export function VerificationFlow() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [inFlight, p.unloadWarning]);
 
-  /** identity (once) → pile. Called by the confirm dialog, and again by Send on a retry. */
-  const send = async (id: CompanyIdentity) => {
+  /** The pile, and nothing else. Called by the confirm dialog, and again by Send on a retry. */
+  const send = async () => {
     setBusy(true);
     setErr(null);
     try {
-      if (!identityDoneRef.current) {
-        const res = await fetch("/api/verification/submit", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          // No document keys, ever: their absence is what makes this a pile submission
-          // (`isPileCompanySubmission`). One key here flips the backend into the labelled shape and it
-          // then demands CR + VAT + a legal name.
-          body: JSON.stringify({
-            authorityRole: id.role,
-            nationalId: id.nationalId,
-            companyCity: id.companyCity,
-            companyLogoKey: id.companyLogoKey,
-          }),
-        });
-        if (!res.ok) {
-          const d = (await res.json().catch(() => ({}))) as {
-            detail?: string;
-            code?: string;
-            backendCode?: string;
-            messageAr?: string;
-          };
-          // CO1013 — a member of a company they do not own. The backend's copy is the clearest
-          // statement of the rule (and is bilingual), so prefer it over ours.
-          if (d.backendCode === "CO1013") {
-            setErr((locale === "ar" ? d.messageAr : d.detail) || p.errors.memberCannotVerify);
-            return;
-          }
-          setErr(d.code === "account_deleted" ? v.errors.accountDeleted : d.detail || v.errors.submit);
-          return;
-        }
-        identityDoneRef.current = true;
-      }
-
       const result = await uploadCompanyPile(files, sessionRef.current);
       sessionRef.current = result.session;
       if (!result.ok) {
@@ -292,14 +232,22 @@ export function VerificationFlow() {
     }
   };
 
-  /** The bottom CTA. A retry skips both popups — the answers are already held. */
+  /**
+   * The bottom CTA. One popup, the confirmation, and then the files go.
+   *
+   * ⚠️ **A RETRY skips the confirmation, as it always did.** The renter has already read and
+   * accepted it; re-asking after a partial upload failure puts a dialog between them and the one
+   * button that finishes the job they are mid-way through. Before the identity modal was removed
+   * this was `if (identity) send(identity)` — "the answers are already held" — and the retry
+   * signal is now the failed set.
+   */
   const onSend = () => {
     if (!files.length || busy) return;
-    if (identity) {
-      void send(identity);
+    if (failedIndexes.size > 0) {
+      void send();
       return;
     }
-    setAskIdentity(true);
+    setAskConfirm(true);
   };
 
   if (status === "loading") {
@@ -518,23 +466,12 @@ export function VerificationFlow() {
         )}
       </div>
 
-      <CompanyIdentityModal
-        open={askIdentity}
-        cities={VERIFY_CITIES}
-        prefill={prefill}
-        onCancel={() => setAskIdentity(false)}
-        onContinue={(id) => {
-          setIdentity(id);
-          setAskIdentity(false);
-          setAskConfirm(true);
-        }}
-      />
       <CompanyDocsConfirmDialog
         open={askConfirm}
         onCancel={() => setAskConfirm(false)}
         onConfirm={() => {
           setAskConfirm(false);
-          if (identity) void send(identity);
+          void send();
         }}
       />
     </div>

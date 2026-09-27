@@ -1,6 +1,7 @@
 /**
  * **The company logo, from a picked file to a stored KEY.** One copy, used by the verification
- * form's picker (`CompanyIdentityModal`) and by the logo dialog the quotation's «Add a logo» opens
+ * logo dialog the quotation's «Add a logo» opens (the verification form's own picker went
+ * with `CompanyIdentityModal` on 2026-09-27 — that screen sends documents and nothing else now)
  * (`CompanyLogoModal`, 2026-09-23).
  *
  * Downscaled to 220px and re-encoded as PNG, the app's `downscaleCompanyLogo`, so one firm's mark
