@@ -34,6 +34,8 @@ export interface SpecRow {
   certificate: SafetyCertificate[];
   /** Text behind the "other" chip above — rendered in its place so the export names the real cert. */
   certificateOther: string;
+  /** This machine's «Your target price», SAR per unit per billing period; null = not stated. */
+  targetPriceSar: number | null;
   notes: string;
 }
 
@@ -62,6 +64,7 @@ export function buildSpecRows(draft: RfqDraft, taxonomy: Taxonomy): SpecRow[] {
       // EQUIPMENT safety cert — per-item override, else the request-wide "settings for all" default.
       certificate: item.safetyCertsOverride ?? draft.project.certificates.safety,
       certificateOther: (item.safetyCertsOtherText ?? (item.safetyCertsOverride ? "" : draft.project.certificates.safetyOther)).trim(),
+      targetPriceSar: item.targetPriceSar && item.targetPriceSar > 0 ? item.targetPriceSar : null,
       notes: item.additionalNotes,
     };
   });

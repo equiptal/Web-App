@@ -746,7 +746,7 @@ export const en = {
       sla: "Response SLA",
     },
     additionalNotes: "Additional notes",
-    budget: { title: "Target price", label: "Your target price", hint: "Entered in SAR." },
+    budget: { title: "Budget", label: "Budget", hint: "Entered in SAR." },
     supplierFilters: {
       title: "Supplier filters",
       verifiedOnly: "Verified suppliers only",
@@ -786,6 +786,7 @@ export const en = {
       delivery: "Delivery",
       return: "Return",
       certificate: "Safety cert",
+      targetPrice: "Budget",
       notes: "Notes",
     },
   },
@@ -2680,8 +2681,8 @@ export const en = {
       notes: "NOTES",
       notesOptional: "(optional)",
       notesPlaceholder: "Anything else the supplier should know…",
-      // Per machine, beside the notes (owner, 2026-09-27). The UI name for `budgetCeiling`.
-      targetPrice: "YOUR TARGET PRICE",
+      // Per machine, in the attachments row (owner, 2026-09-27). Shown as «Budget»; `budgetCeiling`.
+      targetPrice: "BUDGET",
       targetPriceUnit: "SAR",
       unavailableTitle: "{equipment} isn't available from suppliers right now.",
       /* ── Off-catalogue (CUSTOM_EQUIPMENT_ENABLED) ───────────────────────────────────────────
@@ -2768,11 +2769,11 @@ export const en = {
       duration: "Duration",
       durationDays: "{n} days",
       billing: "HOW YOU'RE BILLED",
-      /* Payment and the target price, in this panel (owner, 2026-09-27). «Your target price» is
-         the UI's name for `budgetCeiling` (owner: *"call the budget ceiling in ui as your target
-         price"*); the wire field keeps its name. */
+      /* Payment in this panel (owner, 2026-09-27). The `targetPrice` keys read «Budget»: named
+         «Your target price» for a few hours, then *"call it budget not target price"* (same day).
+         The wire field is `budgetCeiling` throughout. */
       paymentTerms: "PAYMENT TERMS",
-      targetPrice: "YOUR TARGET PRICE",
+      targetPrice: "BUDGET",
       targetPriceUnit: "SAR",
       extendable: "Extendable",
       quoteRate: "Suppliers quote you a {basis} rate.",
@@ -2877,7 +2878,7 @@ export const en = {
       paymentTerms: "PAYMENT DETAILS",
       maintenance: "MAINTENANCE",
       maintenanceSla: "RESPONSE TIME",
-      budget: "YOUR TARGET PRICE · SAR",
+      budget: "BUDGET · SAR",
       bidWindow: "OFFER / BID WINDOW",
       supplierFilters: "SUPPLIER FILTERS",
       verifiedOnly: "Verified suppliers only",

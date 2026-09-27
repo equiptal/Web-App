@@ -99,7 +99,7 @@ const FIELD_NAMES: Record<string, string> = {
   paymentMethod: "the payment method",
   maintenanceResponsibility: "who maintains it",
   breakdownResponseSla: "the breakdown response time",
-  budgetCeiling: "your target price",
+  budgetCeiling: "your budget",
   offerDuration: "how long offers stay open",
   projectId: "the project",
 };

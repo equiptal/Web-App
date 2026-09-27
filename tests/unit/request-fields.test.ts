@@ -59,6 +59,7 @@ const SHOWN: Record<string, string> = {
   paymentMethod: "Payment method",
   breakdownResponseSla: "Breakdown response",
   maintenanceResponsibility: "Maintenance",
+  budgetCeiling: "Budget",
   offerDuration: "Offer duration",
   localContent: "Local content",
 };
@@ -149,8 +150,8 @@ describe("reading the values", () => {
     expect(get("Working hours")).toBe("10 hrs/day");
   });
 
-  it("does not show the target price while it is hidden (owner, 2026-09-27)", () => {
-    expect(get("Your target price")).toBeUndefined();
+  it("shows THIS machine's target price with its unit (every posted request is one machine)", () => {
+    expect(get("Budget")).toBe("120,000 SAR");
   });
 
   it("answers in Arabic when asked in Arabic", () => {

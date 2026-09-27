@@ -570,7 +570,7 @@ describe("«Your target price», per machine, beside the attachments", () => {
 
   it("sits in one row with the attachments, and the notes are below it", async () => {
     await card({ attachments: [{ id: "att-bucket", name: "Standard bucket", nameAr: "دلو" }] });
-    const price = screen.getByText("YOUR TARGET PRICE");
+    const price = screen.getByText("BUDGET");
     const attachment = screen.getByText("ATTACHMENT");
     expect(row(price)).not.toBeNull();
     expect(row(price)).toBe(row(attachment));
@@ -580,7 +580,7 @@ describe("«Your target price», per machine, beside the attachments", () => {
   it("keeps the price in the row and lets MANY attachments wrap inside their own column", async () => {
     const many = Array.from({ length: 9 }, (_, i) => ({ id: `att-${i}`, name: `Attachment ${i}`, nameAr: `ملحق ${i}` }));
     await card({ attachments: many });
-    const price = screen.getByText("YOUR TARGET PRICE");
+    const price = screen.getByText("BUDGET");
     const grid = row(price)!;
     // Two fixed columns from `sm` up: the chips column shrinks and wraps, the price keeps 220px.
     expect(grid.className).toContain("sm:grid-cols-[minmax(0,1fr)_220px]");
@@ -591,7 +591,7 @@ describe("«Your target price», per machine, beside the attachments", () => {
   it("stands alone when this machine type has no attachments", async () => {
     await card({ attachments: [] });
     expect(screen.queryByText("ATTACHMENT")).toBeNull();
-    expect(screen.getByText("YOUR TARGET PRICE")).toBeTruthy();
+    expect(screen.getByText("BUDGET")).toBeTruthy();
   });
 
   it("carries no «Per unit, per …» line under the box (owner, 2026-09-27)", async () => {
@@ -602,7 +602,7 @@ describe("«Your target price», per machine, beside the attachments", () => {
   it("writes THIS machine's price, digits only, and clears to null", async () => {
     const { fireEvent } = await import("@testing-library/react");
     const handle = await card();
-    const input = screen.getByLabelText("YOUR TARGET PRICE") as HTMLInputElement;
+    const input = screen.getByLabelText("BUDGET") as HTMLInputElement;
     await handle.run(() => { fireEvent.change(input, { target: { value: "7,500 SAR" } }); });
     expect(handle.store().state.draft!.items[0].targetPriceSar).toBe(7500);
     await handle.run(() => { fireEvent.change(input, { target: { value: "" } }); });

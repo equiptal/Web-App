@@ -229,7 +229,7 @@ describe("payment terms, in the dates and billing row", () => {
 
   it("does not show the target price while it is hidden", async () => {
     await panel();
-    expect(screen.queryByText("YOUR TARGET PRICE")).toBeNull();
+    expect(screen.queryByText("BUDGET")).toBeNull();
     expect(screen.queryByText(/BUDGET CEILING/i)).toBeNull();
   });
 

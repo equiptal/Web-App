@@ -99,7 +99,7 @@ describe("Preferences are the only editable region (MREQ-AC-43)", () => {
     expect(screen.getByText(/PAYMENT DETAILS/)).toBeTruthy();
     expect(screen.getByText("MAINTENANCE")).toBeTruthy();
     // «Your target price» is hidden for now (owner, 2026-09-27).
-    expect(screen.queryByText(/YOUR TARGET PRICE/)).toBeNull();
+    expect(screen.queryByText(/BUDGET · SAR/)).toBeNull();
     expect(screen.getByText(/OFFER \/ BID WINDOW/)).toBeTruthy();
     expect(screen.getByText("SUPPLIER FILTERS")).toBeTruthy();
     expect(screen.getByText(/ADDITIONAL NOTES/)).toBeTruthy();
@@ -340,5 +340,30 @@ describe("the ready strip holds its row", () => {
     const at = SRC.indexOf("ms-auto flex flex-none items-center");
     expect(at).toBeGreaterThan(0);
     expect(SRC.slice(at, at + 400)).toMatch(/whitespace-nowrap/);
+  });
+});
+
+/**
+ * Owner, 2026-09-27: *"check all surfaces in review summary ... show the target price"*. Each
+ * machine's own figure is a column of the machines table (and so of the CSV built from it).
+ */
+describe("«Your target price» on the review", () => {
+  it("is a column of the machines table, per machine", async () => {
+    const handle = await review({
+      draft: makeAgentDraft({
+        items: [makeItem({ targetPriceSar: 7500 }), makeItem({ id: "i2", targetPriceSar: 12000 })],
+        project: confirmedProject(),
+      }),
+    });
+    await openDetails(handle);
+    expect(screen.getByText("Budget")).toBeTruthy();
+    expect(screen.getByText("7,500 SAR")).toBeTruthy();
+    expect(screen.getByText("12,000 SAR")).toBeTruthy();
+  });
+
+  it("drops the column when no machine has one, like every other empty column", async () => {
+    const handle = await review();
+    await openDetails(handle);
+    expect(screen.queryByText("Budget")).toBeNull();
   });
 });

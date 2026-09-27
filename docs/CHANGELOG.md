@@ -7,6 +7,23 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-27 - «Your target price» is called «Budget» again, in every string.** Owner: *"call it
+  budget not target price"*. English «Budget» / «BUDGET», Arabic «الميزانية», on the machine card,
+  the review table + CSV, request details, the edit modal, the send error, and the two hidden
+  request-wide fields. Label only: `targetPrice` i18n keys and `targetPriceSar` keep their names, and
+  the entries below say «target price» because that was its name when they were written.
+
+- **2026-09-27 - «Your target price» is read back everywhere it is set.** Owner: *"check all surfaces
+  in review summary, request details after post ... it is not missed"*. It WAS missed on all four:
+  entered per machine and sent, never shown again. Now: a column of the review's machines table
+  (`SpecRow.targetPriceSar`, so the CSV export carries it too; dropped when empty like every column),
+  the request-details row and the edit-request input are UN-hidden. Those two read
+  `request.budgetCeiling`, which IS the machine's own figure because every posted request is one
+  machine. Grouped «7,500 SAR» on both, so one figure reads one way.
+  Files: `src/lib/export/spec-sheet.ts`, `src/components/create/ReadyToSend.tsx`,
+  `src/lib/contract/request-fields.ts`, `src/components/requests/RequestEditModals.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/{ready-to-send.test.tsx,request-fields.test.ts}`.
+
 - **2026-09-27 - «Your target price» is PER MACHINE, in the attachments row, sent as each item's `budgetCeiling`.**
   Owner: *"make it in ui beside the notes per item"*; a target price is per machine in business
   terms. New optional `EquipmentItem.targetPriceSar`, a field in `MachineCard` (first beside the notes,

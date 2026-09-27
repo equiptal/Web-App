@@ -63,8 +63,7 @@ export function requestFieldFormatters(ar: boolean, L: Pick) {
  * and a field printed twice makes a reader wonder which one is authoritative.
  */
 export function requestDetailRows(r: RequestRecord, ar: boolean, L: Pick): Row[] {
-  // `n` returns with the hidden «Your target price» row below (2026-09-27).
-  const { yn, enumL, qty } = requestFieldFormatters(ar, L);
+  const { yn, enumL, n, qty } = requestFieldFormatters(ar, L);
 
   const rentalMap = { DAILY: ["Daily", "يومي"], WEEKLY: ["Weekly", "أسبوعي"], MONTHLY: ["Monthly", "شهري"], PER_JOB: ["Per job", "للمهمة"], LONG_TERM: ["Long term", "طويل الأمد"] } as Record<string, [string, string]>;
   /* `urgencyMap` went with the Urgency row: the value is computed from the start date, not asked. */
@@ -120,8 +119,9 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: Pick): Row[]
     [L("Payment method", "طريقة الدفع"), enumL(r.paymentMethod, {})],
     [L("Breakdown response", "زمن الاستجابة للأعطال"), enumL(r.breakdownResponseSla, slaMap)],
     [L("Maintenance", "الصيانة"), enumL(r.maintenanceResponsibility, maintMap)],
-    // «Your target price» — HIDDEN (owner, 2026-09-27: *"remove it from ui for now"*):
-    // [L("Your target price", "سعرك المستهدف"), r.budgetCeiling ? `${n(r.budgetCeiling)} ${L("SAR", "ر.س")}` : null],
+    // «Your target price»: THIS machine's, since every posted request is one machine (hidden for a
+    // few hours on 2026-09-27 while it was request-wide; per machine since the same day).
+    [L("Budget", "الميزانية"), r.budgetCeiling ? `${n(r.budgetCeiling)} ${L("SAR", "ر.س")}` : null],
     [L("Offer duration", "مدة العرض"), enumL(r.offerDuration, offerMap)],
     [L("Local content", "المحتوى المحلي"), yn(r.localContent)],
   ]);
