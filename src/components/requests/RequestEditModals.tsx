@@ -644,7 +644,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
             {supplierMaintains && (
               <Sel label={L("Breakdown response", "زمن الاستجابة للأعطال")} value={sla} onChange={setSla} opts={SLA_OPTS} />
             )}
-            <Num label={L("Budget ceiling (SAR)", "سقف الميزانية (ر.س)")} value={budget} onChange={setBudget} min={0} />
+            <Num label={L("Your target price (SAR)", "سعرك المستهدف (ر.س)")} value={budget} onChange={setBudget} min={0} />
             <Sel label={L("Offer validity", "صلاحية العرض")} value={offer} onChange={setOffer} opts={OFFER_OPTS} />
           </div>
           <Chk label={L("Verified suppliers only", "المؤجّرون الموثّقون فقط")} value={verifiedOnly} onChange={setVerifiedOnly} />

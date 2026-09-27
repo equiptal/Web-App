@@ -19,7 +19,7 @@ import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, Toggle } from "@/components/ui";
 import { CanvasField, CheckFromProject, ChoiceRow, PanelDot } from "@/components/create/Provenance";
 import { useProvenance } from "@/components/create/hooks";
-import { computeChargedDays, RENTAL_BASES, type RentalBasis } from "@/lib/contract";
+import { computeChargedDays, PAYMENT_TERMS, RENTAL_BASES, type PaymentTerm, type RentalBasis } from "@/lib/contract";
 // Re-add `OVERTIME_RATES, type OvertimeRate` here when the overtime picker below comes back.
 import { arabicIndicDigits } from "@/lib/contract/bid-map";
 import { pin } from "@/lib/uiPins";
@@ -59,6 +59,10 @@ export function WhenPanel({
   const agentTiming = prov.agentProject?.timing;
   const basisSource = prov.projectSource("timing.rental_basis", timing.rentalBasis, agentTiming?.rentalBasis);
   const hoursSource = prov.projectSource("timing.hours_per_day", timing.hoursPerDay, agentTiming?.hoursPerDay, true);
+  /* A project can fill the payment term (`applyProjectDefaults` → `preferences.payment_terms`), so it
+     carries the same «from your project» mark as the timing above. */
+  const prefs = state.draft?.preferences;
+  const paymentSource = prov.projectSource("preferences.payment_terms", prefs?.payment.terms ?? null);
 
   const setTiming = (patch: Parameters<typeof actions.patchTiming>[0], key: string) => {
     prov.touchRaw(key);
@@ -287,6 +291,47 @@ export function WhenPanel({
                 </label>
               </div>
               )}
+            </div>
+          </div>
+
+          {/* ---- Payment terms and the target price (owner, 2026-09-27) ────────────────────────
+              *"i want payment terms - budget ceiling terms to appear in the when block before the
+              more details and call the budget ceiling in ui as your target price"*. Renters could
+              not find payment: it lived only on «Ready to send», the last screen. Both stay there
+              too, as the read-back; this is the same `preferences` value, not a copy.
+
+              Both OPTIONAL, as on the review screen: no star, no gap, nothing here gates a move.
+              Pressing the chosen term again clears it, since a ChoiceRow has no ×. */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-sm bg-surface2 p-5">
+              <CanvasField label={t.create.whenPanel.paymentTerms} source={paymentSource}>
+                <ChoiceRow<PaymentTerm>
+                  columns={PAYMENT_TERMS.length}
+                  value={prefs?.payment.terms ?? null}
+                  onChange={(v) => {
+                    prov.touchRaw("preferences.payment_terms");
+                    actions.patchPreferences({ payment: { terms: v === prefs?.payment.terms ? null : v } });
+                  }}
+                  options={PAYMENT_TERMS.map((p) => ({ value: p, label: t.options.paymentTerm[p] }))}
+                />
+              </CanvasField>
+            </div>
+            <div className="rounded-sm bg-surface2 p-5">
+              <CanvasField label={t.create.whenPanel.targetPrice}>
+                <label className="flex items-center gap-2 rounded-sm border border-border bg-surface px-3.5 py-2.5">
+                  <input
+                    inputMode="numeric"
+                    value={prefs?.budgetSar == null ? "" : String(prefs.budgetSar)}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/[^\d]/g, "");
+                      actions.patchPreferences({ budgetSar: digits ? Number(digits) : null });
+                    }}
+                    aria-label={t.create.whenPanel.targetPrice}
+                    className="min-w-0 flex-1 bg-transparent text-subhead font-extrabold text-navy outline-none"
+                  />
+                  <span className="flex-none text-meta font-semibold text-muted">{t.create.whenPanel.targetPriceUnit}</span>
+                </label>
+              </CanvasField>
             </div>
           </div>
 

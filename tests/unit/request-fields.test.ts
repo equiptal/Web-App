@@ -59,7 +59,7 @@ const SHOWN: Record<string, string> = {
   paymentMethod: "Payment method",
   breakdownResponseSla: "Breakdown response",
   maintenanceResponsibility: "Maintenance",
-  budgetCeiling: "Budget",
+  budgetCeiling: "Your target price",
   offerDuration: "Offer duration",
   localContent: "Local content",
 };
@@ -117,7 +117,7 @@ describe("a value that is not there", () => {
   it("is dropped, not printed as a dash", () => {
     const rows = requestDetailRows({ ...FULL, budgetCeiling: null, offerDuration: null }, false, L);
     const labels = rows.map(([k]) => k);
-    expect(labels).not.toContain("Budget");
+    expect(labels).not.toContain("Your target price");
     expect(labels).not.toContain("Offer duration");
     expect(rows.every(([, v]) => v !== "" && v !== "—")).toBe(true);
   });
@@ -149,7 +149,7 @@ describe("reading the values", () => {
 
   it("carries the unit with the number", () => {
     expect(get("Working hours")).toBe("10 hrs/day");
-    expect(get("Budget")).toBe("120,000 SAR");
+    expect(get("Your target price")).toBe("120,000 SAR");
   });
 
   it("answers in Arabic when asked in Arabic", () => {

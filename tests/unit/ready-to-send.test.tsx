@@ -98,7 +98,7 @@ describe("Preferences are the only editable region (MREQ-AC-43)", () => {
     await openDetails(handle);
     expect(screen.getByText(/PAYMENT DETAILS/)).toBeTruthy();
     expect(screen.getByText("MAINTENANCE")).toBeTruthy();
-    expect(screen.getByText(/BUDGET CEILING/)).toBeTruthy();
+    expect(screen.getByText(/YOUR TARGET PRICE/)).toBeTruthy();
     expect(screen.getByText(/OFFER \/ BID WINDOW/)).toBeTruthy();
     expect(screen.getByText("SUPPLIER FILTERS")).toBeTruthy();
     expect(screen.getByText(/ADDITIONAL NOTES/)).toBeTruthy();
@@ -150,7 +150,7 @@ describe("Preferences are the only editable region (MREQ-AC-43)", () => {
   it("takes digits only for the budget", async () => {
     const handle = await review();
     await openDetails(handle);
-    const field = screen.getByText(/BUDGET CEILING/).closest("div")!.parentElement!;
+    const field = screen.getByText(/YOUR TARGET PRICE/).closest("div")!.parentElement!;
     const input = within(field).getByRole("textbox") as HTMLInputElement;
     // fireEvent.change goes through React's value setter; assigning .value directly does not.
     await handle.run(() => {

@@ -746,7 +746,7 @@ export const en = {
       sla: "Response SLA",
     },
     additionalNotes: "Additional notes",
-    budget: { title: "Budget", label: "Budget ceiling", hint: "Entered in SAR." },
+    budget: { title: "Target price", label: "Your target price", hint: "Entered in SAR." },
     supplierFilters: {
       title: "Supplier filters",
       verifiedOnly: "Verified suppliers only",
@@ -2765,6 +2765,12 @@ export const en = {
       duration: "Duration",
       durationDays: "{n} days",
       billing: "HOW YOU'RE BILLED",
+      /* Payment and the target price, in this panel (owner, 2026-09-27). «Your target price» is
+         the UI's name for `budgetCeiling` (owner: *"call the budget ceiling in ui as your target
+         price"*); the wire field keeps its name. */
+      paymentTerms: "PAYMENT TERMS",
+      targetPrice: "YOUR TARGET PRICE",
+      targetPriceUnit: "SAR",
       extendable: "Extendable",
       quoteRate: "Suppliers quote you a {basis} rate.",
       moreDetails: "MORE DETAILS",
@@ -2868,7 +2874,7 @@ export const en = {
       paymentTerms: "PAYMENT DETAILS",
       maintenance: "MAINTENANCE",
       maintenanceSla: "RESPONSE TIME",
-      budget: "BUDGET CEILING · SAR",
+      budget: "YOUR TARGET PRICE · SAR",
       bidWindow: "OFFER / BID WINDOW",
       supplierFilters: "SUPPLIER FILTERS",
       verifiedOnly: "Verified suppliers only",

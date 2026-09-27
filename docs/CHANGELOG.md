@@ -7,6 +7,20 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-27 - Payment terms and «Your target price» sit in the schedule panel; «budget ceiling» is renamed everywhere a renter reads it.**
+  Owner: *"payment terms - budget ceiling terms to appear in the when block before the more details
+  and call the budget ceiling in ui as your target price"*. Renters could not find payment: it lived
+  only on «Ready to send». New row in `WhenPanel` between the dates/billing boxes and «More
+  details», writing the SAME `preferences.payment.terms` / `budgetSar` the review screen edits
+  (kept there as the read-back). Both optional; a second press on the chosen term clears it, since
+  `ChoiceRow` has no ×. The payment term carries the «from your project» mark
+  (`preferences.payment_terms`). Label only: the wire field is still `budgetCeiling`.
+  Checked first that the name does not mislead: the backend stores and displays the ceiling and
+  filters nothing by it (the «a stale one filters out every real bid» note in `client.ts` is
+  unverified). Files: `src/components/create/WhenPanel.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `src/lib/contract/{request-fields,submit-error}.ts`, `src/components/requests/RequestEditModals.tsx`,
+  `tests/unit/{when-panel.test.tsx,ready-to-send.test.tsx,request-fields.test.ts}`.
+
 - **2026-09-26 - Inbox drops the request code; «My Company» is no longer read as a firm's name.**
   Owner: *"in inbox remove the request id … why the chats show the user name while the chat header
   show the company name also why some show «My company»"*. (1) The group header's RFQ/REQ code badge

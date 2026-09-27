@@ -119,7 +119,7 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: Pick): Row[]
     [L("Payment method", "طريقة الدفع"), enumL(r.paymentMethod, {})],
     [L("Breakdown response", "زمن الاستجابة للأعطال"), enumL(r.breakdownResponseSla, slaMap)],
     [L("Maintenance", "الصيانة"), enumL(r.maintenanceResponsibility, maintMap)],
-    [L("Budget", "الميزانية"), r.budgetCeiling ? `${n(r.budgetCeiling)} ${L("SAR", "ر.س")}` : null],
+    [L("Your target price", "سعرك المستهدف"), r.budgetCeiling ? `${n(r.budgetCeiling)} ${L("SAR", "ر.س")}` : null],
     [L("Offer duration", "مدة العرض"), enumL(r.offerDuration, offerMap)],
     [L("Local content", "المحتوى المحلي"), yn(r.localContent)],
   ]);
