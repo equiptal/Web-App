@@ -9,9 +9,9 @@ reversal, or the reason an odd-looking line is load-bearing.
 
 - **2026-09-27 - «Your target price» is PER MACHINE, beside the notes, sent as each item's `budgetCeiling`.**
   Owner: *"make it in ui beside the notes per item"*; a target price is per machine in business
-  terms. New optional `EquipmentItem.targetPriceSar`, a field in `MachineCard` next to the notes, hint
-  «Per unit, per <billing basis>» (how an offer is quoted, so the two compare directly), digits
-  only. `draftToCreateRequest` sends it per item and only when > 0; the request-wide field stays
+  terms. New optional `EquipmentItem.targetPriceSar`, a field in `MachineCard` next to the notes,
+  digits only, meant per unit per billing period (how an offer is quoted). A «Per unit, per <basis>»
+  hint under it was removed at the owner's word. `draftToCreateRequest` sends it per item and only when > 0; the request-wide field stays
   hidden and unsent (entry below). Not copied to a second machine (`machineTermsOf` does not carry
   it). ⚠️ DEPLOY ORDER: the backend must ship first. Before Moedatech-App 2026-09-27 the agents
   `itemSchema` had no such key and zod stripped it SILENTLY: the request posts, the price is lost.

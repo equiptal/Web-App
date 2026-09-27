@@ -166,8 +166,6 @@ export function MachineCard({
   }, [pulseName]);
   const photoBroken = brokenPhoto !== null && brokenPhoto === photo;
   const overrides = useItemOverrides(item, state.draft!.project);
-  /** The billing basis the target price is quoted against (per unit, per this period). */
-  const basis = state.draft!.project.timing.rentalBasis;
   const attachments = useItemAttachments(item);
   const prov = useProvenance(item.id);
   const years = equipmentYears();
@@ -920,13 +918,8 @@ export function MachineCard({
                   onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })}
                 />
               </CanvasField>
-              <CanvasField
-                label={t.create.machineCard.targetPrice}
-                optional
-                hint={
-                  basis ? t.create.machineCard.targetPricePer[basis] : t.create.machineCard.targetPricePerUnit
-                }
-              >
+              {/* ~~A «Per unit, per <basis>» hint under the box.~~ Removed (owner, 2026-09-27). */}
+              <CanvasField label={t.create.machineCard.targetPrice} optional>
                 <label className="flex items-center gap-2 rounded-sm border border-border bg-surface px-3 py-2">
                   <input
                     inputMode="numeric"

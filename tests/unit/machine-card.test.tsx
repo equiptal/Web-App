@@ -574,14 +574,9 @@ describe("«Your target price», per machine, beside the notes", () => {
     expect(row(price)).toBe(row(notes));
   });
 
-  it("says what the figure is per, from the billing basis", async () => {
+  it("carries no «Per unit, per …» line under the box (owner, 2026-09-27)", async () => {
     await card({ draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }) }); // bills monthly
-    expect(screen.getByText("Per unit, per month")).toBeTruthy();
-  });
-
-  it("says «Per unit» alone before a billing basis is chosen", async () => {
-    await card(); // the default draft has no basis yet
-    expect(screen.getByText("Per unit")).toBeTruthy();
+    expect(screen.queryByText(/^Per unit/)).toBeNull();
   });
 
   it("writes THIS machine's price, digits only, and clears to null", async () => {
