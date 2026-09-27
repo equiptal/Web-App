@@ -880,18 +880,48 @@ export function MachineCard({
             </div>
           </div>
 
-          {/* Attachment, work type and notes — one box, as the prototype has them. */}
+          {/* Attachment + target price, work type and notes — one box, as the prototype has them. */}
           <div className="flex w-full flex-col gap-2.5 rounded-sm bg-surface2 p-3.5">
-            {/* Hidden entirely when this subtype has no admin-defined attachments (MREQ-AC-22). */}
-            {attachments.hasOptions && (
-              <CanvasField
-                label={t.create.machineCard.attachment}
-                optional
-                source={prov.itemSource("attachments", item.attachmentIds, "attachmentIds")}
-              >
-                <ChoiceChips<string> values={attachments.selected} onToggle={attachments.toggle} options={attachments.options} />
-              </CanvasField>
-            )}
+            {/* ── Attachments and «Your target price», one row (owner, 2026-09-27: *"make the target
+                price beside the attachments in one row"*) ─────────────────────────────────────────
+                ~~Beside the notes.~~ Moved the same day. Attachments are admin-defined per subtype
+                and the seed carries at most five short chips. The PRICE never leaves the row: when the
+                chips outgrow their column they wrap onto more lines inside it (owner, same day: *"if
+                attachments are more than what can fit then just wrap the options"*). Only a phone-width
+                card stacks the two. With no attachments for this subtype (MREQ-AC-22) the price stands
+                alone.
+                The price is THIS machine's, per unit per billing period, which is how an offer is
+                quoted. Optional; digits only. */}
+            <div className={`grid items-start gap-2.5 ${attachments.hasOptions ? "sm:grid-cols-[minmax(0,1fr)_220px]" : "sm:grid-cols-[220px]"}`}>
+              {attachments.hasOptions && (
+                <div className="min-w-0">
+                  <CanvasField
+                    label={t.create.machineCard.attachment}
+                    optional
+                    source={prov.itemSource("attachments", item.attachmentIds, "attachmentIds")}
+                  >
+                    <ChoiceChips<string> values={attachments.selected} onToggle={attachments.toggle} options={attachments.options} />
+                  </CanvasField>
+                </div>
+              )}
+              <div className="min-w-0">
+                <CanvasField label={t.create.machineCard.targetPrice} optional>
+                  <label className="flex items-center gap-2 rounded-sm border border-border bg-surface px-3 py-2">
+                    <input
+                      inputMode="numeric"
+                      value={item.targetPriceSar == null ? "" : String(item.targetPriceSar)}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/[^\d]/g, "");
+                        actions.patchItem(item.id, { targetPriceSar: digits ? Number(digits) : null });
+                      }}
+                      aria-label={t.create.machineCard.targetPrice}
+                      className="min-w-0 flex-1 bg-transparent text-body font-semibold text-navy outline-none"
+                    />
+                    <span className="flex-none text-meta font-semibold text-muted">{t.create.machineCard.targetPriceUnit}</span>
+                  </label>
+                </CanvasField>
+              </div>
+            </div>
 
             {/* Crane-only, mirroring `equipment_step.dart` `_isCraneSelected` (MREQ-AC-23). */}
             {tax.isCrane && (
@@ -905,36 +935,15 @@ export function MachineCard({
               </CanvasField>
             )}
 
-            {/* Notes and «Your target price», side by side (owner, 2026-09-27: *"make it in ui beside
-                the notes per item"*). The price is THIS machine's, per unit per billing period, which
-                is how an offer is quoted, so the two compare directly. Optional; digits only. */}
-            <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_220px]">
-              <CanvasField label={t.create.machineCard.notes} optional>
-                <TextArea
-                  value={item.additionalNotes}
-                  rows={3}
-                  className="h-24"
-                  placeholder={t.create.machineCard.notesPlaceholder}
-                  onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })}
-                />
-              </CanvasField>
-              {/* ~~A «Per unit, per <basis>» hint under the box.~~ Removed (owner, 2026-09-27). */}
-              <CanvasField label={t.create.machineCard.targetPrice} optional>
-                <label className="flex items-center gap-2 rounded-sm border border-border bg-surface px-3 py-2">
-                  <input
-                    inputMode="numeric"
-                    value={item.targetPriceSar == null ? "" : String(item.targetPriceSar)}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/[^\d]/g, "");
-                      actions.patchItem(item.id, { targetPriceSar: digits ? Number(digits) : null });
-                    }}
-                    aria-label={t.create.machineCard.targetPrice}
-                    className="min-w-0 flex-1 bg-transparent text-body font-semibold text-navy outline-none"
-                  />
-                  <span className="flex-none text-meta font-semibold text-muted">{t.create.machineCard.targetPriceUnit}</span>
-                </label>
-              </CanvasField>
-            </div>
+            <CanvasField label={t.create.machineCard.notes} optional>
+              <TextArea
+                value={item.additionalNotes}
+                rows={3}
+                className="h-24"
+                placeholder={t.create.machineCard.notesPlaceholder}
+                onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })}
+              />
+            </CanvasField>
           </div>
         </div>
       </div>

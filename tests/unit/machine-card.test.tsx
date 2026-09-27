@@ -564,14 +564,34 @@ describe("the card fits a phone", () => {
  * Owner, 2026-09-27: *"make it in ui beside the notes per item"*: «Your target price» per machine,
  * per unit per billing period (how an offer is quoted).
  */
-describe("«Your target price», per machine, beside the notes", () => {
-  it("sits beside the notes, in the same row", async () => {
-    await card();
+describe("«Your target price», per machine, beside the attachments", () => {
+  /** The row both fields share: the grid above each label. */
+  const row = (el: Element) => el.closest(".grid");
+
+  it("sits in one row with the attachments, and the notes are below it", async () => {
+    await card({ attachments: [{ id: "att-bucket", name: "Standard bucket", nameAr: "دلو" }] });
     const price = screen.getByText("YOUR TARGET PRICE");
-    const notes = screen.getByText("NOTES");
-    const row = (el: Element) => el.closest(".grid");
+    const attachment = screen.getByText("ATTACHMENT");
     expect(row(price)).not.toBeNull();
-    expect(row(price)).toBe(row(notes));
+    expect(row(price)).toBe(row(attachment));
+    expect(row(screen.getByText("NOTES"))).not.toBe(row(price));
+  });
+
+  it("keeps the price in the row and lets MANY attachments wrap inside their own column", async () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({ id: `att-${i}`, name: `Attachment ${i}`, nameAr: `ملحق ${i}` }));
+    await card({ attachments: many });
+    const price = screen.getByText("YOUR TARGET PRICE");
+    const grid = row(price)!;
+    // Two fixed columns from `sm` up: the chips column shrinks and wraps, the price keeps 220px.
+    expect(grid.className).toContain("sm:grid-cols-[minmax(0,1fr)_220px]");
+    expect(row(screen.getByText("Attachment 8"))).toBe(grid);
+    expect(screen.getByText("Attachment 0").closest(".flex-wrap")).not.toBeNull();
+  });
+
+  it("stands alone when this machine type has no attachments", async () => {
+    await card({ attachments: [] });
+    expect(screen.queryByText("ATTACHMENT")).toBeNull();
+    expect(screen.getByText("YOUR TARGET PRICE")).toBeTruthy();
   });
 
   it("carries no «Per unit, per …» line under the box (owner, 2026-09-27)", async () => {
