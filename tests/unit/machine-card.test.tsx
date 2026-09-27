@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { screen, within } from "@testing-library/react";
 import { MachineCard } from "@/components/create/MachineCard";
 import { equipmentYears, FUEL_TYPES, SAFETY_CERTIFICATES, itemGaps, transportGaps } from "@/lib/contract";
-import { makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
+import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
 
 /* The two overlay pills are addressed by their accessible NAME, and that name is the field’s noun —
    «Certificate», «Minimum year». Their visible text is an INSTRUCTION while unanswered («Pick
@@ -557,5 +557,40 @@ describe("the card fits a phone", () => {
       const guarded = cls.includes("sm:whitespace-nowrap") || cls.includes("truncate") || cls.includes("text-subhead");
       expect(guarded, `unguarded nowrap: ${cls}`).toBe(true);
     }
+  });
+});
+
+/**
+ * Owner, 2026-09-27: *"make it in ui beside the notes per item"*: «Your target price» per machine,
+ * per unit per billing period (how an offer is quoted).
+ */
+describe("«Your target price», per machine, beside the notes", () => {
+  it("sits beside the notes, in the same row", async () => {
+    await card();
+    const price = screen.getByText("YOUR TARGET PRICE");
+    const notes = screen.getByText("NOTES");
+    const row = (el: Element) => el.closest(".grid");
+    expect(row(price)).not.toBeNull();
+    expect(row(price)).toBe(row(notes));
+  });
+
+  it("says what the figure is per, from the billing basis", async () => {
+    await card({ draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }) }); // bills monthly
+    expect(screen.getByText("Per unit, per month")).toBeTruthy();
+  });
+
+  it("says «Per unit» alone before a billing basis is chosen", async () => {
+    await card(); // the default draft has no basis yet
+    expect(screen.getByText("Per unit")).toBeTruthy();
+  });
+
+  it("writes THIS machine's price, digits only, and clears to null", async () => {
+    const { fireEvent } = await import("@testing-library/react");
+    const handle = await card();
+    const input = screen.getByLabelText("YOUR TARGET PRICE") as HTMLInputElement;
+    await handle.run(() => { fireEvent.change(input, { target: { value: "7,500 SAR" } }); });
+    expect(handle.store().state.draft!.items[0].targetPriceSar).toBe(7500);
+    await handle.run(() => { fireEvent.change(input, { target: { value: "" } }); });
+    expect(handle.store().state.draft!.items[0].targetPriceSar).toBeNull();
   });
 });

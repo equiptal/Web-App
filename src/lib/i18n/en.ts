@@ -2680,6 +2680,11 @@ export const en = {
       notes: "NOTES",
       notesOptional: "(optional)",
       notesPlaceholder: "Anything else the supplier should know…",
+      // Per machine, beside the notes (owner, 2026-09-27). The UI name for `budgetCeiling`.
+      targetPrice: "YOUR TARGET PRICE",
+      targetPriceUnit: "SAR",
+      targetPricePer: { daily: "Per unit, per day", weekly: "Per unit, per week", monthly: "Per unit, per month" },
+      targetPricePerUnit: "Per unit",
       unavailableTitle: "{equipment} isn't available from suppliers right now.",
       /* ── Off-catalogue (CUSTOM_EQUIPMENT_ENABLED) ───────────────────────────────────────────
          ~~«This equipment type is not available, but you can still post and share the link with your

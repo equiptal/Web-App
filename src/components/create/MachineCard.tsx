@@ -166,6 +166,8 @@ export function MachineCard({
   }, [pulseName]);
   const photoBroken = brokenPhoto !== null && brokenPhoto === photo;
   const overrides = useItemOverrides(item, state.draft!.project);
+  /** The billing basis the target price is quoted against (per unit, per this period). */
+  const basis = state.draft!.project.timing.rentalBasis;
   const attachments = useItemAttachments(item);
   const prov = useProvenance(item.id);
   const years = equipmentYears();
@@ -905,15 +907,41 @@ export function MachineCard({
               </CanvasField>
             )}
 
-            <CanvasField label={t.create.machineCard.notes} optional>
-              <TextArea
-                value={item.additionalNotes}
-                rows={3}
-                className="h-24"
-                placeholder={t.create.machineCard.notesPlaceholder}
-                onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })}
-              />
-            </CanvasField>
+            {/* Notes and «Your target price», side by side (owner, 2026-09-27: *"make it in ui beside
+                the notes per item"*). The price is THIS machine's, per unit per billing period, which
+                is how an offer is quoted, so the two compare directly. Optional; digits only. */}
+            <div className="grid gap-2.5 sm:grid-cols-[minmax(0,1fr)_220px]">
+              <CanvasField label={t.create.machineCard.notes} optional>
+                <TextArea
+                  value={item.additionalNotes}
+                  rows={3}
+                  className="h-24"
+                  placeholder={t.create.machineCard.notesPlaceholder}
+                  onChange={(e) => actions.patchItem(item.id, { additionalNotes: e.target.value })}
+                />
+              </CanvasField>
+              <CanvasField
+                label={t.create.machineCard.targetPrice}
+                optional
+                hint={
+                  basis ? t.create.machineCard.targetPricePer[basis] : t.create.machineCard.targetPricePerUnit
+                }
+              >
+                <label className="flex items-center gap-2 rounded-sm border border-border bg-surface px-3 py-2">
+                  <input
+                    inputMode="numeric"
+                    value={item.targetPriceSar == null ? "" : String(item.targetPriceSar)}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/[^\d]/g, "");
+                      actions.patchItem(item.id, { targetPriceSar: digits ? Number(digits) : null });
+                    }}
+                    aria-label={t.create.machineCard.targetPrice}
+                    className="min-w-0 flex-1 bg-transparent text-body font-semibold text-navy outline-none"
+                  />
+                  <span className="flex-none text-meta font-semibold text-muted">{t.create.machineCard.targetPriceUnit}</span>
+                </label>
+              </CanvasField>
+            </div>
           </div>
         </div>
       </div>

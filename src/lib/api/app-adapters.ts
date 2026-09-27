@@ -250,8 +250,8 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     paymentMethod: preferences.payment.method ? PAYMENT_METHOD_MAP[preferences.payment.method] : undefined, // AC-36
     maintenanceResponsibility: MAINTENANCE_RESP_MAP[preferences.maintenance.responsibility], // AC-37 (default supplier)
     breakdownResponseSla: preferences.maintenance.sla ? SLA_MAP[preferences.maintenance.sla] : undefined, // AC-37
-    /* «Your target price» (`budgetCeiling`) is NOT sent while its field is hidden (owner, 2026-09-27:
-       *"remove it from ui for now like hide it"*). The agent still reads a budget out of the text
+    /* The REQUEST-WIDE «Your target price» (`budgetCeiling`) is NOT sent (owner, 2026-09-27): its
+       field is hidden, replaced by the per-machine one sent on each item below. The agent still reads a budget out of the text
        (`agent-adapters`: `budget_ceiling` → `budgetSar`), and posting a number no screen showed the
        renter would put a figure on his request he never saw. Restore with the field:
     budgetCeiling: preferences.budgetSar && preferences.budgetSar > 0 ? preferences.budgetSar : undefined, // AC-39 */
@@ -311,6 +311,9 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
           const note = other && !CERT_TOKEN_MAP[normalizeSafetyCert(other)] ? `Additional certificate required: ${other}` : "";
           return [i.additionalNotes?.trim(), note].filter(Boolean).join("\n") || undefined;
         })(),
+        // «Your target price», PER MACHINE (2026-09-27). Omitted unless a positive figure: the
+        // backend reads 0 as absent anyway, and an absent key keeps older backends unaffected.
+        budgetCeiling: i.targetPriceSar && i.targetPriceSar > 0 ? i.targetPriceSar : undefined,
         // Part 1: free-text work type, crane subtypes only (≤255). Trimmed; omitted when blank.
         workType: i.workType?.trim() ? i.workType.trim().slice(0, 255) : undefined,
         maxEquipmentAge: toManufactureYear(i.equipmentYear ?? project.advanced.equipmentYear), // AC-28 per-item year, falls back to request-wide (undefined ⇒ key dropped)

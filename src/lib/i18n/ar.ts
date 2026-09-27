@@ -2100,6 +2100,10 @@ export const ar: Dictionary = {
       notes: "ملاحظات",
       notesOptional: "(اختياري)",
       notesPlaceholder: "أي شيء آخر ينبغي أن يعرفه المورّد…",
+      targetPrice: "سعرك المستهدف",
+      targetPriceUnit: "ريال",
+      targetPricePer: { daily: "للوحدة، لليوم", weekly: "للوحدة، للأسبوع", monthly: "للوحدة، للشهر" },
+      targetPricePerUnit: "للوحدة",
       unavailableTitle: "{equipment} غير متوفرة لدى المورّدين حالياً.",
       // خارج الكتالوج: النتيجة أولاً — لا مورّد لدينا مطابق لمعدّة يسمّيها المستأجر بنفسه، فلا نرسلها
       // إلى أحد، ثم الطريق الذي يبقى له. لا ادّعاء عن الكتالوج: قد يكون النوع موجوداً وقد رفضه هو.

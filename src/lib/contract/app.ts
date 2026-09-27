@@ -71,6 +71,9 @@ export interface CreateRequestItem {
   demobilizationByRentee: boolean;
   /** AC-53 per-item free-text qualifier. Requires the `additional_notes` item column (rule 6 migration). */
   additionalNotes?: string;
+  /** This machine's «Your target price» (SAR, > 0). Backend stores it on the item's own fan-out
+   *  request row, preferring it over the request-wide `budgetCeiling` (2026-09-27). */
+  budgetCeiling?: number;
   /** Part 1: optional free-text work type (crane subtypes only). Backend `work_type` VARCHAR(255). */
   workType?: string;
   // Project-level fields fanned out onto every item (ALIGNMENT rule 4):

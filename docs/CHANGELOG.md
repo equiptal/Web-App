@@ -7,6 +7,18 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-27 - «Your target price» is PER MACHINE, beside the notes, sent as each item's `budgetCeiling`.**
+  Owner: *"make it in ui beside the notes per item"*; a target price is per machine in business
+  terms. New optional `EquipmentItem.targetPriceSar`, a field in `MachineCard` next to the notes, hint
+  «Per unit, per <billing basis>» (how an offer is quoted, so the two compare directly), digits
+  only. `draftToCreateRequest` sends it per item and only when > 0; the request-wide field stays
+  hidden and unsent (entry below). Not copied to a second machine (`machineTermsOf` does not carry
+  it). ⚠️ DEPLOY ORDER: the backend must ship first. Before Moedatech-App 2026-09-27 the agents
+  `itemSchema` had no such key and zod stripped it SILENTLY: the request posts, the price is lost.
+  Files: `src/lib/contract/{draft,app}.ts`, `src/lib/api/app-adapters.ts`,
+  `src/components/create/{MachineCard,WhenPanel}.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/{machine-card.test.tsx,app-adapters.test.ts}`.
+
 - **2026-09-27 - CRITICAL: a project's «no operator» was lost two more ways, and the request posted an operator.**
   Owner: *"the project says no for operator but the request open it and send it with operator"*.
   Both reproduced in a reducer test first. (1) Tier 1 never ran the full path's guess check

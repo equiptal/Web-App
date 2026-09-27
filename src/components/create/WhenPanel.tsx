@@ -298,8 +298,8 @@ export function WhenPanel({
                 Optional: no star, no gap. A second press on the chosen term clears it (no ×).
 
                 ~~«Your target price» beside it.~~ HIDDEN (owner, same day: *"remove it from ui for now
-                like hide it"*) until it can be per machine: the backend stores one figure per request
-                row and copies it to every machine. The input is kept below for the switch back.
+                like hide it"*), then REPLACED the same day by a per-machine field beside the notes
+                (`MachineCard`, `item.targetPriceSar`). This request-wide input stays off.
 
                 <CanvasField label={t.create.whenPanel.targetPrice}>
                   <input inputMode="numeric" value={prefs?.budgetSar == null ? "" : String(prefs.budgetSar)}
