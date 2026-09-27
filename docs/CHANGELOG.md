@@ -7,19 +7,37 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
-- **2026-09-27 - Payment terms and «Your target price» sit in the schedule panel; «budget ceiling» is renamed everywhere a renter reads it.**
-  Owner: *"payment terms - budget ceiling terms to appear in the when block before the more details
-  and call the budget ceiling in ui as your target price"*. Renters could not find payment: it lived
-  only on «Ready to send». New row in `WhenPanel` between the dates/billing boxes and «More
-  details», writing the SAME `preferences.payment.terms` / `budgetSar` the review screen edits
-  (kept there as the read-back). Both optional; a second press on the chosen term clears it, since
-  `ChoiceRow` has no ×. The payment term carries the «from your project» mark
-  (`preferences.payment_terms`). Label only: the wire field is still `budgetCeiling`.
-  Checked first that the name does not mislead: the backend stores and displays the ceiling and
-  filters nothing by it (the «a stale one filters out every real bid» note in `client.ts` is
-  unverified). Files: `src/components/create/WhenPanel.tsx`, `src/lib/i18n/{en,ar}.ts`,
-  `src/lib/contract/{request-fields,submit-error}.ts`, `src/components/requests/RequestEditModals.tsx`,
-  `tests/unit/{when-panel.test.tsx,ready-to-send.test.tsx,request-fields.test.ts}`.
+- **2026-09-27 - CRITICAL: a project's «no operator» was lost two more ways, and the request posted an operator.**
+  Owner: *"the project says no for operator but the request open it and send it with operator"*.
+  Both reproduced in a reducer test first. (1) Tier 1 never ran the full path's guess check
+  (`agentOutputToDraft`, 2026-08-26): a guessed `operator_included: true`, marked in `field_notes` or
+  `missing_required_fields`, arrived as «yes», `applyMachineTerms` read it as the renter's words
+  (`agentSet`) and skipped the project. Now a marked guess is NOT STATED, so the project lands.
+  (2) `SET_ITEM_SUBCATEGORY` reset `operatorNeeded` to `defaultOperatorNeeded(subtype)` («yes» for
+  almost everything), so changing the machine type put an operator back over the project's «no».
+  Now `templateTerms.operatorNeeded` first, the default only without one (AC-24 unchanged there).
+  Files: `src/lib/agent/quick-draft.ts`, `src/lib/store/rfq-store.tsx`,
+  `tests/unit/operator-from-project.test.ts`. ⚠️ Still «yes» by design: an operator the agent read
+  with NO guess mark, since the text outranks the project. If the report was that case, the agent
+  is guessing unmarked and needs the live payload to prove it.
+
+- **2026-09-27 - Payment terms sit in the schedule panel, in the dates/billing row; «Your target price» (the renamed budget ceiling) is hidden and not sent.**
+  Owner, in three steps the same day: payment and budget into the When panel, budget renamed
+  *"your target price"*; then *"remove it from ui for now like hide it just make the payment term in
+  the same row of the date-billing"*. Renters could not find payment: it lived only on «Ready to
+  send», which keeps it as the read-back of the SAME `preferences.payment.terms`. It is now the third
+  box of the dates/billing grid (`lg:grid-cols-3`), optional, a second press clears it (`ChoiceRow`
+  has no ×), and carries the «from your project» mark (`preferences.payment_terms`).
+  «Your target price» is hidden on all four surfaces (When panel, review details, edit-request
+  modal, request details list), each left commented for the switch back, AND `draftToCreateRequest`
+  stops sending `budgetCeiling`: the agent still reads `budget_ceiling` out of the text into
+  `budgetSar`, and a hidden field must not post a number the renter never saw. The edit modal still
+  round-trips a stored value unchanged. Why hidden: it cannot yet be PER MACHINE. The backend stores
+  one `EquipmentRequest.budgetCeiling` and copies it onto every fan-out request, though each fan-out
+  row is already single-item, so per-machine needs a backend code change, not a migration.
+  Files: `src/components/create/{WhenPanel,ReadyToSend}.tsx`, `src/components/requests/RequestEditModals.tsx`,
+  `src/lib/contract/{request-fields,submit-error}.ts`, `src/lib/api/app-adapters.ts`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/{when-panel.test.tsx,ready-to-send.test.tsx,request-fields.test.ts,app-adapters.test.ts}`.
 
 - **2026-09-26 - Inbox drops the request code; «My Company» is no longer read as a firm's name.**
   Owner: *"in inbox remove the request id … why the chats show the user name while the chat header

@@ -790,7 +790,12 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // AC-21: changing subcategory clears & re-prompts measurement; reset operator default (AC-24).
       return withDraft(state, (d) =>
         mapItem(d, a.id, (i) => {
-          const operatorNeeded = defaultOperatorNeeded(a.subcategoryId);
+          /* The PROJECT's operator answer outranks the app's per-subtype default (owner, 2026-09-27:
+             *"the project says no for operator but the request open it and send it with operator"*).
+             ~~`defaultOperatorNeeded(subtype)` alone~~ put «yes» back on every machine whose type
+             the renter changed, over a project that had said «no». The default stays for a request
+             with no project answer, which is what AC-24 describes. */
+          const operatorNeeded = state.templateTerms?.operatorNeeded ?? defaultOperatorNeeded(a.subcategoryId);
           const next = {
             ...i,
             ref: { ...i.ref, subcategoryId: a.subcategoryId, measurementId: null },

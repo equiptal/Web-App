@@ -281,10 +281,11 @@ describe("draftToCreateRequest — §4.2 fields", () => {
     expect(draftToCreateRequest(makeDraft({ project }), "46").equipmentItems[0].safetyCertifications).toEqual(["saso_technical_inspection"]);
   });
 
-  it("budgetCeiling only when > 0", () => {
+  it("never sends budgetCeiling while «Your target price» is hidden (owner, 2026-09-27)", () => {
+    // The agent can still read a budget out of the text; a number no screen showed must not post.
     const prefs = defaultPreferences();
     prefs.budgetSar = 5000;
-    expect(draftToCreateRequest(makeDraft({ preferences: prefs }), "46").budgetCeiling).toBe(5000);
+    expect(draftToCreateRequest(makeDraft({ preferences: prefs }), "46").budgetCeiling).toBeUndefined();
     expect(draftToCreateRequest(makeDraft(), "46").budgetCeiling).toBeUndefined();
   });
 

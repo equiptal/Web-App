@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { ReadyToSend } from "@/components/create/ReadyToSend";
 import { BID_WINDOWS, MAINTENANCE_SLAS, PAYMENT_TERMS } from "@/lib/contract";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
@@ -93,12 +93,13 @@ describe("what suppliers will see (MREQ-AC-42)", () => {
 });
 
 describe("Preferences are the only editable region (MREQ-AC-43)", () => {
-  it("offers payment terms, maintenance, budget, bid window, filters and notes", async () => {
+  it("offers payment terms, maintenance, bid window, filters and notes", async () => {
     const handle = await review();
     await openDetails(handle);
     expect(screen.getByText(/PAYMENT DETAILS/)).toBeTruthy();
     expect(screen.getByText("MAINTENANCE")).toBeTruthy();
-    expect(screen.getByText(/YOUR TARGET PRICE/)).toBeTruthy();
+    // «Your target price» is hidden for now (owner, 2026-09-27).
+    expect(screen.queryByText(/YOUR TARGET PRICE/)).toBeNull();
     expect(screen.getByText(/OFFER \/ BID WINDOW/)).toBeTruthy();
     expect(screen.getByText("SUPPLIER FILTERS")).toBeTruthy();
     expect(screen.getByText(/ADDITIONAL NOTES/)).toBeTruthy();
@@ -145,18 +146,6 @@ describe("Preferences are the only editable region (MREQ-AC-43)", () => {
     await openDetails(handle);
     const field = screen.getByText(/OFFER \/ BID WINDOW/).closest("div")!.parentElement!;
     expect(within(field).getAllByRole("button").length).toBe(BID_WINDOWS.length);
-  });
-
-  it("takes digits only for the budget", async () => {
-    const handle = await review();
-    await openDetails(handle);
-    const field = screen.getByText(/YOUR TARGET PRICE/).closest("div")!.parentElement!;
-    const input = within(field).getByRole("textbox") as HTMLInputElement;
-    // fireEvent.change goes through React's value setter; assigning .value directly does not.
-    await handle.run(() => {
-      fireEvent.change(input, { target: { value: "45,000 SAR" } });
-    });
-    expect(handle.store().state.draft!.preferences.budgetSar).toBe(45000);
   });
 
   it("toggles the two supplier filters independently", async () => {

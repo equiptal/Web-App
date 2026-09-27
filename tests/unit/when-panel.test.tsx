@@ -214,18 +214,22 @@ describe("hours (MREQ-AC-37)", () => {
 });
 
 /**
- * Owner, 2026-09-27: *"i want payment terms - budget ceiling terms to appear in the when block before
- * the more details and call the budget ceiling in ui as your target price"*.
+ * Owner, 2026-09-27: payment terms in the schedule panel, *"in the same row of the date-billing"*,
+ * and «Your target price» hidden *"for now"* until it can be set per machine.
  */
-describe("payment terms and the target price", () => {
-  it("sit in the panel, before «More details», named as the owner asked", async () => {
+describe("payment terms, in the dates and billing row", () => {
+  it("is a box in the same grid as the dates and the billing basis", async () => {
     await panel();
     const payment = screen.getByText("PAYMENT TERMS");
-    const target = screen.getByText("YOUR TARGET PRICE");
-    const more = screen.getByText(/MORE DETAILS/i);
-    // DOCUMENT_POSITION_FOLLOWING: «More details» comes after both.
-    expect(payment.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(target.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const billing = screen.getByText("HOW YOU'RE BILLED");
+    const row = (el: Element) => el.closest(".grid.gap-4");
+    expect(row(payment)).not.toBeNull();
+    expect(row(payment)).toBe(row(billing));
+  });
+
+  it("does not show the target price while it is hidden", async () => {
+    await panel();
+    expect(screen.queryByText("YOUR TARGET PRICE")).toBeNull();
     expect(screen.queryByText(/BUDGET CEILING/i)).toBeNull();
   });
 
@@ -235,15 +239,5 @@ describe("payment terms and the target price", () => {
     expect(handle.store().state.draft!.preferences.payment.terms).toBe("net-30");
     await handle.run(() => screen.getByText("Net 30").click());
     expect(handle.store().state.draft!.preferences.payment.terms).toBeNull();
-  });
-
-  it("writes the target price to the budget ceiling, digits only", async () => {
-    const { fireEvent } = await import("@testing-library/react");
-    const handle = await panel();
-    const input = screen.getByLabelText("YOUR TARGET PRICE") as HTMLInputElement;
-    await handle.run(() => { fireEvent.change(input, { target: { value: "12,500 SAR" } }); });
-    expect(handle.store().state.draft!.preferences.budgetSar).toBe(12500);
-    await handle.run(() => { fireEvent.change(input, { target: { value: "" } }); });
-    expect(handle.store().state.draft!.preferences.budgetSar).toBeNull();
   });
 });

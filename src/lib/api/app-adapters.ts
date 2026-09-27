@@ -250,7 +250,11 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
     paymentMethod: preferences.payment.method ? PAYMENT_METHOD_MAP[preferences.payment.method] : undefined, // AC-36
     maintenanceResponsibility: MAINTENANCE_RESP_MAP[preferences.maintenance.responsibility], // AC-37 (default supplier)
     breakdownResponseSla: preferences.maintenance.sla ? SLA_MAP[preferences.maintenance.sla] : undefined, // AC-37
-    budgetCeiling: preferences.budgetSar && preferences.budgetSar > 0 ? preferences.budgetSar : undefined, // AC-39
+    /* «Your target price» (`budgetCeiling`) is NOT sent while its field is hidden (owner, 2026-09-27:
+       *"remove it from ui for now like hide it"*). The agent still reads a budget out of the text
+       (`agent-adapters`: `budget_ceiling` → `budgetSar`), and posting a number no screen showed the
+       renter would put a figure on his request he never saw. Restore with the field:
+    budgetCeiling: preferences.budgetSar && preferences.budgetSar > 0 ? preferences.budgetSar : undefined, // AC-39 */
     verifiedSuppliersOnly: preferences.supplierFilters.verifiedOnly, // AC-40
     subletting: preferences.supplierFilters.sublettingAllowed, // AC-40
     offerDuration: preferences.supplierFilters.bidWindow ? OFFER_DURATION_MAP[preferences.supplierFilters.bidWindow] : undefined, // AC-40 bid window

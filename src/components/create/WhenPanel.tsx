@@ -110,7 +110,7 @@ export function WhenPanel({
       {open && (
         <div {...pin("when-panel-body")} className="flex flex-col gap-4 px-5 pb-5">
           {prefilledNote && <CheckFromProject />}
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {/* ---- Dates. Optional here; the nudge explains what it costs to leave them out. ---- */}
             <div className="rounded-sm bg-surface2 p-5">
               {/* Dates are OPTIONAL (MREQ-AC-10) — the mark appears only for the one date state
@@ -292,21 +292,25 @@ export function WhenPanel({
               </div>
               )}
             </div>
-          </div>
+            {/* ---- Payment terms, the third box of this row (owner, 2026-09-27: *"make the payment
+                term in the same row of the date-billing"*). Renters could not find payment: it lived
+                only on «Ready to send», which keeps it as the read-back of this same `preferences` value.
+                Optional: no star, no gap. A second press on the chosen term clears it (no ×).
 
-          {/* ---- Payment terms and the target price (owner, 2026-09-27) ────────────────────────
-              *"i want payment terms - budget ceiling terms to appear in the when block before the
-              more details and call the budget ceiling in ui as your target price"*. Renters could
-              not find payment: it lived only on «Ready to send», the last screen. Both stay there
-              too, as the read-back; this is the same `preferences` value, not a copy.
+                ~~«Your target price» beside it.~~ HIDDEN (owner, same day: *"remove it from ui for now
+                like hide it"*) until it can be per machine: the backend stores one figure per request
+                row and copies it to every machine. The input is kept below for the switch back.
 
-              Both OPTIONAL, as on the review screen: no star, no gap, nothing here gates a move.
-              Pressing the chosen term again clears it, since a ChoiceRow has no ×. */}
-          <div className="grid gap-4 md:grid-cols-2">
+                <CanvasField label={t.create.whenPanel.targetPrice}>
+                  <input inputMode="numeric" value={prefs?.budgetSar == null ? "" : String(prefs.budgetSar)}
+                    onChange={(e) => { const digits = e.target.value.replace(/[^\d]/g, "");
+                      actions.patchPreferences({ budgetSar: digits ? Number(digits) : null }); }} />
+                  {t.create.whenPanel.targetPriceUnit}
+                </CanvasField> */}
             <div className="rounded-sm bg-surface2 p-5">
               <CanvasField label={t.create.whenPanel.paymentTerms} source={paymentSource}>
                 <ChoiceRow<PaymentTerm>
-                  columns={PAYMENT_TERMS.length}
+                  columns={3}
                   value={prefs?.payment.terms ?? null}
                   onChange={(v) => {
                     prov.touchRaw("preferences.payment_terms");
@@ -314,23 +318,6 @@ export function WhenPanel({
                   }}
                   options={PAYMENT_TERMS.map((p) => ({ value: p, label: t.options.paymentTerm[p] }))}
                 />
-              </CanvasField>
-            </div>
-            <div className="rounded-sm bg-surface2 p-5">
-              <CanvasField label={t.create.whenPanel.targetPrice}>
-                <label className="flex items-center gap-2 rounded-sm border border-border bg-surface px-3.5 py-2.5">
-                  <input
-                    inputMode="numeric"
-                    value={prefs?.budgetSar == null ? "" : String(prefs.budgetSar)}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/[^\d]/g, "");
-                      actions.patchPreferences({ budgetSar: digits ? Number(digits) : null });
-                    }}
-                    aria-label={t.create.whenPanel.targetPrice}
-                    className="min-w-0 flex-1 bg-transparent text-subhead font-extrabold text-navy outline-none"
-                  />
-                  <span className="flex-none text-meta font-semibold text-muted">{t.create.whenPanel.targetPriceUnit}</span>
-                </label>
               </CanvasField>
             </div>
           </div>

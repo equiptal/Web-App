@@ -17,7 +17,7 @@ import { Dialog } from "@/components/Dialog";
 import { useRouter } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
-import { Icon, Pchips, Seg2, SelChips, TextArea, TextInput } from "@/components/ui";
+import { Icon, Pchips, Seg2, SelChips, TextArea } from "@/components/ui"; // + TextInput when the target price returns
 import { buildSpecRows, downloadCsv, toCsv, type SpecRow } from "@/lib/export/spec-sheet";
 import {
   BID_WINDOWS,
@@ -362,6 +362,8 @@ export function ReadyToSend() {
               />
             </Tile>
           )}
+          {/* «Your target price» — HIDDEN (owner, 2026-09-27: *"remove it from ui for now like hide
+              it"*) until it can be set per machine. Kept for the switch back:
           <Tile label={`${t.create.ready.budget} ${t.create.ready.optional}`}>
             <TextInput
               inputMode="numeric"
@@ -371,7 +373,7 @@ export function ReadyToSend() {
                 actions.patchPreferences({ budgetSar: digits ? Number(digits) : null });
               }}
             />
-          </Tile>
+          </Tile> */}
           <Tile label={`${t.create.ready.bidWindow} ${t.create.ready.optional}`}>
             <Pchips<BidWindow>
               value={prefs.supplierFilters.bidWindow}

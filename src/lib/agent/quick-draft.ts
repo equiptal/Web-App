@@ -154,6 +154,33 @@ export function quickItemsToDraft(
   tree: Taxonomy | null | undefined,
   text = "",
 ): AgentDraft {
+  /**
+   * ── An operator the agent GUESSED is not stated (owner, 2026-09-27: *"the project says no for
+   *    operator but the request open it and send it with operator !! it is critical"*) ────────────
+   *
+   * The full path has refused a guessed operator since 2026-08-26 (`agentOutputToDraft`: a
+   * `field_notes` entry or a `missing_required_fields` entry on the line's operator means the RFQ
+   * was silent). This lane never ran that check, so a guessed `operator_included: true` arrived as
+   * «yes», `applyMachineTerms` read it as the renter's own words, and the project's «no» was
+   * skipped: the rail opened and the request posted a priced operator nobody asked for.
+   *
+   * Same marks, same exception (an operator the line evidenced another way, by nationality, head
+   * count or night shift, is not a guess). A guess becomes NOT STATED rather than «no», so the
+   * project's answer lands above it and PROCESS_SUCCESS folds whatever is left to «no».
+   */
+  const noteFields = new Set(
+    [...(quick.field_notes ?? []), ...(quick.missing_required_fields ?? [])]
+      .map((m) => (m && typeof m === "object" ? (m as Record<string, unknown>).field : null))
+      .filter((f): f is string => typeof f === "string"),
+  );
+  const guessedOperator = (idx: number, r: Record<string, unknown>): boolean =>
+    [`line_items[${idx}].operator_included`, `line_items[${idx}].operator`, `line_items[${idx}].fat_required`].some((f) =>
+      noteFields.has(f),
+    ) &&
+    r.operator_nationality == null &&
+    r.number_of_operators == null &&
+    r.night_shift_required == null;
+
   const items = (quick.line_items ?? []).map((raw, i) => {
     const r = raw as Record<string, unknown>;
     const subtype = (r.subtype as string) ?? null;
@@ -225,7 +252,7 @@ export function quickItemsToDraft(
 
          The rest of the payload stays dropped on purpose: the five `*_match` verdicts, `verdict`,
          the three Arabic names and the duplicate `category`. The app reads none of them. */
-      operatorNeeded: operatorOf(r.operator_included),
+      operatorNeeded: guessedOperator(i, r) ? null : operatorOf(r.operator_included),
       /* `by_rentee` is a boolean about WHO, and this app stores the party. `true` is the renter, so
          "delivery on the supplier" arrives as false and becomes "supplier" — the same fold
          `machineTermsOfRequestItem` does on the full path, not a second opinion about it. */
