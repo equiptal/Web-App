@@ -58,10 +58,13 @@ describe("the wiring (read from the source: jsdom cannot lay the row out)", () =
     expect(workspace).toContain("budget={itemBudget}");
   });
 
-  it("draws «Your budget» as its own navy card beside the request, only when there is one", () => {
+  it("draws «Your budget» as the SAME card's light grey side section, only when there is one", () => {
     expect(bar).toContain("{budget && (");
     expect(bar).toContain('pin("request-budget")');
     expect(bar).toContain("yourBudgetLabel(budget.rentalType, L)");
+    // One card: the navy part keeps the leading corners, the grey part the trailing ones.
+    expect(bar).toContain('budget ? "rounded-s-md" : "rounded-md"');
+    expect(bar).toContain("rounded-e-md border border-s-0 border-navy bg-surface2");
   });
 
   it("puts the arrow on each bid from the LIVE rate", () => {

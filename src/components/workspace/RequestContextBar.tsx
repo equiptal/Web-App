@@ -116,7 +116,9 @@ export function RequestContextBar({
         disabled={!onOpenRequest}
         title={group.address ?? group.locationLabel}
         className={cx(
-          "group control-lg flex min-w-0 max-w-[30rem] items-center gap-2 rounded-md border border-navy bg-navy !px-3 text-start transition-colors",
+          "group control-lg flex min-w-0 max-w-[30rem] items-center gap-2 border border-navy bg-navy !px-3 text-start transition-colors",
+          // With a budget the card continues into the grey section, so only the LEADING corners round.
+          budget ? "rounded-s-md" : "rounded-md",
           onOpenRequest ? "hover:bg-navy-mid" : "cursor-default",
         )}
       >
@@ -215,21 +217,22 @@ export function RequestContextBar({
         )}
       </button>
 
-      {/* ── «Your budget», its own navy card beside the request (owner, 2026-09-28: *"show your
-          budget in the navy card of the request card maybe another stuck card"*) ───────────────
-          A SEPARATE card rather than a third line inside the bar: the bar is one 44px control that
-          opens the request, and a figure the renter compares every offer against should not live
-          inside a button. Same height, same navy, butted against it so the two read as one subject.
-          The period is named («per month»), because an offer is compared against it per unit per
-          period. Drawn only when this machine has a budget. */}
+      {/* ── «Your budget», the SAME card's light side section (owner, 2026-09-28: *"make it in the
+          same card as the navy blue like just side section in light grey"*) ─────────────────────
+          ~~Its own navy card beside the bar.~~ Now the bar's trailing section: the navy button keeps
+          its leading corners, this grey part takes the trailing ones, and one navy outline runs
+          round both, so they read as one card. It stays OUT of the button: the button opens the
+          request, and a figure every offer is compared against should not be a press target.
+          The period is named («per month») because an offer is compared per unit per period.
+          Drawn only when this machine has a budget. */}
       {budget && (
         <div
           {...pin("request-budget")}
-          className="control-lg ms-1.5 flex flex-none flex-col justify-center gap-1 rounded-md border border-navy bg-navy !px-3"
+          className="control-lg flex flex-none flex-col justify-center gap-1 rounded-e-md border border-s-0 border-navy bg-surface2 !px-3"
         >
-          <span className="text-label font-semibold leading-[13px] text-white/60">{yourBudgetLabel(budget.rentalType, L)}</span>
-          <span className="tabular text-meta font-extrabold leading-[15px] text-white">
-            {formatSar(budget.amount)} <span className="font-semibold text-white/60">{L("SAR", "ر.س")}</span>
+          <span className="text-label font-semibold leading-[13px] text-muted">{yourBudgetLabel(budget.rentalType, L)}</span>
+          <span className="tabular text-meta font-extrabold leading-[15px] text-navy">
+            {formatSar(budget.amount)} <span className="font-semibold text-muted">{L("SAR", "ر.س")}</span>
           </span>
         </div>
       )}

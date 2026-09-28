@@ -9,8 +9,9 @@ reversal, or the reason an odd-looking line is load-bearing.
 
 - **2026-09-28 - The offers page shows «Your budget» beside the request, and every bid says above or below it.**
   Owner: *"show «your budget» in the navy card of the request card, maybe another stuck card, and on
-  each bid show arrow above or below the budget"*. A second navy card butted against
-  `RequestContextBar` («Your budget (per month) · 7,500 SAR»), drawn only when the machine has one;
+  each bid show arrow above or below the budget"*. «Your budget (per month) · 7,500 SAR» is the
+  light grey (`surface2`) trailing section of the SAME card as the navy `RequestContextBar` (first a
+  second navy card; merged the same day at the owner's word), drawn only when the machine has one;
   each bid card gets a red ↑ «Above your budget», green ↓ «Below» or plain «On» under its rate.
   `budgetVerdict` compares the LIVE rate per unit with the budget per unit ONLY when the periods
   match (PER_MONTH ↔ MONTHLY …): a daily offer on a monthly budget draws nothing rather than a
