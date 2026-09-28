@@ -64,7 +64,7 @@ describe("the wiring (read from the source: jsdom cannot lay the row out)", () =
     expect(bar).toContain("yourBudgetLabel(budget.rentalType, L)");
     // One card: the navy part keeps the leading corners, the grey part the trailing ones.
     expect(bar).toContain('budget ? "rounded-s-md" : "rounded-md"');
-    expect(bar).toContain("rounded-e-md border border-s-0 border-navy bg-surface2");
+    expect(bar).toContain("rounded-e-md border border-s-0 border-border bg-surface2"); // grey outline, not navy
   });
 
   it("puts the arrow on each bid from the LIVE rate", () => {

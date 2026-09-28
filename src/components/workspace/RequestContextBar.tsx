@@ -220,15 +220,16 @@ export function RequestContextBar({
       {/* ── «Your budget», the SAME card's light side section (owner, 2026-09-28: *"make it in the
           same card as the navy blue like just side section in light grey"*) ─────────────────────
           ~~Its own navy card beside the bar.~~ Now the bar's trailing section: the navy button keeps
-          its leading corners, this grey part takes the trailing ones, and one navy outline runs
-          round both, so they read as one card. It stays OUT of the button: the button opens the
+          its leading corners, this grey part takes the trailing ones, joined with no gap, so they
+          read as one card. The grey part's outline is the house grey (`border-border`), not navy
+          (owner, same day: *"just make it grey borders not navy blue"*). It stays OUT of the button: the button opens the
           request, and a figure every offer is compared against should not be a press target.
           The period is named («per month») because an offer is compared per unit per period.
           Drawn only when this machine has a budget. */}
       {budget && (
         <div
           {...pin("request-budget")}
-          className="control-lg flex flex-none flex-col justify-center gap-1 rounded-e-md border border-s-0 border-navy bg-surface2 !px-3"
+          className="control-lg flex flex-none flex-col justify-center gap-1 rounded-e-md border border-s-0 border-border bg-surface2 !px-3"
         >
           <span className="text-label font-semibold leading-[13px] text-muted">{yourBudgetLabel(budget.rentalType, L)}</span>
           <span className="tabular text-meta font-extrabold leading-[15px] text-navy">

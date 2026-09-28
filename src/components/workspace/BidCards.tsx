@@ -126,10 +126,18 @@ export function BidCards({
     return (
       <div className="grid min-h-[220px] place-items-center px-4 py-12 text-center">
         <div>
-          <Icon name="inbox" size={30} className="text-muted" />
-          <p className="mt-2 text-body font-semibold text-muted">{t.workspace.noBidsYet}</p>
+          {/* ~~«No bids on this item yet» over the held count.~~ Only when nothing is held (owner,
+              2026-09-28: *"if there is larger bids dont say no bids on this item, we are already
+              showing option to view the larger"*): a bid IS there, one press away, so the line
+              contradicted the box under it. */}
+          {held === 0 && (
+            <>
+              <Icon name="inbox" size={30} className="text-muted" />
+              <p className="mt-2 text-body font-semibold text-muted">{t.workspace.noBidsYet}</p>
+            </>
+          )}
           {held > 0 && (
-            <div className="mt-3 inline-flex flex-wrap items-center justify-center gap-2 rounded-md border border-brand/40 bg-brand-soft px-3 py-2">
+            <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-md border border-brand/40 bg-brand-soft px-3 py-2">
               <span className="inline-flex items-center gap-1.5 text-meta font-semibold text-navy">
                 <Icon name="straighten" size={14} className="text-brand-deep" />
                 {fmt(held === 1 ? t.workspace.sizeLargerHeldOne : t.workspace.sizeLargerHeldMany, { n: String(held) })}
