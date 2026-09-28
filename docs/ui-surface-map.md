@@ -78,12 +78,12 @@ Two things it does not hold, on purpose:
 | `src/components/stores/StoreDetailSurface.tsx` | 62 Store detail (`store-detail`) · 66 Store equipment card (`store-equipment-card`) |
 | `src/components/suppliers/SuppliersPage.tsx` | 10.6 My Suppliers — the list (`suppliers-list`) |
 | `src/components/workspace/AiRankPanel.tsx` | 30.9 Compare — the assistant under the table (`ai-rank-panel`) |
-| `src/components/workspace/BidCards.tsx` | 29 Bid cards (`workspace-bid-cards`) · 29.1 Bid card — one tile (`bid-card`) · 29.2 Bid card — header (`bid-card-header`) · 29.3 Bid card — bottom row (`bid-card-footer`) |
+| `src/components/workspace/BidCards.tsx` | 29 Bid cards (`workspace-bid-cards`) · 29.1 Bid card — one tile (`bid-card`) · 29.2 Bid card — header (`bid-card-header`) · 29.3 Bid card — bottom row (`bid-card-footer`) · 29.4 Bid card: above / below your budget (`bid-budget-verdict`) |
 | `src/components/workspace/BidSizeFilter.tsx` | 28.5 Bid size filter — include larger equipment (`bid-size-filter`) |
 | `src/components/workspace/CircleArt.tsx` | 26.4 Circle — the request's machines on one ground (`circle-art`) |
 | `src/components/workspace/CompareMatrix.tsx` | 30 Compare matrix (`compare-matrix`) · 30.1 Matrix — horizontal scroller (`matrix-scroller`) · 30.2 Matrix — supplier column (`matrix-supplier-col`) |
 | `src/components/workspace/ItemTier.tsx` | 26.3 Item tier — one chip per machine (`item-tier`) |
-| `src/components/workspace/RequestContextBar.tsx` | 27 Request context bar (location + machines) (`request-context`) · 27.1 Context bar — the machines the request asked for (`context-machines`) |
+| `src/components/workspace/RequestContextBar.tsx` | 27 Request context bar (location + machines) (`request-context`) · 27.1 Context bar — the machines the request asked for (`context-machines`) · 27.2 Your budget card, beside the request context bar (`request-budget`) |
 | `src/components/workspace/RequestDetailsModal.tsx` | 28 Request details modal (`request-details`) |
 | `src/components/workspace/RequestRail.tsx` | 26 Requests rail (full-bleed band) (`request-rail`) · 26.1 Rail — create tile (`rail-create-tile`) · 26.2 Rail — request tiles (`rail-tiles`) · 26.5 Circle — the zoomed view behind a double press (`circle-zoom`) |
 | `src/components/workspace/RequestsWorkspace.tsx` | 25 Requests workspace (`requests-workspace`) |

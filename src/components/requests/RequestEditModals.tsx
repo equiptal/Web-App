@@ -11,6 +11,7 @@ import { SAFETY_CERTIFICATES, type SafetyCertificate } from "@/lib/contract/opti
 import { taxName, type Taxonomy } from "@/lib/contract/taxonomy";
 import { fetchTaxonomy, updateRequest } from "@/lib/api/client";
 import { type RequestRecord } from "@/lib/contract/requests";
+import { budgetLabel } from "@/lib/contract/request-fields";
 import "@/components/requests/requests-proto.css";
 import { CARD_FOOTER, btn } from "@/lib/ds";
 
@@ -644,8 +645,9 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
             {supplierMaintains && (
               <Sel label={L("Breakdown response", "زمن الاستجابة للأعطال")} value={sla} onChange={setSla} opts={SLA_OPTS} />
             )}
-            {/* THIS machine's target price: an edit is of one posted request, which is one machine. */}
-            <Num label={L("Budget (SAR)", "الميزانية (ر.س)")} value={budget} onChange={setBudget} min={0} />
+            {/* THIS machine's budget: an edit is of one posted request, which is one machine. Its period
+                follows the rental basis chosen above, live. */}
+            <Num label={`${budgetLabel(rentalType, L)} · ${L("SAR", "ر.س")}`} value={budget} onChange={setBudget} min={0} />
             <Sel label={L("Offer validity", "صلاحية العرض")} value={offer} onChange={setOffer} opts={OFFER_OPTS} />
           </div>
           <Chk label={L("Verified suppliers only", "المؤجّرون الموثّقون فقط")} value={verifiedOnly} onChange={setVerifiedOnly} />

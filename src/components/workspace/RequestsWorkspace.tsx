@@ -46,7 +46,7 @@ import { RequestDetailsModal, type ShareLinkMeta } from "@/components/workspace/
 import { ConfirmCancelModal } from "@/components/requests/RequestEditModals";
 import { computeCycleTotals } from "@/lib/contract/cycle-totals";
 import { buildCompareSheet, type SheetMoneyCol } from "@/lib/export/compare-sheet";
-import { formatSar } from "@/lib/pricing/rental";
+import { formatSar, type BidBudget } from "@/lib/pricing/rental";
 import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
@@ -133,6 +133,8 @@ export function RequestsWorkspace() {
    * fetches it for Edit; this asks for the code alone, once per item, and only when it is missing.
    */
   const [fetchedCode, setFetchedCode] = useState<string | null>(null);
+  /** The on-screen item's budget and the basis it is per, off its detail record (see the effect). */
+  const [itemBudget, setItemBudget] = useState<BidBudget | null>(null);
 
   // ── The renter's requests ──
   useEffect(() => {
@@ -232,16 +234,28 @@ export function RequestsWorkspace() {
     };
   }, [status, itemId, showLarger, bidTick]);
 
-  // The code the list row lacked. One call, keyed on the item, dropped the moment the item changes so
-  // a stale code can never sit over the wrong request.
+  // The code the list row lacked, AND the item's budget. One call, keyed on the item, dropped the
+  // moment the item changes so a stale code or budget can never sit over the wrong request.
+  //
+  // ⚠️ **Always fetched now, not only when the code is missing** (owner, 2026-09-28: *"show your
+  // budget in the navy card ... and on each bid show arrow above or below the budget"*). The list
+  // projection (`requestListSelect`) carries no `budgetCeiling`; the detail record does. Each posted
+  // request is ONE machine, so its `budgetCeiling` is that machine's own budget.
   useEffect(() => {
     setFetchedCode(null);
+    setItemBudget(null);
     if (status !== "authed" || !itemId) return;
     const row = (groups ?? []).flatMap((g) => g.items).find((i) => i.id === itemId);
-    if (!row || row.code) return; // the list already carried it
+    if (!row) return;
     let live = true;
     fetchRequestDetail(itemId)
-      .then((rec) => live && setFetchedCode(requestCodeOf(rec as unknown as Record<string, unknown>)))
+      .then((rec) => {
+        if (!live) return;
+        if (!row.code) setFetchedCode(requestCodeOf(rec as unknown as Record<string, unknown>));
+        // Prisma sends a Decimal as a STRING («7500.00»), so it is read with Number, not a typeof test.
+        const amount = Number(rec.budgetCeiling ?? NaN);
+        setItemBudget(amount > 0 ? { amount, rentalType: rec.rentalType ?? row.rentalType ?? null } : null);
+      })
       .catch(() => {});
     return () => {
       live = false;
@@ -939,6 +953,7 @@ export function RequestsWorkspace() {
             <RequestContextBar
               group={group}
               item={item}
+              budget={itemBudget}
               onOpenRequest={() => drawer.open("details")}
             />
           </div>
@@ -1106,6 +1121,8 @@ export function RequestsWorkspace() {
               // supplier declined to price.
               mobByRentee={item?.mobByRentee ?? null}
               demobByRentee={item?.demobByRentee ?? null}
+              // The item's budget, so each card can say whether it is above or below it.
+              budget={itemBudget}
               // So «no bids on this item» can say when that is only true of the size he asked for.
               largerHeld={largerHeld}
               showLarger={showLarger}

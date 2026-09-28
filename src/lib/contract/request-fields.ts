@@ -62,6 +62,32 @@ export function requestFieldFormatters(ar: boolean, L: Pick) {
  * in the modal — duration and extendable beside the dates they describe, the certificates as chips —
  * and a field printed twice makes a reader wonder which one is authoritative.
  */
+/**
+ * «Budget (per month)» and so on: the budget's period, from the request's rental basis (owner,
+ * 2026-09-28: *"budget (per month) or whatever the frequency so user has clear"*). Plain «Budget» for
+ * a basis with no single period (long term) or none at all.
+ */
+export function budgetLabel(rentalType: unknown, L: Pick): string {
+  switch (rentalType) {
+    case "DAILY": return L("Budget (per day)", "الميزانية (لليوم)");
+    case "WEEKLY": return L("Budget (per week)", "الميزانية (للأسبوع)");
+    case "MONTHLY": return L("Budget (per month)", "الميزانية (للشهر)");
+    case "PER_JOB": return L("Budget (per job)", "الميزانية (للمهمة)");
+    default: return L("Budget", "الميزانية");
+  }
+}
+
+/** «Your budget (per month)»: the renter's own figure named for him, on the offers page. */
+export function yourBudgetLabel(rentalType: unknown, L: Pick): string {
+  switch (rentalType) {
+    case "DAILY": return L("Your budget (per day)", "ميزانيتك (لليوم)");
+    case "WEEKLY": return L("Your budget (per week)", "ميزانيتك (للأسبوع)");
+    case "MONTHLY": return L("Your budget (per month)", "ميزانيتك (للشهر)");
+    case "PER_JOB": return L("Your budget (per job)", "ميزانيتك (للمهمة)");
+    default: return L("Your budget", "ميزانيتك");
+  }
+}
+
 export function requestDetailRows(r: RequestRecord, ar: boolean, L: Pick): Row[] {
   const { yn, enumL, n, qty } = requestFieldFormatters(ar, L);
 
@@ -121,7 +147,7 @@ export function requestDetailRows(r: RequestRecord, ar: boolean, L: Pick): Row[]
     [L("Maintenance", "الصيانة"), enumL(r.maintenanceResponsibility, maintMap)],
     // «Your target price»: THIS machine's, since every posted request is one machine (hidden for a
     // few hours on 2026-09-27 while it was request-wide; per machine since the same day).
-    [L("Budget", "الميزانية"), r.budgetCeiling ? `${n(r.budgetCeiling)} ${L("SAR", "ر.س")}` : null],
+    [budgetLabel(r.rentalType, L), r.budgetCeiling ? `${n(r.budgetCeiling)} ${L("SAR", "ر.س")}` : null],
     [L("Offer duration", "مدة العرض"), enumL(r.offerDuration, offerMap)],
     [L("Local content", "المحتوى المحلي"), yn(r.localContent)],
   ]);

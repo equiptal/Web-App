@@ -787,6 +787,8 @@ export const en = {
       return: "Return",
       certificate: "Safety cert",
       targetPrice: "Budget",
+      // The period the budget covers, from the billing basis (owner, 2026-09-28).
+      targetPricePer: { daily: "Budget (per day)", weekly: "Budget (per week)", monthly: "Budget (per month)" },
       notes: "Notes",
     },
   },
@@ -2683,6 +2685,9 @@ export const en = {
       notesPlaceholder: "Anything else the supplier should know…",
       // Per machine, in the attachments row (owner, 2026-09-27). Shown as «Budget»; `budgetCeiling`.
       targetPrice: "BUDGET",
+      // …naming its period from the billing basis (owner, 2026-09-28: *"budget (per month) or
+      // whatever the frequency so user has clear"*). Plain «BUDGET» until a basis is chosen.
+      targetPricePer: { daily: "BUDGET (PER DAY)", weekly: "BUDGET (PER WEEK)", monthly: "BUDGET (PER MONTH)" },
       targetPriceUnit: "SAR",
       unavailableTitle: "{equipment} isn't available from suppliers right now.",
       /* ── Off-catalogue (CUSTOM_EQUIPMENT_ENABLED) ───────────────────────────────────────────
@@ -2776,7 +2781,6 @@ export const en = {
       targetPrice: "BUDGET",
       targetPriceUnit: "SAR",
       extendable: "Extendable",
-      quoteRate: "Suppliers quote you a {basis} rate.",
       moreDetails: "MORE DETAILS",
       moreDetailsHint: "hours a day",
       hours: "HOURS A DAY",
@@ -2808,9 +2812,13 @@ export const en = {
       // One first sentence across all three, because the reason does not change — only the ask does.
       // A renter who has filled the start in should not be told again that his dates are missing; he
       // should be told which one is.
-      nudgeBoth: "Suppliers price lower when they know your duration. Add a start and end date to get better bids.",
-      nudgeEnd: "Suppliers price lower when they know your duration. Add an end date to get better bids.",
-      nudgeStart: "Suppliers price lower when they know your duration. Add a start date to get better bids.",
+      /* ONE LINE in the dates box (owner, 2026-09-28: *"reduce size so it is one line row"*). The box
+         is a third of the panel since payment joined the row, about 50 characters at this size, so
+         ~~«Suppliers price lower when they know your duration. Add … to get better bids.»~~ (85)
+         could not fit however small. Same ask, same reason, in the words that fit. */
+      nudgeBoth: "Add dates for lower bids",
+      nudgeEnd: "Add an end date for lower bids",
+      nudgeStart: "Add a start date for lower bids",
     },
     /* ~~`carry` — the carry-forward modal's four strings («Equipment #{n}», what is locked, what is
        copied, and its two buttons).~~ Deleted with the modal (owner, 2026-09-09). What they said is

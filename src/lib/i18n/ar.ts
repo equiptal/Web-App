@@ -645,6 +645,7 @@ export const ar: Dictionary = {
       return: "الإرجاع",
       certificate: "شهادة السلامة",
       targetPrice: "الميزانية",
+      targetPricePer: { daily: "الميزانية (لليوم)", weekly: "الميزانية (للأسبوع)", monthly: "الميزانية (للشهر)" },
       notes: "ملاحظات",
     },
   },
@@ -2102,6 +2103,7 @@ export const ar: Dictionary = {
       notesOptional: "(اختياري)",
       notesPlaceholder: "أي شيء آخر ينبغي أن يعرفه المورّد…",
       targetPrice: "الميزانية",
+      targetPricePer: { daily: "الميزانية (لليوم)", weekly: "الميزانية (للأسبوع)", monthly: "الميزانية (للشهر)" },
       targetPriceUnit: "ريال",
       unavailableTitle: "{equipment} غير متوفرة لدى المورّدين حالياً.",
       // خارج الكتالوج: النتيجة أولاً — لا مورّد لدينا مطابق لمعدّة يسمّيها المستأجر بنفسه، فلا نرسلها
@@ -2161,7 +2163,6 @@ export const ar: Dictionary = {
       durationDays: "{n} يومًا",
       billing: "طريقة الفوترة",
       extendable: "قابل للتمديد",
-      quoteRate: "يسعّر لك المورّدون بسعر {basis}.",
       moreDetails: "تفاصيل أخرى",
       moreDetailsHint: "ساعات اليوم",
       hours: "ساعات العمل يومياً",
@@ -2178,9 +2179,9 @@ export const ar: Dictionary = {
       // The Arabic already had the condition the right way round — it is what caught the English
       // saying the opposite. Now both say the same thing in the same shape: one reason, then the ask,
       // and the ask names the date that is actually missing rather than repeating both.
-      nudgeBoth: "يقدّم الموردون أسعاراً أقل عندما يعرفون مدة الإيجار. أضف تاريخ البداية والنهاية للحصول على عروض أفضل.",
-      nudgeEnd: "يقدّم الموردون أسعاراً أقل عندما يعرفون مدة الإيجار. أضف تاريخ الانتهاء للحصول على عروض أفضل.",
-      nudgeStart: "يقدّم الموردون أسعاراً أقل عندما يعرفون مدة الإيجار. أضف تاريخ البداية للحصول على عروض أفضل.",
+      nudgeBoth: "أضف التاريخين لعروض أقل",
+      nudgeEnd: "أضف تاريخ الانتهاء لعروض أقل",
+      nudgeStart: "أضف تاريخ البداية لعروض أقل",
     },
     /* ~~`carry` — the carry-forward modal's four strings («Equipment #{n}», what is locked, what is
        copied, and its two buttons).~~ Deleted with the modal (owner, 2026-09-09). What they said is

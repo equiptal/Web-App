@@ -101,12 +101,14 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**26.5** | Circle — the zoomed view behind a double press | `src/components/workspace/RequestRail.tsx` |
 | **27** | Request context bar (location + machines) | `src/components/workspace/RequestContextBar.tsx` |
 | &nbsp;&nbsp;**27.1** | Context bar — the machines the request asked for | `src/components/workspace/RequestContextBar.tsx` |
+| &nbsp;&nbsp;**27.2** | Your budget card, beside the request context bar | `src/components/workspace/RequestContextBar.tsx` |
 | **28** | Request details modal | `src/components/workspace/RequestDetailsModal.tsx` |
 | &nbsp;&nbsp;**28.5** | Bid size filter — include larger equipment | `src/components/workspace/BidSizeFilter.tsx` |
 | **29** | Bid cards | `src/components/workspace/BidCards.tsx` |
 | &nbsp;&nbsp;**29.1** | Bid card — one tile | `src/components/workspace/BidCards.tsx` |
 | &nbsp;&nbsp;**29.2** | Bid card — header | `src/components/workspace/BidCards.tsx` |
 | &nbsp;&nbsp;**29.3** | Bid card — bottom row | `src/components/workspace/BidCards.tsx` |
+| &nbsp;&nbsp;**29.4** | Bid card: above / below your budget | `src/components/workspace/BidCards.tsx` |
 | **30** | Compare matrix | `src/components/workspace/CompareMatrix.tsx` |
 | &nbsp;&nbsp;**30.1** | Matrix — horizontal scroller | `src/components/workspace/CompareMatrix.tsx` |
 | &nbsp;&nbsp;**30.2** | Matrix — supplier column | `src/components/workspace/CompareMatrix.tsx` |

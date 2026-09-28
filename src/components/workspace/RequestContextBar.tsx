@@ -7,6 +7,8 @@ import { groupBiddingClosed, type RequestGroup, type RequestListItem } from "@/l
 import { railMachines } from "@/lib/contract/workspace";
 import { CircleArt, MAX_IN_CIRCLE } from "@/components/workspace/CircleArt";
 import { cx } from "@/lib/ds";
+import { formatSar, type BidBudget } from "@/lib/pricing/rental";
+import { yourBudgetLabel } from "@/lib/contract/request-fields";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -34,17 +36,21 @@ import { pin } from "@/lib/uiPins";
 export function RequestContextBar({
   group,
   item,
+  budget = null,
   onOpenRequest,
 }: {
   group: RequestGroup;
   /** The item on screen. Null before the first has resolved. */
   item: RequestListItem | null;
+  /** That item's budget, per unit per its rental basis. Null = none set, and no card is drawn. */
+  budget?: BidBudget | null;
   /** Opens the request drawer. Null where the page cannot show one. */
   onOpenRequest: (() => void) | null;
 }) {
   const { locale } = useLocale();
   const t = useT();
   const ar = locale === "ar";
+  const L = (en: string, a: string) => (ar ? a : en);
 
   const label = itemLabel(item, ar);
   const qty = item?.item?.qty ?? 1;
@@ -208,6 +214,25 @@ export function RequestContextBar({
           />
         )}
       </button>
+
+      {/* ── «Your budget», its own navy card beside the request (owner, 2026-09-28: *"show your
+          budget in the navy card of the request card maybe another stuck card"*) ───────────────
+          A SEPARATE card rather than a third line inside the bar: the bar is one 44px control that
+          opens the request, and a figure the renter compares every offer against should not live
+          inside a button. Same height, same navy, butted against it so the two read as one subject.
+          The period is named («per month»), because an offer is compared against it per unit per
+          period. Drawn only when this machine has a budget. */}
+      {budget && (
+        <div
+          {...pin("request-budget")}
+          className="control-lg ms-1.5 flex flex-none flex-col justify-center gap-1 rounded-md border border-navy bg-navy !px-3"
+        >
+          <span className="text-label font-semibold leading-[13px] text-white/60">{yourBudgetLabel(budget.rentalType, L)}</span>
+          <span className="tabular text-meta font-extrabold leading-[15px] text-white">
+            {formatSar(budget.amount)} <span className="font-semibold text-white/60">{L("SAR", "ر.س")}</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

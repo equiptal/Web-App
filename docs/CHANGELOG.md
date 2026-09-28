@@ -7,6 +7,21 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-28 - The offers page shows «Your budget» beside the request, and every bid says above or below it.**
+  Owner: *"show «your budget» in the navy card of the request card, maybe another stuck card, and on
+  each bid show arrow above or below the budget"*. A second navy card butted against
+  `RequestContextBar` («Your budget (per month) · 7,500 SAR»), drawn only when the machine has one;
+  each bid card gets a red ↑ «Above your budget», green ↓ «Below» or plain «On» under its rate.
+  `budgetVerdict` compares the LIVE rate per unit with the budget per unit ONLY when the periods
+  match (PER_MONTH ↔ MONTHLY …): a daily offer on a monthly budget draws nothing rather than a
+  guessed conversion. ⚠️ The list projection (`requestListSelect`) has no `budgetCeiling`, so the
+  workspace now fetches the item's DETAIL on every item switch (it did so only when the code was
+  missing); a Decimal arrives as a string, read with `Number`. Adding `budgetCeiling` to the backend
+  list select would save that call. Pins 27.2 / 29.4 added and the pins docs regenerated.
+  Files: `src/lib/pricing/rental.ts`, `src/lib/contract/request-fields.ts`,
+  `src/components/workspace/{RequestsWorkspace,RequestContextBar,BidCards}.tsx`, `src/lib/uiPins.ts`,
+  `docs/{ui-pins,ui-surface-map}.md`, `tests/unit/bid-budget.test.ts`.
+
 - **2026-09-27 - «Your target price» is called «Budget» again, in every string.** Owner: *"call it
   budget not target price"*. English «Budget» / «BUDGET», Arabic «الميزانية», on the machine card,
   the review table + CSV, request details, the edit modal, the send error, and the two hidden

@@ -356,7 +356,8 @@ describe("«Your target price» on the review", () => {
       }),
     });
     await openDetails(handle);
-    expect(screen.getByText("Budget")).toBeTruthy();
+    // Its period from the billing basis: the fixture bills monthly (owner, 2026-09-28).
+    expect(screen.getByText("Budget (per month)")).toBeTruthy();
     expect(screen.getByText("7,500 SAR")).toBeTruthy();
     expect(screen.getByText("12,000 SAR")).toBeTruthy();
   });
@@ -364,6 +365,6 @@ describe("«Your target price» on the review", () => {
   it("drops the column when no machine has one, like every other empty column", async () => {
     const handle = await review();
     await openDetails(handle);
-    expect(screen.queryByText("Budget")).toBeNull();
+    expect(screen.queryByText(/^Budget/)).toBeNull();
   });
 });

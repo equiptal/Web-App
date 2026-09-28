@@ -588,6 +588,12 @@ describe("«Your target price», per machine, beside the attachments", () => {
     expect(screen.getByText("Attachment 0").closest(".flex-wrap")).not.toBeNull();
   });
 
+  it("names its period from the billing basis: «BUDGET (PER MONTH)» (owner, 2026-09-28)", async () => {
+    await card({ draft: makeAgentDraft({ items: [makeItem()], project: confirmedProject() }) }); // bills monthly
+    expect(screen.getByText("BUDGET (PER MONTH)")).toBeTruthy();
+    expect(screen.getByLabelText("BUDGET (PER MONTH)")).toBeTruthy();
+  });
+
   it("stands alone when this machine type has no attachments", async () => {
     await card({ attachments: [] });
     expect(screen.queryByText("ATTACHMENT")).toBeNull();

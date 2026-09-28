@@ -90,7 +90,7 @@ export function ReadyToSend() {
     // it, and it left the item pills for the same reason. `tt.fuelResp`, who PAYS for it, stays.
     tt.food, tt.transport, tt.fuelResp, tt.delivery, tt.return, tt.certificate,
     // Each machine's own «Your target price» (2026-09-27), so the review reads back what posts.
-    tt.targetPrice,
+    project.timing.rentalBasis ? tt.targetPricePer[project.timing.rentalBasis] : tt.targetPrice,
     tt.notes,
   ];
   const cell = (r: SpecRow) => [
