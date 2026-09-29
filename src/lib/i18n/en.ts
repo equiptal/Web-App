@@ -1769,15 +1769,15 @@ export const en = {
       /* A room exists and nobody has priced yet. The owner asked for the second wording explicitly:
          there is an OFFER on the table to answer, not just a price to undercut. */
       counterOffer: "Counter this offer",
-      awaitingSupplier: "Awaiting supplier response",
+      awaitingSupplier: "Awaiting reply",
       newCounterOffer: "New counter offer",
-      newMessage: "New message from supplier",
+      newMessage: "New message",
       /* ⚠️ ONE caption for every ask and every resolution (app parity): the renter does not remember
          which question he asked, and the room shows him when he opens it. It is also what makes a
          PARTIAL answer safe to report, since the wording claims nothing about what is on file. */
-      supplierAnswered: "Supplier answered your request",
-      offerUpdated: "Supplier updated the offer",
-      awaitingConfirmation: "Awaiting supplier confirmation",
+      supplierAnswered: "Supplier replied",
+      offerUpdated: "Offer updated",
+      awaitingConfirmation: "Awaiting confirmation",
       dealClosed: "Deal closed",
       accepted: "Accepted",
       withdrawn: "Withdrawn",

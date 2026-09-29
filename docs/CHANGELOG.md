@@ -7,6 +7,13 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-29 - Bid card button captions shortened so they fit the half-width button.**
+  Owner: *"make the font size fit all the button or shorten the words"* ("Supplier Updated The O..."). The foot
+  row now splits with «Chat», so five captions ellipsised. The card is already one supplier's, so «supplier» was
+  redundant: Offer updated, Supplier replied, New message, Awaiting reply, Awaiting confirmation (Arabic to match).
+  Files: `src/lib/i18n/en.ts`, `src/lib/i18n/ar.ts`. ⚠️ These are now SHORTER than the app's wording, which the
+  i18n comment calls app parity: the app still reads «Supplier updated the offer» and «Supplier answered your
+  request» (`apps/mobile/lib/l10n/app_en.arb:11286-11290`).
 - **2026-09-29 - `/payment-complete` rewritten onto colour tokens; it had broken every Amplify build since it landed.**
   The page shipped in `14a3d791` with raw hex, a raw `rgba()` and a `boxShadow` in inline styles, which the
   `no-restricted-syntax` lint rule rejects, and `next build` runs lint. Staging jobs 810-811 and main jobs 77-78 all
