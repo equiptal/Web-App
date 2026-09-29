@@ -21,23 +21,13 @@ reversal, or the reason an odd-looking line is load-bearing.
   `--border`, `--ok-soft`, `--ok`, `--muted`, `--muted-light`, `--border-hair`) and dropped the shadow.
   Files: `src/app/payment-complete/page.tsx`. ⚠️ Inline `style={{}}` is linted too: a page with no Tailwind is not exempt.
 
-- **2026-09-29 - Inbox list drawn as a tree: site card, machine row with its real drawing, bids on a connector.**
-  Owner picked option B of the mock (*"just try the tree"*, *"use the equipment image not icon"*). Grouping is
-  unchanged (site, then equipment type, then bids). The type node now shows the taxonomy drawing looked up by
-  `equipmentType.id` in `/api/stores/taxonomy` (a subtype with none inherits its category's; name match as
-  fallback), via `EquipImg`, which still falls back to a glyph when the object 403s. The storefront glyph on a
-  bid row became the supplier's initials. Files: `src/components/inbox/InboxView.tsx`. ⚠️ The received-bids
-  feed carries NO image of its own, so the drawing needs that second read; it is fetched once, never polled.
-- **2026-09-29 - In-app bid cards end in two buttons: «Counter this price» and «Chat».**
-  Owner: *"instead of the orange bottom for the whole card, one orange ... bigger called counter this
-  price which holds the same states ... and beside it chat button instead of the chat icon on top"*.
-  The full-width band is now a `btn("primary")` in the foot row (same states, captions, glyph and
-  delta; terminal = disabled grey), and the round chat control in the header is gone for a labelled
-  «Chat» (`tinted`; the navy fill for unread was dropped). Unread shows as a red COUNT badge on it,
-  capped at 99+ (owner, same day: *"any new chat show it as red count on the chat button"*); the
-  number is `unreadByBid`, unchanged. ⚠️ The counter is no
-  longer `disabled` while `countering`: `openCounter` already refuses a second press, and the shared
-  disabled grey flashed behind the open sheet. Files: `src/components/workspace/BidCards.tsx`.
+- **2026-09-29 - Inbox list restyled after the app's inbox: site line, orange-bar machine header, plain cards.**
+  Owner, with the app's inbox screenshot: *"like this but with the location at top, no equipment image, no
+  complex ui"*. Grouping unchanged (site, then equipment type, then bids). Replaced, the same day, a TREE
+  version (site card, machine drawing in a circle, bids on a connector) and with it the `/api/stores/taxonomy`
+  read it needed: the received-bids feed carries no image, so a picture costs a second request. Rows are cards
+  again with the supplier's logo or initials (on `brand-soft`, as the app's «DC»), where a storefront glyph was.
+  Files: `src/components/inbox/InboxView.tsx`, `src/lib/uiPins.ts` (60.5 site, 60.6 machine header).
 
 - **2026-09-29 - Browse: smaller search + city pair, category rail moves by `‹ ›` with the scrollbar hidden.**
   Owner: *"too long and big, i want something smaller and cuter"* and *"use this < > to move and remove this"*.

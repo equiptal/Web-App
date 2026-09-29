@@ -11,9 +11,6 @@ import { leaseStream } from "@/lib/chat/stream-connection";
 import { readInboxChatSummaries } from "@/lib/chat/inbox-chat-summary";
 import type { BidCard } from "@/lib/contract/bids";
 import type { InboxBid } from "@/lib/contract/inbox";
-import type { TaxonomyNode } from "@/lib/contract/stores";
-import { iconForName, namedIcons, type NamedIcon } from "@/lib/contract/taxonomy-icons";
-import { EquipImg } from "@/components/requests/EquipImg";
 import type { RequestRecord } from "@/lib/contract/requests";
 import { inboxPreview, inboxTimeLabel, type InboxChatSummary } from "@/lib/contract/inbox-chat";
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
@@ -160,37 +157,6 @@ export function InboxView() {
     return () => { active = false; };
   }, []);
 
-  /**
-   * The machine's DRAWING per equipment node (owner, 2026-09-29: *"use the equipment image not
-   * icon"*). The app taxonomy tree the requests rail reads, keyed by node id, since a bid's
-   * `equipmentType.id` is that tree's subtype (else category) id. A subtype with no drawing of its
-   * own inherits its category's. The name match is the fallback for a line with no id.
-   *
-   * ⚠️ Read ONCE and never polled: the catalogue does not move while a renter reads messages. A
-   * failure leaves the map empty and every node on its glyph, which is today's header.
-   */
-  const [art, setArt] = useState<{ byId: Map<string, string>; named: NamedIcon[] }>({ byId: new Map(), named: [] });
-  useEffect(() => {
-    let active = true;
-    fetch("/api/stores/taxonomy", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
-      .then((d: { taxonomy: TaxonomyNode[] }) => {
-        if (!active) return;
-        const byId = new Map<string, string>();
-        const walk = (nodes: TaxonomyNode[], inherited: string | null) => {
-          for (const n of nodes) {
-            const url = n.iconUrl ?? inherited;
-            if (url) byId.set(n.id, url);
-            if (n.children?.length) walk(n.children, url);
-          }
-        };
-        walk(d.taxonomy ?? [], null);
-        setArt({ byId, named: namedIcons(d.taxonomy ?? []) });
-      })
-      .catch(() => {});
-    return () => { active = false; };
-  }, []);
-
   /* ~~Each group's RFQ short code, one `fetchRequestSubmissions` per group.~~ Its only reader was the
      code badge on the group header, removed 2026-09-26 (owner: *"in inbox remove the request id"*). */
 
@@ -314,7 +280,7 @@ export function InboxView() {
 
   // Two-level grouping: RFQ group (fan-out `requestGroupId`, falling back to the individual request
   // until the backend projects it) → equipment type (subtype) → bid rows.
-  type Sub = { key: string; label: string; art: string | null; rows: InboxBid[] };
+  type Sub = { key: string; label: string; rows: InboxBid[] };
   type Grp = { key: string; label: string; subs: Map<string, Sub>; count: number };
   const groups = new Map<string, Grp>();
   for (const b of shown) {
@@ -326,11 +292,7 @@ export function InboxView() {
     const tKey = b.equipmentType.id || b.request.id || b.bidId;
     const tLabel = b.equipmentType.name || b.request.equipmentSummary || L("Equipment", "معدة");
     let sub = g.subs.get(tKey);
-    if (!sub) {
-      const drawing = (b.equipmentType.id && art.byId.get(b.equipmentType.id)) || iconForName(art.named, tLabel);
-      sub = { key: tKey, label: tLabel, art: drawing, rows: [] };
-      g.subs.set(tKey, sub);
-    }
+    if (!sub) { sub = { key: tKey, label: tLabel, rows: [] }; g.subs.set(tKey, sub); }
     sub.rows.push(b);
     g.count += 1;
   }
@@ -383,15 +345,15 @@ export function InboxView() {
         type="button"
         onClick={() => openBid(b.bidId)}
         aria-current={active ? "true" : undefined}
-        /* A leaf of the tree: no box of its own, the site card is the box (owner, 2026-09-29, the
-           «Tree» mock). The open row is marked by a navy bar on its start edge and a tint. */
-        className={`flex w-full items-center gap-2 rounded-md border-s-2 px-1.5 py-1 text-start ${
-          active ? "border-navy bg-surface2" : "border-transparent hover:bg-surface2"
+        /* A card of its own, the app's `_InboxCard` (owner, 2026-09-29, the app's inbox as the
+           reference). ~~A leaf of the tree with no box, the site card as the box.~~ */
+        className={`flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-start ${
+          active ? "border-navy bg-surface2" : "border-border bg-surface hover:bg-surface2"
         }`}
       >
         {/* The supplier's logo, else his initials: a mark that says WHO, where the storefront glyph
             said only «a supplier» and read the same on every row. */}
-        <div className="grid h-7 w-7 flex-none place-items-center overflow-hidden rounded-full bg-navy text-label font-extrabold text-white">
+        <div className="grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-full bg-brand-soft text-label font-extrabold text-brand-deep">
           {b.supplierLogoUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={b.supplierLogoUrl} alt="" className="h-full w-full object-cover" />
@@ -446,54 +408,31 @@ export function InboxView() {
           {L("Nothing from this supplier yet.", "لا شيء من هذا المورّد بعد.")}
         </p>
       )}
-      {/* ── The TREE (owner, 2026-09-29: *"just try the tree"*, option B of the mock) ──────────────
-          Same three levels as before: site, equipment type, bids. ~~A folder line, an orange chip
-          with a `construction` glyph, rows as bordered cards under a left rule.~~ Now one white card
-          per site; the machine is a row with its real taxonomy DRAWING; its bids hang off a
-          connector line, a vertical rule plus a short tick into each row.
-          ⚠️ Each leaf draws its OWN slice of the rule (`after:`), and the last one stops at its middle
-          (`last:after:bottom-1/2`), so the tree ends on a tick at any row height. ~~One rule on the
-          container stopping at `bottom-5`~~ left a stub below the final leaf whenever a row was not
-          40px tall. Logical `start` insets, so the tree mirrors under RTL.
-          Condensed and the drawing made a 36px circle (owner, 2026-09-29: *"more condensed, reduce
-          white spaces, make the equipment image a circle"*). */}
+      {/* ── Site, then machine, then cards: the APP's inbox look (owner, 2026-09-29: *"like this but
+          with the location at top, no equipment image, no complex ui"*, the app's screenshot).
+          Same three levels as before. The machine is the app's section header, a short orange bar,
+          the name and a count pill; the rows are plain cards. ~~The tree: one site card, the
+          machine's taxonomy drawing in a circle, bids on a connector line~~ (2026-09-29, same day),
+          and with it the second read of `/api/stores/taxonomy` it needed for the drawing. */}
       {[...groups.values()].map((g) => (
-        <div key={g.key} {...pin("inbox-site")} className="mb-1.5 rounded-lg border border-border bg-surface px-1.5 pb-0.5 pt-1.5">
+        <div key={g.key} {...pin("inbox-site")} className="mb-3">
           {/* Level 1 — the RFQ group, by its site. ~~The short code first (RFQ-NNNNN, else REQ-).~~
               Removed (owner, 2026-09-26: *"in inbox remove the request id"*). */}
-          <div className="mb-0.5 flex items-center gap-1 px-1 text-label font-extrabold text-muted">
-            <Icon name="location_on" size={15} className="flex-none text-muted-light" />
+          <div className="mb-1 flex items-center gap-1 px-0.5 text-label font-semibold text-muted">
+            <Icon name="location_on" size={14} className="flex-none text-muted-light" />
             <span className="min-w-0 flex-1 truncate">{g.label}</span>
-            <span className="flex-none font-semibold">{g.count}</span>
           </div>
-          {[...g.subs.values()].map((sub, i) => (
-            <div key={sub.key} className={i > 0 ? "border-t border-dashed border-border pt-0.5" : undefined}>
-              {/* Level 2 — the machine, by its drawing */}
-              <div {...pin("inbox-machine")} className="flex items-center gap-2 px-1 py-0.5">
-                <EquipImg
-                  src={sub.art}
-                  categoryId={null}
-                  name={sub.label}
-                  box="grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-full border border-border bg-white"
-                  img="h-full w-full scale-[1.2] object-contain"
-                  iconSize={18}
-                />
+          {[...g.subs.values()].map((sub) => (
+            <div key={sub.key} className="mb-2">
+              {/* Level 2 — the machine, as the app draws a section */}
+              <div {...pin("inbox-machine")} className="mb-1.5 flex items-center gap-2 px-0.5">
+                <span className="h-4 w-1 flex-none rounded-full bg-brand" aria-hidden />
                 <span className="min-w-0 flex-1 truncate text-meta font-extrabold text-navy">{sub.label}</span>
-                <span className="flex-none rounded-sm bg-brand-soft px-1.5 py-0.5 text-label font-extrabold text-brand-deep">
+                <span className="grid h-5 min-w-5 flex-none place-items-center rounded-full bg-brand-soft px-1.5 text-label font-extrabold text-brand-deep">
                   {sub.rows.length}
                 </span>
               </div>
-              {/* Level 3 — the bids, on the connector */}
-              <div className="mb-1 ms-[21px] flex flex-col ps-3">
-                {sub.rows.map((b) => (
-                  <div
-                    key={b.bidId}
-                    className="relative before:absolute before:-start-3 before:top-1/2 before:h-0.5 before:w-2.5 before:bg-border before:content-[''] after:absolute after:-start-3 after:bottom-0 after:top-0 after:w-0.5 after:bg-border after:content-[''] last:after:bottom-1/2"
-                  >
-                    {row(b)}
-                  </div>
-                ))}
-              </div>
+              <div className="flex flex-col gap-1.5">{sub.rows.map(row)}</div>
             </div>
           ))}
         </div>
