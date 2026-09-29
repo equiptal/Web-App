@@ -385,13 +385,13 @@ export function InboxView() {
         aria-current={active ? "true" : undefined}
         /* A leaf of the tree: no box of its own, the site card is the box (owner, 2026-09-29, the
            «Tree» mock). The open row is marked by a navy bar on its start edge and a tint. */
-        className={`flex w-full items-center gap-2.5 rounded-md border-s-2 px-2 py-1.5 text-start ${
+        className={`flex w-full items-center gap-2 rounded-md border-s-2 px-1.5 py-1 text-start ${
           active ? "border-navy bg-surface2" : "border-transparent hover:bg-surface2"
         }`}
       >
         {/* The supplier's logo, else his initials: a mark that says WHO, where the storefront glyph
             said only «a supplier» and read the same on every row. */}
-        <div className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full bg-navy text-label font-extrabold text-white">
+        <div className="grid h-7 w-7 flex-none place-items-center overflow-hidden rounded-full bg-navy text-label font-extrabold text-white">
           {b.supplierLogoUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={b.supplierLogoUrl} alt="" className="h-full w-full object-cover" />
@@ -439,7 +439,7 @@ export function InboxView() {
   };
 
   const list = (
-    <div {...pin("inbox-list")} className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
+    <div {...pin("inbox-list")} className="flex min-h-0 flex-1 flex-col overflow-y-auto p-2">
       {banner}
       {only && shown.length === 0 && (
         <p className="rounded-md border border-dashed border-border bg-surface2 px-4 py-6 text-center text-meta text-muted">
@@ -451,28 +451,32 @@ export function InboxView() {
           with a `construction` glyph, rows as bordered cards under a left rule.~~ Now one white card
           per site; the machine is a row with its real taxonomy DRAWING; its bids hang off a
           connector line, a vertical rule plus a short tick into each row.
-          ⚠️ The rule stops short of the last row (`bottom-5`) so the tree ends on a tick, not a
-          stub below the final leaf. Logical `start` insets, so the tree mirrors under RTL. */}
+          ⚠️ Each leaf draws its OWN slice of the rule (`after:`), and the last one stops at its middle
+          (`last:after:bottom-1/2`), so the tree ends on a tick at any row height. ~~One rule on the
+          container stopping at `bottom-5`~~ left a stub below the final leaf whenever a row was not
+          40px tall. Logical `start` insets, so the tree mirrors under RTL.
+          Condensed and the drawing made a 36px circle (owner, 2026-09-29: *"more condensed, reduce
+          white spaces, make the equipment image a circle"*). */}
       {[...groups.values()].map((g) => (
-        <div key={g.key} {...pin("inbox-site")} className="mb-2.5 rounded-lg border border-border bg-surface px-2 pb-1 pt-2">
+        <div key={g.key} {...pin("inbox-site")} className="mb-1.5 rounded-lg border border-border bg-surface px-1.5 pb-0.5 pt-1.5">
           {/* Level 1 — the RFQ group, by its site. ~~The short code first (RFQ-NNNNN, else REQ-).~~
               Removed (owner, 2026-09-26: *"in inbox remove the request id"*). */}
-          <div className="mb-1 flex items-center gap-1 px-1 text-label font-extrabold text-muted">
+          <div className="mb-0.5 flex items-center gap-1 px-1 text-label font-extrabold text-muted">
             <Icon name="location_on" size={15} className="flex-none text-muted-light" />
             <span className="min-w-0 flex-1 truncate">{g.label}</span>
             <span className="flex-none font-semibold">{g.count}</span>
           </div>
           {[...g.subs.values()].map((sub, i) => (
-            <div key={sub.key} className={i > 0 ? "border-t border-dashed border-border pt-1.5" : undefined}>
+            <div key={sub.key} className={i > 0 ? "border-t border-dashed border-border pt-0.5" : undefined}>
               {/* Level 2 — the machine, by its drawing */}
-              <div {...pin("inbox-machine")} className="flex items-center gap-2.5 p-1">
+              <div {...pin("inbox-machine")} className="flex items-center gap-2 px-1 py-0.5">
                 <EquipImg
                   src={sub.art}
                   categoryId={null}
                   name={sub.label}
-                  box="grid h-11 w-11 flex-none place-items-center overflow-hidden rounded-md border border-border bg-white"
-                  img="h-full w-full object-contain p-0.5"
-                  iconSize={22}
+                  box="grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-full border border-border bg-white"
+                  img="h-full w-full scale-[1.2] object-contain"
+                  iconSize={18}
                 />
                 <span className="min-w-0 flex-1 truncate text-meta font-extrabold text-navy">{sub.label}</span>
                 <span className="flex-none rounded-sm bg-brand-soft px-1.5 py-0.5 text-label font-extrabold text-brand-deep">
@@ -480,11 +484,11 @@ export function InboxView() {
                 </span>
               </div>
               {/* Level 3 — the bids, on the connector */}
-              <div className="relative mb-1.5 ms-[26px] flex flex-col gap-0.5 ps-3.5 before:absolute before:bottom-5 before:start-0 before:top-0 before:w-0.5 before:rounded-full before:bg-border before:content-['']">
+              <div className="mb-1 ms-[21px] flex flex-col ps-3">
                 {sub.rows.map((b) => (
                   <div
                     key={b.bidId}
-                    className="relative before:absolute before:-start-3.5 before:top-1/2 before:h-0.5 before:w-3 before:bg-border before:content-['']"
+                    className="relative before:absolute before:-start-3 before:top-1/2 before:h-0.5 before:w-2.5 before:bg-border before:content-[''] after:absolute after:-start-3 after:bottom-0 after:top-0 after:w-0.5 after:bg-border after:content-[''] last:after:bottom-1/2"
                   >
                     {row(b)}
                   </div>
