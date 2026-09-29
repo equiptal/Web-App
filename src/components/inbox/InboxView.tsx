@@ -11,6 +11,9 @@ import { leaseStream } from "@/lib/chat/stream-connection";
 import { readInboxChatSummaries } from "@/lib/chat/inbox-chat-summary";
 import type { BidCard } from "@/lib/contract/bids";
 import type { InboxBid } from "@/lib/contract/inbox";
+import type { TaxonomyNode } from "@/lib/contract/stores";
+import { iconForName, namedIcons, type NamedIcon } from "@/lib/contract/taxonomy-icons";
+import { EquipImg } from "@/components/requests/EquipImg";
 import type { RequestRecord } from "@/lib/contract/requests";
 import { inboxPreview, inboxTimeLabel, type InboxChatSummary } from "@/lib/contract/inbox-chat";
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
@@ -44,6 +47,17 @@ import "@/components/map/map-proto.css";
  */
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
+
+/** A supplier's mark when he has no logo: the first letter of his first two words («Al-Faisal
+ *  Contracting» → «AC», «345678» → «3»). `Array.from` so a letter outside the BMP stays whole. */
+const initials = (name: string) =>
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => Array.from(w)[0] ?? "")
+    .join("")
+    .toUpperCase() || "?";
 
 /**
  * How often the list re-reads the unread counts and the last messages.
@@ -143,6 +157,37 @@ export function InboxView() {
         if (!active) return;
         setGroupMap(new Map(req.requests.filter((x) => x.requestGroupId).map((x) => [x.id, x.requestGroupId as string])));
       });
+    return () => { active = false; };
+  }, []);
+
+  /**
+   * The machine's DRAWING per equipment node (owner, 2026-09-29: *"use the equipment image not
+   * icon"*). The app taxonomy tree the requests rail reads, keyed by node id, since a bid's
+   * `equipmentType.id` is that tree's subtype (else category) id. A subtype with no drawing of its
+   * own inherits its category's. The name match is the fallback for a line with no id.
+   *
+   * ⚠️ Read ONCE and never polled: the catalogue does not move while a renter reads messages. A
+   * failure leaves the map empty and every node on its glyph, which is today's header.
+   */
+  const [art, setArt] = useState<{ byId: Map<string, string>; named: NamedIcon[] }>({ byId: new Map(), named: [] });
+  useEffect(() => {
+    let active = true;
+    fetch("/api/stores/taxonomy", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
+      .then((d: { taxonomy: TaxonomyNode[] }) => {
+        if (!active) return;
+        const byId = new Map<string, string>();
+        const walk = (nodes: TaxonomyNode[], inherited: string | null) => {
+          for (const n of nodes) {
+            const url = n.iconUrl ?? inherited;
+            if (url) byId.set(n.id, url);
+            if (n.children?.length) walk(n.children, url);
+          }
+        };
+        walk(d.taxonomy ?? [], null);
+        setArt({ byId, named: namedIcons(d.taxonomy ?? []) });
+      })
+      .catch(() => {});
     return () => { active = false; };
   }, []);
 
@@ -269,7 +314,7 @@ export function InboxView() {
 
   // Two-level grouping: RFQ group (fan-out `requestGroupId`, falling back to the individual request
   // until the backend projects it) → equipment type (subtype) → bid rows.
-  type Sub = { key: string; label: string; rows: InboxBid[] };
+  type Sub = { key: string; label: string; art: string | null; rows: InboxBid[] };
   type Grp = { key: string; label: string; subs: Map<string, Sub>; count: number };
   const groups = new Map<string, Grp>();
   for (const b of shown) {
@@ -281,7 +326,11 @@ export function InboxView() {
     const tKey = b.equipmentType.id || b.request.id || b.bidId;
     const tLabel = b.equipmentType.name || b.request.equipmentSummary || L("Equipment", "معدة");
     let sub = g.subs.get(tKey);
-    if (!sub) { sub = { key: tKey, label: tLabel, rows: [] }; g.subs.set(tKey, sub); }
+    if (!sub) {
+      const drawing = (b.equipmentType.id && art.byId.get(b.equipmentType.id)) || iconForName(art.named, tLabel);
+      sub = { key: tKey, label: tLabel, art: drawing, rows: [] };
+      g.subs.set(tKey, sub);
+    }
     sub.rows.push(b);
     g.count += 1;
   }
@@ -334,16 +383,20 @@ export function InboxView() {
         type="button"
         onClick={() => openBid(b.bidId)}
         aria-current={active ? "true" : undefined}
-        className={`flex w-full items-center gap-2.5 rounded-lg border p-2.5 text-start ${
-          active ? "border-navy bg-surface2" : "border-border bg-surface hover:bg-surface2"
+        /* A leaf of the tree: no box of its own, the site card is the box (owner, 2026-09-29, the
+           «Tree» mock). The open row is marked by a navy bar on its start edge and a tint. */
+        className={`flex w-full items-center gap-2.5 rounded-md border-s-2 px-2 py-1.5 text-start ${
+          active ? "border-navy bg-surface2" : "border-transparent hover:bg-surface2"
         }`}
       >
-        <div className="grid h-10 w-10 flex-none place-items-center overflow-hidden rounded-full bg-surface2 text-navy-mid">
+        {/* The supplier's logo, else his initials: a mark that says WHO, where the storefront glyph
+            said only «a supplier» and read the same on every row. */}
+        <div className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full bg-navy text-label font-extrabold text-white">
           {b.supplierLogoUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={b.supplierLogoUrl} alt="" className="h-full w-full object-cover" />
           ) : (
-            <Icon name="storefront" size={20} />
+            initials(b.supplierName)
           )}
         </div>
         <div className="min-w-0 flex-1">
@@ -393,23 +446,50 @@ export function InboxView() {
           {L("Nothing from this supplier yet.", "لا شيء من هذا المورّد بعد.")}
         </p>
       )}
+      {/* ── The TREE (owner, 2026-09-29: *"just try the tree"*, option B of the mock) ──────────────
+          Same three levels as before: site, equipment type, bids. ~~A folder line, an orange chip
+          with a `construction` glyph, rows as bordered cards under a left rule.~~ Now one white card
+          per site; the machine is a row with its real taxonomy DRAWING; its bids hang off a
+          connector line, a vertical rule plus a short tick into each row.
+          ⚠️ The rule stops short of the last row (`bottom-5`) so the tree ends on a tick, not a
+          stub below the final leaf. Logical `start` insets, so the tree mirrors under RTL. */}
       {[...groups.values()].map((g) => (
-        <div key={g.key} className="mb-4">
+        <div key={g.key} {...pin("inbox-site")} className="mb-2.5 rounded-lg border border-border bg-surface px-2 pb-1 pt-2">
           {/* Level 1 — the RFQ group, by its site. ~~The short code first (RFQ-NNNNN, else REQ-).~~
               Removed (owner, 2026-09-26: *"in inbox remove the request id"*). */}
-          <div className="mb-1.5 flex items-center gap-1.5 px-0.5 text-meta font-extrabold text-navy">
-            <Icon name="folder_open" size={14} />
-            <span className="min-w-0 flex-1 truncate text-muted">{g.label}</span>
-            <span className="flex-none text-label font-semibold text-muted">{g.count}</span>
+          <div className="mb-1 flex items-center gap-1 px-1 text-label font-extrabold text-muted">
+            <Icon name="location_on" size={15} className="flex-none text-muted-light" />
+            <span className="min-w-0 flex-1 truncate">{g.label}</span>
+            <span className="flex-none font-semibold">{g.count}</span>
           </div>
-          {[...g.subs.values()].map((sub) => (
-            <div key={sub.key} className="mb-2 ms-1 border-s-2 border-border ps-2">
-              {/* Level 2 — equipment type */}
-              <div className="mb-1.5 inline-flex max-w-full items-center gap-1 rounded-sm bg-brand-soft px-2 py-0.5 text-label font-extrabold text-brand-deep">
-                <Icon name="construction" size={13} /> <span className="truncate">{sub.label}</span>
-                <span className="flex-none rounded-full bg-brand/15 px-1.5">{sub.rows.length}</span>
+          {[...g.subs.values()].map((sub, i) => (
+            <div key={sub.key} className={i > 0 ? "border-t border-dashed border-border pt-1.5" : undefined}>
+              {/* Level 2 — the machine, by its drawing */}
+              <div {...pin("inbox-machine")} className="flex items-center gap-2.5 p-1">
+                <EquipImg
+                  src={sub.art}
+                  categoryId={null}
+                  name={sub.label}
+                  box="grid h-11 w-11 flex-none place-items-center overflow-hidden rounded-md border border-border bg-white"
+                  img="h-full w-full object-contain p-0.5"
+                  iconSize={22}
+                />
+                <span className="min-w-0 flex-1 truncate text-meta font-extrabold text-navy">{sub.label}</span>
+                <span className="flex-none rounded-sm bg-brand-soft px-1.5 py-0.5 text-label font-extrabold text-brand-deep">
+                  {sub.rows.length}
+                </span>
               </div>
-              <div className="flex flex-col gap-1.5">{sub.rows.map(row)}</div>
+              {/* Level 3 — the bids, on the connector */}
+              <div className="relative mb-1.5 ms-[26px] flex flex-col gap-0.5 ps-3.5 before:absolute before:bottom-5 before:start-0 before:top-0 before:w-0.5 before:rounded-full before:bg-border before:content-['']">
+                {sub.rows.map((b) => (
+                  <div
+                    key={b.bidId}
+                    className="relative before:absolute before:-start-3.5 before:top-1/2 before:h-0.5 before:w-3 before:bg-border before:content-['']"
+                  >
+                    {row(b)}
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>

@@ -1006,6 +1006,9 @@
    The scrim is what closes the menu on an outside click — no document listener, so nothing has to
    be torn down when the room unmounts mid-menu. */
 .dlproto { position: relative; }
+/* Sheet-only mode (`DealRoom sheetOnly`): no room box, no page height. The wrapper is kept only for
+   the scoped tokens and rules the sheet reads; the sheet itself is a fixed overlay. */
+.dlproto.dlproto-sheet { display: contents; }
 .dlproto .dr-menu-scrim { position: fixed; inset: 0; z-index: 60; }
 .dlproto .dr-menu {
   position: absolute; z-index: 61; top: 62px; inset-inline-end: 6px; min-width: 218px;

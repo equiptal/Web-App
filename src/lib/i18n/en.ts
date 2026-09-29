@@ -226,6 +226,8 @@ export const en = {
     // exist for the screen reader and the tooltip (owner, 2026-09-16: 20 per page, arrows for the rest).
     prevPage: "Previous page",
     nextPage: "Next page",
+    scrollBack: "Scroll categories back",
+    scrollForward: "Scroll categories forward",
     empty: "No suppliers match your filters.",
     error: "We couldn't load suppliers.",
     retry: "Retry",

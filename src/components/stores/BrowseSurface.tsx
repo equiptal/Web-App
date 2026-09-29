@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Dropdown } from "@/components/Dropdown";
 import { useLocale, useT } from "@/lib/i18n";
@@ -29,11 +29,16 @@ interface CityOpt {
 
 /**
  * The search field and the city share ONE skin, so they cannot drift apart in height again (owner,
- * 2026-09-16: *"make the search bar and filter with same size and height"*). `py-3` on a
- * `text-shop-control` line box is what sets the height; both controls state it from here.
+ * 2026-09-16: *"make the search bar and filter with same size and height"*). `h-9` is what sets
+ * the height; both controls state it from here.
+ *
+ * ~~`py-3` on a `text-shop-control` line box, `bg-shop-field`, and a search that took every pixel
+ * the heading left (`flex-1`).~~ Smaller and fixed-width now (owner, 2026-09-29: *"too long and
+ * big, i want something smaller and cuter"*, with a 36px white field as the reference): 36px tall,
+ * 13px type, white. No shadow: the app has none (lint rule), the border carries the edge.
  */
 const CONTROL_SKIN =
-  "rounded-shop-control border border-shop-line bg-shop-field py-3 px-4 text-shop-control text-shop-ink outline-none transition focus:border-shop-amber hover:border-shop-amber";
+  "h-9 rounded-shop-control border border-shop-line bg-white px-3 text-shop-item text-shop-ink outline-none transition focus:border-shop-amber hover:border-shop-amber";
 
 
 /**
@@ -248,52 +253,51 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
             <Icon name={expanded ? "expand_less" : "chevron_right"} size={16} className={expanded ? "" : "rtl:scale-x-[-1]"} />
           </button>
         )}
-        <div className="relative min-w-[200px] flex-1">
-          <span className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-shop-ink-4">
-            <SearchIcon />
-          </span>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t.browse.search}
-            className={`w-full ps-10 pe-4 ${CONTROL_SKIN} placeholder:text-shop-ink-4`}
-          />
-        </div>
-        {/* ⚠️ **The city wears the search field's own skin**, which is what «same size and height»
-            means here (owner, 2026-09-16). It used to fall through to `Dropdown`'s `field` tone — house
-            tokens, `py-2` — so it stood 8px shorter than the input beside it and in a different grey.
-            `triggerClass` is a per-call override and reaches no other dropdown in the product.
-            The wrapper carries the width because `Dropdown`'s root takes no `className`. */}
-        {/* ⚠️ **Full width once the row has wrapped** (phone). Measured at 360 and 392: the
-            search takes the whole row, so the city dropped to a line of its own and sat 190px wide
-            in a 360px row - a ragged half-empty band under a full-width field. It keeps its 190px
-            from `sm` up, which is where the two share a line and the pair reads as one control. */}
-        <div className="w-full flex-none sm:w-[190px]">
-          <Dropdown
-            label={t.browse.anyCity}
-            placeholder={t.browse.anyCity}
-            prefix={<PinIcon size={15} strokeWidth={1.8} />}
-            value={city || null}
-            onChange={setCity}
-            options={cities.map((c) => ({ value: c.value, label: c.label }))}
-            triggerClass={`w-full ${CONTROL_SKIN}`}
-          />
+        {/* The search and the city are ONE pair, so they wrap together and never apart. On a phone
+            the pair takes the row and the search takes what the city leaves; from `sm` up both are
+            fixed widths at the row's end (owner, 2026-09-29). The magnifier sits at the END, as in
+            the reference he sent. */}
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="relative min-w-0 flex-1 sm:w-[260px] sm:flex-none">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t.browse.search}
+              className={`w-full pe-9 ${CONTROL_SKIN} placeholder:text-shop-ink-4`}
+            />
+            <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-shop-ink-3">
+              <SearchIcon />
+            </span>
+          </div>
+          {/* ⚠️ **The city wears the search field's own skin**, which is what «same size and height»
+              means here (owner, 2026-09-16). It used to fall through to `Dropdown`'s `field` tone —
+              house tokens, `py-2` — so it stood 8px shorter than the input beside it and in a
+              different grey. `triggerClass` is a per-call override and reaches no other dropdown in
+              the product. The wrapper carries the width because `Dropdown`'s root takes no
+              `className`. */}
+          <div className="w-[140px] flex-none">
+            <Dropdown
+              label={t.browse.anyCity}
+              placeholder={t.browse.anyCity}
+              prefix={<PinIcon size={14} strokeWidth={1.8} />}
+              value={city || null}
+              onChange={setCity}
+              options={cities.map((c) => ({ value: c.value, label: c.label }))}
+              triggerClass={`w-full ${CONTROL_SKIN}`}
+            />
+          </div>
         </div>
       </div>
 
       {/* The categories. «All» first, then the tree's top level — the pill that is on is the house
           navy, filled, and every other is an outline. */}
       {taxonomy.length > 0 && (
-        /* ⚠️ **`shop-rail` is the scrollbar, and it is a LOCAL rule in `globals.css`** — the browser's
-           default bar is ~15px of chrome under a 34px row, which is what read as thick (owner,
-           2026-09-16: *"make it thinner and nicer"*). 6px, the row's own line colour, on a
-           transparent track, and it keeps `overflow-x: auto` so it still scrolls where it must. */
-        <div {...pin("browse-categories")} className="shop-rail -mx-1 mb-[26px] flex gap-2 overflow-x-auto px-1 pb-1.5">
+        <CategoryRail prevLabel={t.browse.scrollBack} nextLabel={t.browse.scrollForward}>
           <Pill label={t.browse.allCategories} active={!categoryId} onClick={() => setCategoryId("")} />
           {taxonomy.map((c) => (
             <Pill key={c.id} label={tabel(c, ar)} active={categoryId === c.id} onClick={() => setCategoryId(c.id)} />
           ))}
-        </div>
+        </CategoryRail>
       )}
 
       {/* Results (AC-16/17/23) */}
@@ -364,6 +368,71 @@ function Pill({ label, active, onClick }: { label: string; active: boolean; onCl
     >
       {label}
     </button>
+  );
+}
+
+/**
+ * The category pills, moved by `‹ ›` rather than a scrollbar (owner, 2026-09-29: *"use this < > to
+ * move and remove this"*, pointing at the bar).
+ *
+ * ~~`shop-rail`: a 6px scrollbar in the row's line colour (owner, 2026-09-16: *"make it thinner and
+ * nicer"*).~~ The bar is hidden now; the row still scrolls by touch, trackpad and wheel, and the
+ * arrows are what a mouse reader presses. They are also what makes a hidden bar safe: without them
+ * the rest of the row is unreachable on a trackpad with no shift-scroll.
+ *
+ * ⚠️ **The arrows show only when the row overflows**, and each one disables at its end. Two dead
+ * arrows round a row that fits would say only that there is nothing to press.
+ *
+ * ⚠️ **RTL: `scrollLeft` runs from 0 to NEGATIVE** in every current engine, so the ends are read off
+ * `Math.abs`, and a press scrolls by `-step` under `dir="rtl"`. «Next» is always the reading
+ * direction; the chevrons mirror with it.
+ */
+function CategoryRail({ prevLabel, nextLabel, children }: { prevLabel: string; nextLabel: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [ends, setEnds] = useState({ start: true, end: true });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const read = () => {
+      const x = Math.abs(el.scrollLeft);
+      setEnds({ start: x <= 1, end: x + el.clientWidth >= el.scrollWidth - 1 });
+    };
+    read();
+    el.addEventListener("scroll", read, { passive: true });
+    // The row's width changes on resize; its CONTENT changes when a pill's label switches language.
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    const mo = new MutationObserver(read);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => {
+      el.removeEventListener("scroll", read);
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, []);
+
+  const move = (sign: 1 | -1) => {
+    const el = ref.current;
+    if (!el) return;
+    const rtl = getComputedStyle(el).direction === "rtl";
+    el.scrollBy({ left: sign * (rtl ? -1 : 1) * el.clientWidth * 0.8, behavior: "smooth" });
+  };
+
+  const overflows = !(ends.start && ends.end);
+
+  return (
+    <div {...pin("browse-rail-arrows")} className="mb-[26px] flex items-center gap-2">
+      {overflows && <PageArrow dir="prev" label={prevLabel} disabled={ends.start} onClick={() => move(-1)} />}
+      <div
+        {...pin("browse-categories")}
+        ref={ref}
+        className="flex min-w-0 flex-1 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {children}
+      </div>
+      {overflows && <PageArrow dir="next" label={nextLabel} disabled={ends.end} onClick={() => move(1)} />}
+    </div>
   );
 }
 

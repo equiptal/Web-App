@@ -7,6 +7,55 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-29 - Inbox list drawn as a tree: site card, machine row with its real drawing, bids on a connector.**
+  Owner picked option B of the mock (*"just try the tree"*, *"use the equipment image not icon"*). Grouping is
+  unchanged (site, then equipment type, then bids). The type node now shows the taxonomy drawing looked up by
+  `equipmentType.id` in `/api/stores/taxonomy` (a subtype with none inherits its category's; name match as
+  fallback), via `EquipImg`, which still falls back to a glyph when the object 403s. The storefront glyph on a
+  bid row became the supplier's initials. Files: `src/components/inbox/InboxView.tsx`. ⚠️ The received-bids
+  feed carries NO image of its own, so the drawing needs that second read; it is fetched once, never polled.
+- **2026-09-29 - In-app bid cards end in two buttons: «Counter this price» and «Chat».**
+  Owner: *"instead of the orange bottom for the whole card, one orange ... bigger called counter this
+  price which holds the same states ... and beside it chat button instead of the chat icon on top"*.
+  The full-width band is now a `btn("primary")` in the foot row (same states, captions, glyph and
+  delta; terminal = disabled grey), and the round chat control in the header is gone for a labelled
+  «Chat» (`tinted`; the navy fill for unread was dropped). Unread shows as a red COUNT badge on it,
+  capped at 99+ (owner, same day: *"any new chat show it as red count on the chat button"*); the
+  number is `unreadByBid`, unchanged. ⚠️ The counter is no
+  longer `disabled` while `countering`: `openCounter` already refuses a second press, and the shared
+  disabled grey flashed behind the open sheet. Files: `src/components/workspace/BidCards.tsx`.
+
+- **2026-09-29 - Browse: smaller search + city pair, category rail moves by `‹ ›` with the scrollbar hidden.**
+  Owner: *"too long and big, i want something smaller and cuter"* and *"use this < > to move and remove this"*.
+  Search is 260px (was `flex-1`, the whole row), city 140px, both `h-9` white with 13px type; the magnifier
+  moved to the end. On a phone the pair shares one row. The rail hides its bar and gets `PageArrow`s that
+  show only when it overflows and disable at each end. `.shop-rail` deleted from `globals.css` (no other user).
+  Files: `src/components/stores/BrowseSurface.tsx`, `src/app/globals.css`, `src/lib/i18n/{en,ar}.ts`,
+  `src/lib/uiPins.ts` (pin 61.4). ⚠️ A hidden bar is only safe WITH the arrows: without them a trackpad
+  with no shift-scroll cannot reach the rest of the row. ⚠️ RTL `scrollLeft` is negative, so the ends read
+  `Math.abs` and a press flips its sign. ⚠️ No `shadow-sm` on the field: lint bans shadows app-wide.
+- **2026-09-29 - Counter sheet: the pen on an agreed term works, and «Counter this price» opens over the offers.**
+  Owner: *"i clicked edit but nothing happen"* and *"loading over the old ui of the deal room chat"*.
+  (1) A term BOTH sides already hold the same value on has no resolution, so the pen's reopen cleared
+  nothing, the row stayed in «Agreed terms» and `activeKey` (which only picks from `attention`) never
+  opened it. `reopenedAgreed` now hands it to the pending walk; `decide` and the accept gate's
+  `termMatched` let a sheet answer outrank the server's match, or a changed agreed term would still
+  read (and gate) as agreed. (2) The bid card's band pushed `/deal-room/{id}?act=counter`, which drew
+  the sheet over the retired room page. It now mounts `DealRoom sheetOnly` over the offers through
+  `CounterSheet` (portal, lazy-loaded); `RoomBack` carries the room's `usePageBack` so the sheet mode
+  does not steal the workspace's Back. ⚠️ The map footer (`PriceFooter`, also in the inbox) still
+  navigates: the map never re-reads the bid after a send, so in place it would show a stale price.
+  ⚠️ The app has the same pen defect (`counter_offer_terms_page.dart`, agreed `onReopen`).
+  Files: `src/components/deal-room/DealRoom.tsx`, `src/components/deal-room/CounterSheet.tsx`,
+  `src/components/deal-room/deal-room-proto.css`, `src/components/workspace/BidCards.tsx`,
+  `tests/unit/negotiation-sheet.test.ts`.
+
+- **2026-09-29 - The bid's budget verdict is now just a red or green arrow beside the price.**
+  Owner: *"i dont want this, i want only arrow red or green beside the price"* (of the «↑ Above your
+  budget» line under the rate). The words moved into `aria-label` / `title`; an equal rate now draws
+  nothing (the old grey «On your budget» had no colour to become). Pin 29.4 kept, on the arrow.
+  Files: `src/components/workspace/BidCards.tsx`.
+
 - **2026-09-28 - The offers page shows «Your budget» beside the request, and every bid says above or below it.**
   Owner: *"show «your budget» in the navy card of the request card, maybe another stuck card, and on
   each bid show arrow above or below the budget"*. «Your budget (per month) · 7,500 SAR» is the

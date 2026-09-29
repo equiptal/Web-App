@@ -179,6 +179,8 @@ export const ar: Dictionary = {
     allCategories: "كل المتاجر",
     prevPage: "الصفحة السابقة",
     nextPage: "الصفحة التالية",
+    scrollBack: "تمرير الفئات للخلف",
+    scrollForward: "تمرير الفئات للأمام",
     empty: "لا يوجد مؤجرون مطابقون لعوامل التصفية.",
     error: "تعذّر تحميل المؤجرين.",
     retry: "إعادة المحاولة",

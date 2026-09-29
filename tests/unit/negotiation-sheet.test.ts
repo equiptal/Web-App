@@ -353,7 +353,9 @@ describe("the terms sheet", () => {
     expect(FLOW).toContain("const conflicts = operatingTerms.filter(isConflictingTerm)");
     expect(FLOW).toContain('badge: isConflictingTerm(t) ? "conflict" : "none"');
     expect(SRC).toContain("const unresolvedDisputed = room.terms.filter((t) => isConflictingTerm(t)");
-    expect(SRC).toContain('t.state === "fixed" || t.state === "soft_accepted" || isSettledByValues(t)');
+    // The accept gate: the values decide, unless the sheet holds an answer of its own on the term
+    // (an agreed term reopened and changed is no longer agreed).
+    expect(SRC).toContain('if (!r) return t.state === "soft_accepted" || isSettledByValues(t);');
   });
 
   /* 🔴 **THREE LABELS on one button**, because they answer three different situations (app parity,

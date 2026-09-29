@@ -861,24 +861,6 @@ body {
 .legal-doc hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
 .legal-doc blockquote { margin: 0 0 12px; padding-inline-start: 12px; border-inline-start: 2px solid var(--border); color: var(--muted-dark); }
 
-/* ══ The category rail on Browse ════════════════════════════════════════════════════════════════
-   A slim scrollbar for the horizontal strip of category pills (owner, 2026-09-16: *"make it thinner
-   and nicer"*). The browser's default bar is ~15px of chrome under a 28px row, so the furniture was
-   half the height of the thing it scrolled.
-
-   ⚠️ **`overflow-x: auto` STAYS on the element** — this styles the bar, it does not remove it. A
-   hidden bar on a strip that really does overflow is a row whose rest is unreachable on a trackpad
-   with no shift-scroll, which is the fault the dropdown list met on 2026-09-13.
-
-   ⚠️ Firefox takes `scrollbar-width`/`scrollbar-color` and ignores the pseudo-elements; WebKit takes
-   the pseudo-elements and ignores those two. Both are stated, so neither engine falls back to the
-   default bar.                                                                                   */
-.shop-rail { scrollbar-width: thin; scrollbar-color: var(--shop-line) transparent; }
-.shop-rail::-webkit-scrollbar { height: 6px; }
-.shop-rail::-webkit-scrollbar-track { background: transparent; }
-.shop-rail::-webkit-scrollbar-thumb { background: var(--shop-line); border-radius: 999px; }
-.shop-rail:hover::-webkit-scrollbar-thumb { background: var(--shop-ink-4); }
-
 
 /* ════════════════════════════════════════════════════════════════════════════════════════════════
    THE NATIONAL DAY SKIN
