@@ -604,7 +604,7 @@ export const ar: Dictionary = {
       sla: "زمن الاستجابة",
     },
     additionalNotes: "ملاحظات إضافية",
-    budget: { title: "السعر المستهدف", label: "سعرك المستهدف", hint: "يُدخل بالريال السعودي." },
+    budget: { title: "الميزانية", label: "الميزانية", hint: "يُدخل بالريال السعودي." },
     supplierFilters: {
       title: "عوامل تصفية الموردين",
       verifiedOnly: "الموردون الموثّقون فقط",
@@ -644,6 +644,8 @@ export const ar: Dictionary = {
       delivery: "التوصيل",
       return: "الإرجاع",
       certificate: "شهادة السلامة",
+      targetPrice: "الميزانية",
+      targetPricePer: { daily: "الميزانية (لليوم)", weekly: "الميزانية (للأسبوع)", monthly: "الميزانية (للشهر)" },
       notes: "ملاحظات",
     },
   },
@@ -2100,6 +2102,9 @@ export const ar: Dictionary = {
       notes: "ملاحظات",
       notesOptional: "(اختياري)",
       notesPlaceholder: "أي شيء آخر ينبغي أن يعرفه المورّد…",
+      targetPrice: "الميزانية",
+      targetPricePer: { daily: "الميزانية (لليوم)", weekly: "الميزانية (للأسبوع)", monthly: "الميزانية (للشهر)" },
+      targetPriceUnit: "ريال",
       unavailableTitle: "{equipment} غير متوفرة لدى المورّدين حالياً.",
       // خارج الكتالوج: النتيجة أولاً — لا مورّد لدينا مطابق لمعدّة يسمّيها المستأجر بنفسه، فلا نرسلها
       // إلى أحد، ثم الطريق الذي يبقى له. لا ادّعاء عن الكتالوج: قد يكون النوع موجوداً وقد رفضه هو.
@@ -2152,13 +2157,12 @@ export const ar: Dictionary = {
       startDate: "تاريخ البداية",
       endDate: "تاريخ النهاية",
       paymentTerms: "شروط الدفع",
-      targetPrice: "سعرك المستهدف",
+      targetPrice: "الميزانية",
       targetPriceUnit: "ريال",
       duration: "المدة",
       durationDays: "{n} يومًا",
       billing: "طريقة الفوترة",
       extendable: "قابل للتمديد",
-      quoteRate: "يسعّر لك المورّدون بسعر {basis}.",
       moreDetails: "تفاصيل أخرى",
       moreDetailsHint: "ساعات اليوم",
       hours: "ساعات العمل يومياً",
@@ -2175,9 +2179,9 @@ export const ar: Dictionary = {
       // The Arabic already had the condition the right way round — it is what caught the English
       // saying the opposite. Now both say the same thing in the same shape: one reason, then the ask,
       // and the ask names the date that is actually missing rather than repeating both.
-      nudgeBoth: "يقدّم الموردون أسعاراً أقل عندما يعرفون مدة الإيجار. أضف تاريخ البداية والنهاية للحصول على عروض أفضل.",
-      nudgeEnd: "يقدّم الموردون أسعاراً أقل عندما يعرفون مدة الإيجار. أضف تاريخ الانتهاء للحصول على عروض أفضل.",
-      nudgeStart: "يقدّم الموردون أسعاراً أقل عندما يعرفون مدة الإيجار. أضف تاريخ البداية للحصول على عروض أفضل.",
+      nudgeBoth: "أضف التاريخين لعروض أقل",
+      nudgeEnd: "أضف تاريخ الانتهاء لعروض أقل",
+      nudgeStart: "أضف تاريخ البداية لعروض أقل",
     },
     /* ~~`carry` — the carry-forward modal's four strings («Equipment #{n}», what is locked, what is
        copied, and its two buttons).~~ Deleted with the modal (owner, 2026-09-09). What they said is
@@ -2218,7 +2222,7 @@ export const ar: Dictionary = {
       paymentTerms: "شروط الدفع",
       maintenance: "الصيانة",
       maintenanceSla: "زمن الاستجابة",
-      budget: "سعرك المستهدف · ريال",
+      budget: "الميزانية · ريال",
       bidWindow: "مهلة تقديم العروض",
       supplierFilters: "تصفية المورّدين",
       verifiedOnly: "المورّدون الموثّقون فقط",

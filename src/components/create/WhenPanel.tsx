@@ -146,10 +146,16 @@ export function WhenPanel({
 
               {/* MREQ-AC-10 — shown whenever EITHER end is missing. The prototype gated this on the end
                   date alone, so its own "add a start date" wording could never appear. */}
+              {/* One line (owner, 2026-09-28): smaller type and padding, and a short sentence (see the
+                  strings). `truncate` is only the guard for a very narrow card; `title` keeps the whole
+                  sentence readable there. */}
               {nudge && (
-                <p className="mt-3.5 flex items-start gap-2 rounded-sm border border-warn/40 bg-warn/[0.08] px-3.5 py-2.5 text-body font-semibold leading-snug text-navy">
-                  <Icon name="info" size={15} className="mt-px flex-none text-warn" />
-                  {nudge}
+                <p
+                  title={nudge}
+                  className="mt-3 flex items-center gap-1.5 rounded-sm border border-warn/40 bg-warn/[0.08] px-2.5 py-1.5 text-meta font-semibold text-navy"
+                >
+                  <Icon name="info" size={13} className="flex-none text-warn" />
+                  <span className="min-w-0 truncate">{nudge}</span>
                 </p>
               )}
               {/* A backwards window is an ERROR, not a nudge: it blocks the send, where a missing end
@@ -184,7 +190,7 @@ export function WhenPanel({
                 missing={!timing.rentalBasis}
                 required={!!tried && !timing.rentalBasis}
                 star
-                hint={timing.rentalBasis ? fmt(t.create.whenPanel.quoteRate, { basis: t.options.rentalBasis[timing.rentalBasis].toLowerCase() }) : undefined}
+                /* ~~hint: «Suppliers quote you a <basis> rate.»~~ Removed (owner, 2026-09-28). */
               >
                 {/* ── One control for every choice on the canvas (owner, 2026-08-26) ─────────────
                      These three were a segmented pill — grey labels on a grey track, 15px — while
@@ -298,8 +304,8 @@ export function WhenPanel({
                 Optional: no star, no gap. A second press on the chosen term clears it (no ×).
 
                 ~~«Your target price» beside it.~~ HIDDEN (owner, same day: *"remove it from ui for now
-                like hide it"*) until it can be per machine: the backend stores one figure per request
-                row and copies it to every machine. The input is kept below for the switch back.
+                like hide it"*), then REPLACED the same day by a per-machine field beside the notes
+                (`MachineCard`, `item.targetPriceSar`). This request-wide input stays off.
 
                 <CanvasField label={t.create.whenPanel.targetPrice}>
                   <input inputMode="numeric" value={prefs?.budgetSar == null ? "" : String(prefs.budgetSar)}

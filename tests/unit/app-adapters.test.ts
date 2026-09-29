@@ -324,3 +324,22 @@ describe("draftToCreateRequest — postable items (specs#245-AC-33/43)", () => {
     expect(p.type).toBe("BROADCAST");
   });
 });
+
+describe("draftToCreateRequest — «Your target price» per machine (2026-09-27)", () => {
+  it("sends each machine's own figure as that item's budgetCeiling", () => {
+    const out = draftToCreateRequest(
+      makeDraft({ items: [makeItem({ id: "a", targetPriceSar: 7500 }), makeItem({ id: "b", targetPriceSar: 12000 })] }),
+      "46",
+    );
+    expect(out.equipmentItems.map((i) => i.budgetCeiling)).toEqual([7500, 12000]);
+  });
+
+  it("omits it when the machine has none, or zero", () => {
+    const out = draftToCreateRequest(
+      makeDraft({ items: [makeItem({ id: "a" }), makeItem({ id: "b", targetPriceSar: 0 }), makeItem({ id: "c", targetPriceSar: null })] }),
+      "46",
+    );
+    expect(out.equipmentItems.map((i) => i.budgetCeiling)).toEqual([undefined, undefined, undefined]);
+    expect(out.budgetCeiling).toBeUndefined();
+  });
+});

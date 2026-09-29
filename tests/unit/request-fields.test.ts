@@ -59,6 +59,7 @@ const SHOWN: Record<string, string> = {
   paymentMethod: "Payment method",
   breakdownResponseSla: "Breakdown response",
   maintenanceResponsibility: "Maintenance",
+  budgetCeiling: "Budget (per month)", // the fixture bills MONTHLY
   offerDuration: "Offer duration",
   localContent: "Local content",
 };
@@ -149,8 +150,17 @@ describe("reading the values", () => {
     expect(get("Working hours")).toBe("10 hrs/day");
   });
 
-  it("does not show the target price while it is hidden (owner, 2026-09-27)", () => {
-    expect(get("Your target price")).toBeUndefined();
+  it("shows THIS machine's budget with its unit (every posted request is one machine)", () => {
+    expect(get("Budget (per month)")).toBe("120,000 SAR");
+  });
+
+  it("names the budget's period from the rental basis (owner, 2026-09-28)", () => {
+    const label = (rentalType: string | null) =>
+      requestDetailRows({ ...FULL, rentalType } as never, false, L).find(([k]) => k.startsWith("Budget"))?.[0];
+    expect(label("DAILY")).toBe("Budget (per day)");
+    expect(label("WEEKLY")).toBe("Budget (per week)");
+    expect(label("PER_JOB")).toBe("Budget (per job)");
+    expect(label("LONG_TERM")).toBe("Budget");
   });
 
   it("answers in Arabic when asked in Arabic", () => {

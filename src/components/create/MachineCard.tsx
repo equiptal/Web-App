@@ -166,6 +166,9 @@ export function MachineCard({
   }, [pulseName]);
   const photoBroken = brokenPhoto !== null && brokenPhoto === photo;
   const overrides = useItemOverrides(item, state.draft!.project);
+  /** «BUDGET (PER MONTH)» and so on: the period the budget covers, from the billing basis. */
+  const basis = state.draft!.project.timing.rentalBasis;
+  const budgetLabel = basis ? t.create.machineCard.targetPricePer[basis] : t.create.machineCard.targetPrice;
   const attachments = useItemAttachments(item);
   const prov = useProvenance(item.id);
   const years = equipmentYears();
@@ -880,18 +883,48 @@ export function MachineCard({
             </div>
           </div>
 
-          {/* Attachment, work type and notes — one box, as the prototype has them. */}
+          {/* Attachment + target price, work type and notes — one box, as the prototype has them. */}
           <div className="flex w-full flex-col gap-2.5 rounded-sm bg-surface2 p-3.5">
-            {/* Hidden entirely when this subtype has no admin-defined attachments (MREQ-AC-22). */}
-            {attachments.hasOptions && (
-              <CanvasField
-                label={t.create.machineCard.attachment}
-                optional
-                source={prov.itemSource("attachments", item.attachmentIds, "attachmentIds")}
-              >
-                <ChoiceChips<string> values={attachments.selected} onToggle={attachments.toggle} options={attachments.options} />
-              </CanvasField>
-            )}
+            {/* ── Attachments and «Your target price», one row (owner, 2026-09-27: *"make the target
+                price beside the attachments in one row"*) ─────────────────────────────────────────
+                ~~Beside the notes.~~ Moved the same day. Attachments are admin-defined per subtype
+                and the seed carries at most five short chips. The PRICE never leaves the row: when the
+                chips outgrow their column they wrap onto more lines inside it (owner, same day: *"if
+                attachments are more than what can fit then just wrap the options"*). Only a phone-width
+                card stacks the two. With no attachments for this subtype (MREQ-AC-22) the price stands
+                alone.
+                The price is THIS machine's, per unit per billing period, which is how an offer is
+                quoted. Optional; digits only. */}
+            <div className={`grid items-start gap-2.5 ${attachments.hasOptions ? "sm:grid-cols-[minmax(0,1fr)_220px]" : "sm:grid-cols-[220px]"}`}>
+              {attachments.hasOptions && (
+                <div className="min-w-0">
+                  <CanvasField
+                    label={t.create.machineCard.attachment}
+                    optional
+                    source={prov.itemSource("attachments", item.attachmentIds, "attachmentIds")}
+                  >
+                    <ChoiceChips<string> values={attachments.selected} onToggle={attachments.toggle} options={attachments.options} />
+                  </CanvasField>
+                </div>
+              )}
+              <div className="min-w-0">
+                <CanvasField label={budgetLabel} optional>
+                  <label className="flex items-center gap-2 rounded-sm border border-border bg-surface px-3 py-2">
+                    <input
+                      inputMode="numeric"
+                      value={item.targetPriceSar == null ? "" : String(item.targetPriceSar)}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/[^\d]/g, "");
+                        actions.patchItem(item.id, { targetPriceSar: digits ? Number(digits) : null });
+                      }}
+                      aria-label={budgetLabel}
+                      className="min-w-0 flex-1 bg-transparent text-body font-semibold text-navy outline-none"
+                    />
+                    <span className="flex-none text-meta font-semibold text-muted">{t.create.machineCard.targetPriceUnit}</span>
+                  </label>
+                </CanvasField>
+              </div>
+            </div>
 
             {/* Crane-only, mirroring `equipment_step.dart` `_isCraneSelected` (MREQ-AC-23). */}
             {tax.isCrane && (

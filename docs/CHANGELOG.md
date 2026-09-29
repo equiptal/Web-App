@@ -7,6 +7,53 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-28 - The offers page shows «Your budget» beside the request, and every bid says above or below it.**
+  Owner: *"show «your budget» in the navy card of the request card, maybe another stuck card, and on
+  each bid show arrow above or below the budget"*. «Your budget (per month) · 7,500 SAR» is the
+  light grey (`surface2`) trailing section of the SAME card as the navy `RequestContextBar` (first a
+  second navy card; merged the same day at the owner's word), drawn only when the machine has one;
+  each bid card gets a red ↑ «Above your budget», green ↓ «Below» or plain «On» under its rate.
+  `budgetVerdict` compares the LIVE rate per unit with the budget per unit ONLY when the periods
+  match (PER_MONTH ↔ MONTHLY …): a daily offer on a monthly budget draws nothing rather than a
+  guessed conversion. ⚠️ The list projection (`requestListSelect`) has no `budgetCeiling`, so the
+  workspace now fetches the item's DETAIL on every item switch (it did so only when the code was
+  missing); a Decimal arrives as a string, read with `Number`. Adding `budgetCeiling` to the backend
+  list select would save that call. Pins 27.2 / 29.4 added and the pins docs regenerated.
+  Files: `src/lib/pricing/rental.ts`, `src/lib/contract/request-fields.ts`,
+  `src/components/workspace/{RequestsWorkspace,RequestContextBar,BidCards}.tsx`, `src/lib/uiPins.ts`,
+  `docs/{ui-pins,ui-surface-map}.md`, `tests/unit/bid-budget.test.ts`.
+
+- **2026-09-27 - «Your target price» is called «Budget» again, in every string.** Owner: *"call it
+  budget not target price"*. English «Budget» / «BUDGET», Arabic «الميزانية», on the machine card,
+  the review table + CSV, request details, the edit modal, the send error, and the two hidden
+  request-wide fields. Label only: `targetPrice` i18n keys and `targetPriceSar` keep their names, and
+  the entries below say «target price» because that was its name when they were written.
+
+- **2026-09-27 - «Your target price» is read back everywhere it is set.** Owner: *"check all surfaces
+  in review summary, request details after post ... it is not missed"*. It WAS missed on all four:
+  entered per machine and sent, never shown again. Now: a column of the review's machines table
+  (`SpecRow.targetPriceSar`, so the CSV export carries it too; dropped when empty like every column),
+  the request-details row and the edit-request input are UN-hidden. Those two read
+  `request.budgetCeiling`, which IS the machine's own figure because every posted request is one
+  machine. Grouped «7,500 SAR» on both, so one figure reads one way.
+  Files: `src/lib/export/spec-sheet.ts`, `src/components/create/ReadyToSend.tsx`,
+  `src/lib/contract/request-fields.ts`, `src/components/requests/RequestEditModals.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/{ready-to-send.test.tsx,request-fields.test.ts}`.
+
+- **2026-09-27 - «Your target price» is PER MACHINE, in the attachments row, sent as each item's `budgetCeiling`.**
+  Owner: *"make it in ui beside the notes per item"*; a target price is per machine in business
+  terms. New optional `EquipmentItem.targetPriceSar`, a field in `MachineCard` (first beside the notes,
+  then moved into ONE ROW with the attachments: a 220px column the price never leaves, while extra
+  chips wrap inside theirs; alone when a subtype has none; notes back to full width, the original size),
+  digits only, meant per unit per billing period (how an offer is quoted). A «Per unit, per <basis>»
+  hint under it was removed at the owner's word. `draftToCreateRequest` sends it per item and only when > 0; the request-wide field stays
+  hidden and unsent (entry below). Not copied to a second machine (`machineTermsOf` does not carry
+  it). ⚠️ DEPLOY ORDER: the backend must ship first. Before Moedatech-App 2026-09-27 the agents
+  `itemSchema` had no such key and zod stripped it SILENTLY: the request posts, the price is lost.
+  Files: `src/lib/contract/{draft,app}.ts`, `src/lib/api/app-adapters.ts`,
+  `src/components/create/{MachineCard,WhenPanel}.tsx`, `src/lib/i18n/{en,ar}.ts`,
+  `tests/unit/{machine-card.test.tsx,app-adapters.test.ts}`.
+
 - **2026-09-27 - CRITICAL: a project's «no operator» was lost two more ways, and the request posted an operator.**
   Owner: *"the project says no for operator but the request open it and send it with operator"*.
   Both reproduced in a reducer test first. (1) Tier 1 never ran the full path's guess check

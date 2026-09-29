@@ -88,7 +88,10 @@ export function ReadyToSend() {
     tt.equipment, tt.category, tt.size, tt.qty, tt.year, tt.operator, tt.operatorCert,
     // `tt.fuel` (the fuel TYPE column) is gone — the renter does not choose it, the system prefills
     // it, and it left the item pills for the same reason. `tt.fuelResp`, who PAYS for it, stays.
-    tt.food, tt.transport, tt.fuelResp, tt.delivery, tt.return, tt.certificate, tt.notes,
+    tt.food, tt.transport, tt.fuelResp, tt.delivery, tt.return, tt.certificate,
+    // Each machine's own «Your target price» (2026-09-27), so the review reads back what posts.
+    project.timing.rentalBasis ? tt.targetPricePer[project.timing.rentalBasis] : tt.targetPrice,
+    tt.notes,
   ];
   const cell = (r: SpecRow) => [
     r.equipment,
@@ -107,6 +110,10 @@ export function ReadyToSend() {
     r.ret ? t.options.party[r.ret] : "—",
     r.certificate.length
       ? r.certificate.map((c) => (c === "other" && r.certificateOther ? r.certificateOther : t.options.safetyCert[c])).join(", ")
+      : "—",
+    // Grouped like the request details show it (`request-fields`), so one figure reads one way.
+    r.targetPriceSar != null
+      ? `${r.targetPriceSar.toLocaleString(ar ? "ar-SA-u-ca-gregory" : "en-US")} ${t.create.machineCard.targetPriceUnit}`
       : "—",
     r.notes || "—",
   ];

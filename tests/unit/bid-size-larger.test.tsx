@@ -108,9 +108,10 @@ describe("the empty cards tab", () => {
     return onShowLarger;
   }
 
-  it("names the held bid under «no bids», and its button asks for it", () => {
+  it("names the held bid WITHOUT claiming «no bids», and its button asks for it", () => {
     const onShowLarger = draw({ largerHeld: 1, showLarger: false });
-    expect(screen.getByText("No bids on this item yet")).toBeTruthy();
+    // Owner, 2026-09-28: a bid IS there, one press away, so «No bids» would contradict the box.
+    expect(screen.queryByText("No bids on this item yet")).toBeNull();
     expect(screen.getByText("1 bid offers a larger size")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Show it" }));
     expect(onShowLarger).toHaveBeenCalled();

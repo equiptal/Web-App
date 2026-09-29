@@ -197,6 +197,27 @@ export function headlineShowsRawRate(priceUnit: string | null | undefined): bool
  * headline its rate. Nothing does today; the argument is what a future exception would come back
  * through, and dropping it would make that exception a signature change across every card.
  */
+/**
+ * **Is this offer above or below the renter's budget?** (owner, 2026-09-28: *"on each bid show arrow
+ * above or below the budget"*).
+ *
+ * The budget is per unit per the REQUEST's rental basis; an offer's `price` is its live rate per unit
+ * per its own `priceUnit`. They compare only when the two periods are the SAME: a 400/day offer
+ * against a 9,000/month budget is neither above nor below without inventing a conversion, so the
+ * answer there is `null` and no arrow is drawn. Both figures are before VAT (a bid's rate always is).
+ */
+export type BidBudget = { amount: number; rentalType: string | null };
+const BUDGET_UNIT: Record<string, string> = { DAILY: "PER_DAY", WEEKLY: "PER_WEEK", MONTHLY: "PER_MONTH", PER_JOB: "PER_JOB" };
+export function budgetVerdict(
+  rate: number | null | undefined,
+  priceUnit: string | null | undefined,
+  budget: BidBudget | null | undefined,
+): "above" | "below" | "equal" | null {
+  if (!budget || !(budget.amount > 0) || rate == null || !(rate > 0)) return null;
+  if (!budget.rentalType || BUDGET_UNIT[budget.rentalType] !== priceUnit) return null;
+  return rate > budget.amount ? "above" : rate < budget.amount ? "below" : "equal";
+}
+
 export function headlineAmount(priceUnit: string | null | undefined, rate: number, proratedTotal: number): number {
   return headlineShowsRawRate(priceUnit) ? rate : proratedTotal;
 }

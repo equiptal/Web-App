@@ -11,7 +11,8 @@
  * to ten documents on a domestic uplink partially fails often enough that the retry has to be cheap,
  * so this helper hands the session back and re-PUTs only what failed.
  *
- * The two steps of the submission are deliberately separate: identity (`/api/verification/submit`)
+ * ⚠️ **There is no longer an identity step** (2026-09-27). `/api/verification/submit` still exists
+ * and is still tested, but nothing in the UI calls it. The submission is this pile and nothing else
  * opens the verification, then the pile goes out. See `VerificationFlow`.
  */
 

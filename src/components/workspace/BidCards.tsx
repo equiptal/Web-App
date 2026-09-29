@@ -13,7 +13,7 @@ import { resolveRenteeBandState, renteeBandIsDead, renteeBandShowsDelta, type Re
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
 import { liveRentalUnits } from "@/lib/contract/comparison";
-import { computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay } from "@/lib/pricing/rental";
+import { budgetVerdict, computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay, type BidBudget } from "@/lib/pricing/rental";
 import { BidTermsModal } from "@/components/requests/BidTermsModal";
 import { checkArcs, equipmentCheckOf, type BidCardCheck, type CheckTone } from "@/lib/contract/bid-card-checks";
 import { computeBidReadiness } from "@/lib/contract/bid-readiness";
@@ -78,6 +78,7 @@ export function BidCards({
   startDate,
   mobByRentee = null,
   demobByRentee = null,
+  budget = null,
   largerHeld = 0,
   showLarger = false,
   onShowLarger,
@@ -100,6 +101,8 @@ export function BidCards({
    */
   mobByRentee?: boolean | null;
   demobByRentee?: boolean | null;
+  /** The item's budget (per unit per its rental basis), for each card's above/below arrow. */
+  budget?: BidBudget | null;
   /**
    * How many bids on this item offer a machine LARGER than the one asked for (`sizeCounts.larger`).
    * They are dropped by the backend unless the list asks for them, so on an otherwise empty item
@@ -123,10 +126,18 @@ export function BidCards({
     return (
       <div className="grid min-h-[220px] place-items-center px-4 py-12 text-center">
         <div>
-          <Icon name="inbox" size={30} className="text-muted" />
-          <p className="mt-2 text-body font-semibold text-muted">{t.workspace.noBidsYet}</p>
+          {/* ~~«No bids on this item yet» over the held count.~~ Only when nothing is held (owner,
+              2026-09-28: *"if there is larger bids dont say no bids on this item, we are already
+              showing option to view the larger"*): a bid IS there, one press away, so the line
+              contradicted the box under it. */}
+          {held === 0 && (
+            <>
+              <Icon name="inbox" size={30} className="text-muted" />
+              <p className="mt-2 text-body font-semibold text-muted">{t.workspace.noBidsYet}</p>
+            </>
+          )}
           {held > 0 && (
-            <div className="mt-3 inline-flex flex-wrap items-center justify-center gap-2 rounded-md border border-brand/40 bg-brand-soft px-3 py-2">
+            <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-md border border-brand/40 bg-brand-soft px-3 py-2">
               <span className="inline-flex items-center gap-1.5 text-meta font-semibold text-navy">
                 <Icon name="straighten" size={14} className="text-brand-deep" />
                 {fmt(held === 1 ? t.workspace.sizeLargerHeldOne : t.workspace.sizeLargerHeldMany, { n: String(held) })}
@@ -195,6 +206,7 @@ export function BidCards({
           startDate={startDate}
           mobByRentee={mobByRentee}
           demobByRentee={demobByRentee}
+          budget={budget}
           onSelect={() => onToggle(b.card.id)}
         />
       ))}
@@ -211,6 +223,7 @@ function BidCardTile({
   startDate,
   mobByRentee,
   demobByRentee,
+  budget,
   onSelect,
 }: {
   bid: WorkspaceBid;
@@ -221,6 +234,7 @@ function BidCardTile({
   startDate: string | null;
   mobByRentee?: boolean | null;
   demobByRentee?: boolean | null;
+  budget?: BidBudget | null;
   onSelect: () => void;
 }) {
   const t = useT();
@@ -343,6 +357,8 @@ function BidCardTile({
   // rental row below a restatement of it. `headlineShowsRawRate` is the app's own rule and its own
   // name for it. The prorated figure lives in the breakdown, one row down, for every unit alike.
   const headline = headlineAmount(card.priceUnit, card.price ?? 0, rental.total);
+  /** The LIVE rate per unit against the item's budget per unit; null when the periods differ. */
+  const verdict = budgetVerdict(card.price, card.priceUnit, budget);
   const rentalTypeLabel =
     card.priceUnit === "PER_MONTH" ? t.workspace.rentalMonthly
     : card.priceUnit === "PER_WEEK" ? t.workspace.rentalWeekly
@@ -605,6 +621,26 @@ function BidCardTile({
           <div className="min-w-0 flex-1">
             <div className="text-body font-extrabold leading-none text-navy">{headlineLabel}</div>
             {basis && <div className="mt-1.5 text-label font-semibold leading-none text-muted">{basis}</div>}
+            {/* ── Above or below YOUR budget (owner, 2026-09-28: *"on each bid show arrow above or
+                below the budget"*) ──────────────────────────────────────────────────────────────
+                The live rate per unit against the budget per unit, and only when both are for the
+                same period: `budgetVerdict` returns null for a daily offer on a monthly budget, and a
+                null draws nothing rather than a guess. Red above, green below, no colour when equal. */}
+            {verdict && (
+              <div
+                {...pin("bid-budget-verdict")}
+                className={`mt-1.5 flex items-center gap-0.5 text-label font-extrabold leading-none ${
+                  verdict === "above" ? "text-danger" : verdict === "below" ? "text-ok" : "text-muted"
+                }`}
+              >
+                <Icon name={verdict === "above" ? "arrow_upward" : verdict === "below" ? "arrow_downward" : "drag_handle"} size={13} />
+                {verdict === "above"
+                  ? L("Above your budget", "أعلى من ميزانيتك")
+                  : verdict === "below"
+                    ? L("Below your budget", "أقل من ميزانيتك")
+                    : L("On your budget", "مطابق لميزانيتك")}
+              </div>
+            )}
           </div>
           <div className="flex flex-none items-baseline gap-1.5">
             <b className="text-subhead font-extrabold leading-none text-navy">{formatSar(headline)}</b>

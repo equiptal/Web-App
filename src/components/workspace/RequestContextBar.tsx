@@ -7,6 +7,8 @@ import { groupBiddingClosed, type RequestGroup, type RequestListItem } from "@/l
 import { railMachines } from "@/lib/contract/workspace";
 import { CircleArt, MAX_IN_CIRCLE } from "@/components/workspace/CircleArt";
 import { cx } from "@/lib/ds";
+import { formatSar, type BidBudget } from "@/lib/pricing/rental";
+import { yourBudgetLabel } from "@/lib/contract/request-fields";
 import { pin } from "@/lib/uiPins";
 
 /**
@@ -34,17 +36,21 @@ import { pin } from "@/lib/uiPins";
 export function RequestContextBar({
   group,
   item,
+  budget = null,
   onOpenRequest,
 }: {
   group: RequestGroup;
   /** The item on screen. Null before the first has resolved. */
   item: RequestListItem | null;
+  /** That item's budget, per unit per its rental basis. Null = none set, and no card is drawn. */
+  budget?: BidBudget | null;
   /** Opens the request drawer. Null where the page cannot show one. */
   onOpenRequest: (() => void) | null;
 }) {
   const { locale } = useLocale();
   const t = useT();
   const ar = locale === "ar";
+  const L = (en: string, a: string) => (ar ? a : en);
 
   const label = itemLabel(item, ar);
   const qty = item?.item?.qty ?? 1;
@@ -110,7 +116,9 @@ export function RequestContextBar({
         disabled={!onOpenRequest}
         title={group.address ?? group.locationLabel}
         className={cx(
-          "group control-lg flex min-w-0 max-w-[30rem] items-center gap-2 rounded-md border border-navy bg-navy !px-3 text-start transition-colors",
+          "group control-lg flex min-w-0 max-w-[30rem] items-center gap-2 border border-navy bg-navy !px-3 text-start transition-colors",
+          // With a budget the card continues into the grey section, so only the LEADING corners round.
+          budget ? "rounded-s-md" : "rounded-md",
           onOpenRequest ? "hover:bg-navy-mid" : "cursor-default",
         )}
       >
@@ -208,6 +216,27 @@ export function RequestContextBar({
           />
         )}
       </button>
+
+      {/* ── «Your budget», the SAME card's light side section (owner, 2026-09-28: *"make it in the
+          same card as the navy blue like just side section in light grey"*) ─────────────────────
+          ~~Its own navy card beside the bar.~~ Now the bar's trailing section: the navy button keeps
+          its leading corners, this grey part takes the trailing ones, joined with no gap, so they
+          read as one card. The grey part's outline is the house grey (`border-border`), not navy
+          (owner, same day: *"just make it grey borders not navy blue"*). It stays OUT of the button: the button opens the
+          request, and a figure every offer is compared against should not be a press target.
+          The period is named («per month») because an offer is compared per unit per period.
+          Drawn only when this machine has a budget. */}
+      {budget && (
+        <div
+          {...pin("request-budget")}
+          className="control-lg flex flex-none flex-col justify-center gap-1 rounded-e-md border border-s-0 border-border bg-surface2 !px-3"
+        >
+          <span className="text-label font-semibold leading-[13px] text-muted">{yourBudgetLabel(budget.rentalType, L)}</span>
+          <span className="tabular text-meta font-extrabold leading-[15px] text-navy">
+            {formatSar(budget.amount)} <span className="font-semibold text-muted">{L("SAR", "ر.س")}</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

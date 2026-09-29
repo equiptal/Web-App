@@ -184,6 +184,13 @@ export interface EquipmentItem {
   /** Part 1: optional free-text "work type" — surfaced only for crane subtypes (mirrors mobile). ≤255. */
   workType?: string;
   additionalNotes: string; // AC-53 agent-extracted free-text qualifiers, editable
+  /**
+   * «Your target price» for THIS machine, in SAR, per unit per billing period (owner, 2026-09-27:
+   * *"make it in ui beside the notes per item"*; per unit per period is how suppliers quote, so the
+   * two compare directly). Sent as the item's `budgetCeiling`, which the backend stores on this
+   * machine's own fan-out row. Optional; `null`/absent = not stated. Never copied to another machine.
+   */
+  targetPriceSar?: number | null;
 
   // Per-item overrides of request-wide settings (AC-25/26):
   deliveryOverride: Party | null;
@@ -452,6 +459,7 @@ export function newManualItem(id: string): EquipmentItem {
     operator: defaultOperatorDetails(),
     fuelType: "diesel",
     additionalNotes: "",
+    targetPriceSar: null,
     deliveryOverride: null,
     returnOverride: null,
     fuelResponsibilityOverride: null,

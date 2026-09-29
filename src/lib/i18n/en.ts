@@ -746,7 +746,7 @@ export const en = {
       sla: "Response SLA",
     },
     additionalNotes: "Additional notes",
-    budget: { title: "Target price", label: "Your target price", hint: "Entered in SAR." },
+    budget: { title: "Budget", label: "Budget", hint: "Entered in SAR." },
     supplierFilters: {
       title: "Supplier filters",
       verifiedOnly: "Verified suppliers only",
@@ -786,6 +786,9 @@ export const en = {
       delivery: "Delivery",
       return: "Return",
       certificate: "Safety cert",
+      targetPrice: "Budget",
+      // The period the budget covers, from the billing basis (owner, 2026-09-28).
+      targetPricePer: { daily: "Budget (per day)", weekly: "Budget (per week)", monthly: "Budget (per month)" },
       notes: "Notes",
     },
   },
@@ -2680,6 +2683,12 @@ export const en = {
       notes: "NOTES",
       notesOptional: "(optional)",
       notesPlaceholder: "Anything else the supplier should know…",
+      // Per machine, in the attachments row (owner, 2026-09-27). Shown as «Budget»; `budgetCeiling`.
+      targetPrice: "BUDGET",
+      // …naming its period from the billing basis (owner, 2026-09-28: *"budget (per month) or
+      // whatever the frequency so user has clear"*). Plain «BUDGET» until a basis is chosen.
+      targetPricePer: { daily: "BUDGET (PER DAY)", weekly: "BUDGET (PER WEEK)", monthly: "BUDGET (PER MONTH)" },
+      targetPriceUnit: "SAR",
       unavailableTitle: "{equipment} isn't available from suppliers right now.",
       /* ── Off-catalogue (CUSTOM_EQUIPMENT_ENABLED) ───────────────────────────────────────────
          ~~«This equipment type is not available, but you can still post and share the link with your
@@ -2765,14 +2774,13 @@ export const en = {
       duration: "Duration",
       durationDays: "{n} days",
       billing: "HOW YOU'RE BILLED",
-      /* Payment and the target price, in this panel (owner, 2026-09-27). «Your target price» is
-         the UI's name for `budgetCeiling` (owner: *"call the budget ceiling in ui as your target
-         price"*); the wire field keeps its name. */
+      /* Payment in this panel (owner, 2026-09-27). The `targetPrice` keys read «Budget»: named
+         «Your target price» for a few hours, then *"call it budget not target price"* (same day).
+         The wire field is `budgetCeiling` throughout. */
       paymentTerms: "PAYMENT TERMS",
-      targetPrice: "YOUR TARGET PRICE",
+      targetPrice: "BUDGET",
       targetPriceUnit: "SAR",
       extendable: "Extendable",
-      quoteRate: "Suppliers quote you a {basis} rate.",
       moreDetails: "MORE DETAILS",
       moreDetailsHint: "hours a day",
       hours: "HOURS A DAY",
@@ -2804,9 +2812,13 @@ export const en = {
       // One first sentence across all three, because the reason does not change — only the ask does.
       // A renter who has filled the start in should not be told again that his dates are missing; he
       // should be told which one is.
-      nudgeBoth: "Suppliers price lower when they know your duration. Add a start and end date to get better bids.",
-      nudgeEnd: "Suppliers price lower when they know your duration. Add an end date to get better bids.",
-      nudgeStart: "Suppliers price lower when they know your duration. Add a start date to get better bids.",
+      /* ONE LINE in the dates box (owner, 2026-09-28: *"reduce size so it is one line row"*). The box
+         is a third of the panel since payment joined the row, about 50 characters at this size, so
+         ~~«Suppliers price lower when they know your duration. Add … to get better bids.»~~ (85)
+         could not fit however small. Same ask, same reason, in the words that fit. */
+      nudgeBoth: "Add dates for lower bids",
+      nudgeEnd: "Add an end date for lower bids",
+      nudgeStart: "Add a start date for lower bids",
     },
     /* ~~`carry` — the carry-forward modal's four strings («Equipment #{n}», what is locked, what is
        copied, and its two buttons).~~ Deleted with the modal (owner, 2026-09-09). What they said is
@@ -2874,7 +2886,7 @@ export const en = {
       paymentTerms: "PAYMENT DETAILS",
       maintenance: "MAINTENANCE",
       maintenanceSla: "RESPONSE TIME",
-      budget: "YOUR TARGET PRICE · SAR",
+      budget: "BUDGET · SAR",
       bidWindow: "OFFER / BID WINDOW",
       supplierFilters: "SUPPLIER FILTERS",
       verifiedOnly: "Verified suppliers only",
