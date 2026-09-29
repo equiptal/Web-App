@@ -11,6 +11,7 @@ import { JOIN_URL } from "@/lib/config/store-links";
 import { bidCounterDelta } from "@/lib/contract/bid-counter-delta";
 import { resolveRenteeBandState, renteeBandIsDead, renteeBandShowsDelta, type RenteeBandState } from "@/lib/contract/bid-band-state";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
+import { CounterSheet } from "@/components/deal-room/CounterSheet";
 import { distinctMachinesOffered, unitCountNotes } from "@/lib/contract/unit-count-notes";
 import { liveRentalUnits } from "@/lib/contract/comparison";
 import { budgetVerdict, computeQuoteTotals, computeRentalTotal, divisorNote, formatSar, headlineAmount, legDisplay, type BidBudget } from "@/lib/pricing/rental";
@@ -412,6 +413,8 @@ function BidCardTile({
    * nothing and the first SEND creates the room (RM3-AC-47). Pressing chat is no longer an act.
    */
   const [countering, setCountering] = useState(false);
+  /** The room whose counter sheet is open over the offers, or null. */
+  const [sheetRoom, setSheetRoom] = useState<string | null>(null);
 
   const openRoom = () => {
     router.push(`/bids/${encodeURIComponent(card.id)}/equipment?chat=1`);
@@ -428,6 +431,9 @@ function BidCardTile({
    * The map's own footer has always done it properly (`PriceFooter.handOff`): resolve or create the
    * room first — countering is one of exactly three acts allowed to create one (004a §4.5) — then
    * `?act=counter`, which is what opens the sheet. Same two lines here.
+ *
+ * 🔴 **The sheet opens HERE, over the offers** (owner, 2026-09-29), through `CounterSheet`.
+ * ~~`router.push("/deal-room/{id}?act=counter")`~~ loaded it over the retired room page instead.
    *
    * A failure leaves the renter where he is rather than dumping him in a room he did not ask for:
    * `ensureDealRoom` throwing means no room, and no room means no sheet to open.
@@ -441,8 +447,7 @@ function BidCardTile({
     if (countering) return;
     setCountering(true);
     try {
-      const roomId = await ensureDealRoom(card.id, card.dealRoomId ?? null);
-      router.push(`/deal-room/${encodeURIComponent(roomId)}?act=counter`);
+      setSheetRoom(await ensureDealRoom(card.id, card.dealRoomId ?? null));
     } catch {
       setCountering(false);
     }
@@ -621,28 +626,25 @@ function BidCardTile({
           <div className="min-w-0 flex-1">
             <div className="text-body font-extrabold leading-none text-navy">{headlineLabel}</div>
             {basis && <div className="mt-1.5 text-label font-semibold leading-none text-muted">{basis}</div>}
-            {/* ── Above or below YOUR budget (owner, 2026-09-28: *"on each bid show arrow above or
-                below the budget"*) ──────────────────────────────────────────────────────────────
-                The live rate per unit against the budget per unit, and only when both are for the
-                same period: `budgetVerdict` returns null for a daily offer on a monthly budget, and a
-                null draws nothing rather than a guess. Red above, green below, no colour when equal. */}
-            {verdict && (
-              <div
-                {...pin("bid-budget-verdict")}
-                className={`mt-1.5 flex items-center gap-0.5 text-label font-extrabold leading-none ${
-                  verdict === "above" ? "text-danger" : verdict === "below" ? "text-ok" : "text-muted"
-                }`}
-              >
-                <Icon name={verdict === "above" ? "arrow_upward" : verdict === "below" ? "arrow_downward" : "drag_handle"} size={13} />
-                {verdict === "above"
-                  ? L("Above your budget", "أعلى من ميزانيتك")
-                  : verdict === "below"
-                    ? L("Below your budget", "أقل من ميزانيتك")
-                    : L("On your budget", "مطابق لميزانيتك")}
-              </div>
-            )}
           </div>
           <div className="flex flex-none items-baseline gap-1.5">
+            {/* ── Above or below YOUR budget (owner, 2026-09-28: *"on each bid show arrow above or
+                below the budget"*; 2026-09-29: *"only arrow red or green beside the price"*) ────────
+                The live rate per unit against the budget per unit, and only when both are for the
+                same period: `budgetVerdict` returns null for a daily offer on a monthly budget, and a
+                null draws nothing rather than a guess. Just the arrow, red above, green below; the
+                words live in the label for screen readers. Equal draws nothing: no colour to give it. */}
+            {(verdict === "above" || verdict === "below") && (
+              <span
+                {...pin("bid-budget-verdict")}
+                role="img"
+                aria-label={verdict === "above" ? L("Above your budget", "أعلى من ميزانيتك") : L("Below your budget", "أقل من ميزانيتك")}
+                title={verdict === "above" ? L("Above your budget", "أعلى من ميزانيتك") : L("Below your budget", "أقل من ميزانيتك")}
+                className={`self-center ${verdict === "above" ? "text-danger" : "text-ok"}`}
+              >
+                <Icon name={verdict === "above" ? "arrow_upward" : "arrow_downward"} size={15} />
+              </span>
+            )}
             <b className="text-subhead font-extrabold leading-none text-navy">{formatSar(headline)}</b>
             <span className="text-label font-semibold leading-none text-muted">{t.priceFooter.currency}</span>
             {accepted && <Icon name="check_circle" size={15} className="self-center text-ok" />}
@@ -935,6 +937,8 @@ function BidCardTile({
       {subOpen && (
         <SharedBidSubmissionModal bid={card} submission={submission} ar={ar} L={L} onClose={() => setSubOpen(false)} />
       )}
+      {/* The band stays disabled while the sheet is up; the offers poll picks up a sent counter. */}
+      {sheetRoom && <CounterSheet roomId={sheetRoom} onExit={() => { setSheetRoom(null); setCountering(false); }} />}
     </article>
   );
 }
