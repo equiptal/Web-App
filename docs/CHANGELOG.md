@@ -7,6 +7,13 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-29 - `/payment-complete` rewritten onto colour tokens; it had broken every Amplify build since it landed.**
+  The page shipped in `14a3d791` with raw hex, a raw `rgba()` and a `boxShadow` in inline styles, which the
+  `no-restricted-syntax` lint rule rejects, and `next build` runs lint. Staging jobs 810-811 and main jobs 77-78 all
+  failed on it, so both stayed on older builds. Mapped to the nearest tokens (`--background`, `--navy`, `--surface`,
+  `--border`, `--ok-soft`, `--ok`, `--muted`, `--muted-light`, `--border-hair`) and dropped the shadow.
+  Files: `src/app/payment-complete/page.tsx`. ⚠️ Inline `style={{}}` is linted too: a page with no Tailwind is not exempt.
+
 - **2026-09-29 - Inbox list drawn as a tree: site card, machine row with its real drawing, bids on a connector.**
   Owner picked option B of the mock (*"just try the tree"*, *"use the equipment image not icon"*). Grouping is
   unchanged (site, then equipment type, then bids). The type node now shows the taxonomy drawing looked up by
