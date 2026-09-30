@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { buildSiblingTabs } from "@/lib/contract/sibling-tabs";
-import { dealSystemEventKind, dealSystemEventIcon, SYSTEM_EVENT_ICON } from "@/lib/contract/deal-system-event";
+import { dealSystemEventKind, dealSystemEventIcon, dealSystemLine, SYSTEM_EVENT_ICON } from "@/lib/contract/deal-system-event";
 
 /**
  * **Cancelling a negotiation from the web room** (app parity, module 4A).
@@ -234,5 +234,26 @@ describe("dealSystemEventKind", () => {
     const icons = new Set(Object.values(SYSTEM_EVENT_ICON));
     expect(icons.size).toBe(Object.keys(SYSTEM_EVENT_ICON).length);
     expect(dealSystemEventIcon("Supplier accepted all terms")).toBe("check_circle");
+  });
+});
+
+describe("dealSystemLine (the app's localizedSystemMessage)", () => {
+  const en = (e: string) => e;
+  const ar = (_e: string, a: string) => a;
+
+  it("rewrites the supplier-worded «awaiting your confirmation» to the neutral line, in both locales", () => {
+    const raw = "خالد العبدلله has accepted all terms and is awaiting your confirmation.";
+    expect(dealSystemLine(raw, en)).toBe("خالد العبدلله accepted all terms, awaiting confirmation");
+    expect(dealSystemLine(raw, ar)).toBe("خالد العبدلله قبل جميع الشروط، بانتظار التأكيد");
+  });
+
+  it("localises withdrawn, deal confirmed and Request Summary", () => {
+    expect(dealSystemLine("The rentee withdrew their acceptance. The deal is back in negotiation.", ar)).toBe("سحب المستأجر قبوله. عادت الصفقة إلى التفاوض");
+    expect(dealSystemLine("Deal confirmed! A quotation has been generated.", en)).toBe("Deal confirmed! Quotation generated");
+    expect(dealSystemLine("Request Summary", ar)).toBe("ملخص الطلب");
+  });
+
+  it("returns an unmatched line as it arrived, never a blank", () => {
+    expect(dealSystemLine("Q declined the deal", ar)).toBe("Q declined the deal");
   });
 });

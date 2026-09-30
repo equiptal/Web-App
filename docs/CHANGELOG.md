@@ -7,6 +7,19 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-01 - Chat dock: «awaiting confirmation», «withdrew», «Deal confirmed» and «Request Summary» are grey pills now.**
+  Owner: *"why these not in the middle same style the grey pills"* and *"this message is for supplier wording"*.
+  The backend tags them `awaiting_confirmation` / `acceptance_withdrawn` / `deal_closed`, which `parseChatCard`
+  does not read, so they fell through to the plain-bubble branch and, authored by `system_bot`, sat on the far
+  side. And `"{renteeName} has accepted all terms and is awaiting your confirmation."` is ONE line in the channel
+  both sides read, worded for the supplier, so the renter was told he was waiting on himself. `dealSystemLine`
+  ports the app's `localizedSystemMessage` for the four (the app's neutral «{name} accepted all terms, awaiting
+  confirmation», EN + AR); unmatched lines stay as sent. Files: `src/components/map/ChatDock.tsx`,
+  `src/lib/contract/deal-system-event.ts`, `tests/unit/deal-room-cancel.test.ts`. ⚠️ The app applies the
+  action-sentence test to EVERY message; the web holds it to `system_bot`'s lines, or a renter typing «I updated
+  the dates» would become a pill. The backend wording is still supplier-addressed: a backend change to the
+  sentence would break the match on both clients.
+
 - **2026-09-29 - /browse scrolls the WINDOW: no horizontal bar, and the vertical bar starts at the top.**
   Owner: *"why horizontal scroll at bottom"* and *"vertical scroll starting from the header cta doesn't make
   sense"*. Both came from the page's inner `overflow-y-auto` box: its bar began under the header, and the CTA

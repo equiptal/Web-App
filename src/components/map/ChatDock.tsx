@@ -90,6 +90,8 @@ import {
   requestRepliesByRef,
   requestThreadCards,
 } from "@/lib/contract/deal-rounds";
+import { dealSystemEventIcon, dealSystemLine } from "@/lib/contract/deal-system-event";
+import { isDealActionMessage } from "@/lib/contract/inbox-chat";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import type { InboxBid } from "@/lib/contract/inbox";
 import {
@@ -122,6 +124,8 @@ const POLL_MS = 45_000;
 type ChatMsg = {
   id: string;
   text?: string;
+  /** Stream's own message type (`regular`, `system`, …), NOT the card's `custom.type`. */
+  type?: string;
   user?: { id?: string };
   created_at?: string | Date;
   /** Read through `dockMessageView` — the deal room renders these, so the dock must not drop them. */
@@ -1299,6 +1303,23 @@ export function ChatDock({
                     <div key={m.id} {...pin("chat-dock-event")} className="bm-chat-pill" title={view.at}>
                       <span className="material-icons-outlined" aria-hidden="true">{view.icon}</span>
                       <span className="bm-chat-pill-t">{chatEventLine(view, ar)}</span>
+                    </div>
+                  );
+                }
+                // Narration with no card the parser reads (`awaiting_confirmation`,
+                // `acceptance_withdrawn`, `deal_closed`, «Request Summary») is still an EVENT, so it
+                // takes the same grey pill (owner, 2026-10-01: *"why these not in the middle same
+                // style the grey pills"*). Read as the app reads it: Stream's own `system` type, or
+                // a backend action sentence. Shown raw it was a white bubble on the far side, since
+                // its author is `system_bot`, and in the supplier's words.
+                // ⚠️ The sentence test is held to `system_bot`'s own lines, where the app applies it
+                // to every message: a renter typing «I updated the dates» must stay his bubble.
+                const rawText = (m.text ?? "").trim();
+                if (rawText && (m.type === "system" || (m.user?.id === "system_bot" && isDealActionMessage(rawText)))) {
+                  return (
+                    <div key={m.id} {...pin("chat-dock-event")} className="bm-chat-pill" title={chatCardTime(m.created_at, ar)}>
+                      <span className="material-icons-outlined" aria-hidden="true">{dealSystemEventIcon(rawText)}</span>
+                      <span className="bm-chat-pill-t">{dealSystemLine(rawText, L)}</span>
                     </div>
                   );
                 }
