@@ -189,6 +189,7 @@ export const PIN_REGISTRY = {
   "rail-tiles": { n: "26.2", label: "Rail — request tiles", file: "src/components/workspace/RequestRail.tsx" },
   "circle-art": { n: "26.4", label: "Circle — the request's machines on one ground", file: "src/components/workspace/CircleArt.tsx" },
   "circle-zoom": { n: "26.5", label: "Circle — the zoomed view behind a double press", file: "src/components/workspace/RequestRail.tsx" },
+  "rail-scroll-back": { n: "26.6", label: "Rail — the back arrow, once scrolled", file: "src/components/workspace/RequestRail.tsx" },
   // 27 was the request strip, a full-width band above the tabs. It is the context bar now — the
   // location and the item, and the item switcher the strip used to carry as chips (owner, 2026-08-27).
   "item-tier": { n: "26.3", label: "Item tier — one chip per machine", file: "src/components/workspace/ItemTier.tsx" },

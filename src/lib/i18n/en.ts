@@ -1794,7 +1794,7 @@ export const en = {
     itemsBadge: "{n} different machines",
     unitsTitle: "×{n} of one machine",
     railScrollNext: "More requests",
-    railScrollPrev: "Earlier requests",
+    railScrollPrev: "Newer requests",
     // The dark strip, left half — the request itself.
     bidsCount: "{n} bids",
     oneBid: "1 bid",

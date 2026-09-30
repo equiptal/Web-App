@@ -44,7 +44,15 @@ import { pin } from "@/lib/uiPins";
 /* ~~`wide`.~~ Removed with the second gutter it chose (owner, 2026-08-30): with one gutter and one
    cap there is nothing left for it to select. Its one caller, `/create`, is unchanged on screen
    except that it now sits at the same margin as every other page. */
-type AppShellProps = { children: ReactNode; title?: string; fullBleed?: boolean };
+/**
+ * `pageScroll` (with `fullBleed`): the full-bleed COLUMN, but the DOCUMENT scrolls rather than a box
+ * inside it (owner, 2026-09-29, on /browse: *"why horizontal scroll at bottom"* and *"vertical scroll
+ * starting from the header doesn't make sense"*). For a page that is one long column rather than a
+ * set of pinned bands. Both faults came from the inner scroller: its bar began under the header, and
+ * a `100vw` band inside it overhung by the bar's width with `body { overflow-x: clip }` out of reach,
+ * since that rule only clips the DOCUMENT. The header is `sticky`, so it stays put either way.
+ */
+type AppShellProps = { children: ReactNode; title?: string; fullBleed?: boolean; pageScroll?: boolean };
 
 /**
  * ── The page gutters, defined once (owner, 2026-08-25: "unify the margin - paddings for all
@@ -162,7 +170,7 @@ export function AppShell(props: AppShellProps) {
   );
 }
 
-function AppShellInner({ children, title, fullBleed }: AppShellProps) {
+function AppShellInner({ children, title, fullBleed, pageScroll }: AppShellProps) {
   /** The manual, opened from the header's «?». Local to the shell: it is the same book on every
    *  page, and nothing else needs to know it is open. */
   const [helpOpen, setHelpOpen] = useState(false);
@@ -317,7 +325,7 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
         sidebar, and had no reason to carry the pin — it forked on 2026-08-13 and the pin landed on
         08-19 — so taking its side wholesale would have quietly reopened the bug the pin fixes. The
         dock shell is the redesign's; the conditional is staging's. */}
-    <div {...pin("app-shell")} className={`flex ${fullBleed ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
+    <div {...pin("app-shell")} className={`flex ${fullBleed && !pageScroll ? "h-dvh overflow-hidden" : "min-h-screen"}`}>
       {/* Main column — the whole page; navigation is the row in its header. */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ── Top bar (AC-03), and the app's navigation (owner, 2026-08-25) ──────────────────────
@@ -724,7 +732,11 @@ function AppShellInner({ children, title, fullBleed }: AppShellProps) {
                So it caps itself, one layer in: each band spans the window and puts `PAGE_MAX` +
                `PAGE_X` on its own inner row, which is what keeps the rail's tiles on the same left
                edge as the bids underneath and as every other page in the app. */
-            fullBleed ? "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" : `${PAGE_MAX} ${PAGE_Y} ${PAGE_X}`,
+            fullBleed
+              ? pageScroll
+                ? "flex min-w-0 flex-1 flex-col"
+                : "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+              : `${PAGE_MAX} ${PAGE_Y} ${PAGE_X}`,
           )}
         >
           {/* ── Back, on the page (owner, 2026-08-26) ────────────────────────────────────────────

@@ -7,6 +7,22 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-09-29 - /browse scrolls the WINDOW: no horizontal bar, and the vertical bar starts at the top.**
+  Owner: *"why horizontal scroll at bottom"* and *"vertical scroll starting from the header cta doesn't make
+  sense"*. Both came from the page's inner `overflow-y-auto` box: its bar began under the header, and the CTA
+  band's `w-screen` (100vw includes the bar) overhung it by the bar's width. `body { overflow-x: clip }` exists
+  for exactly that overhang but only clips the DOCUMENT, not a box inside it. New `AppShell` prop `pageScroll`
+  keeps the full-bleed column and lets the document scroll; the header is already `sticky`. Default unchanged,
+  so no other page moves. Files: `src/components/AppShell.tsx`, `src/app/browse/page.tsx`. ⚠️ `/stores/[id]`
+  and `/equipment/[id]` use the same inner-scroller pattern and likely show the same vertical bar; not changed.
+- **2026-09-29 - Requests rail gets a `‹` back arrow, shown once the rail has scrolled.**
+  Owner: *"there is no other way i can go to the left by <, so show it when i really scroll"*. The rail had one
+  forward chevron on the premise that its newest end is the only start; with the bar hidden, a mouse reader who
+  pressed `›` had no way back. `scrolled` is set from the scroller's own `onScroll`. The unused `railScrollPrev`
+  string said «Earlier requests», the WRONG direction for going back; now «Newer requests» / «طلبات أحدث».
+  Files: `src/components/workspace/RequestRail.tsx`, `src/lib/i18n/{en,ar}.ts`, `src/lib/uiPins.ts` (26.6).
+  ⚠️ `scrollBy` now flips its step under RTL. It never did, so the old `›` should have moved Arabic readers
+  toward the newest end, not away; reasoned from the RTL `scrollLeft` convention, not seen in a browser.
 - **2026-09-29 - Bid card button captions shortened so they fit the half-width button.**
   Owner: *"make the font size fit all the button or shorten the words"* ("Supplier Updated The O..."). The foot
   row now splits with «Chat», so five captions ellipsised. The card is already one supplier's, so «supplier» was

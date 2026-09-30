@@ -85,6 +85,6 @@ Two things it does not hold, on purpose:
 | `src/components/workspace/ItemTier.tsx` | 26.3 Item tier — one chip per machine (`item-tier`) |
 | `src/components/workspace/RequestContextBar.tsx` | 27 Request context bar (location + machines) (`request-context`) · 27.1 Context bar — the machines the request asked for (`context-machines`) · 27.2 Your budget card, beside the request context bar (`request-budget`) |
 | `src/components/workspace/RequestDetailsModal.tsx` | 28 Request details modal (`request-details`) |
-| `src/components/workspace/RequestRail.tsx` | 26 Requests rail (full-bleed band) (`request-rail`) · 26.1 Rail — create tile (`rail-create-tile`) · 26.2 Rail — request tiles (`rail-tiles`) · 26.5 Circle — the zoomed view behind a double press (`circle-zoom`) |
+| `src/components/workspace/RequestRail.tsx` | 26 Requests rail (full-bleed band) (`request-rail`) · 26.1 Rail — create tile (`rail-create-tile`) · 26.2 Rail — request tiles (`rail-tiles`) · 26.5 Circle — the zoomed view behind a double press (`circle-zoom`) · 26.6 Rail — the back arrow, once scrolled (`rail-scroll-back`) |
 | `src/components/workspace/RequestsWorkspace.tsx` | 25 Requests workspace (`requests-workspace`) |
 <!-- pins:end -->

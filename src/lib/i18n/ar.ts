@@ -1427,7 +1427,7 @@ export const ar: Dictionary = {
     itemsBadge: "{n} معدات مختلفة",
     unitsTitle: "×{n} من معدة واحدة",
     railScrollNext: "طلبات أخرى",
-    railScrollPrev: "طلبات سابقة",
+    railScrollPrev: "طلبات أحدث",
     bidsCount: "{n} عروض",
     oneBid: "عرض واحد",
     openRequest: "فتح الطلب",

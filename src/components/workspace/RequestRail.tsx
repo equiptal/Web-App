@@ -129,7 +129,23 @@ export function RequestRail({
   const [zoom, setZoom] = useState<RailTile | null>(null);
 
   // Roughly three tiles a press — far enough to feel like progress, short enough to keep your place.
-  const scrollBy = (dir: 1 | -1) => scroller.current?.scrollBy({ left: dir * 300, behavior: "smooth" });
+  // ⚠️ `scrollBy` takes PHYSICAL pixels, and under `dir="rtl"` forward is leftward, so the step flips
+  // there. The old single arrow never flipped and so moved Arabic readers the wrong way; the row is
+  // RTL-mirrored with the rest of the page.
+  const scrollBy = (dir: 1 | -1) => {
+    const el = scroller.current;
+    if (!el) return;
+    const rtl = getComputedStyle(el).direction === "rtl";
+    el.scrollBy({ left: dir * (rtl ? -1 : 1) * 300, behavior: "smooth" });
+  };
+  /**
+   * Whether the rail has left its newest end, which is when `‹` appears (owner, 2026-09-29: *"there
+   * is no other way i can go to the left by <, so show it when i really scroll"*). ~~One control,
+   * pointing forward, because "earlier" was the only direction to travel.~~ True at the start, not
+   * after the first press: a mouse reader had no way back but a trackpad.
+   * `Math.abs` because an RTL row's `scrollLeft` runs from 0 to NEGATIVE.
+   */
+  const [scrolled, setScrolled] = useState(false);
 
   // ── 88px, and every pixel of it is spoken for (owner, 2026-08-25) ──────────────────────────────
   // It was 96, then 80, then 76 — and each of those CLIPPED, because this row is `overflow-hidden`
@@ -203,6 +219,21 @@ export function RequestRail({
           circles' line. */}
       <div className="mb-[26px] h-11 w-px flex-none bg-border/70" />
 
+      {/* Back toward the newest end, drawn only once the rail has left it (see `scrolled`). The
+          same disc as the forward chevron, mirrored in Arabic with the rest of the row. */}
+      {scrolled && (
+        <button
+          {...pin("rail-scroll-back")}
+          type="button"
+          onClick={() => scrollBy(-1)}
+          aria-label={t.workspace.railScrollPrev}
+          title={t.workspace.railScrollPrev}
+          className="mb-[26px] grid h-7 w-7 flex-none place-items-center rounded-full border border-border bg-surface/60 text-muted transition hover:bg-surface"
+        >
+          <Icon name="chevron_left" size={16} className="rtl:scale-x-[-1]" />
+        </button>
+      )}
+
       <div {...pin("rail-tiles")}
         ref={scroller}
         /* Every circle on one line, `New` included (owner, 2026-08-25).
@@ -214,6 +245,7 @@ export function RequestRail({
            would push their circles UP relative to the rest. The label block therefore has a fixed
            height (13px name + 9px CLOSED) whether or not the second line is present, so
            every tile is the same height and one `items-center` lands every circle on the same line. */
+        onScroll={(e) => setScrolled(Math.abs(e.currentTarget.scrollLeft) > 1)}
         className="flex min-w-0 flex-1 items-center gap-4 overflow-x-auto scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tiles.map((tile) => {
@@ -426,8 +458,8 @@ export function RequestRail({
         })}
       </div>
 
-      {/* One control, pointing forward: the rail starts at its newest end, so "earlier" is the only
-          direction there is to travel. It mirrors itself in Arabic with the rest of the row. */}
+      {/* Forward, toward older requests: the rail starts at its newest end. Its partner `‹` sits
+          before the tiles and shows once the rail has scrolled. Mirrors itself in Arabic. */}
       <button
         type="button"
         onClick={() => scrollBy(1)}

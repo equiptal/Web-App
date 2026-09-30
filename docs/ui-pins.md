@@ -99,6 +99,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**26.3** | Item tier — one chip per machine | `src/components/workspace/ItemTier.tsx` |
 | &nbsp;&nbsp;**26.4** | Circle — the request's machines on one ground | `src/components/workspace/CircleArt.tsx` |
 | &nbsp;&nbsp;**26.5** | Circle — the zoomed view behind a double press | `src/components/workspace/RequestRail.tsx` |
+| &nbsp;&nbsp;**26.6** | Rail — the back arrow, once scrolled | `src/components/workspace/RequestRail.tsx` |
 | **27** | Request context bar (location + machines) | `src/components/workspace/RequestContextBar.tsx` |
 | &nbsp;&nbsp;**27.1** | Context bar — the machines the request asked for | `src/components/workspace/RequestContextBar.tsx` |
 | &nbsp;&nbsp;**27.2** | Your budget card, beside the request context bar | `src/components/workspace/RequestContextBar.tsx` |

@@ -16,12 +16,12 @@ import { BrowsePage } from "@/components/stores/BrowsePage";
  */
 export default function Browse() {
   return (
-    <AppShell fullBleed>
-      {/* `fullBleed` + an inner scroller, so the storefront's own 1360 column is the only gutter on
-          the page rather than the shell's on top of it. See the note in `/stores/[id]`. */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <BrowsePage />
-      </div>
+    /* `fullBleed`, so the storefront's own 1360 column is the only gutter on the page rather than the
+       shell's on top of it (see the note in `/stores/[id]`). `pageScroll`, so the WINDOW scrolls:
+       ~~an inner `overflow-y-auto` box~~ drew its bar from under the header and let the banner's
+       `100vw` overhang into a horizontal bar (owner, 2026-09-29; see `AppShellProps`). */
+    <AppShell fullBleed pageScroll>
+      <BrowsePage />
     </AppShell>
   );
 }
