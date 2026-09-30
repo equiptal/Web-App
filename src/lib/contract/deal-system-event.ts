@@ -67,3 +67,31 @@ export function dealSystemEventKind(text: string | null | undefined, opts?: { is
 export function dealSystemEventIcon(text: string | null | undefined, opts?: { isRoomOpened?: boolean }): string {
   return SYSTEM_EVENT_ICON[dealSystemEventKind(text, opts)];
 }
+
+/**
+ * **A narration line with no card, in the thread's language.** A port of the app's
+ * `localizedSystemMessage` for the lines the backend posts with a `custom.type` the card parser does
+ * not read (`awaiting_confirmation`, `acceptance_withdrawn`, `deal_closed`) and for «Request Summary».
+ *
+ * 🔴 **«awaiting YOUR confirmation» is the supplier's sentence** (owner, 2026-10-01: *"this message
+ * is for supplier wording"*). The backend posts ONE line into the channel both sides read, worded for
+ * the supplier, so shown raw it tells the renter he is waiting on himself. The app rewrites it to the
+ * neutral «{name} accepted all terms, awaiting confirmation», and so does this.
+ *
+ * Anything unmatched comes back as it arrived: a line the web has no wording for is still the
+ * backend's words, never a blank.
+ */
+export function dealSystemLine(text: string, L: (en: string, ar: string) => string): string {
+  const t = text.trim();
+  if (t === "Request Summary") return L("Request Summary", "ملخص الطلب");
+  if (t.startsWith("Deal confirmed!")) return L("Deal confirmed! Quotation generated", "تم تأكيد الصفقة! تم إنشاء عرض السعر");
+  const awaiting = /^(.+?)\s+has accepted all terms and is awaiting your confirmation\.?$/.exec(t);
+  if (awaiting) {
+    const name = awaiting[1];
+    return L(`${name} accepted all terms, awaiting confirmation`, `${name} قبل جميع الشروط، بانتظار التأكيد`);
+  }
+  if (t.includes("withdrew their acceptance") || t.includes("سحب المستأجر قبوله")) {
+    return L("The rentee withdrew their acceptance. The deal is back in negotiation", "سحب المستأجر قبوله. عادت الصفقة إلى التفاوض");
+  }
+  return text;
+}

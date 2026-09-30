@@ -99,6 +99,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**26.3** | Item tier — one chip per machine | `src/components/workspace/ItemTier.tsx` |
 | &nbsp;&nbsp;**26.4** | Circle — the request's machines on one ground | `src/components/workspace/CircleArt.tsx` |
 | &nbsp;&nbsp;**26.5** | Circle — the zoomed view behind a double press | `src/components/workspace/RequestRail.tsx` |
+| &nbsp;&nbsp;**26.6** | Rail — the back arrow, once scrolled | `src/components/workspace/RequestRail.tsx` |
 | **27** | Request context bar (location + machines) | `src/components/workspace/RequestContextBar.tsx` |
 | &nbsp;&nbsp;**27.1** | Context bar — the machines the request asked for | `src/components/workspace/RequestContextBar.tsx` |
 | &nbsp;&nbsp;**27.2** | Your budget card, beside the request context bar | `src/components/workspace/RequestContextBar.tsx` |
@@ -178,10 +179,13 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**60.2** | Inbox — one chat row | `src/components/inbox/InboxView.tsx` |
 | &nbsp;&nbsp;**60.3** | Inbox — the conversation beside the list | `src/components/inbox/InboxView.tsx` |
 | &nbsp;&nbsp;**60.4** | Inbox — nothing picked yet | `src/components/inbox/InboxView.tsx` |
+| &nbsp;&nbsp;**60.5** | Inbox — one site, its header and its machines | `src/components/inbox/InboxView.tsx` |
+| &nbsp;&nbsp;**60.6** | Inbox — a machine section header | `src/components/inbox/InboxView.tsx` |
 | **61** | Browse stores | `src/components/stores/BrowseSurface.tsx` |
 | &nbsp;&nbsp;**61.1** | Browse — heading + search + city, one row | `src/components/stores/BrowseSurface.tsx` |
 | &nbsp;&nbsp;**61.2** | Browse — category rail | `src/components/stores/BrowseSurface.tsx` |
 | &nbsp;&nbsp;**61.3** | Browse — page arrows | `src/components/stores/BrowseSurface.tsx` |
+| &nbsp;&nbsp;**61.4** | Browse — category rail arrows | `src/components/stores/BrowseSurface.tsx` |
 | **62** | Store detail | `src/components/stores/StoreDetailSurface.tsx` |
 | **63** | Store card | `src/components/stores/StoreCard.tsx` |
 | **64** | Store card (category) | `src/components/stores/StoreCard.tsx` |

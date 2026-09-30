@@ -226,6 +226,8 @@ export const en = {
     // exist for the screen reader and the tooltip (owner, 2026-09-16: 20 per page, arrows for the rest).
     prevPage: "Previous page",
     nextPage: "Next page",
+    scrollBack: "Scroll categories back",
+    scrollForward: "Scroll categories forward",
     empty: "No suppliers match your filters.",
     error: "We couldn't load suppliers.",
     retry: "Retry",
@@ -1767,15 +1769,15 @@ export const en = {
       /* A room exists and nobody has priced yet. The owner asked for the second wording explicitly:
          there is an OFFER on the table to answer, not just a price to undercut. */
       counterOffer: "Counter this offer",
-      awaitingSupplier: "Awaiting supplier response",
+      awaitingSupplier: "Awaiting reply",
       newCounterOffer: "New counter offer",
-      newMessage: "New message from supplier",
+      newMessage: "New message",
       /* ⚠️ ONE caption for every ask and every resolution (app parity): the renter does not remember
          which question he asked, and the room shows him when he opens it. It is also what makes a
          PARTIAL answer safe to report, since the wording claims nothing about what is on file. */
-      supplierAnswered: "Supplier answered your request",
-      offerUpdated: "Supplier updated the offer",
-      awaitingConfirmation: "Awaiting supplier confirmation",
+      supplierAnswered: "Supplier replied",
+      offerUpdated: "Offer updated",
+      awaitingConfirmation: "Awaiting confirmation",
       dealClosed: "Deal closed",
       accepted: "Accepted",
       withdrawn: "Withdrawn",
@@ -1792,7 +1794,7 @@ export const en = {
     itemsBadge: "{n} different machines",
     unitsTitle: "×{n} of one machine",
     railScrollNext: "More requests",
-    railScrollPrev: "Earlier requests",
+    railScrollPrev: "Newer requests",
     // The dark strip, left half — the request itself.
     bidsCount: "{n} bids",
     oneBid: "1 bid",

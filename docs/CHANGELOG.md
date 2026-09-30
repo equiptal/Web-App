@@ -7,6 +7,88 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-01 - Chat dock: «awaiting confirmation», «withdrew», «Deal confirmed» and «Request Summary» are grey pills now.**
+  Owner: *"why these not in the middle same style the grey pills"* and *"this message is for supplier wording"*.
+  The backend tags them `awaiting_confirmation` / `acceptance_withdrawn` / `deal_closed`, which `parseChatCard`
+  does not read, so they fell through to the plain-bubble branch and, authored by `system_bot`, sat on the far
+  side. And `"{renteeName} has accepted all terms and is awaiting your confirmation."` is ONE line in the channel
+  both sides read, worded for the supplier, so the renter was told he was waiting on himself. `dealSystemLine`
+  ports the app's `localizedSystemMessage` for the four (the app's neutral «{name} accepted all terms, awaiting
+  confirmation», EN + AR); unmatched lines stay as sent. Files: `src/components/map/ChatDock.tsx`,
+  `src/lib/contract/deal-system-event.ts`, `tests/unit/deal-room-cancel.test.ts`. ⚠️ The app applies the
+  action-sentence test to EVERY message; the web holds it to `system_bot`'s lines, or a renter typing «I updated
+  the dates» would become a pill. The backend wording is still supplier-addressed: a backend change to the
+  sentence would break the match on both clients.
+
+- **2026-09-29 - /browse scrolls the WINDOW: no horizontal bar, and the vertical bar starts at the top.**
+  Owner: *"why horizontal scroll at bottom"* and *"vertical scroll starting from the header cta doesn't make
+  sense"*. Both came from the page's inner `overflow-y-auto` box: its bar began under the header, and the CTA
+  band's `w-screen` (100vw includes the bar) overhung it by the bar's width. `body { overflow-x: clip }` exists
+  for exactly that overhang but only clips the DOCUMENT, not a box inside it. New `AppShell` prop `pageScroll`
+  keeps the full-bleed column and lets the document scroll; the header is already `sticky`. Default unchanged,
+  so no other page moves. Files: `src/components/AppShell.tsx`, `src/app/browse/page.tsx`. ⚠️ `/stores/[id]`
+  and `/equipment/[id]` use the same inner-scroller pattern and likely show the same vertical bar; not changed.
+- **2026-09-29 - Requests rail gets a `‹` back arrow, shown once the rail has scrolled.**
+  Owner: *"there is no other way i can go to the left by <, so show it when i really scroll"*. The rail had one
+  forward chevron on the premise that its newest end is the only start; with the bar hidden, a mouse reader who
+  pressed `›` had no way back. `scrolled` is set from the scroller's own `onScroll`. The unused `railScrollPrev`
+  string said «Earlier requests», the WRONG direction for going back; now «Newer requests» / «طلبات أحدث».
+  Files: `src/components/workspace/RequestRail.tsx`, `src/lib/i18n/{en,ar}.ts`, `src/lib/uiPins.ts` (26.6).
+  ⚠️ `scrollBy` now flips its step under RTL. It never did, so the old `›` should have moved Arabic readers
+  toward the newest end, not away; reasoned from the RTL `scrollLeft` convention, not seen in a browser.
+- **2026-09-29 - Bid card button captions shortened so they fit the half-width button.**
+  Owner: *"make the font size fit all the button or shorten the words"* ("Supplier Updated The O..."). The foot
+  row now splits with «Chat», so five captions ellipsised. The card is already one supplier's, so «supplier» was
+  redundant: Offer updated, Supplier replied, New message, Awaiting reply, Awaiting confirmation (Arabic to match).
+  Files: `src/lib/i18n/en.ts`, `src/lib/i18n/ar.ts`. ⚠️ These are now SHORTER than the app's wording, which the
+  i18n comment calls app parity: the app still reads «Supplier updated the offer» and «Supplier answered your
+  request» (`apps/mobile/lib/l10n/app_en.arb:11286-11290`).
+- **2026-09-29 - `/payment-complete` rewritten onto colour tokens; it had broken every Amplify build since it landed.**
+  The page shipped in `14a3d791` with raw hex, a raw `rgba()` and a `boxShadow` in inline styles, which the
+  `no-restricted-syntax` lint rule rejects, and `next build` runs lint. Staging jobs 810-811 and main jobs 77-78 all
+  failed on it, so both stayed on older builds. Mapped to the nearest tokens (`--background`, `--navy`, `--surface`,
+  `--border`, `--ok-soft`, `--ok`, `--muted`, `--muted-light`, `--border-hair`) and dropped the shadow.
+  Files: `src/app/payment-complete/page.tsx`. ⚠️ Inline `style={{}}` is linted too: a page with no Tailwind is not exempt.
+
+- **2026-09-29 - Inbox list restyled after the app's inbox: site line, orange-bar machine header, plain cards.**
+  Owner, with the app's inbox screenshot: *"like this but with the location at top, no equipment image, no
+  complex ui"*. Grouping unchanged (site, then equipment type, then bids). Replaced, the same day, a TREE
+  version (site card, machine drawing in a circle, bids on a connector) and with it the `/api/stores/taxonomy`
+  read it needed: the received-bids feed carries no image, so a picture costs a second request. Rows are cards
+  again with the supplier's logo or initials (on `brand-soft`, as the app's «DC»), where a storefront glyph was.
+  Files: `src/components/inbox/InboxView.tsx`, `src/lib/uiPins.ts` (60.5 site, 60.6 machine header).
+
+- **2026-09-29 - Browse: smaller search + city pair, category rail moves by `‹ ›` with the scrollbar hidden.**
+  Owner: *"too long and big, i want something smaller and cuter"* and *"use this < > to move and remove this"*.
+  Search is 260px (was `flex-1`, the whole row), city 140px, both `h-9` white with 13px type; the magnifier
+  moved to the end. On a phone the pair shares one row. The rail hides its bar and gets `PageArrow`s that
+  show only when it overflows and disable at each end. `.shop-rail` deleted from `globals.css` (no other user).
+  Files: `src/components/stores/BrowseSurface.tsx`, `src/app/globals.css`, `src/lib/i18n/{en,ar}.ts`,
+  `src/lib/uiPins.ts` (pin 61.4). ⚠️ A hidden bar is only safe WITH the arrows: without them a trackpad
+  with no shift-scroll cannot reach the rest of the row. ⚠️ RTL `scrollLeft` is negative, so the ends read
+  `Math.abs` and a press flips its sign. ⚠️ No `shadow-sm` on the field: lint bans shadows app-wide.
+- **2026-09-29 - Counter sheet: the pen on an agreed term works, and «Counter this price» opens over the offers.**
+  Owner: *"i clicked edit but nothing happen"* and *"loading over the old ui of the deal room chat"*.
+  (1) A term BOTH sides already hold the same value on has no resolution, so the pen's reopen cleared
+  nothing, the row stayed in «Agreed terms» and `activeKey` (which only picks from `attention`) never
+  opened it. `reopenedAgreed` now hands it to the pending walk; `decide` and the accept gate's
+  `termMatched` let a sheet answer outrank the server's match, or a changed agreed term would still
+  read (and gate) as agreed. (2) The bid card's band pushed `/deal-room/{id}?act=counter`, which drew
+  the sheet over the retired room page. It now mounts `DealRoom sheetOnly` over the offers through
+  `CounterSheet` (portal, lazy-loaded); `RoomBack` carries the room's `usePageBack` so the sheet mode
+  does not steal the workspace's Back. ⚠️ The map footer (`PriceFooter`, also in the inbox) still
+  navigates: the map never re-reads the bid after a send, so in place it would show a stale price.
+  ⚠️ The app has the same pen defect (`counter_offer_terms_page.dart`, agreed `onReopen`).
+  Files: `src/components/deal-room/DealRoom.tsx`, `src/components/deal-room/CounterSheet.tsx`,
+  `src/components/deal-room/deal-room-proto.css`, `src/components/workspace/BidCards.tsx`,
+  `tests/unit/negotiation-sheet.test.ts`.
+
+- **2026-09-29 - The bid's budget verdict is now just a red or green arrow beside the price.**
+  Owner: *"i dont want this, i want only arrow red or green beside the price"* (of the «↑ Above your
+  budget» line under the rate). The words moved into `aria-label` / `title`; an equal rate now draws
+  nothing (the old grey «On your budget» had no colour to become). Pin 29.4 kept, on the arrow.
+  Files: `src/components/workspace/BidCards.tsx`.
+
 - **2026-09-28 - The offers page shows «Your budget» beside the request, and every bid says above or below it.**
   Owner: *"show «your budget» in the navy card of the request card, maybe another stuck card, and on
   each bid show arrow above or below the budget"*. «Your budget (per month) · 7,500 SAR» is the

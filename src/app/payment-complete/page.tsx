@@ -25,8 +25,8 @@ export default function PaymentCompletePage() {
         alignItems: 'center',
         justifyContent: 'center',
         padding: 24,
-        background: '#f6f7f9',
-        color: '#1f2937',
+        background: 'var(--background)',
+        color: 'var(--navy)',
         fontFamily: 'system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif',
       }}
     >
@@ -35,11 +35,10 @@ export default function PaymentCompletePage() {
           maxWidth: 440,
           width: '100%',
           textAlign: 'center',
-          background: '#ffffff',
-          border: '1px solid #e5e7eb',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
           borderRadius: 16,
           padding: '32px 24px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
         }}
       >
         <div
@@ -49,8 +48,8 @@ export default function PaymentCompletePage() {
             height: 64,
             margin: '0 auto 20px',
             borderRadius: 9999,
-            background: 'rgba(34,197,94,0.12)',
-            color: '#16a34a',
+            background: 'var(--ok-soft)',
+            color: 'var(--ok)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -63,20 +62,20 @@ export default function PaymentCompletePage() {
 
         <div dir="rtl" style={{ marginBottom: 18 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 8px' }}>تم استلام الدفع</h1>
-          <p style={{ fontSize: 15, margin: '0 0 4px', color: '#4b5563' }}>
+          <p style={{ fontSize: 15, margin: '0 0 4px', color: 'var(--muted)' }}>
             شكراً لك. يجري تفعيل اشتراكك.
           </p>
-          <p style={{ fontSize: 13, margin: 0, color: '#9ca3af' }}>
+          <p style={{ fontSize: 13, margin: 0, color: 'var(--muted-light)' }}>
             يمكنك إغلاق هذه الصفحة والعودة إلى التطبيق.
           </p>
         </div>
 
-        <div style={{ borderTop: '1px solid #f0f1f3', paddingTop: 16 }}>
+        <div style={{ borderTop: '1px solid var(--border-hair)', paddingTop: 16 }}>
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>Payment received</h2>
-          <p style={{ fontSize: 14, margin: '0 0 4px', color: '#4b5563' }}>
+          <p style={{ fontSize: 14, margin: '0 0 4px', color: 'var(--muted)' }}>
             Thank you. Your subscription is being activated.
           </p>
-          <p style={{ fontSize: 12, margin: 0, color: '#9ca3af' }}>
+          <p style={{ fontSize: 12, margin: 0, color: 'var(--muted-light)' }}>
             You can close this page and return to the app.
           </p>
         </div>

@@ -529,25 +529,8 @@ function BidCardTile({
 
               Nothing takes its place. An off-platform bid has no deal room to open, so that slot has
               nothing to offer on this card; the units badge below it still draws. */}
-          {!offline && (
-            /* The conversation, as one round control: filled while there is something unread on it,
-               quiet while there is not. */
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                void openRoom();
-              }}
-              aria-label={t.workspace.openChat}
-              title={t.workspace.openChat}
-              className={`relative grid h-[34px] w-[34px] flex-none place-items-center rounded-full border transition disabled:bg-disabled-bg disabled:text-disabled-fg ${
-                unread > 0 ? "border-navy bg-navy text-white" : "border-border bg-surface2 text-muted hover:bg-surface3"
-              }`}
-            >
-              <Icon name="chat_bubble_outline" size={16} />
-              {unread > 0 && <span className="absolute -end-px -top-px h-[9px] w-[9px] rounded-full bg-brand ring-2 ring-surface" />}
-            </button>
-          )}
+          {/* ~~The round chat control.~~ Moved to the foot as a labelled «Chat» button beside the
+              counter (owner, 2026-09-29: *"beside it chat button instead of the chat icon on top"*). */}
           {/* ── What THIS bid covers (owner, 2026-08-28) ──────────────────────────────────
               A renter reading four offers to a four-unit request had no way to tell a supplier
               covering the whole of it from one covering a single machine — both cards looked the
@@ -761,9 +744,64 @@ function BidCardTile({
           `mt-auto` is back and now earns it: the cards are stretched to a COMMON height rather than
           to the pane, so the slack it crosses is only ever the difference between this card and the
           fullest one. That is what puts the buttons on one line.
-          ⚠️ On an ON-PLATFORM bid this row now holds NOTHING — the band below it is the way on — so
-          it collapses to the `mt-auto` spacer that keeps the bands level across a row of cards. */}
-      <div className={`mt-auto flex flex-none gap-2 px-3.5 pt-0.5 ${offline ? "pb-3.5" : ""}`}>
+          On an ON-PLATFORM bid it holds the band as a button and «Chat» beside it (owner,
+          2026-09-29: *"for in app bids show 2 buttons too instead of the orange bottom for the whole
+          card"*), the same pair shape as the offline card's «View quote» and «Invite». */}
+      <div className="mt-auto flex flex-none gap-2 px-3.5 pb-3.5 pt-0.5">
+        {!offline && (
+          <>
+            {/* The band, as a button: same states, captions, glyph and delta as before; only the
+                shape moved. A live bid is orange whatever the caption, a terminal one is disabled. */}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); if (!bandDead) void openCounter(); }}
+              // Not disabled while countering: `openCounter` already ignores a second press, and the
+              // shared disabled grey would flash behind the sheet.
+              disabled={bandDead}
+              aria-busy={countering || undefined}
+              aria-live={bandIsNews ? "polite" : undefined}
+              className={btn(bandDead ? "tinted" : "primary", "lg", { className: "min-w-0 flex-1 px-3" })}
+            >
+              {/* The glyph rides its own translucent disc, as the app draws it: on a saturated orange a
+                  bare white outline icon has almost no edge to sit against. */}
+              <span className={`grid size-6 flex-none place-items-center rounded-full ${bandDead ? "bg-border" : "bg-white/20"}`}>
+                <Icon name={BAND_GLYPH[bandState]} size={14} />
+              </span>
+              {/* Ellipsising: the button centres its content, so an over-long caption would push the
+                  glyph off the leading edge rather than simply running past the trailing one. */}
+              <span className={`min-w-0 truncate ${bandShowsDelta ? "text-meta" : "text-body"}`}>{bandLabel}</span>
+              {/* ⚠️ Never truncated and never wrapped — a cut price is a WRONG price. Forced LTR, because
+                  money reads left to right in both locales and a mirrored pair says the opposite of
+                  what happened. */}
+              {bandShowsDelta && delta && (
+                <span dir="ltr" className="inline-flex flex-none items-baseline gap-1.5">
+                  <span className="text-label font-semibold text-white/55 line-through">{formatSar(delta.from)}</span>
+                  <span aria-hidden="true" className="text-label font-semibold text-white/55">→</span>
+                  <span className="text-meta font-extrabold">{formatSar(delta.to)}</span>
+                </span>
+              )}
+            </button>
+            {/* The conversation. A red COUNT of the unread messages on it (owner, 2026-09-29: *"any
+                new chat show it as red count on the chat button"*), capped at 99+. */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void openRoom();
+              }}
+              aria-label={t.workspace.openChat}
+              className={btn("tinted", "lg", { className: "relative flex-none whitespace-nowrap" })}
+            >
+              <Icon name="chat_bubble_outline" size={16} />
+              {L("Chat", "محادثة")}
+              {unread > 0 && (
+                <span className="absolute -end-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-label font-extrabold leading-none text-white ring-2 ring-surface">
+                  {unread > 99 ? "99+" : unread}
+                </span>
+              )}
+            </button>
+          </>
+        )}
         {offline && (
           <>
             {/* ── «View quote» leads, «Invite» follows (owner, 2026-09-05) ───────────────────────
@@ -863,8 +901,8 @@ function BidCardTile({
           and a pale bar beside a coloured one reads as disabled. Only a TERMINAL bid is drawn down,
           and that one really is unpressable.
 
-          ⚠️ Square corners: the CARD clips this to its own radius (`overflow-hidden` on the article).
-          Rounding here too would put the corner in two places and they would drift. */}
+          🔴 **Now a button in the foot row above, beside «Chat»** (owner, 2026-09-29). ~~A
+          full-width square band at the card's foot.~~ */}
       {/* 🔴 **NO BAND ON AN OFF-PLATFORM BID** (owner, 2026-09-22, on a picture of one carrying
           «Counter this price»: *"how offline bids has counter this pruce, remove"*).
 
@@ -882,36 +920,6 @@ function BidCardTile({
           ⚠️ The whole BUTTON is withheld rather than drawn dead: `bandDead` is the terminal state
           of a live negotiation («Deal closed»), and a grey bar saying that over an offer nobody ever
           negotiated would be a claim about a conversation that never happened. */}
-      {!offline && (
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); if (!bandDead) void openCounter(); }}
-        disabled={bandDead || countering}
-        aria-live={bandIsNews ? "polite" : undefined}
-        className={`flex flex-none items-center justify-center gap-2.5 px-3.5 py-3 text-body font-extrabold transition ${
-          bandDead ? "cursor-default bg-surface2 text-muted" : "bg-brand text-white hover:bg-brand-press"
-        }`}
-      >
-        {/* The glyph rides its own translucent disc, as the app draws it: on a saturated orange a
-            bare white outline icon has almost no edge to sit against. */}
-        <span className={`grid size-7 flex-none place-items-center rounded-full ${bandDead ? "bg-border" : "bg-white/20"}`}>
-          <Icon name={BAND_GLYPH[bandState]} size={15} />
-        </span>
-        {/* Ellipsising: the band centres its content, so an over-long caption would push the glyph
-            off the leading edge rather than simply running past the trailing one. */}
-        <span className={`min-w-0 truncate ${bandShowsDelta ? "text-meta" : "text-body"}`}>{bandLabel}</span>
-        {/* ⚠️ Never truncated and never wrapped — a cut price is a WRONG price. Forced LTR, because
-            money reads left to right in both locales and a mirrored pair says the opposite of what
-            happened. */}
-        {bandShowsDelta && delta && (
-          <span dir="ltr" className="inline-flex flex-none items-baseline gap-1.5">
-            <span className="text-label font-semibold text-white/55 line-through">{formatSar(delta.from)}</span>
-            <span aria-hidden="true" className="text-label font-semibold text-white/55">→</span>
-            <span className="text-meta font-extrabold">{formatSar(delta.to)}</span>
-          </span>
-        )}
-      </button>
-      )}
 
       {termsOpen && (
         <BidTermsModal

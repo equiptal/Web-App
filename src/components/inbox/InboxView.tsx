@@ -45,6 +45,17 @@ import "@/components/map/map-proto.css";
 
 const nf = (n: number) => Math.round(n).toLocaleString("en-US");
 
+/** A supplier's mark when he has no logo: the first letter of his first two words («Al-Faisal
+ *  Contracting» → «AC», «345678» → «3»). `Array.from` so a letter outside the BMP stays whole. */
+const initials = (name: string) =>
+  name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => Array.from(w)[0] ?? "")
+    .join("")
+    .toUpperCase() || "?";
+
 /**
  * How often the list re-reads the unread counts and the last messages.
  *
@@ -334,16 +345,20 @@ export function InboxView() {
         type="button"
         onClick={() => openBid(b.bidId)}
         aria-current={active ? "true" : undefined}
-        className={`flex w-full items-center gap-2.5 rounded-lg border p-2.5 text-start ${
+        /* A card of its own, the app's `_InboxCard` (owner, 2026-09-29, the app's inbox as the
+           reference). ~~A leaf of the tree with no box, the site card as the box.~~ */
+        className={`flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-start ${
           active ? "border-navy bg-surface2" : "border-border bg-surface hover:bg-surface2"
         }`}
       >
-        <div className="grid h-10 w-10 flex-none place-items-center overflow-hidden rounded-full bg-surface2 text-navy-mid">
+        {/* The supplier's logo, else his initials: a mark that says WHO, where the storefront glyph
+            said only «a supplier» and read the same on every row. */}
+        <div className="grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-full bg-brand-soft text-label font-extrabold text-brand-deep">
           {b.supplierLogoUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={b.supplierLogoUrl} alt="" className="h-full w-full object-cover" />
           ) : (
-            <Icon name="storefront" size={20} />
+            initials(b.supplierName)
           )}
         </div>
         <div className="min-w-0 flex-1">
@@ -386,28 +401,36 @@ export function InboxView() {
   };
 
   const list = (
-    <div {...pin("inbox-list")} className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
+    <div {...pin("inbox-list")} className="flex min-h-0 flex-1 flex-col overflow-y-auto p-2">
       {banner}
       {only && shown.length === 0 && (
         <p className="rounded-md border border-dashed border-border bg-surface2 px-4 py-6 text-center text-meta text-muted">
           {L("Nothing from this supplier yet.", "لا شيء من هذا المورّد بعد.")}
         </p>
       )}
+      {/* ── Site, then machine, then cards: the APP's inbox look (owner, 2026-09-29: *"like this but
+          with the location at top, no equipment image, no complex ui"*, the app's screenshot).
+          Same three levels as before. The machine is the app's section header, a short orange bar,
+          the name and a count pill; the rows are plain cards. ~~The tree: one site card, the
+          machine's taxonomy drawing in a circle, bids on a connector line~~ (2026-09-29, same day),
+          and with it the second read of `/api/stores/taxonomy` it needed for the drawing. */}
       {[...groups.values()].map((g) => (
-        <div key={g.key} className="mb-4">
+        <div key={g.key} {...pin("inbox-site")} className="mb-3">
           {/* Level 1 — the RFQ group, by its site. ~~The short code first (RFQ-NNNNN, else REQ-).~~
               Removed (owner, 2026-09-26: *"in inbox remove the request id"*). */}
-          <div className="mb-1.5 flex items-center gap-1.5 px-0.5 text-meta font-extrabold text-navy">
-            <Icon name="folder_open" size={14} />
-            <span className="min-w-0 flex-1 truncate text-muted">{g.label}</span>
-            <span className="flex-none text-label font-semibold text-muted">{g.count}</span>
+          <div className="mb-1 flex items-center gap-1 px-0.5 text-label font-semibold text-muted">
+            <Icon name="location_on" size={14} className="flex-none text-muted-light" />
+            <span className="min-w-0 flex-1 truncate">{g.label}</span>
           </div>
           {[...g.subs.values()].map((sub) => (
-            <div key={sub.key} className="mb-2 ms-1 border-s-2 border-border ps-2">
-              {/* Level 2 — equipment type */}
-              <div className="mb-1.5 inline-flex max-w-full items-center gap-1 rounded-sm bg-brand-soft px-2 py-0.5 text-label font-extrabold text-brand-deep">
-                <Icon name="construction" size={13} /> <span className="truncate">{sub.label}</span>
-                <span className="flex-none rounded-full bg-brand/15 px-1.5">{sub.rows.length}</span>
+            <div key={sub.key} className="mb-2">
+              {/* Level 2 — the machine, as the app draws a section */}
+              <div {...pin("inbox-machine")} className="mb-1.5 flex items-center gap-2 px-0.5">
+                <span className="h-4 w-1 flex-none rounded-full bg-brand" aria-hidden />
+                <span className="min-w-0 flex-1 truncate text-meta font-extrabold text-navy">{sub.label}</span>
+                <span className="grid h-5 min-w-5 flex-none place-items-center rounded-full bg-brand-soft px-1.5 text-label font-extrabold text-brand-deep">
+                  {sub.rows.length}
+                </span>
               </div>
               <div className="flex flex-col gap-1.5">{sub.rows.map(row)}</div>
             </div>

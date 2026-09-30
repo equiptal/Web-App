@@ -189,6 +189,7 @@ export const PIN_REGISTRY = {
   "rail-tiles": { n: "26.2", label: "Rail — request tiles", file: "src/components/workspace/RequestRail.tsx" },
   "circle-art": { n: "26.4", label: "Circle — the request's machines on one ground", file: "src/components/workspace/CircleArt.tsx" },
   "circle-zoom": { n: "26.5", label: "Circle — the zoomed view behind a double press", file: "src/components/workspace/RequestRail.tsx" },
+  "rail-scroll-back": { n: "26.6", label: "Rail — the back arrow, once scrolled", file: "src/components/workspace/RequestRail.tsx" },
   // 27 was the request strip, a full-width band above the tabs. It is the context bar now — the
   // location and the item, and the item switcher the strip used to carry as chips (owner, 2026-08-27).
   "item-tier": { n: "26.3", label: "Item tier — one chip per machine", file: "src/components/workspace/ItemTier.tsx" },
@@ -282,10 +283,13 @@ export const PIN_REGISTRY = {
   "inbox-row": { n: "60.2", label: "Inbox — one chat row", file: "src/components/inbox/InboxView.tsx" },
   "inbox-pane": { n: "60.3", label: "Inbox — the conversation beside the list", file: "src/components/inbox/InboxView.tsx" },
   "inbox-pane-empty": { n: "60.4", label: "Inbox — nothing picked yet", file: "src/components/inbox/InboxView.tsx" },
+  "inbox-site": { n: "60.5", label: "Inbox — one site, its header and its machines", file: "src/components/inbox/InboxView.tsx" },
+  "inbox-machine": { n: "60.6", label: "Inbox — a machine section header", file: "src/components/inbox/InboxView.tsx" },
   "browse-surface": { n: "61", label: "Browse stores", file: "src/components/stores/BrowseSurface.tsx" },
   "browse-controls": { n: "61.1", label: "Browse — heading + search + city, one row", file: "src/components/stores/BrowseSurface.tsx" },
   "browse-categories": { n: "61.2", label: "Browse — category rail", file: "src/components/stores/BrowseSurface.tsx" },
   "browse-pager": { n: "61.3", label: "Browse — page arrows", file: "src/components/stores/BrowseSurface.tsx" },
+  "browse-rail-arrows": { n: "61.4", label: "Browse — category rail arrows", file: "src/components/stores/BrowseSurface.tsx" },
   "store-detail": { n: "62", label: "Store detail", file: "src/components/stores/StoreDetailSurface.tsx" },
   "store-card": { n: "63", label: "Store card", file: "src/components/stores/StoreCard.tsx" },
   "store-card-equipment": { n: "64", label: "Store card (category)", file: "src/components/stores/StoreCard.tsx" },

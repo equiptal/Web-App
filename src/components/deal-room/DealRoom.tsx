@@ -91,7 +91,7 @@ function buildQuotationHtml(
   });
 }
 
-export function DealRoom({ id, onTitle, initialFlow }: {
+export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }: {
   id: string;
   onTitle?: (t: string) => void;
   /**
@@ -104,6 +104,15 @@ export function DealRoom({ id, onTitle, initialFlow }: {
    * part of the flow is reachable, or duplicated, through this prop.
    */
   initialFlow?: "counter" | "accept";
+  /**
+   * 🔴 **Only the sheet, over the screen the renter is on** (owner, 2026-09-29: *"i see the
+   * quotation sheets for negotiation loading over the old ui of the deal room chat, i want it to be
+   * loading over the existing screen the user on"*). Nothing of the room is drawn and no route
+   * changes: the caller mounts this where the renter already is, and `onExit` hands control back
+   * when the sheet closes, sends, or cannot open.
+   */
+  sheetOnly?: boolean;
+  onExit?: () => void;
 }) {
   const { locale } = useLocale();
   const ar = locale === "ar";
@@ -118,8 +127,10 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   /* `{ fallback }`, not a handler: the shell can then NAME where the press lands, and a renter who
      reached this room from the Marketplace goes back there rather than to the inbox he never
      visited (owner, 2026-09-03). The inbox stays the answer for a cold load, which is where a deal
-     room belongs when nobody can say how he arrived. */
-  usePageBack({ fallback: "/inbox" });
+     room belongs when nobody can say how he arrived.
+     ⚠️ Drawn as `<RoomBack />` in the room's own render, not called here: the sheet-only mode lives
+     on another page, and registering (then clearing) the shell's Back from there would take that
+     page's own Back away. */
 
   const [room, setRoom] = useState<DealRoomView | null>(null);
   const [error, setError] = useState(false);
@@ -515,6 +526,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
   function closeFlow() {
     if (busy) return;
     setFlowMode(null);
+    if (sheetOnly) return onExit?.();
     if (!arrivedForFlow.current) return;
     arrivedForFlow.current = false;
     if (typeof window !== "undefined" && window.history.length > 1) router.back();
@@ -545,10 +557,19 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       openFlow(initialFlow);
       // The room was never the destination — see `closeFlow`.
       arrivedForFlow.current = true;
+    } else if (sheetOnly) {
+      // No sheet to show and no room to fall back on: hand the renter back where he is.
+      onExit?.();
     }
     // `openFlow` is redeclared every render; the one-shot ref above is what actually bounds this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFlow, room, busy, chatReady]);
+
+  // Sheet-only and the room would not load: nothing to show, so hand the renter back.
+  useEffect(() => {
+    if (sheetOnly && error) onExit?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetOnly, error]);
 
   // Collect a term resolution locally (no server call — app parity). Submitted on Counter/Accept.
   const setResolution = (key: string, action: "accept" | "counter", value?: unknown) =>
@@ -580,6 +601,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       setResolutions({});
       await loadRoom();
       setFlowMode(null);
+      if (sheetOnly) onExit?.();
     } catch (e) {
       setCounterErr(errMsg(e, L("Couldn’t send your counter: please try again.", "تعذّر إرسال عرضك المقابل: حاول مرة أخرى.")));
     } finally {
@@ -615,6 +637,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       setResolutions({});
       await loadRoom();
       setFlowMode(null);
+      if (sheetOnly) onExit?.();
     } catch (e) {
       window.alert(errMsg(e, L("Couldn’t accept right now: please try again.", "تعذّر القبول الآن: حاول مرة أخرى.")));
     } finally {
@@ -633,8 +656,12 @@ export function DealRoom({ id, onTitle, initialFlow }: {
      These are hooks, so they sit ABOVE the two early returns below: a room that has not loaded yet
      still has to run them, and a conversation with no cards in it costs three empty derivations. */
 
-  if (error) return <div className="dlproto"><div className="rempty">{L("Couldn’t open this deal room.", "تعذّر فتح غرفة الصفقة.")}</div></div>;
-  if (!room) return <div className="dlproto"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
+  // Sheet-only: a room that will not open leaves the renter where he is (the effect above hands
+  // back), and one still loading draws its wait OVER his screen, where the sheet will appear.
+  if (sheetOnly && error) return null;
+  if (sheetOnly && !room) return <div className="dlproto dlproto-sheet"><div className="qp-scrim"><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28, color: "var(--surface)" }}>progress_activity</span></div></div></div>;
+  if (error) return <div className="dlproto"><RoomBack /><div className="rempty">{L("Couldn’t open this deal room.", "تعذّر فتح غرفة الصفقة.")}</div></div>;
+  if (!room) return <div className="dlproto"><RoomBack /><div className="rstate"><span className="material-icons-outlined" style={{ fontSize: 28 }}>progress_activity</span></div></div>;
 
   // Single source of truth for the money — SHARED with the confirmed quotation via computeDealTotals so
   // the price bar and the quotation can never diverge. Prorated ÷26/÷7; PER_JOB / no-duration = one full
@@ -743,9 +770,11 @@ export function DealRoom({ id, onTitle, initialFlow }: {
     // ⚠️ `isSettledByValues`, not the state column alone (app parity, 2026-09-21): a counter that
     // landed ON the supplier's value writes `pending`, never `agreed`, so two identical values were
     // reported as an open question and held the accept gate shut for good.
-    if (t.state === "fixed" || t.state === "soft_accepted" || isSettledByValues(t)) return true;
+    if (t.state === "fixed") return true;
     const r = resolutions[t.key];
-    if (!r) return false;
+    // An answer given in the sheet outranks the server's match: an agreed term reopened and changed
+    // is no longer agreed (see `reopenedAgreed`).
+    if (!r) return t.state === "soft_accepted" || isSettledByValues(t);
     if (r.action === "accept") return true;
     return r.value != null && String(r.value) === String(t.supplierDeclared);
   };
@@ -795,8 +824,38 @@ export function DealRoom({ id, onTitle, initialFlow }: {
      own comparison of terms, price and units; nothing here loosens it. */
   flowGate.current = { counter: true, accept: showAct && canAccept };
 
+  // The sheet, drawn by the room and by the sheet-only mode alike.
+  const flowEl = flowMode && (
+    <CounterFlow
+      mode={flowMode}
+      room={room}
+      ar={ar}
+      L={L}
+      busy={busy}
+      error={counterErr}
+      resolutions={resolutions}
+      onResolveLocal={setResolution}
+      onReopenLocal={clearResolution}
+      unresolvedCount={unresolvedDisputed.length}
+      periodLabel={periodLabel}
+      periods={periods}
+      hasDuration={hasDuration}
+      units={units}
+      messages={messages}
+      onClose={closeFlow}
+      onCounter={submitCounter}
+      onAccept={doAccept}
+      // Accept from the counter's review step goes through the accept flow, gate and all.
+      onAcceptInstead={() => setFlowMode("accept")}
+      onOpenQuotation={openQuotation}
+    />
+  );
+
+  if (sheetOnly) return <div className="dlproto dlproto-sheet">{flowEl}</div>;
+
   return (
     <div {...pin("deal-room")} className="dlproto" dir={ar ? "rtl" : "ltr"}>
+      <RoomBack />
       {/* top bar (§5.2) — supplier chip · equipment/request block · phase pill · icon actions */}
       <div className="topbar">
         {/* supplier chip → profile & documents. NOTE: the deal-room payload only carries name + isVerified
@@ -1127,31 +1186,7 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       )}
       </div>
 
-      {flowMode && (
-        <CounterFlow
-          mode={flowMode}
-          room={room}
-          ar={ar}
-          L={L}
-          busy={busy}
-          error={counterErr}
-          resolutions={resolutions}
-          onResolveLocal={setResolution}
-          onReopenLocal={clearResolution}
-          unresolvedCount={unresolvedDisputed.length}
-          periodLabel={periodLabel}
-          periods={periods}
-          hasDuration={hasDuration}
-          units={units}
-          messages={messages}
-          onClose={closeFlow}
-          onCounter={submitCounter}
-          onAccept={doAccept}
-          // Accept from the counter's review step goes through the accept flow, gate and all.
-          onAcceptInstead={() => setFlowMode("accept")}
-          onOpenQuotation={openQuotation}
-        />
-      )}
+      {flowEl}
 
       {releaseOpen && (
         <Dialog
@@ -1202,6 +1237,12 @@ export function DealRoom({ id, onTitle, initialFlow }: {
       )}
     </div>
   );
+}
+
+/** The shell's Back for the room itself → the inbox. See the note where `DealRoom` starts. */
+function RoomBack() {
+  usePageBack({ fallback: "/inbox" });
+  return null;
 }
 
 /**
@@ -1540,6 +1581,11 @@ function CounterFlow({
    *  the answer she just gave on this card. Ticking that would put a mark on a value she never
    *  chose here, which is the same fault as pre-ticking the supplier's. */
   const [reopenedVals, setReopenedVals] = useState<Record<string, string>>({});
+  /** 🔴 **Agreed-by-values terms the reader pressed the pen on** (owner, 2026-09-29: *"i clicked
+   *  edit but nothing happen"*). A term both sides already hold the same value on has no resolution
+   *  to clear, so the reopen below changed nothing and the row never left «Agreed terms». Keys here
+   *  walk with the pending rows until the sheet closes. ⚠️ The app has the same defect. */
+  const [reopenedAgreed, setReopenedAgreed] = useState<ReadonlySet<string>>(() => new Set());
   const reopenTerm = (key: string, previous: unknown) => {
     if (previous != null && String(previous) !== "") setReopenedVals((m) => ({ ...m, [key]: String(previous) }));
     onReopenLocal(key);
@@ -1741,10 +1787,12 @@ function CounterFlow({
   type Dec = { badge: "match" | "conflict" | "none" | "locked"; chosen: unknown; server: boolean };
   const decide = (t: DealTerm): Dec => {
     if (t.state === "fixed") return { badge: "locked", chosen: t.value ?? t.platformDefault, server: true };
+    const r = resolutions[t.key];
     // ⚠️ `isSettledByValues`, not `state === "agreed"` alone (app parity, 2026-09-21): a counter that
     // landed ON the other side's value writes `pending`, so two identical values read as unanswered.
-    if (t.state === "soft_accepted" || isSettledByValues(t)) return { badge: "match", chosen: t.value ?? t.supplierDeclared ?? t.renteePreference, server: true };
-    const r = resolutions[t.key];
+    // Only while this sheet has no answer of its own on it: a reopened agreed term the reader has
+    // just changed must show HER value, not the one the server still carries.
+    if (!r && (t.state === "soft_accepted" || isSettledByValues(t))) return { badge: "match", chosen: t.value ?? t.supplierDeclared ?? t.renteePreference, server: true };
     // ⚠️ And `isConflictingTerm`, not `state === "disputed"`: the server stamps `disputed` only at
     // room creation, so a clash raised in round two arrived here as «Not set» with two contradictory
     // values sitting on the card.
@@ -2306,8 +2354,10 @@ function CounterFlow({
   const unstated = pendingAll.filter((t) => !theyStated(t) && !iStated(t));
   const ackTerms = operatingTerms.filter((t) => t.state === "fixed");
   const agreedTerms = operatingTerms.filter(
-    (t) => t.state !== "fixed" && (t.state === "soft_accepted" || isSettledByValues(t)),
+    (t) => t.state !== "fixed" && (t.state === "soft_accepted" || isSettledByValues(t)) && !reopenedAgreed.has(t.key),
   );
+  /** Agreed terms handed back to the walk by their pen - see `reopenedAgreed`. */
+  const reopenedWalk = operatingTerms.filter((t) => t.state !== "fixed" && reopenedAgreed.has(t.key));
 
   /** Answered ON THE SUPPLIER'S VALUE leaves the walk for «Agreed terms»; answered on a different
    *  one stays and stays red, because it is still something he has not agreed to. */
@@ -2317,7 +2367,7 @@ function CounterFlow({
     if (r.action === "accept") return true;
     return r.value != null && String(r.value) === supStr(t);
   };
-  const pendingWalk = [...needsFixing, ...unstated];
+  const pendingWalk = [...needsFixing, ...unstated, ...reopenedWalk];
   const openPending = pendingWalk.filter((t) => !settledMatch(t));
   const openConflicts = conflicts.filter((t) => !settledMatch(t));
   const openAwaiting = awaitingThem.filter((t) => !settledMatch(t));
@@ -2326,7 +2376,7 @@ function CounterFlow({
      reader with only the arguments — and the section order below matches the walk, or the open card
      appears under the second heading while the first still says it has rows left. */
   const attention = [...openPending, ...openConflicts, ...openAwaiting];
-  const settledHere = [...needsFixing, ...conflicts, ...awaitingThem, ...unstated].filter(settledMatch);
+  const settledHere = [...needsFixing, ...conflicts, ...awaitingThem, ...unstated, ...reopenedWalk].filter(settledMatch);
   /* 🔴 The ONE open card: whichever the reader pressed, else the FIRST row still without an answer.
      Answering the open one takes it out of `attention`, so the next unanswered row becomes active by
      itself — the list walks forward without a second mechanism. */
@@ -2558,7 +2608,7 @@ function CounterFlow({
                     // Pressing a settled row hands it back to the walk as an open card — the same
                     // reopen the resolved card's ↻ fires.
                     body: [...agreedTerms, ...settledHere].map((t) =>
-                      settledRow(t, "agreed", editable ? () => { reopenTerm(t.key, decide(t).chosen); setForcedTerm(t.key); setOpenTerm(t.key); } : undefined)),
+                      settledRow(t, "agreed", editable ? () => { reopenTerm(t.key, decide(t).chosen); setReopenedAgreed((s) => new Set(s).add(t.key)); setPendOpen(true); setForcedTerm(t.key); setOpenTerm(t.key); } : undefined)),
                   })}
 
                   {/* 🔴 **ANSWERED BY ME, WAITING ON HIM.** Listed as a settled row, not a card: there

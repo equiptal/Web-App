@@ -44,7 +44,7 @@ Two things it does not hold, on purpose:
 | `src/components/home/HomeNotificationBubble.tsx` | 10.7 Home — notification bubble (`home-bubble`) |
 | `src/components/home/HomeRequests.tsx` | 10.4 Home — requests + bids rail (`home-requests`) |
 | `src/components/home/StartYourRequestModal.tsx` | 11 Start-your-request modal (`start-request-modal`) |
-| `src/components/inbox/InboxView.tsx` | 60 Inbox (`inbox-view`) · 60.1 Inbox — the chats column (`inbox-list`) · 60.2 Inbox — one chat row (`inbox-row`) · 60.3 Inbox — the conversation beside the list (`inbox-pane`) · 60.4 Inbox — nothing picked yet (`inbox-pane-empty`) |
+| `src/components/inbox/InboxView.tsx` | 60 Inbox (`inbox-view`) · 60.1 Inbox — the chats column (`inbox-list`) · 60.2 Inbox — one chat row (`inbox-row`) · 60.3 Inbox — the conversation beside the list (`inbox-pane`) · 60.4 Inbox — nothing picked yet (`inbox-pane-empty`) · 60.5 Inbox — one site, its header and its machines (`inbox-site`) · 60.6 Inbox — a machine section header (`inbox-machine`) |
 | `src/components/map/BidMapWorkspace.tsx` | 45 Bid map workspace (`bid-map-workspace`) · 45.1 Bid map — canvas side (`bidmap-canvas`) · 45.2 Bid map — side panel (`bidmap-panel`) |
 | `src/components/map/ChatDock.tsx` | 57 Chat drawer (map) (`chat-dock`) · 57.1 Chat drawer — identity + phase + kebab (`chat-dock-head`) · 57.2 Chat drawer — supplier tabs (`chat-dock-tabs`) · 57.3 Chat drawer — the thread (`chat-dock-thread`) · 57.4 Chat drawer — composer (`chat-dock-composer`) · 57.5 Chat drawer — staged request card (`chat-dock-draft`) · 57.6 Chat drawer — negotiation event (grey pill) (`chat-dock-event`) |
 | `src/components/map/EquipmentList.tsx` | 47 Fleet card (equipment list) (`equipment-card`) · 47.1 Fleet card — photo cell (`equipment-card-photo`) · 47.2 Fleet card — readiness + «Equipment documents» (`equipment-card-head`) · 47.3 Fleet card — yard card (distance + availability) (`equipment-card-yard`) · 47.5 Fleet list — filter control (end of the count pills row) (`equipment-filter`) · 47.6 Fleet list — filter panel (`equipment-filter-panel`) |
@@ -72,7 +72,7 @@ Two things it does not hold, on purpose:
 | `src/components/screens/Intake.tsx` | 15 Create — intake screen (`create-intake`) · 15.5 Intake — Mansour, riding the caret (`intake-caret`) |
 | `src/components/screens/Processing.tsx` | 24 Create — processing screen (`create-processing`) |
 | `src/components/stores/BrowsePage.tsx` | 10.5 Browse — banner + supplier directory (`browse-page`) |
-| `src/components/stores/BrowseSurface.tsx` | 61 Browse stores (`browse-surface`) · 61.1 Browse — heading + search + city, one row (`browse-controls`) · 61.2 Browse — category rail (`browse-categories`) · 61.3 Browse — page arrows (`browse-pager`) |
+| `src/components/stores/BrowseSurface.tsx` | 61 Browse stores (`browse-surface`) · 61.1 Browse — heading + search + city, one row (`browse-controls`) · 61.2 Browse — category rail (`browse-categories`) · 61.3 Browse — page arrows (`browse-pager`) · 61.4 Browse — category rail arrows (`browse-rail-arrows`) |
 | `src/components/stores/EquipmentDetailSurface.tsx` | 65 Equipment sheet (`equipment-sheet`) |
 | `src/components/stores/StoreCard.tsx` | 63 Store card (`store-card`) · 64 Store card (category) (`store-card-equipment`) |
 | `src/components/stores/StoreDetailSurface.tsx` | 62 Store detail (`store-detail`) · 66 Store equipment card (`store-equipment-card`) |
@@ -85,6 +85,6 @@ Two things it does not hold, on purpose:
 | `src/components/workspace/ItemTier.tsx` | 26.3 Item tier — one chip per machine (`item-tier`) |
 | `src/components/workspace/RequestContextBar.tsx` | 27 Request context bar (location + machines) (`request-context`) · 27.1 Context bar — the machines the request asked for (`context-machines`) · 27.2 Your budget card, beside the request context bar (`request-budget`) |
 | `src/components/workspace/RequestDetailsModal.tsx` | 28 Request details modal (`request-details`) |
-| `src/components/workspace/RequestRail.tsx` | 26 Requests rail (full-bleed band) (`request-rail`) · 26.1 Rail — create tile (`rail-create-tile`) · 26.2 Rail — request tiles (`rail-tiles`) · 26.5 Circle — the zoomed view behind a double press (`circle-zoom`) |
+| `src/components/workspace/RequestRail.tsx` | 26 Requests rail (full-bleed band) (`request-rail`) · 26.1 Rail — create tile (`rail-create-tile`) · 26.2 Rail — request tiles (`rail-tiles`) · 26.5 Circle — the zoomed view behind a double press (`circle-zoom`) · 26.6 Rail — the back arrow, once scrolled (`rail-scroll-back`) |
 | `src/components/workspace/RequestsWorkspace.tsx` | 25 Requests workspace (`requests-workspace`) |
 <!-- pins:end -->
