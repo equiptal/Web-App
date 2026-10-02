@@ -224,6 +224,14 @@ body.cust .slot{cursor:grab}
 .slot-h button{margin-inline-start:auto;font:inherit;font-size:11px;font-weight:700;border:1px solid var(--border);
   background:var(--surface);border-radius:4px;padding:2px 8px;cursor:pointer;color:var(--muted-dark)}
 .slot-h button:hover{border-color:var(--brand);color:var(--brand-deep)}
+@media print {
+  #agent, #agentBtn, #scrim, #dw, .away-bar, .rs, .slot-h, .head .acts { display:none !important }
+  body, body.docked { padding:0 !important; background:#fff }
+  .wrap { max-width:none; padding:0 }
+  #deck { gap:12px }
+  .slot { break-inside:avoid }
+  .card, .kpi { box-shadow:none }
+}
 .blank{display:none;border:1px dashed var(--border-strong);border-radius:var(--radius);
   background:var(--surface);padding:30px 24px;text-align:center}
 .blank.on{display:block}
@@ -405,13 +413,8 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
 </head>
 <body>
 
-<div class="bar">
-  <span class="mark">Moedatech</span>
-  <nav><a href="#">Browse</a><a href="#">Dashboard</a><a href="#">Requests</a><a href="#" class="on">Integrity</a></nav>
-  <span class="who">Al Rajhi Contracting Est. <span class="avatar">YA</span></span>
-</div>
-
 <div class="wrap">
+
 
   <div class="head">
     <div>
@@ -419,9 +422,7 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
       <p id="scope">Loading your awards…</p>
     </div>
     <div class="acts">
-      <label class="cust"><input type="checkbox" id="custOn"> Rearrange and resize</label>
-      <button class="btn sm" id="resetL">Reset</button>
-      <button class="btn sm">Export</button>
+      <button class="btn sm" id="exportPdf">Export as PDF</button>
     </div>
   </div>
 
@@ -575,24 +576,6 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
     </div>
   </section>
 
-  <section data-card="blind">
-    <div class="blind">
-      <p style="margin-bottom:10px"><b style="color:var(--navy)">What this page cannot answer.</b>
-        Named so nobody reads a clean row as a clean decision · click any one for what it would take</p>
-      <div class="items">
-        <span class="bi" data-x="b-reach">How many suppliers the marketplace reached</span>
-        <span class="bi" data-x="b-volume">Patterns across many requests</span>
-        <span class="bi" data-x="b-actor">Who raised it, who awarded it</span>
-        <span class="bi part" data-x="b-shares">Who the request was sent to</span>
-        <span class="bi" data-x="b-diff">What a post-bid edit changed</span>
-        <span class="bi" data-x="b-case">Case state and the buyer's answer</span>
-        <span class="bi" data-x="b-delivery">What machine actually arrived</span>
-        <span class="bi" data-x="b-money">Invoices and payments</span>
-        <span class="bi" data-x="b-approval">Approval limits</span>
-        <span class="bi" data-x="b-coi">Conflicts of interest</span>
-      </div>
-    </div>
-  </section>
 
 </div>
 
@@ -1857,35 +1840,10 @@ PANEL["c-position"] = () => `<div class="dtitle">Where each award landed against
 /* A blind spot still has records behind it: the ones it cannot speak for.
    Naming them turns "we cannot answer this" into a list you can hand to
    whoever owns the field that is missing. */
-const BLIND = {
- "b-reach":   [AW.filter(a=>a.route==="Moedatech marketplace"), "firms reached", "not stored"],
- "b-actor":   [AW, "raised by, awarded by", "not stored"],
- "b-shares":  [AW.filter(a=>a.route==="Your own shared link"), "who it was emailed to", "stored, not read here"],
- "b-diff":    [AW.filter(a=>R[a.id].disputed || a.id==="1064"), "what the edit changed", "not stored"],
- "b-case":    [AW.filter(a=>a.over || a.gap>0), "case opened, answer given", "not stored"],
- "b-delivery":[AW, "machine that actually arrived", "not stored"],
- "b-money":   [AW, "invoice, payment", "not stored"],
- "b-approval":[AW, "approval limit, who signed", "not stored"]
-};
-for (const [k, [rows, field, state]] of Object.entries(BLIND)) PANEL[k] = () =>
-  `<div class="dtitle">${rows.length} record${rows.length>1?"s":""} this affects</div>` +
-  rows.map(a => dr(`${a.ref} \u00b7 ${a.machine}`, sar(a.value), state, " bad")).join("") +
-  `<div class="dfoot">Every one of these rows is complete except for <b>${field}</b>.
-    Nothing on this page infers it, and nothing should</div>`;
 
-PANEL["b-coi"] = () => `<div class="dtitle">Every firm this would need to check</div>` +
-  Object.values(SUP).map(t => dr(t.name, t.cr === "None on file" ? "no registration" : "CR " + t.cr,
-    "ownership not stored", t.cr === "None on file" ? " bad" : "")).join("") +
-  `<div class="dfoot">A conflict check needs the people behind each firm. The platform stores the firm,
-    never its owners, so two companies with the same director look like two companies</div>`;
 
-PANEL["b-volume"] = () => `<div class="dtitle">What this period holds</div>` +
-  dr("Requests decided", AW.length) +
-  dr("Suppliers who bid", Object.keys(SUP).length) +
-  dr("Machine types", Object.keys(EQ).length) +
-  dr("Repeat hires of one type", 0, "every type was hired once", " bad") +
-  `<div class="dfoot">A pattern needs the same thing to happen more than once. At seven requests and one
-    hire per machine type, every rate on this page is a single observation, not an average</div>`;
+
+
 
 for (const k of Object.keys(CERT)) PANEL[k] = () => { const c = CERT[k];
   return `<div class="dtitle">${c.doc}</div>` +
@@ -1982,7 +1940,7 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     money:"Spend by channel and supplier", channel:"Moedatech against offline suppliers",
     awards:"Award decision record", equipment:"Average rental per machine, by project",
     suppliers:"Supplier activity, wins and fit",
-    papers:"Certificates and papers expiring", blind:"What this page cannot answer"
+    papers:"Certificates and papers expiring"
   };
   /* Nothing is forced onto the board. The page opens empty and the reader
      picks, so a card that cannot be removed would be a card he never chose. */
@@ -2089,7 +2047,7 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   });
 
   const custBox = document.getElementById("custOn");
-  custBox.addEventListener("change", ()=>{
+  if (custBox) custBox.addEventListener("change", ()=>{
     document.body.classList.toggle("cust", custBox.checked);
     slots().forEach(x=> x.draggable = custBox.checked);
     redrawAway();
@@ -2116,8 +2074,9 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
      put away. Dragging and the agent both still write an order. */
   const KPI = ["spend","cheapest","saved","market"];
   const DEFAULT = KPI.concat(["awards","money","papers","channel",
-                              "equipment","suppliers","blind"]);
-  document.getElementById("resetL").onclick = ()=>{
+                              "equipment","suppliers"]);
+  const resetBtn = document.getElementById("resetL");
+  if (resetBtn) resetBtn.onclick = ()=>{
     apply(DEFAULT, []); setPeriod("");
     slots().forEach(x => x.style.setProperty("--sp",
       x.classList.contains("quarter") ? 1 : x.classList.contains("full") ? 4 : 2));
@@ -2169,7 +2128,7 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
       measures = ["sum(award.value)","bid.isCompliant","min(bid.price)","variance to market.median"];
       why = "Money first, then the awards that explain it";
     } else if (/wrong|suspic|risk|findin|issue|problem|investig/.test(t)){
-      show = KPI.concat(["awards","blind","papers"]);
+      show = KPI.concat(["awards","papers"]);
       measures = ["bid.isCompliant","bid.rank","award.awardedAt vs requestExpiry","doc.daysToExpiry"];
       why = "The awards carrying a finding, with the blind spots named beside them so a clean row is not read as a clean decision";
     } else if (/marketplace|offline|moedatech|compare|channel|own supplier/.test(t)){
@@ -2205,7 +2164,7 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     ["Where the money goes",  ["money","channel"]],
     ["What we paid",          ["awards","equipment"]],
     ["Who we buy from",       ["suppliers"]],
-    ["How it was run",        ["papers","blind"]]
+    ["How it was run",        ["papers"]]
   ];
 
   /* Cloned once, after the cards have rendered. Ids are stripped so the clone
@@ -2222,7 +2181,6 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     equipment:  "Day rate per machine type, per site, against the market",
     suppliers:  "Bids made, awards won, and terms met, per firm",
     papers:     "Running out on machines you are hiring now",
-    blind:      "The gaps, and what each would take to close"
   };
 
   const MINI = {};
@@ -2360,6 +2318,11 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
 
   document.getElementById("blankPick").onclick = ()=> openPanel("cards");
   document.getElementById("blankAll").onclick  = ()=> { apply(DEFAULT, []); drawLib(); save(); };
+
+  /* Export is the browser's own print-to-PDF. The reader arranged this board, so what prints
+     has to be the arrangement in front of him, which rules out regenerating it anywhere else. */
+  const pdf = document.getElementById("exportPdf");
+  if (pdf) pdf.onclick = () => { closePanel(); close(); setTimeout(() => window.print(), 60); };
 
   /* First visit opens with nothing chosen and the panel showing, because the
      point of the library is that the reader builds the board. A board he has
