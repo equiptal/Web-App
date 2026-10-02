@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppShell, PageBack } from "@/components/AppShell";
+import { GovernanceBoard } from "@/components/home/GovernanceBoard";
 import { useLocale } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import {
@@ -86,12 +87,9 @@ export default function DashboardPage() {
         which is held in the page, not in the URL.
       */}
       {canGov && (
-        <iframe
-          src={`/governance-dashboard.html?embed=1&v=4&lang=${locale}`}
-          title={ar ? "الحوكمة والالتزام" : "Governance and compliance"}
-          className={"block min-h-0 w-full flex-1 " + (active === "governance" ? "" : "hidden")}
-          style={{ border: 0 }}
-        />
+        <div className={"min-h-0 w-full overflow-y-auto " + (active === "governance" ? "flex-1" : "hidden")}>
+          <GovernanceBoard />
+        </div>
       )}
       {canProc && (
         <iframe

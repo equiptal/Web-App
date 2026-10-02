@@ -13,6 +13,7 @@ import { HomeRequests } from "@/components/home/HomeRequests";
 import { ProjectsSurface } from "@/components/projects/ProjectsSurface";
 import { SuppliersPage } from "@/components/suppliers/SuppliersPage";
 import { canSeeGovernanceDashboard } from "@/lib/access/dashboard";
+import { GovernanceBoard } from "@/components/home/GovernanceBoard";
 import { pin } from "@/lib/uiPins";
 import { Icon } from "@/components/Icon";
 
@@ -279,13 +280,8 @@ export function HomeHub() {
           it fans out across every request to build itself, which is not a cost to pay for a reader
           who never presses it. */}
       {canGovernance && seenGovernance && (
-        <div className={cx("min-h-[70vh]", view !== "governance" && "hidden")}>
-          <iframe
-            src="/governance-dashboard.html?embed=1&v=4"
-            title="Governance and compliance"
-            className="block min-h-[70vh] w-full"
-            style={{ border: 0 }}
-          />
+        <div className={cx(view !== "governance" && "hidden")}>
+          <GovernanceBoard />
         </div>
       )}
 

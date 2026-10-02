@@ -224,6 +224,24 @@ body.cust .slot{cursor:grab}
 .slot-h button{margin-inline-start:auto;font:inherit;font-size:11px;font-weight:700;border:1px solid var(--border);
   background:var(--surface);border-radius:4px;padding:2px 8px;cursor:pointer;color:var(--muted-dark)}
 .slot-h button:hover{border-color:var(--brand);color:var(--brand-deep)}
+/* Embedded: no page chrome of its own, and the overlays track the visible slice the host
+   reports rather than a viewport this document no longer has. */
+html.embed, html.embed body { background:transparent; overflow:visible }
+html.embed .wrap { max-width:none; padding:0 0 8px }
+html.embed #agent { position:absolute; inset-block:auto;
+  top:var(--vtop,0); height:var(--vh,100vh) }
+html.embed #dw { position:absolute; inset-block:auto;
+  top:var(--vtop,0); height:var(--vh,100vh) }
+html.embed #scrim { position:absolute; inset-block:auto;
+  top:var(--vtop,0); height:var(--vh,100vh) }
+/* Hidden until the host has said where the visible slice is: see the note in the script. */
+html.embed #agentBtn { display:none }
+html.embed.placed #agentBtn { display:flex; position:absolute; inset-block-end:auto;
+  top:calc(var(--vtop,0px) + var(--vh,100vh) - 64px) }
+/* Docking is kept in the frame: it is the page's full width, so the board narrowing while the
+   panel is open is better than the panel sitting on top of the cards it is describing. Below the
+   breakpoint the base rule already drops back to an overlay. */
+
 @media print {
   #agent, #agentBtn, #scrim, #dw, .away-bar, .rs, .slot-h, .head .acts { display:none !important }
   body, body.docked { padding:0 !important; background:#fff }
@@ -1255,8 +1273,37 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.4";
+const BUILD = "2026-10-03.6";
 console.log("[governance] page build " + BUILD);
+
+/* ── Embedded in the app shell ───────────────────────────────────────────────────────────────
+   Two scrollbars is the complaint this answers. The host sizes the frame to whatever height
+   this document reports, so this document never scrolls and the browser does it once.
+
+   The catch, and the reason for the second message: once the frame is as tall as its content,
+   `position: fixed` in here anchors to the WHOLE document rather than to what is on screen, so
+   the Cards panel and its launcher would sit in the first screenful and scroll out of reach.
+   The host sends the visible slice and they are positioned against it instead. */
+const EMBED = new URLSearchParams(location.search).get("embed") === "1";
+if (EMBED) {
+  document.documentElement.classList.add("embed");
+  const post = () => {
+    const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+    parent.postMessage({ t: "gov:h", h }, location.origin);
+  };
+  /* Height changes when cards are picked, when the agent rearranges and when a card's own
+     content arrives, so it is observed rather than measured once. */
+  new ResizeObserver(post).observe(document.documentElement);
+  window.addEventListener("load", post);
+  window.addEventListener("message", (e) => {
+    if (e.origin !== location.origin) return;
+    const d = e.data;
+    if (!d || d.t !== "gov:view") return;
+    document.documentElement.style.setProperty("--vtop", (d.top || 0) + "px");
+    document.documentElement.style.setProperty("--vh", (d.h || 0) + "px");
+    document.documentElement.classList.add("placed");
+  });
+}
 
 let R = {}, SUPMETA = {}, CERT = {}, WINDOW_INFO = null;
 
@@ -2338,12 +2385,15 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   (function start(){
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem(STORE) || "null"); } catch(e){}
+    /* Open on arrival, whether or not a board was saved (owner, 2026-10-03). The launcher
+       stays for reopening it after a close. */
+    setTimeout(() => openPanel("cards"), 0);
     if (saved) {
       apply(saved.order.filter(byId), saved.off.filter(byId));
       for (const [id, sp] of Object.entries(saved.span || {})) if (byId(id) && sp) byId(id).style.setProperty("--sp", sp);
       drawLib();
     }
-    else { apply(DEFAULT, DEFAULT.slice()); openPanel("cards"); }
+    else { apply(DEFAULT, DEFAULT.slice()); }
   })();
 
   setPeriod("");
