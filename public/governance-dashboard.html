@@ -200,7 +200,10 @@ th:first-child,td:first-child{min-width:230px}
 .slot > div:not(.slot-h){flex:1;min-width:0;display:flex;flex-direction:column}
 .slot > div:not(.slot-h) > .card,
 .slot > div:not(.slot-h) > .blind{flex:1}
-.slot .card{display:flex;flex-direction:column}
+.slot .card{display:flex;flex-direction:column;min-width:0}
+/* `min-width:0` is the whole fix: without it a flex item refuses to go below its content's
+   width, so a wide table inside a card widens the PAGE instead of scrolling inside the card
+   that was built to scroll. `.scroll` already carries overflow-x:auto for exactly this. */
 .slot .card > .pfoot{margin-top:auto}
 /* Drag the right edge to make a card wider or narrower. Only in Rearrange,
    the same mode that arms dragging, so an ordinary reader cannot catch it. */
@@ -228,15 +231,19 @@ body.cust .slot{cursor:grab}
    reports rather than a viewport this document no longer has. */
 html.embed, html.embed body { background:transparent; overflow:visible }
 html.embed .wrap { max-width:none; padding:0 0 8px }
-html.embed #agent { position:absolute; inset-block:auto;
+/* The frame is sized to its CONTENT height and told not to scroll, so horizontal overflow
+   here is unreachable rather than merely ugly. Nothing is allowed to widen the page. */
+html.embed, html.embed body { max-width:100%; overflow-x:clip }
+html.embed #deck, html.embed .slot, html.embed .two > * { min-width:0 }
+html.embed #agent { position:absolute; inset-block:auto; inset-inline-end:0;
   top:var(--vtop,0); height:var(--vh,100vh) }
-html.embed #dw { position:absolute; inset-block:auto;
+html.embed #dw { position:absolute; inset-block:auto; inset-inline-end:0;
   top:var(--vtop,0); height:var(--vh,100vh) }
 html.embed #scrim { position:absolute; inset-block:auto;
   top:var(--vtop,0); height:var(--vh,100vh) }
 /* Hidden until the host has said where the visible slice is: see the note in the script. */
 html.embed #agentBtn { display:none }
-html.embed.placed #agentBtn { display:flex; position:absolute; inset-block-end:auto;
+html.embed.placed #agentBtn { display:flex; position:absolute; inset-block-end:auto; inset-inline-end:22px;
   top:calc(var(--vtop,0px) + var(--vh,100vh) - 64px) }
 /* Docking is kept in the frame: it is the page's full width, so the board narrowing while the
    panel is open is better than the panel sitting on top of the cards it is describing. Below the
@@ -1273,7 +1280,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.6";
+const BUILD = "2026-10-03.7";
 console.log("[governance] page build " + BUILD);
 
 /* ── Embedded in the app shell ───────────────────────────────────────────────────────────────
