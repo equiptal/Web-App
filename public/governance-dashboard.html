@@ -218,7 +218,9 @@ body.cust .rs{display:flex}
 .slot-h{display:none;align-items:center;gap:8px;padding:5px 9px;margin-bottom:6px;
   background:var(--surface2);border:1px dashed var(--border-strong);border-radius:var(--radius);
   font-size:11px;font-weight:700;color:var(--muted-dark)}
-body.cust .slot-h{display:flex}
+body.cust .slot-h{display:flex;opacity:0;transition:opacity .12s}
+body.cust .slot:hover .slot-h,
+body.cust .slot:focus-within .slot-h{opacity:1}
 body.cust .slot{cursor:grab}
 .slot.drag{opacity:.4}
 .slot.over{outline:2px dashed var(--brand);outline-offset:4px;border-radius:var(--radius)}
@@ -1280,7 +1282,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.7";
+const BUILD = "2026-10-03.8";
 console.log("[governance] page build " + BUILD);
 
 /* ── Embedded in the app shell ───────────────────────────────────────────────────────────────
@@ -1330,10 +1332,11 @@ async function boot() {
     /* Named rather than swallowed. A governance page that silently shows nothing is worse than
        one that says it could not read: the first looks like a clean period. */
     console.error("[governance] fetch rejected", e); fail("Could not reach your data", "The request failed before the server answered. Reload, or check you are still signed in.");
+    main();
     return;
   }
-  if (res.status === 401) { console.error("[governance] 401"); fail("Your session has expired", "Sign in again and reopen this page."); return; }
-  if (!res.ok) { console.error("[governance] HTTP " + res.status); fail("Could not read your data", "The server answered " + res.status + "."); return; }
+  if (res.status === 401) { console.error("[governance] 401"); fail("Your session has expired", "Sign in again and reopen this page."); main(); return; }
+  if (!res.ok) { console.error("[governance] HTTP " + res.status); fail("Could not read your data", "The server answered " + res.status + "."); main(); return; }
 
   const d = await res.json();
   R = d.R || {}; SUPMETA = d.SUPMETA || {}; CERT = d.CERT || {}; WINDOW_INFO = d.window || null;
@@ -1347,9 +1350,9 @@ async function boot() {
     const why = (d.skipped || []).slice(0, 6).map(x => x.ref + ": " + x.why).join(" \u00b7 ");
     fail("No award on this account can be checked yet",
          (d.skipped || []).length
-           ? "Of " + (d.skipped || []).length + " requests, none has both an accepted bid and the dates needed to price it. " + why
+           ? "Of " + (d.skipped || []).length + " request" + ((d.skipped || []).length === 1 ? "" : "s")
+             + ", none has both an accepted bid and the dates needed to price it. " + why
            : "This account has no awarded requests in the period.");
-    return;
   }
   main();
 }
@@ -2034,7 +2037,7 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
       slot.className = "slot " + span;
       slot.style.setProperty("--sp", span === "quarter" ? 1 : span === "full" ? 4 : 2);
       slot.dataset.card = id;
-      slot.draggable = false;
+      slot.draggable = true;
       const locked = LOCKED.includes(id);
       slot.innerHTML = '<div class="slot-h"><span class="grip">⠿</span>' + (NAMES[id]||id) +
         (locked ? '<span class="lock">Always shown</span>' : '<button data-hide="'+id+'">Put away</button>') +
@@ -2107,6 +2110,9 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", up);
   });
+
+  document.body.classList.add("cust");
+  slots().forEach((x) => { x.draggable = true; });
 
   const custBox = document.getElementById("custOn");
   if (custBox) custBox.addEventListener("change", ()=>{

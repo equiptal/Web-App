@@ -66,7 +66,7 @@ export function GovernanceBoard({ className = "" }: { className?: string }) {
   return (
     <iframe
       ref={ref}
-      src="/governance-dashboard.html?embed=1&v=7"
+      src="/governance-dashboard.html?embed=1&v=8"
       title="Governance and compliance"
       onLoad={report}
       scrolling="no"
