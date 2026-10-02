@@ -87,7 +87,7 @@ export default function DashboardPage() {
       */}
       {canGov && (
         <iframe
-          src={`/governance-dashboard.html?embed=1&lang=${locale}`}
+          src={`/governance-dashboard.html?embed=1&v=4&lang=${locale}`}
           title={ar ? "الحوكمة والالتزام" : "Governance and compliance"}
           className={"block min-h-0 w-full flex-1 " + (active === "governance" ? "" : "hidden")}
           style={{ border: 0 }}

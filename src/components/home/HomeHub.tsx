@@ -281,7 +281,7 @@ export function HomeHub() {
       {canGovernance && seenGovernance && (
         <div className={cx("min-h-[70vh]", view !== "governance" && "hidden")}>
           <iframe
-            src="/governance-dashboard.html?embed=1"
+            src="/governance-dashboard.html?embed=1&v=4"
             title="Governance and compliance"
             className="block min-h-[70vh] w-full"
             style={{ border: 0 }}

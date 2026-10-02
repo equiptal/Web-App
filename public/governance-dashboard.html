@@ -1253,6 +1253,11 @@ const X = {
    fetch resolves. The shape is identical, which is the point: not one
    card, figure or drill-down needed changing to go from fixture to live.
    ══════════════════════════════════════════════════════════════════ */
+/* Bumped whenever this file changes. It is the first thing in the console, so "which version am
+   I actually looking at" is never a guess — a cached copy answers with an older string. */
+const BUILD = "2026-10-03.4";
+console.log("[governance] page build " + BUILD);
+
 let R = {}, SUPMETA = {}, CERT = {}, WINDOW_INFO = null;
 
 function fail(msg, detail) {
@@ -1270,14 +1275,17 @@ async function boot() {
   } catch (e) {
     /* Named rather than swallowed. A governance page that silently shows nothing is worse than
        one that says it could not read: the first looks like a clean period. */
-    fail("Could not reach your data", "The request failed before the server answered. Reload, or check you are still signed in.");
+    console.error("[governance] fetch rejected", e); fail("Could not reach your data", "The request failed before the server answered. Reload, or check you are still signed in.");
     return;
   }
-  if (res.status === 401) { fail("Your session has expired", "Sign in again and reopen this page."); return; }
-  if (!res.ok) { fail("Could not read your data", "The server answered " + res.status + "."); return; }
+  if (res.status === 401) { console.error("[governance] 401"); fail("Your session has expired", "Sign in again and reopen this page."); return; }
+  if (!res.ok) { console.error("[governance] HTTP " + res.status); fail("Could not read your data", "The server answered " + res.status + "."); return; }
 
   const d = await res.json();
   R = d.R || {}; SUPMETA = d.SUPMETA || {}; CERT = d.CERT || {}; WINDOW_INFO = d.window || null;
+  console.log("[governance] " + res.status + " · " + Object.keys(R).length + " requests, "
+    + Object.keys(SUPMETA).length + " suppliers, " + Object.keys(CERT).length + " papers, "
+    + ((d.skipped || []).length) + " skipped");
 
   if (!Object.keys(R).length) {
     /* The honest empty state. `skipped` carries why each request was left out, which is the
