@@ -7,6 +7,297 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-03 - CORRECTION: "firms reached" needs no new column; the count is already stored.**
+  Earlier entries and the blind-spots card say the marketplace match count is computed and
+  discarded, and that the fix is to persist `matchedSupplierCount` on the request. That was wrong.
+  Owner: *"check how many suppliers receive the notification of the request, this is the count"*.
+  `notification_dispatch_logs` already holds one row per recipient per channel, carries
+  `request_id`, `recipient_id`, `channel` and `delivery_status`, and is indexed on
+  `(tenant_id, request_id)`. The ask is a READ, not a write: expose
+  `COUNT(DISTINCT recipient)` per request on the request projection the renter already calls.
+  Files: none yet — this corrects the ticket, not the code.
+  WARNING: three ways to get the number wrong. Count DISTINCT RECIPIENTS, not rows (one supplier
+  notified by push and SMS is two rows, one firm). Count distinct FIRMS, not users, matching how
+  bids are scoped by `supplierCompanyId`, or the denominator and numerator measure different
+  things. And decide between sent and DELIVERED: `delivery_status` exists, a bounced push did not
+  reach anyone, and "notified 40, delivered 12" is itself a finding worth showing.
+
+- **2026-10-03 - Governance and compliance: the board runs on the renter's own data, as a tab on
+  `/dashboard`.** `src/lib/governance/build.ts` folds requests, bids and awards into the shape the
+  board draws; `src/app/api/me/governance/route.ts` serves it as the signed-in renter;
+  `public/governance-dashboard.html` fetches it. One route, not six: the four figures reconcile to
+  the award table only because one function computed both, and splitting the fetch would move that
+  reconciliation into the browser across payloads that arrived at different moments. Fan-out is
+  capped at 60 requests newest-first, 6 in flight.
+  Files: `src/lib/governance/build.ts`, `src/app/api/me/governance/route.ts`,
+  `public/governance-dashboard.html`, `src/app/dashboard/page.tsx`, `src/lib/access/dashboard.ts`.
+  WARNING: the bid list is fetched with `sizeMatch=exact_or_larger`. The default DROPS every bid
+  offering a machine larger than the one asked for, so a governance page on the default reports a
+  field of three on a request that drew five and calls an award uncontested when it was not. The
+  held-back count is `sizeCounts.larger` directly, never `exactOrLarger - exact`: the envelope
+  counts both sides BEFORE the filter, and deriving it from the returned bids gives zero in the one
+  state where the sentence matters.
+
+- **2026-10-03 - Governance: the award table was hand-written markup and would have shown fixture
+  RFQs beside live figures.** Every other card derived from `R`; the spine never did. Its seven
+  rows carried the fixture's RFQ-1042 and friends in the HTML. It is generated now, and the
+  warnings with it. Files: `public/governance-dashboard.html`.
+  WARNING: only EIGHT of the prototype's fifteen warnings survive, because the rest need fields the
+  renter API does not return: award-before-bids-closed, late bid, bid window, urgency,
+  supplier-just-added, post-bid edit, and deal-room renegotiation all want timestamps or audit rows
+  that are not on the wire. They are named in the blind-spots card rather than guessed at. Do not
+  reinstate one without the field behind it.
+
+- **2026-10-03 - Governance: the staging gate was the production copy, so `/dashboard` was dead on
+  staging.** `src/lib/access/dashboard.ts` and `tests/unit/dashboard-access.test.ts` both returned
+  and asserted "false for everyone", which is the PRODUCTION posture, while the file's own comment
+  described a phone gate that was no longer in it. A promotion had overwritten both, exactly as the
+  warning in that file predicted. Restored as a staging gate, now covering two demo accounts.
+  Files: `src/lib/access/dashboard.ts`, `tests/unit/dashboard-access.test.ts`.
+  WARNING: both files INTENTIONALLY DIFFER from `main`. Keep the production versions on promotion.
+
+- **2026-10-03 - `scripts/account-health.cjs` could never reach staging.** Staging runs
+  `--require_secure_transport=ON` and the env file carries no TLS parameter, so every staging run
+  died on `ERROR HY000 (3159)`. It appends `sslaccept=strict` now. Files: `scripts/account-health.cjs`.
+  WARNING: the guard tests for `sslaccept`, NOT for "ssl". The staging URL already carries
+  `ssl-mode`, a MySQL CLI flag Prisma ignores; a looser check matches it, skips the append, and
+  leaves the connection plaintext while looking correct. Second trap: on WINDOWS the chain then
+  fails anyway, because Prisma verifies against the Windows store, which has no Amazon RDS root,
+  and `sslcert` cannot supply one to schannel. Run it from WSL or trust the root on the machine.
+  Do not add an insecure fallback.
+
+- **2026-10-02 - Governance prototype: cards in one row line up.** `#deck` aligned items to the
+  top, so two cards sharing a row shared a width but not a height and the board read as a ragged
+  pile. The row stretches now, the slot is a flex column, the card fills it, and `.pfoot` is
+  pinned with `margin-top:auto` so the slack a short card gains sits inside the card instead of
+  under it. Widths were already equal for equal spans; the resize handle still overrides both.
+  Files: `prototypes/renter-governance-v6.html`.
+  WARNING: `.slot .card{display:flex}` is scoped to `.slot` on purpose. The picker previews are
+  clones that live outside any slot, so they keep the unstretched layout, which is what a 106px
+  thumbnail wants.
+
+- **2026-10-02 - Governance prototype: every click on the board now opens data, not an explanation.**
+  Owner: *"each info clickable is like more details or drill down to actual data"*. A click used to
+  open "what it is / why it matters / where the data comes from" and only reached real rows when
+  the cursor happened to be inside a `[data-row]`. Four changes: the drawer leads with the data
+  block and folds the prose into a closed `<details>`; the four figures, the route bar and the
+  channel matrix got `PANEL` renderers computed from the same seven awards; any `<th>` opens its
+  own column for every row through one generic `columnDetail()` that reads the rendered table, so
+  no per-column code; and each of the fifteen warning chips maps to the renderer that holds its
+  evidence (a terms warning opens the terms, a price warning opens the bids, a timing warning
+  opens the arrival order). Swept all 194 clickable elements on the board: every one lands on
+  data. Files: `prototypes/renter-governance-v6.html`.
+  WARNING: the blind-spot chips were the hard case, because by definition they have no data. They
+  now list the RECORDS the gap affects, with the missing field named, which is data about the
+  absence rather than a lecture about it. Keep that shape if new gaps are added: a gap with no
+  record list is indistinguishable from an opinion.
+
+- **2026-10-02 - Governance prototype: batch of owner feedback on wording and board behaviour.**
+  Four figures forced to equal height (the deck aligns to the top, so a two-line label made one
+  shorter and it read as a different kind of thing). Channel card gained *Requests sent* and
+  *Bids received*, and "Who we paid is identifiable" became "Winner is a registered company".
+  "Direct" became "One firm only" everywhere, one route vocabulary across all cards. "What to ask
+  about" became **Warnings**, all fifteen rewritten as sentences. The supplier card gained *How his
+  bids came in* (marketplace, link or direct), which is as close as the data gets to "requests
+  received": which firms a marketplace request reached is not stored. Reach merged into the award
+  table and its card removed, 12 cards to 11. Board order now follows pick order, cards carry a
+  drag handle on the right edge that resizes them in whole columns, and width is saved with the
+  board. Files: `prototypes/renter-governance-v6.html`.
+  WARNING: slot width moved from the classes `.quarter/.half/.full` to `grid-column: span var(--sp)`.
+  The classes still exist and still carry styling (the KPI stretch), so changing a card's width
+  means setting `--sp`, not swapping a class.
+
+- **2026-10-02 - Governance prototype: two pairs of cards were the same data twice, merged to 12.**
+  Owner spotted it. "Average rental by project" was the seven day rates from "Day rate by machine
+  type" re-sorted into two buckets, identical numbers, because each machine type was hired exactly
+  once this period so type and hire are the same row. "Supplier activity and compatibility" was
+  two of the four columns of "Supplier bids, wins and fit", drawn as bars. Machine types gained a
+  Project column plus per-project subtotals in the footer; suppliers gained inline bars in the two
+  bar-able columns. Both merged cards now carry strictly more than either original.
+  Files: `prototypes/renter-governance-v6.html`.
+  WARNING: removing a card means removing its RENDERER too. The activity card's footer declared
+  `const unfit`, the supplier footer now declares it as well, and leaving both threw
+  "Identifier 'unfit' has already been declared" at parse time, which kills the whole script and
+  every handler with it. Deleting markup is half the job; grep the script for the card's element
+  ids and fail the build if any survive.
+
+- **2026-10-02 - Governance prototype: the card previews painted over their own titles, because
+  `.th` was a `<span>`.** `height` and `overflow` do not apply to a non-replaced inline box, so
+  the 106px preview box never existed and the absolutely positioned clone inside it was never
+  clipped: the scaled card rendered at full height straight over the title and caption beneath
+  it. Reported as "not clear what each chart I am selecting". One `display:block` fixed it.
+  Files: `prototypes/renter-governance-v6.html`.
+  WARNING: jsdom cannot catch this class of bug at all. It has no layout, so the markup, the
+  classes and the text all assert green while the page is unreadable. The headless harness proves
+  wiring and numbers, never geometry. Anything sized, clipped, scaled or overlapped has to be
+  looked at.
+
+- **2026-10-02 - Governance prototype: each of the four figures is its own card.** Owner: *"even
+  these make each as kpi"*. They were one `figures` card holding all four, so a reader who wanted
+  only the savings number had to take the other three. Fourteen cards now. The board grid went
+  from two columns to four, with `half` as span 2 and `full` as span 4, so a quarter-width card
+  has somewhere to sit without a second grid. Files: `prototypes/renter-governance-v6.html`.
+
+- **2026-10-02 - Governance prototype: the panel's own `.t` rule was restyling the inside of every
+  preview.** The picker tile titled itself with `class="t"`, and `.row2 .t` is the title class on
+  every share row, project row and supplier row inside the cloned cards, so `.lib .t` reached into
+  the previews and gave their rows the tile's padding and size. It read as three tiles with the
+  wrong captions. Renamed to `.lib-t`.
+  Files: `prototypes/renter-governance-v6.html`.
+  WARNING: the previews are clones of real markup, so ANY rule written as `.lib <generic-class>`
+  or `.th <generic-class>` leaks into them. Scope new picker styles to the tile chrome by a
+  prefixed class, never by a shared one.
+
+- **2026-10-02 - Governance prototype: the picker previews are the real cards, scaled, not
+  drawings of them.** They were abstract CSS shapes, which is a second thing to keep in step with
+  the first and answers "roughly what shape is this" when the reader is asking "what is on it".
+  Each tile now holds a clone of the live card at `scale(var(--mini))`, measured from the tile's
+  own width so the panel can change width without the previews going wrong.
+  Files: `prototypes/renter-governance-v6.html`.
+  WARNING: the clone MUST have every `id` stripped. The cards write their rows through
+  `getElementById`, and a cloned `#eqBody` sitting earlier in the document would swallow every
+  later render. `data-x`, `data-row`, `data-grp` and `data-hide` go too, or a tap on a preview
+  opens a drawer behind the panel instead of picking the card. Clone after the cards render, and
+  cache: the previews are a snapshot, not a live mirror.
+
+- **2026-10-02 - Governance prototype: four bands of prose above the first number, cut to one.**
+  Owner named them: the header subtitle, the "same 7 awards read three ways" scope line, the
+  click-a-row instruction, and the closing "findings are indicators" disclaimer. Each one was
+  true and each one was skipped. The period chip, Rearrange and Reset moved into the header, so
+  the page is now one header band and then cards. Files: `prototypes/renter-governance-v6.html`.
+  WARNING: `setPeriod` wrote into the filter chip that no longer exists, and `redrawAway` held a
+  reference to the guide element. Both now target `#scope` or were removed. Deleting a band means
+  grepping the script for it, not just the markup.
+
+- **2026-10-02 - Governance prototype: the side panel docks instead of covering the board.**
+  `body.docked` puts a 404px padding on the page and shifts the explainer drawer to sit beside the
+  panel rather than under it, so choosing cards and reading them are not alternating views. Below
+  1180px it goes back to an overlay, where there is no room to push.
+  Files: `prototypes/renter-governance-v6.html`.
+
+- **2026-10-02 - Governance prototype: the card picker shows what each card looks like.** It was a
+  checkbox and two lines of description per row, which is a worse way to choose a chart than
+  looking at one. Two-column tiles now, each with an abstract CSS preview built from the same
+  shapes the real card uses, title only, no description. Channel keeps its three channel colours
+  in the preview so it is not a fourth plain table beside three other plain tables.
+  Files: `prototypes/renter-governance-v6.html`.
+
+- **2026-10-02 - Governance prototype: the Cards button did nothing, because `restore()` was
+  called above the `const restore` that defines it.** A `const` in the temporal dead zone throws
+  rather than reading as undefined, so the whole deck setup died at that line and every handler
+  below it, the launcher included, was never attached. The page still looked right: the cards are
+  rendered by an earlier block, so only the controls were dead, which is the hardest kind of break
+  to spot by looking. Files: `prototypes/renter-governance-v6.html`.
+  WARNING: this was shipped after a node `--check` pass. Parsing proves nothing about load order.
+  Drive the page in jsdom instead: `new JSDOM(html, {runScripts:"dangerously"})`, then click the
+  real buttons and assert on the DOM. That harness caught this and a second defect in one run.
+
+- **2026-10-02 - Governance prototype: the board starts empty and the reader builds it.** Owner:
+  *"i want the side panel to be opened by default and the page is empty so i select"*. First visit
+  opens with nothing on the board and the Cards tab showing; a board already saved opens as he
+  left it with the panel shut. The four figures became a card (`figures`) so empty means empty,
+  and `LOCKED` is now empty, so no card is forced on. The agent changed with it: it used to
+  reorder all eleven cards, which is invisible on an empty board, so it now names the four or five
+  the answer needs and puts the rest away. Files: `prototypes/renter-governance-v6.html`.
+
+- **2026-10-02 - Governance prototype: the empty state only cleared when the change came through
+  `apply()`.** Ticking a card in the library, the Put away button and the bring-back chips all
+  change what is on the board without calling it, so the board filled up underneath a panel still
+  saying it was empty. Both the empty state and the award-table guide line are settled in
+  `redrawAway()` now, which every one of those paths already ends in.
+  Files: `prototypes/renter-governance-v6.html`.
+
+- **2026-10-02 - Governance prototype: four new cards, and the board became a library you pick from.**
+  Owner asked for average rental per machine per project, most-active suppliers with their
+  compatibility, requests sent against requests answered, and Moedatech against offline suppliers.
+  Ten cards now, all derived from the same seven awards, all selectable from a Cards tab in the
+  side panel, selection and order kept in `localStorage` under `moedatech.board`. The channel
+  comparison grid moved out of the money card so it could be picked on its own.
+  Files: `prototypes/renter-governance-v6.html`.
+  WARNING: `Reached` is only knowable for a link share (opens are counted) and a direct request
+  (one by definition). Five of seven went to the marketplace, where the matched count is computed
+  and discarded, so the column says "not stored" rather than guessing. Do not let anyone read a
+  blank there as zero.
+
+- **2026-10-02 - Governance prototype: the money card and the supplier card disagreed about who
+  won RFQ-1064, and both were defensible.** That request is the records-disagree case: Nesma holds
+  the accepted bid, the award names Al Faisal. The derived supplier table counted the bid, so it
+  credited Nesma; the typed money card counted the award, so it credited Al Faisal. Two cards on
+  one page answering "who won" differently. Money now follows the AWARD record everywhere
+  (`r.award` on the request, falling back to the winning bid), because the award is what the
+  invoice follows. Also surfaced in the channel card, where "who we paid is identifiable" is 4 of
+  5 on the marketplace rather than 5 of 5: the firm the award names has no commercial
+  registration. Files: `prototypes/renter-governance-v6.html`.
+  WARNING: the fallback matters. An award can name a firm that never bid, and attributing by bid
+  alone would silently drop that hire from every supplier total.
+
+- **2026-10-02 - Governance prototype: by-supplier spend shares are derived, and rounded so they
+  total 100.** They were typed, and rounding each share on its own produced 43 + 22 + 18 + 9 + 9 =
+  101%. Largest remainder puts the stray point on the share that lost most to rounding.
+  Files: `prototypes/renter-governance-v6.html`.
+
+- **2026-10-02 - Governance prototype: the deck stopped counting sections and reads `data-card`.**
+  Card identity was a positional array zipped against the sections in document order, so inserting
+  one section silently renamed every card after it, including the one `LOCKED` protects. Each card
+  names itself now. Files: `prototypes/renter-governance-v6.html`.
+  WARNING: a new card needs five entries that nothing checks at runtime: `data-card` in markup,
+  `NAMES`, `LIB`, `DEFAULT`, and every agent `order`. There is a standalone node check for this in
+  the session scratchpad pattern: parse the file, compare the five lists, fail on any gap.
+
+- **2026-10-02 - Governance prototype: the four role layouts are gone, and the builder box with
+  them.** Procurement, Finance, Audit and Supplier manager were saved card orders and nothing
+  else: all six cards, identical figures, nothing put away, so the only difference between a
+  Finance view and an Audit view was scroll position. Owner: *"remove them"*. Rearrange and Reset
+  survive and moved into the scope bar, which removes a bordered card that held two checkboxes
+  and lifts the award table roughly 90px, into the first viewport. `PRESETS` collapsed to one
+  `DEFAULT` order that Reset and the agent both start from.
+  Files: `prototypes/renter-governance-v6.html`.
+
+- **2026-10-02 - Governance prototype: the agent sent "which machines cost us the most" to the
+  money card.** The savings branch tested `/sav|cheap|money|cost us|lost|leak/` and sat above the
+  equipment branch, so `cost us` claimed a question about machines. One of the five suggestion
+  chips on the demo path. Machine words are tested first now.
+  Files: `prototypes/renter-governance-v6.html`. WARNING: the branches are ordered, not scored.
+  Any new keyword has to be checked against every branch above the one it is added to.
+
+- **2026-10-02 - Governance prototype: the deck was dropping every full-width card on build.**
+  `renter-governance-v6.html` turned each `<section>` into a draggable slot. For a two-column
+  section it moved the two child `<div>`s into slots; for a full-width one it moved `sec` itself,
+  then ran `sec.remove()` at the end of the loop, which took the section straight back out of the
+  slot it had just been put into. The award table and the blind-spots strip rendered as bare
+  headers with nothing under them. It looked right in review because the two-column cards, which
+  are four of the six, were fine. Fixed by handing over `sec.children` inside a fresh wrapper.
+  Files: `prototypes/renter-governance-v6.html`.
+  WARNING: `.slot-h` is only visible in Rearrange mode, so an empty card looks like a short page
+  rather than a broken one. Count `[data-x]` nodes after touching the deck: 179 on a whole page.
+
+- **2026-10-02 - Governance prototype: equipment and supplier tables are computed from the award
+  data instead of typed.** Both were hand-written HTML. The equipment numbers happened to agree
+  with the seven requests; the supplier ones did not. "Meets terms 94%" for Arabian Cranes was not
+  derived from anything: he bid three times and one of those bids failed a term, so the honest
+  figure is 2 of 3. Same for Durrah (86% against a real 4 of 5) and Faisal Heavy (67% against 0 of
+  1). Both tables now build from `R`, the same seven requests the award table renders, and show
+  whole offers rather than a percentage of terms, because a near miss on a certificate is a miss.
+  Column renamed "Bids" to "Bid on" and shown as `5 of 7`, since the denominator is requests that
+  existed, not invitations sent, and invitations are not stored.
+  Files: `prototypes/renter-governance-v6.html`.
+  WARNING: the derived "vs market" per supplier differs from the old typed values by up to nine
+  points. The old ones were invented, not stale.
+
+- **2026-10-02 - Governance prototype: the five filter chips were labels, not controls, and are
+  gone.** Only the period chip remains. The other four read "All suppliers", "All equipment" and
+  so on, and the agent flipped their text to show what it had scoped to, but nothing on the page
+  ever filtered. The CEO ask behind them was a different grain, not a filter: per machine type and
+  per supplier are their own tables, and both now drill down the same way the award rows do.
+  Files: `prototypes/renter-governance-v6.html`.
+
+- **2026-10-02 - Governance prototype: the agent moved from a bar at the top of the page into a
+  side chat.** A launcher at the bottom right opens a right-hand panel; `open()` for the explainer
+  drawer and the chat share the same edge, so opening either closes the other. Naming a supplier
+  now reorders the deck, closes the panel, scrolls his row into view and opens his record, so the
+  answer is the data rather than a description of where to find it.
+  Files: `prototypes/renter-governance-v6.html`.
+
 - **2026-10-01 - Chat dock: «awaiting confirmation», «withdrew», «Deal confirmed» and «Request Summary» are grey pills now.**
   Owner: *"why these not in the middle same style the grey pills"* and *"this message is for supplier wording"*.
   The backend tags them `awaiting_confirmation` / `acceptance_withdrawn` / `deal_closed`, which `parseChatCard`
