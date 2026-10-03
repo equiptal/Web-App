@@ -1389,7 +1389,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.42";
+const BUILD = "2026-10-03.43";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -2754,10 +2754,33 @@ function open(key,el){
   const how = document.getElementById("dwHow");
   how.style.display = (X[key] ? "" : "none");
   how.open = !det && !(x.ex);
-  /* The dossier's own tables are as long as the record behind them — a supplier with thirty
-     bids listed thirty rows and the modal became a scroll. Paged with the same helper the
-     board's cards use, so the reader turns pages the same way in both places. */
-  dw.querySelectorAll('table.dtbl[data-page="1"] > tbody').forEach((tb, i) => pageRows(tb, "rows"));
+  /* The dossier's own lists are as long as the record behind them — a supplier with thirty bids
+     listed thirty rows and the modal became a scroll. Paged with the same helper the board's
+     cards use, so the reader turns pages the same way in both places. */
+  dw.querySelectorAll('table.dtbl[data-page="1"] > tbody').forEach((tb) => pageRows(tb, "rows"));
+
+  /* ⚠️ The TABLE drill-downs were paged and the label-and-value ones were not, and those are
+     most of them: every `PANEL` renderer and `columnDetail` emit a flat run of `.dr` rows, so
+     "every award this period" and "his price against the market, offer by offer" still printed
+     the lot. They are gathered into a wrapper here, after render, because a flat run of
+     siblings has nothing to page over. */
+  for (const det of dw.querySelectorAll(".det")) {
+    let run = [];
+    const flush = () => {
+      if (run.length > PER_PAGE) {
+        const box = document.createElement("div");
+        box.className = "drset";
+        run[0].parentNode.insertBefore(box, run[0]);
+        run.forEach((r) => box.appendChild(r));
+        pageRows(box, "rows");
+      }
+      run = [];
+    };
+    for (const node of [...det.children]) {
+      if (node.classList.contains("dr")) run.push(node); else flush();
+    }
+    flush();
+  }
   dw.classList.add("open"); dw.setAttribute("aria-hidden","false"); scrim.classList.add("open");
   dw.querySelector(".scrollbody").scrollTop=0;
 }
