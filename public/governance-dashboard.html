@@ -151,8 +151,12 @@ body.docked #agentBtn{display:none}
    two different kinds of thing rather than as two cards. The thumbnails were always uniform; the
    label under them was not. */
 .lib-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;grid-auto-rows:1fr}
+/* ONE height for every tile in the picker, across groups and not only within a row.
+   `grid-auto-rows: 1fr` equalises the tiles in a ROW, which they already were; what made the
+   column ragged was that a two-line title and a three-line one give different row heights, so
+   the groups stepped against each other. 188px fits the tallest title at this width. */
 .lib{position:relative;display:flex;flex-direction:column;border:1px solid var(--border);
-  border-radius:7px;overflow:hidden;cursor:pointer;background:var(--surface)}
+  border-radius:7px;overflow:hidden;cursor:pointer;background:var(--surface);min-height:188px}
 /* The title takes whatever height is left, so the thumbnails line up across the row. */
 .lib .lib-t{flex:1}
 .lib:hover{border-color:var(--muted-light)}
@@ -183,9 +187,13 @@ body.docked #agentBtn{display:none}
 /* The preview IS the card, rendered once and scaled down. A drawing of a
    card is a second thing to keep in step with the first, and it answers
    "roughly what shape is this" when the reader is asking "what is on it". */
+/* ONE height for every preview, including the figure cards.
+   They were 66px for a figure and 106px for everything else, which is honest about the cards
+   themselves — a figure is one number — but it made the picker a ragged column: the tiles within
+   each row matched, and the rows did not. Owner asked twice. A figure preview now sits in the
+   same box with air under it, and the grid reads as one list of cards instead of two. */
 .th{display:block;position:relative;height:106px;overflow:hidden;background:var(--surface);
   border-bottom:1px solid var(--border)}
-.th.q{height:66px}
 .th .mini{position:absolute;inset-block-start:0;inset-inline-start:0;
   width:calc(var(--wn,660) * 1px);
   transform:scale(calc(var(--tw,179) / var(--wn,660)));transform-origin:top left;
@@ -1375,7 +1383,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.31";
+const BUILD = "2026-10-03.35";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -1667,8 +1675,14 @@ const PER_PAGE = 5;
 function pageRows(body, label) {
   if (!body) return;
   const host = body.tagName === "TBODY" ? body.closest("table").parentNode : body;
-  let bar = host.parentNode.querySelector(":scope > .pager");
-  const all = () => [...body.children].filter((r) => !r.dataset.hiddenByFilter);
+  /* ⚠️ Tagged with the body it belongs to, and the old one removed before a new one is made.
+     `querySelector(":scope > .pager")` looked right and was not: the renderers run more than
+     once (the rail frame and the board frame each render, and a `storage` event re-renders),
+     and every pass added another bar. Five lists had grown EIGHT pagers. */
+  const tag = body.id || label;
+  host.parentNode.querySelectorAll(`:scope > .pager[data-pager-for="${tag}"]`).forEach((x, i) => { if (i) x.remove(); });
+  let bar = host.parentNode.querySelector(`:scope > .pager[data-pager-for="${tag}"]`);
+  const all = () => [...body.children].filter((r) => !r.dataset.hiddenByFilter && !r.dataset.nopage);
   let page = 0;
 
   function draw() {
@@ -1680,6 +1694,7 @@ function pageRows(body, label) {
     if (!bar) {
       bar = document.createElement("div");
       bar.className = "pager";
+      bar.dataset.pagerFor = tag;
       host.parentNode.insertBefore(bar, host.nextSibling);
     }
     const from = page * PER_PAGE + 1, to = Math.min(rows.length, (page + 1) * PER_PAGE);
@@ -2217,6 +2232,7 @@ for (const id in R) {
   document.getElementById("splitKey").innerHTML = rt.map(([k,label,col],i) =>
     `<div><i style="background:${col}"></i>${label} <b>${sar(CHAN[k].spend)} SAR</b>
      <em>${rpc[i]}%</em></div>`).join("");
+  pageRows(document.getElementById("splitKey"), "routes");
   const share100 = to100(paid.map(t=>t.value));
   document.getElementById("shareBody").innerHTML = paid.map((t,i)=>{
     const share = share100[i];
@@ -2268,7 +2284,7 @@ for (const id in R) {
   const line = (label, f, ok) => `<div class="ch-r"><span>${label}</span>` +
     ch.map(c=>bad(f(c), ok(c))).join("") + "</div>";
   document.getElementById("chanBody").innerHTML =
-    '<div class="ch-h"><span></span><span>Moedatech</span><span>Your own link</span><span>One supplier only</span></div>' +
+    '<div class="ch-h" data-nopage="1"><span></span><span>Moedatech</span><span>Your own link</span><span>One supplier only</span></div>' +
     `<div class="ch-r"><span>Requests sent</span>${ch.map(c=>"<b>"+c.n+"</b>").join("")}</div>` +
     `<div class="ch-r"><span>${BASIS === "awarded" ? "Spend, SAR" : "On the table, SAR"}</span>${ch.map(c=>"<b>"+sar(c.spend)+"</b>").join("")}</div>` +
     /* Reached, then answered, then the ratio. This is the question the owner asked of this card:
@@ -2284,6 +2300,7 @@ for (const id in R) {
   /* Also derived. The old sentence asserted that every off-marketplace award went to an
      unregistered supplier and cost over the market; both were true of the fixture and of nothing
      else, and the page went on saying them over real awards that contradicted them. */
+  pageRows(document.getElementById("chanBody"), "measures");
   const off = ch.slice(1), offN = off.reduce((a,c)=>a+c.n,0);
   const offKnown = off.reduce((a,c)=>a+c.known,0);
   if (!ch.length) {
@@ -2332,7 +2349,7 @@ const sec = (k, title, body, sub) => !body ? "" :
 const facts = rows => `<div class="dfacts">` + rows.filter(Boolean).map(
   ([a, b, bad]) => `<div class="df${bad ? " bad" : ""}"><span>${a}</span><b>${b}</b></div>`).join("") + `</div>`;
 const tbl = (heads, rows, foot) => !rows.length ? "" :
-  `<table class="dtbl"><thead><tr>${heads.map(h =>
+  `<table class="dtbl"${rows.length > PER_PAGE ? ' data-page="1"' : ""}><thead><tr>${heads.map(h =>
     `<th${h[1] ? ' class="r"' : ""}>${h[0]}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>` +
   (foot ? `<div class="dfoot">${foot}</div>` : "");
 
@@ -2731,6 +2748,10 @@ function open(key,el){
   const how = document.getElementById("dwHow");
   how.style.display = (X[key] ? "" : "none");
   how.open = !det && !(x.ex);
+  /* The dossier's own tables are as long as the record behind them — a supplier with thirty
+     bids listed thirty rows and the modal became a scroll. Paged with the same helper the
+     board's cards use, so the reader turns pages the same way in both places. */
+  dw.querySelectorAll('table.dtbl[data-page="1"] > tbody').forEach((tb, i) => pageRows(tb, "rows"));
   dw.classList.add("open"); dw.setAttribute("aria-hidden","false"); scrim.classList.add("open");
   dw.querySelector(".scrollbody").scrollTop=0;
 }
