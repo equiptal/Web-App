@@ -1402,7 +1402,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.45";
+const BUILD = "2026-10-03.47";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -2853,8 +2853,22 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
        after it. */
     const parts = two ? [...two.children].map(c => [c.dataset.card, c])
                       : [[sec.dataset.card, hold()]];
-    const span = two ? (two.classList.contains("four") ? "quarter" : "half") : "full";
+    const authored = two ? (two.classList.contains("four") ? "quarter" : "half") : "full";
+    /* ⚠️ A WIDE TABLE TAKES THE WHOLE ROW, whatever the markup asked for.
+       The spans were authored by hand, and a six-column table in a half-width slot is a column
+       of stripes: every heading wraps to three lines and the numbers end up in a 40px gutter.
+       Owner, 2026-10-03: *"some tables with many columns are showing very crowded and stripped
+       in 50% of row so make it full row"*.
+       Counted off the markup rather than listed by name, so a card that grows a seventh column
+       widens itself instead of waiting for someone to remember this rule. Five is the
+       threshold: four fits a half at this width, five does not. */
+    const WIDE_COLS = 5;
+    const isWide = (el) => {
+      const head = el.querySelector("thead tr");
+      return !!head && head.children.length >= WIDE_COLS;
+    };
     for (const [id, part] of parts){
+      const span = isWide(part) ? "full" : authored;
       const slot = document.createElement("div");
       slot.className = "slot " + span;
       slot.style.setProperty("--sp", span === "quarter" ? 1 : span === "full" ? 4 : 2);
@@ -2925,8 +2939,10 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     e.preventDefault(); e.stopPropagation();
     const sl = h.closest(".slot"), cols = window.innerWidth > 1100 ? 4 : 2;
     const col = (deck.clientWidth + 20) / cols, left = sl.getBoundingClientRect().left;
+    /* A wide table cannot be dragged narrower than the full row; everything else is free. */
+    const floor = (sl.querySelector("thead tr") || { children: [] }).children.length >= 5 ? 4 : 1;
     const move = ev => sl.style.setProperty("--sp",
-      Math.min(cols, Math.max(1, Math.round((ev.clientX - left) / col))));
+      Math.min(cols, Math.max(floor, Math.round((ev.clientX - left) / col))));
     const up = () => { document.removeEventListener("pointermove", move);
                        document.removeEventListener("pointerup", up); save(); };
     document.addEventListener("pointermove", move);
@@ -2941,9 +2957,21 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     document.body.classList.toggle("cust", custBox.checked);
     slots().forEach(x=> x.draggable = custBox.checked);
     redrawAway();
+    widenTables();
   });
 
   /* ── Order a layout ──────────────────────────────────────────── */
+  /* A board saved before this rule, or resized by hand, can still carry a half-width span for a
+     wide table. The floor is re-applied on every layout change rather than only at build. */
+  function widenTables(){
+    slots().forEach(sl => {
+      const head = sl.querySelector("thead tr");
+      if (head && head.children.length >= 5 && Number(sl.style.getPropertyValue("--sp")) < 4) {
+        sl.style.setProperty("--sp", 4);
+      }
+    });
+  }
+
   function apply(order, hide){
     order.forEach(id => { const x = byId(id); if(x) deck.append(x); });
     slots().forEach(x => x.classList.toggle("away",
@@ -2976,6 +3004,7 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     for (const [id, sp] of Object.entries(saved.span || {})) {
       const x = byId(id); if (x && sp) x.style.setProperty("--sp", sp);
     }
+    widenTables();
     drawLib();
     measure();
   });
@@ -3359,6 +3388,9 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     if (saved) {
       apply(saved.order.filter(byId), saved.off.filter(byId));
       for (const [id, sp] of Object.entries(saved.span || {})) if (byId(id) && sp) byId(id).style.setProperty("--sp", sp);
+      /* AFTER the restore, not before: a board saved under the old rule carries half-width
+         spans for the wide tables and would otherwise put them straight back. */
+      widenTables();
       drawLib();
     }
     else {
