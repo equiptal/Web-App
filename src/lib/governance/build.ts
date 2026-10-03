@@ -34,6 +34,7 @@ import type { BidCard, TermRow } from "@/lib/contract/bids";
 import { computeChargedDays } from "@/lib/contract/charged-days";
 import { computeCycleTotals } from "@/lib/contract/cycle-totals";
 import { rentalDivisor, isKnownRentalUnit } from "@/lib/pricing/rental";
+import { MARKET_RATES, MARKET_RATES_MEASURED } from "@/lib/governance/market-rates";
 
 /**
  * One machine type's going rate.
@@ -53,6 +54,19 @@ export interface MarketBand {
   hi: number;
   /** How many separate firms those bids came from. Three bids from one firm is still one opinion. */
   firms: number;
+  /**
+   * Where the band came from.
+   *
+   * `"yours"` is the median of the renter's OWN bids for this machine type — specific to his
+   * dates, site and terms, and the better comparison when there are enough of them.
+   * `"platform"` is the frozen table in `market-rates.ts`, measured once across every bid on the
+   * platform. The two answer different questions and the card has to name which it is showing:
+   * "you are 12% over" means one thing against your own three quotes and another against 589
+   * bids from 47 companies.
+   */
+  source: "yours" | "platform";
+  /** Set only on a platform band: the date it was measured. A snapshot has to carry its date. */
+  measured?: string;
 }
 
 /**
@@ -72,6 +86,15 @@ export interface RegistryEntry {
   vendorRegistered: boolean;
   onMoedatech: boolean;
   groups: string[];
+  /**
+   * What this firm has done with this renter, counted by the registry rather than by this page.
+   *
+   * It covers EVERY bid the firm has ever sent him, not only the ones inside the newest-sixty
+   * window this board folds. A supplier who bid eleven times last quarter and twice this one reads
+   * "2 of 5 requests" from the board's own arithmetic and "13 bids" from here, and both are true
+   * of different questions. The card says which is which rather than picking one.
+   */
+  rollup: { bidsApp: number; bidsLink: number; awards: number; rooms: number; lastBidAt: string | null } | null;
 }
 
 export interface GovernanceInput {
@@ -138,6 +161,17 @@ export interface BoardRequest {
   start: string | null;
   end: string | null;
   created: string | null;
+  /**
+   * When bidding closed. Null on a request that carries no deadline at all.
+   *
+   * Three checks hang off this and nothing else did for a while: a bid that landed after it, a
+   * window too short for a supplier who was not already expecting the request, and the pair of
+   * timestamps a late award would have to be judged against. All three were listed as "needs
+   * something the platform does not store" while `expiresAt` sat unread on the request list.
+   */
+  deadline: string | null;
+  /** ASAP / urgent, as the renter set it when raising the request. */
+  urgency: string | null;
   status: string | null;
   city: string | null;
   days: number;
@@ -147,8 +181,20 @@ export interface BoardRequest {
   channel: string;
   /** Firms the link was sent to. Null on any route that is not a shared link. */
   sent: number | null;
-  /** Firms that opened a shared link. Null on a marketplace request, where reach is not stored. */
+  /**
+   * How many suppliers the request actually reached.
+   *
+   * On a shared link, the firms that opened it. On a marketplace request, the count dispatch
+   * notified (`suppliersNotified`), which the backend has returned on `my-requests` since
+   * 2026-09-24 and which this page simply never read — it printed "suppliers reached not stored"
+   * on every marketplace row for as long as the field went unmapped. On a direct request, one.
+   *
+   * ⚠️ Still null, never zero, when the payload predates the field. A request nobody saw and a
+   * request everybody ignored are different answers.
+   */
   opened: number | null;
+  /** What `opened` counts, so the card can label it rather than make the reader guess. */
+  reach: "notified" | "opened" | "direct" | null;
   held: number;
   /** The renter edited the request after bids were already in. */
   edited: boolean;
@@ -192,21 +238,46 @@ export interface BoardSupplier {
   reg: string;
   /** The groups the renter files this firm under, from his own registry. */
   groups: string[];
+  /** The registry's own count of everything this firm has sent, across all time. Null if unlisted. */
+  rollup: { bidsApp: number; bidsLink: number; awards: number; rooms: number; lastBidAt: string | null } | null;
 }
 
 export interface BoardCert {
   doc: string;
   supplier: string;
+  /** Expired · Expiring · On file · Not held · Not required. */
   state: string;
   machine: string | null;
   req: string | null;
-  expiry: string;
+  /**
+   * ⚠️ Null means the platform holds the document but records no expiry for it, NOT that it never
+   * expires. The papers card was built only from documents that carried a date, so an account
+   * whose certificates are all undated drew an empty card and read as an account with no
+   * certificates at all. A paper with no date is a finding of its own.
+   */
+  expiry: string | null;
   hire: string | null;
   note: string;
+  /** The request asked for this one. A missing paper only matters against a request that wanted it. */
+  required?: 1;
   bad?: 1;
 }
 
 export interface BoardPayload {
+  /**
+   * What the money cards are counting.
+   *
+   * `"awarded"` is the real thing: a bid was accepted and the figures are what it costs.
+   * `"leading"` is the ordinary state of an account mid-flight — bids in, nothing accepted yet —
+   * where every money figure would otherwise be a column of zeros. The board then reports the
+   * LEADING bid on each request instead, and every card that does says so in its own label.
+   *
+   * ⚠️ This is the one place the board reports something that has not happened. It is a
+   * projection, never an award: `BoardRequest.awarded` stays false on every row, no supplier is
+   * credited with a win, and the wording changes from "awarded" to "on the table". A renter whose
+   * dashboard quietly counted his leading bids as spend would be reading a forecast as a fact.
+   */
+  basis: "awarded" | "leading";
   R: Record<string, BoardRequest>;
   SUPMETA: Record<string, BoardSupplier>;
   CERT: Record<string, BoardCert>;
@@ -407,7 +478,20 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
       lo: prices[0],
       hi: prices[prices.length - 1],
       firms: new Set(list.map((x) => x.firm)).size,
+      source: "yours",
     });
+  }
+
+  /* Where the renter has too few bids of his own, fall back to the measured platform band. That
+     is most of his machine types on a young account, and it is the difference between a card that
+     says "no band" and one that answers the question. The fallback never OVERRIDES his own bids:
+     his are specific to his dates, site and terms, and are the better comparison when there are
+     enough of them. */
+  for (const req of input.requests) {
+    const subtype = req.item?.categoryId;
+    if (!subtype || marketBySubtype.has(subtype)) continue;
+    const seeded = MARKET_RATES[subtype];
+    if (seeded) marketBySubtype.set(subtype, { ...seeded, source: "platform", measured: MARKET_RATES_MEASURED });
   }
 
   for (const req of input.requests) {
@@ -494,6 +578,8 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
       start: req.startDate ?? null,
       end: req.endDate ?? null,
       created: req.createdAt ?? null,
+      deadline: req.expiresAt ?? null,
+      urgency: req.urgency ?? null,
       status: req.status ?? null,
       city: req.city ?? null,
       days: charged.totalDays,
@@ -503,7 +589,18 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
       units: lead.unitsOffered || lead.numberOfUnits || req.item?.qty || 1,
       channel,
       sent: channel === CHANNEL.link ? share?.sent ?? 0 : null,
-      opened: channel === CHANNEL.link ? share?.opened ?? 0 : channel === CHANNEL.direct ? 1 : null,
+      opened:
+        channel === CHANNEL.link ? share?.opened ?? 0
+        : channel === CHANNEL.direct ? 1
+        /* ⚠️ ZERO is not a reach of zero. The backend derives this from a batched `MatchEvent`
+           count and its own changelog says it is 0 for any request older than match tracking
+           (which began 2026-04-06). "0 suppliers were notified" and "nobody recorded who was
+           notified" are different sentences, and only one of them is safe to print. */
+        : req.suppliersNotified || null,
+      reach:
+        channel === CHANNEL.link ? "opened"
+        : channel === CHANNEL.direct ? "direct"
+        : req.suppliersNotified ? "notified" : null,
       held: input.heldByRequest[req.id] ?? 0,
       edited: !!req.renteeEditUsed,
       bids: boardBids,
@@ -541,37 +638,91 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
           city: b.supplierCity || "Not given",
           reg: reg?.vendorRegistered ? "Yes" : "No",
           groups: reg?.groups ?? [],
+          rollup: reg?.rollup ?? null,
         };
       }
     }
 
-    /* Papers come off the WINNING bid's offered units, because those are the papers the machine on
-       site is actually working under: a certificate on a bid that lost covers nothing.
-       ⚠️ `offeredUnitsDetail` is undefined on an off-platform shared-link bid, so a hire bought by
-       link contributes no papers at all. That is a gap in what is stored, not an all-clear, and the
-       blind-spots card has to keep saying so. */
+    /* ── Papers ───────────────────────────────────────────────────────────────────────────────
+       Built from the certificate CODES the bid carries, not only from documents that happen to
+       hold an expiry date. The card used to read `offeredUnitsDetail[].documentKeys[].expiryDate`
+       and nothing else, so an account whose papers are on file but undated drew an empty card —
+       which reads as "this supplier has no certificates", the opposite of the truth.
+
+       Three sources, in the order a reader cares about them:
+         1. every certificate the REQUEST asked for, and whether the leading bid holds it;
+         2. every certificate it holds that the request did not ask for;
+         3. the expiry, where one is recorded, measured against the hire rather than against today.
+       ⚠️ An off-platform shared-link bid carries no machine record, so it contributes no expiry
+       dates at all. It can still answer 1 and 2, which is why those come first. */
+    const expiryOf = new Map<string, string>();
     for (const unit of lead.offeredUnitsDetail ?? []) {
       for (const doc of unit.documentKeys ?? []) {
         if (!doc.expiryDate) continue;
-        /* Measured against the HIRE, not against today. A certificate that lapses mid-hire is the
-           finding; one that lapsed before a hire that already ended is history. */
-        const expired = !!req.startDate && doc.expiryDate < req.startDate;
-        CERT[`${req.id}:${unit.equipmentId}:${doc.type}`] = {
-          doc: doc.type,
-          supplier: lead.supplierName,
-          state: expired ? "Expired" : "Expiring",
-          machine: machineLabel(req),
-          req: ref,
-          expiry: doc.expiryDate,
-          hire: req.startDate && req.endDate ? `${req.startDate} to ${req.endDate}` : null,
-          note: expired
-            ? "This paper had already lapsed when the hire began, so the machine worked the whole window uncovered"
-            : "On file and in date. It is listed so the expiry is visible before the next hire is placed",
-          ...(expired ? { bad: 1 as const } : {}),
-        };
+        /* The EARLIEST expiry across the units offered. A fleet is only covered until its first
+           lapse, and reporting the latest would call a hire covered on the strength of one
+           machine while another sits on site uncertified. */
+        const prev = expiryOf.get(doc.type);
+        if (!prev || doc.expiryDate < prev) expiryOf.set(doc.type, doc.expiryDate);
       }
+    }
+
+    const held = new Set<string>([
+      ...(lead.heldCertCodes ?? []),
+      ...(lead.companyCertCodes ?? []),
+      ...(lead.equipmentCertCodes ?? []),
+    ]);
+    const asked = new Set<string>(req.requiredCerts ?? []);
+    const hire = req.startDate && req.endDate ? `${req.startDate} to ${req.endDate}` : null;
+
+    for (const code of new Set([...asked, ...held, ...expiryOf.keys()])) {
+      const has = held.has(code) || expiryOf.has(code);
+      const expiry = expiryOf.get(code) ?? null;
+      /* Measured against the HIRE, not against today. A certificate that lapses mid-hire is the
+         finding; one that lapsed before a hire that already ended is history. */
+      const expired = !!expiry && !!req.startDate && expiry < req.startDate;
+      const want = asked.has(code);
+
+      const state = !has ? "Not held" : expired ? "Expired" : expiry ? "Expiring" : "On file";
+      const note =
+        !has ? `Your request asked for ${code} and the leading bid does not hold it`
+        : expired ? "This paper had already lapsed when the hire began, so the machine worked the whole window uncovered"
+        : expiry ? "On file and in date. It is listed so the expiry is visible before the next hire is placed"
+        : "On file, but the platform records no expiry date for it, so nothing here can say when it lapses";
+
+      CERT[`${req.id}:${code}`] = {
+        doc: code,
+        supplier: lead.supplierName,
+        state,
+        machine: machineLabel(req),
+        req: ref,
+        expiry,
+        hire,
+        note,
+        ...(want ? { required: 1 as const } : {}),
+        ...(expired || !has ? { bad: 1 as const } : {}),
+      };
+    }
+
+    /* Ownership papers are not certificates and carry no expiry, but "no registration document on
+       file for the machine you are paying for" is the same kind of finding. */
+    for (const doc of lead.ownershipDocs ?? []) {
+      CERT[`${req.id}:own:${doc.key}`] = {
+        doc: doc.labelEn,
+        supplier: lead.supplierName,
+        state: "On file",
+        machine: machineLabel(req),
+        req: ref,
+        expiry: null,
+        hire,
+        note: "An ownership or registration document for the machine offered. It carries no expiry",
+      };
     }
   }
 
-  return { R, SUPMETA, CERT, period: { from, to }, skipped };
+  /* Awards win whenever there is even one: a board with three awards and twenty live requests is
+     reporting the three, and mixing a projection into them would make the total unreconcilable
+     with the award table under it. */
+  const basis = Object.values(R).some((r) => r.awarded) ? "awarded" : "leading";
+  return { basis, R, SUPMETA, CERT, period: { from, to }, skipped };
 }

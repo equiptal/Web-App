@@ -119,6 +119,9 @@ th:first-child,td:first-child{min-width:230px}
   background:var(--navy);color:#fff;border:0;border-radius:999px;padding:11px 19px;cursor:pointer;
   font:inherit;font-size:13px;font-weight:700;box-shadow:0 3px 14px rgba(28,39,56,.26)}
 #agentBtn:hover{background:var(--navy-mid)}
+/* While the rail is open the frame covers the host's header, so the launcher would be a second
+   control for a panel already on screen, sitting underneath it. */
+body.docked #agentBtn{display:none}
 #agentBtn .am{color:var(--brand-light);font-size:13px}
 #agent{position:fixed;inset-block:0;inset-inline-end:0;width:min(400px,100vw);background:var(--surface);
   border-inline-start:1px solid var(--border-strong);z-index:55;display:flex;flex-direction:column;
@@ -232,7 +235,13 @@ html.embed, html.embed body { background:transparent; overflow:visible }
 /* No centring and no max-width: the board is the page here, so the title sits at the left
    edge and the cards run to the rail. A centred 1460px column inside a frame that is already
    the content width just draws a narrow strip with air on both sides. */
-html.embed .wrap { max-width:none !important; margin:0 !important; padding:18px 20px 24px }
+/* `--hoff` is how much of this frame is sitting OVER the host's own chrome. The host grows the
+   frame to the full window so the rail can reach the top of the screen, and tells us by how much;
+   the board holds still underneath it rather than sliding up behind a header it cannot see. The
+   strip is transparent (the rule above), so the host's header and banner show through it. */
+html{--hoff:0px}
+html.embed .wrap { max-width:none !important; margin:0 !important;
+  padding:calc(18px + var(--hoff)) 20px 24px }
 /* The frame is sized to its CONTENT height and told not to scroll, so horizontal overflow
    here is unreachable rather than merely ugly. Nothing is allowed to widen the page. */
 html.embed, html.embed body { max-width:100%; overflow-x:clip }
@@ -564,7 +573,8 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
     <div class="two">
 
       <div data-card="money">
-        <div class="sec-head"><h2>Spend by channel and supplier</h2></div>
+        <div class="sec-head"><h2>Spend by channel and supplier</h2>
+          <span class="note" id="shareNote"></span></div>
         <div class="card">
           <div class="split" id="splitBar" data-x="p-route"></div>
           <div class="splitkey" id="splitKey" data-x="p-route"></div>
@@ -575,17 +585,9 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
       </div>
 
       <div data-card="papers">
-        <div class="sec-head"><h2>Certificates and papers expiring</h2>
-          <span class="note">Measured against the hire, not against today · two are not flagged in the award table</span></div>
-        <div class="card">
-          <div class="row2" data-x="cert-1"><div class="g"><div class="t">TÜV · Boom Lift 45 ft</div>
-            <div class="s">Zahid Tractor · expired 4 Sep · hire started 12 Sep</div></div><span class="d bad">Expired</span></div>
-          <div class="row2" data-x="cert-2"><div class="g"><div class="t">Commercial registration · Arabian Cranes Co.</div>
-            <div class="s">Expires 2 Oct · crane on site until 30 Oct</div></div><span class="d warn">14 days</span></div>
-          <div class="row2" data-x="cert-3"><div class="g"><div class="t">National address · Nesma Heavy Equipment</div>
-            <div class="s">Expires 28 Sep · no machine depends on it</div></div><span class="d warn">10 days</span></div>
-          <div class="pfoot"><b>One machine is working today on a certificate that had already lapsed when it arrived</b></div>
-        </div>
+        <div class="sec-head"><h2>Certificates and papers</h2>
+          <span class="note" id="papersNote">Measured against the hire, not against today</span></div>
+        <div class="card" id="papersBody"></div>
       </div>
 
     </div>
@@ -658,12 +660,20 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
 
 </div>
 
+<!-- The way back in. The rail is the only way to put a card on the board, so a board with the
+     rail shut and no launcher is a page the reader cannot change. It hides while the rail is
+     open, where it would sit under the panel anyway. -->
+<button id="agentBtn" type="button" aria-controls="agent">
+  <span class="am">▤</span> Cards
+</button>
+
 <aside id="agent" aria-hidden="true">
   <header>
     <div style="flex:1;min-width:0">
       <div class="kind">Cards and questions</div>
       <h3>Your board</h3>
     </div>
+    <button id="agentX" type="button" aria-label="Close the card panel">✕</button>
   </header>
   <div class="ch-tabs">
     <button class="ct on" data-pane="cards">Cards</button>
@@ -818,7 +828,7 @@ const X = {
   ["Moedatech marketplace","5 requests","3 to 5 bids each"],
   ["Your own shared link","1 request","5 opened, 2 bid",1],
   ["Direct to one named firm","1 request","1 bid possible",1],
-  ["Suppliers the marketplace matched","not stored","see the blind spots",1]],
+  ["Suppliers the marketplace matched","17, 31 and 22","suppliersNotified, per request"]],
   out:"Two of seven requests were answered by fewer than three suppliers, and both of those were routed away from the marketplace"},
  chain:[["A broadcast request goes to the marketplace","Dispatch notifies every supplier stocking that machine, and any of them may bid"],
   ["A shared link goes wherever the renter sends it","By email, WhatsApp or a copied URL. Those submissions arrive separately from marketplace bids, and openedCount records how many looked"],
@@ -1329,7 +1339,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.16";
+const BUILD = "2026-10-03.22";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -1337,7 +1347,16 @@ console.log("[governance] page build " + BUILD);
 const EMBED = new URLSearchParams(location.search).get("embed") === "1";
 if (EMBED) document.documentElement.classList.add("embed");
 
-let R = {}, SUPMETA = {}, CERT = {}, WINDOW_INFO = null;
+/* The host owns the frame's geometry and is the only thing that knows what sits above it. */
+window.addEventListener("message", (e) => {
+  if (e.origin !== location.origin) return;
+  const d = e.data;
+  if (d && d.type === "governance:offset" && typeof d.px === "number") {
+    document.documentElement.style.setProperty("--hoff", Math.max(0, d.px) + "px");
+  }
+});
+
+let R = {}, SUPMETA = {}, CERT = {}, WINDOW_INFO = null, BASIS = "awarded";
 
 function fail(msg, detail) {
   const p = document.createElement("div");
@@ -1368,6 +1387,7 @@ async function boot() {
 
   const d = await res.json();
   R = d.R || {}; SUPMETA = d.SUPMETA || {}; CERT = d.CERT || {}; WINDOW_INFO = d.window || null;
+  BASIS = d.basis || "awarded";
   console.log("[governance] " + res.status + " · " + Object.keys(R).length + " requests, "
     + Object.keys(SUPMETA).length + " suppliers, " + Object.keys(CERT).length + " papers, "
     + ((d.skipped || []).length) + " skipped");
@@ -1415,6 +1435,39 @@ const leadBid = r => r.bids.find(b => b.won)
 /* The market band is absent whenever fewer than three bids landed for that machine type, which is
    the ordinary state of a young account rather than a failure. Every comparison reads it through
    these, and prints nothing rather than dividing by a band that is not there. */
+/* What `r.opened` counts depends on how the request went out, and a bare number beside three
+   different routes means three different things. One label, read off `r.reach`. */
+const REACH = r => r.opened == null ? "suppliers reached not recorded"
+  : r.reach === "opened" ? `${r.opened} of ${r.sent} suppliers opened your link`
+  : r.reach === "direct" ? "sent to one supplier only"
+  : `${r.opened} suppliers were notified`;
+
+/* Declared HERE, with the other shared helpers, not down in the dossier block where it was.
+   `const` is not hoisted: the papers card runs during the first render, which is before that
+   block is evaluated, so reading it there threw "Cannot access 'day' before initialization"
+   and killed every card after it. Same trap as `restore()` on 2026-10-02. */
+const day = v => { if (!v) return "\u2014"; const d = new Date(v);
+  return isNaN(d) ? String(v).slice(0, 10)
+    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
+
+/* THE value of a request: what the award cost, or - on an account with nothing awarded yet -
+   what the leading bid would cost. An account mid-flight is the ordinary case, and a board that
+   counted only awards drew a column of zeros beside twenty requests full of real bids.
+   `BASIS` says which of the two every money card is reporting, and every label follows it. */
+const VAL = r => { if (r.awarded) return num(r.total); const b = leadBid(r); return b ? b.total : 0; };
+/* The vocabulary. "Awarded" is a fact about the past; "on the table" is a figure about offers
+   that are still open, and the two must never be printed in the same words. */
+const MONEY_WORD   = () => BASIS === "awarded" ? "awarded" : "on the table";
+const MONEY_PREFIX = () => BASIS === "awarded" ? "" : "Leading bids · ";
+
+/* Two different bands can sit behind the same number, and they answer different questions.
+   "12% over" means one thing against the renter's own three quotes and another against 589 bids
+   from 47 companies, so every surface that prints a comparison also prints which one it used. */
+const BAND = r => !r.market ? "no going rate for this machine type yet"
+  : r.market.source === "platform"
+    ? `the platform median, ${r.market.n} bids from ${r.market.firms} suppliers, measured ${day(r.market.measured)}`
+    : `the median of the ${r.market.n} bids you received for this type, from ${r.market.firms} supplier${r.market.firms === 1 ? "" : "s"}`;
+
 const med   = r => r.market ? r.market.med : null;
 const vsMed = (rate, r) => r.market ? (rate / r.market.med - 1) * 100 : null;
 /* An average over the rows that HAVE a band. Mixing in the ones that do not, as zeroes, dragged
@@ -1445,8 +1498,8 @@ for (const id in R) {
 
   const e = EQ[base(r.machine)] || (EQ[base(r.machine)] = {type:base(r.machine), hires:[], spend:0});
   e.hires.push({id, ref:r.ref, sup:won.firm, rate, units:r.units, days:r.billable, proj:r.project,
-                total:num(r.total), med:med(r), lo:r.market&&r.market.lo, hi:r.market&&r.market.hi,
-                n:r.market&&r.market.n, firms:r.market&&r.market.firms});
+                total:VAL(r), med:med(r), lo:r.market&&r.market.lo, hi:r.market&&r.market.hi,
+                n:r.market&&r.market.n, firms:r.market&&r.market.firms, band:r.market?BAND(r):null});
   e.spend += num(r.total);
 
   /* Who the money went to is the AWARD record, not the accepted bid. They agree
@@ -1459,7 +1512,7 @@ for (const id in R) {
     t.offers.push({id, ref:r.ref, machine:r.machine, price:b.perDay, quoted:b.price, unit:b.unit,
                    med:med(r), won:b.firm===paidTo, held:b.won&&b.firm!==paidTo, ok:b.ok,
                    route:b.route, missed:b.missed, total:b.total, at:b.at,
-                   best:Math.min(...r.bids.map(x=>x.perDay)), paid:num(r.total), disputed:!!r.disputed});
+                   best:Math.min(...r.bids.map(x=>x.perDay)), paid:VAL(r), disputed:!!r.disputed});
     /* Only an ACTUAL award counts as a win or as spend. The leading bid on a live request
        names the supplier in its row; it does not hand that supplier the money. */
     if (b.firm===paidTo && r.awarded) { t.won++; t.spend += num(r.total); }
@@ -1481,6 +1534,10 @@ for (const k in EQ) { const e=EQ[k];
   const eMed = avg(e.hires.filter(h=>h.med!=null).map(h=>h.med));
   e.med = eMed==null ? null : Math.round(eMed);
   e.vs  = e.med==null ? null : (e.rate/e.med-1)*100;
+  /* Named from the first hire that HAS a band: every hire of one machine type shares a subtype,
+     so they share a band, and the first one that carries it speaks for all of them. */
+  const withBand = e.hires.find(h => h.band);
+  e.band = withBand ? withBand.band : null;
 }
 for (const k in SUP) { const t=SUP[k];
   const cmp = t.offers.filter(o=>o.med!=null).map(o=>o.price/o.med);
@@ -1490,16 +1547,19 @@ for (const k in SUP) { const t=SUP[k];
 const PROJ = {}, CHAN = {};
 for (const id in R) {
   const r = R[id], won = leadBid(r); if (!won) continue;
-  const rate = r.money.length ? num(r.money[0][1]) : won[1], paidTo = r.award || won[0];
+  const rate = won.perDay, paidTo = r.award || won.firm;
 
   const j = PROJ[r.project] || (PROJ[r.project] = {name:r.project, hires:[], spend:0});
   j.hires.push({id, ref:r.ref, type:base(r.machine), sup:paidTo, rate,
-                med:med(r), total:num(r.total)});
-  j.spend += num(r.total);
+                med:med(r), total:VAL(r)});
+  j.spend += VAL(r);
 
   const c = CHAN[r.channel] || (CHAN[r.channel] = {name:r.channel, n:0, spend:0, offers:0, vs:0, vsN:0, known:0,
                                                    reached:0, reachKnown:0});
-  c.n++; c.spend += num(r.total); c.offers += r.bids.length;
+  c.n++; c.spend += VAL(r); c.offers += r.bids.length;
+  /* Suppliers reached, counted only over the requests that RECORD it. A route whose reach is
+     unknown must not be averaged as zero, which would read as "we sent it to nobody". */
+  if (r.opened != null) { c.reached += r.opened; c.reachKnown++; }
   /* Summed over the requests that have a band, counted separately, so the average divides by the
      rows it was actually built from rather than by every row in the channel. */
   if (r.market) { c.vs += rate/r.market.med; c.vsN++; }
@@ -1536,7 +1596,7 @@ for (const id in R) {
   document.getElementById("eqFoot").innerHTML =
     (over.length
       ? `<b>${list(over.map(e=>e.type))} ${over.length>1?"are the ones":"is the one"} to renegotiate.</b>
-         You pay ${list(over.map(e=>pct(e.vs)))} over the marketplace rate${over.length>1?" for them":""}.`
+         You pay ${list(over.map(e=>pct(e.vs)))} over the going rate${over.length>1?" for them":""}.`
       : noBand.length===eq.length
       ? `<b>No machine type has three bids behind it yet, so none can be compared.</b>`
       : `<b>Every machine type that can be compared sits at or under the going rate.</b>`) +
@@ -1570,9 +1630,12 @@ for (const id in R) {
   let awarded = 0, overpaid = 0, mktGap = 0, tookCheapest = 0;
   for (const id in R) {
     const r = R[id];
-    if (!r.awarded) continue;          /* the money figures count awards, and nothing else */
-    const won = leadBid(r), rate = won.perDay, span = r.units * r.billable;
-    awarded += num(r.total);
+    /* On an awarded board, awards only. On a board with none, every request with a bid, priced at
+       its leading bid - which is the whole point of `BASIS`. */
+    if (BASIS === "awarded" && !r.awarded) continue;
+    const won = leadBid(r); if (!won) continue;
+    const rate = won.perDay, span = r.units * r.billable;
+    awarded += VAL(r);
     /* Only the awards that HAVE a band contribute to the market gap. Treating a missing median as
        zero turned every uncomparable hire into a full-price overpayment. */
     if (r.market) mktGap += (rate - r.market.med) * span;
@@ -1586,8 +1649,30 @@ for (const id in R) {
   }
   document.getElementById("kSpend").textContent = sar(awarded);
   document.getElementById("kCheap").innerHTML   = tookCheapest + "<small> of " + NREQ + "</small>";
+  /* The labels under the figures are authored for an awarded board. On a leading-bid board they
+     would each be a false claim, so they are rewritten rather than left to be read charitably. */
+  if (BASIS !== "awarded") {
+    const L = (card, text) => { const el = document.querySelector(`[data-card="${card}"] .l`); if (el) el.textContent = text; };
+    L("spend",    "SAR on the table, at the leading bid on each request");
+    L("cheapest", "requests where the leading bid is the cheapest that met every term");
+    L("saved",    "SAR the leading bids sit above a cheaper bid that met your requirements");
+    L("market",   "SAR the leading bids sit above the going rate for the same machines");
+  }
   document.getElementById("kOver").textContent  = sar(overpaid);
-  document.getElementById("kMkt").textContent   = sar(Math.round(mktGap));
+  document.getElementById("kMkt").textContent   = sar(Math.abs(Math.round(mktGap)));
+  /* A negative gap is money UNDER the going rate, which is the opposite finding. The figure is
+     printed unsigned and the label carries the direction, because "−6,540 above the rate" asks
+     the reader to do the double negative himself. */
+  (function(){
+    const card = document.querySelector('[data-card="market"]');
+    if (!card) return;
+    const under = mktGap < 0;
+    card.classList.toggle("bad", !under); card.classList.toggle("good", under);
+    const l = card.querySelector(".l");
+    if (l) l.textContent = BASIS === "awarded"
+      ? (under ? "SAR under what the going rate would have cost" : "SAR above the going rate for the same machines")
+      : (under ? "SAR the leading bids sit UNDER the going rate" : "SAR the leading bids sit above the going rate");
+  })();
 
   /* ── The spine: one row per award ────────────────────────────
      This table was hand-written while the data was a fixture, which made it the
@@ -1595,13 +1680,18 @@ for (const id in R) {
      generated now, from the same R as the rest. ───────────────────────────── */
   const rk = (n) => n >= 3 ? "ok" : n === 2 ? "warn" : "bad";
 
-  /* Warnings the data can actually support. Each is a claim about one request that
-     R carries the evidence for; the drill-down opens that evidence. Seven more from
-     the prototype are NOT here because the fields they need are not on the wire:
-     award-before-bids-closed, late bid, bid window, urgency, supplier-just-added,
-     post-bid edit and deal-room renegotiation all need timestamps or audit rows the
-     renter API does not return. They are named in the blind-spots card instead of
-     being guessed at. */
+  /* Warnings the data can actually support. Each is a claim about one request that R carries the
+     evidence for; the drill-down opens that evidence.
+
+     ⚠️ This comment used to list SEVEN as impossible — "they need timestamps or audit rows the
+     renter API does not return". Six of the seven were wrong. `expiresAt`, `createdAt`, `urgency`,
+     `renteeEditUsed` and `openingPrice` were all on the request list or the bid the whole time and
+     the board simply never carried them, and the vendor tick came from a registry nobody called.
+     The lesson is not about these six: a surface that declares a question unanswerable should name
+     the field it looked for, so the next reader can check rather than inherit the claim.
+
+     ONE is still genuinely out of reach: award-before-bids-closed needs an award timestamp and an
+     actor, and `Project.awards` is a JSON blob carrying neither. */
   function warningsFor(id, r) {
     const out = [], won = leadBid(r);
     if (!won) return out;
@@ -1641,9 +1731,49 @@ for (const id in R) {
 
     if (r.disputed) out.push(["f-mismatch", "The award names a different supplier from the bid that was accepted"]);
 
+    /* ── The deadline checks ───────────────────────────────────────────────────────────
+       These three were listed in the blind-spots card as needing fields the platform does not
+       store. It stores all of them: `expiresAt`, `createdAt` and `urgency` have been on the
+       request list the whole time, and the board simply never carried them. */
+    if (r.deadline) {
+      const late = r.bids.filter(b => b.at && b.at > r.deadline);
+      if (late.length) {
+        const wonLate = late.some(b => b.won);
+        out.push(["f-latebid", wonLate
+          ? "The bid that won arrived after bidding had closed"
+          : late.length + " bid" + (late.length === 1 ? "" : "s") + " arrived after bidding had closed"]);
+      }
+      if (r.created) {
+        /* Hours, not days: the platform's shortest window is measured in hours and a day count
+           would round a 20-hour window and a 44-hour one to the same number. */
+        const hrs = (new Date(r.deadline) - new Date(r.created)) / 36e5;
+        if (hrs > 0 && hrs < 48) out.push(["f-window",
+          "Suppliers had " + (hrs < 24 ? Math.round(hrs) + " hours" : Math.round(hrs / 24) + " days") + " to answer"]);
+      }
+    }
+
+    /* Ordinary on its own. It earns a line beside a thin field or a missing registration, which
+       is why it is raised rather than judged here. */
+    if (r.urgency && /asap|urgent|high/i.test(r.urgency) && r.bids.length < 3)
+      out.push(["f-urgent", "Marked " + r.urgency.toLowerCase() + ", and drew only " + r.bids.length + " bid" + (r.bids.length === 1 ? "" : "s")]);
+
+    /* The deal room moved the price UP after the field had closed. `from` is the opening price
+       and is only set when the room actually moved it, so this cannot fire on a bid nobody
+       negotiated. The room's own closing rate is not on the renter API, so this catches the
+       movement the bid itself records and no more. */
+    const rose = r.bids.filter(b => b.from != null && b.from < b.price);
+    for (const b of rose) {
+      if (!b.won && !(leadBid(r) && leadBid(r).firm === b.firm)) continue;
+      out.push(["f-reneg", "The price rose from " + sar(b.from) + " to " + sar(b.price)
+        + " after the bid was in, a " + Math.round((b.price / b.from - 1) * 100) + "% increase"]);
+    }
+
     for (const k in CERT) {
-      if (CERT[k].req === r.ref && CERT[k].bad)
-        out.push(["f-certexp", CERT[k].doc + " had already expired when the hire began"]);
+      const c = CERT[k];
+      if (c.req !== r.ref || !c.bad) continue;
+      out.push(["f-certexp", c.state === "Not held"
+        ? c.doc + " was asked for and the supplier does not hold it"
+        : c.doc + " had already expired when the hire began"]);
     }
     return out;
   }
@@ -1701,8 +1831,9 @@ for (const id in R) {
       return `<tr data-row="${id}" data-w="${warns.map(w => w[0]).join(" ")}" data-aw="${r.awarded ? 1 : 0}">
         <td data-x="c-request"><span class="ref">${r.ref}</span><span class="sub">${r.machine} \u00b7 ${r.days} days</span></td>
         <td data-x="c-reach"><span class="rk ${rk(r.bids.length)}">${r.bids.length} bid${r.bids.length === 1 ? "" : "s"}</span>
-          <span class="sub">${route}${r.opened == null ? " \u00b7 suppliers reached not stored" : ""}</span>
-          ${r.held ? `<span class="sub2">${r.held} larger held back</span>` : r.opened != null && r.channel.indexOf("Your own") === 0 ? `<span class="sub2">${r.opened} suppliers opened it</span>` : ""}</td>
+          <span class="sub">${route}${r.opened == null ? " \u00b7 suppliers reached not recorded" : ""}</span>
+          ${r.opened != null ? `<span class="sub2">${REACH(r)}</span>` : ""}
+          ${r.held ? `<span class="sub2">${r.held} larger held back</span>` : ""}</td>
         <td data-x="c-winner">${w.name}<span class="sub${w.cr === "None on file" ? " bad" : ""}">${route} \u00b7 ${w.ver === "Yes" ? "verified" : "unverified"} \u00b7 ${idTag}</span></td>
         <td class="r" data-x="c-terms"><span class="rk ${met === all ? "ok" : met / (all || 1) >= 0.8 ? "warn" : "bad"}">${met} of ${all}</span></td>
         <td class="r" data-x="c-value">${r.awarded ? r.total : '<span class="na">not awarded</span>'}<span class="sub">${sar(price)} /day${r.units > 1 ? " \u00d7" + r.units : ""}${r.awarded ? "" : " \u00b7 leading bid"}</span></td>
@@ -1759,13 +1890,73 @@ for (const id in R) {
       + (flagged ? ` \u00b7 ${flagged} carr${flagged === 1 ? "ies" : "y"} a warning` : "");
   })();
 
+  /* -- Certificates and papers --------------------------------
+     Generated from the same CERT every other card reads, and every row carries its OWN key, so
+     clicking one opens that paper rather than an explanation of what a paper is. */
+  (function papers(){
+    const body = document.getElementById("papersBody"); if (!body) return;
+    const keys = Object.keys(CERT);
+    /* Worst first: what is missing, then what has lapsed, then what is dated, then what is merely
+       on file. A reader who stops after three rows has read the three that matter. */
+    const RANK = { "Not held":0, "Expired":1, "Expiring":2, "On file":3 };
+    keys.sort((a,b) => (RANK[CERT[a].state] ?? 9) - (RANK[CERT[b].state] ?? 9)
+      || String(CERT[a].expiry||"9999").localeCompare(String(CERT[b].expiry||"9999")));
+
+    if (!keys.length) {
+      body.innerHTML = `<div class="pfoot">No certificates are recorded against any bid on this
+        board. That is not an all-clear: it means the platform is holding none, not that none are
+        needed</div>`;
+      const n0 = document.getElementById("papersNote");
+      if (n0) n0.textContent = "Nothing on file";
+      return;
+    }
+
+    const TONE = { "Not held":"bad", "Expired":"bad", "Expiring":"warn", "On file":"" };
+    const firms = new Set(keys.map(k => CERT[k].supplier)).size;
+    body.innerHTML = keys.map(k => {
+      const c = CERT[k];
+      const when = c.expiry ? "expires " + day(c.expiry) : "no expiry recorded";
+      return `<div class="row2" data-x="${k}"><div class="g">
+        <div class="t">${c.doc}${c.machine ? " · " + c.machine : ""}</div>
+        <div class="s">${c.supplier} · ${when}${c.req ? " · " + c.req : ""}${c.required ? " · your request asked for it" : ""}</div>
+        </div><span class="d ${TONE[c.state] || ""}">${c.state}</span></div>`;
+    }).join("") + (() => {
+      const n = (st) => keys.filter(k => CERT[k].state === st).length;
+      const miss = n("Not held"), gone = n("Expired"), soon = n("Expiring");
+      const undated = keys.filter(k => !CERT[k].expiry && CERT[k].state === "On file").length;
+      const parts = [];
+      if (miss) parts.push(`<b>${miss} certificate${miss===1?"":"s"} your requests asked for ${miss===1?"is":"are"} not held by the supplier you went with.</b>`);
+      if (gone) parts.push(`<b>${gone} had already lapsed when the hire began.</b>`);
+      if (soon) parts.push(`${soon} carr${soon===1?"ies":"y"} a date and ${soon===1?"is":"are"} still in date.`);
+      if (undated) parts.push(`${undated} ${undated===1?"is":"are"} on file with no expiry recorded, so nothing here can say when ${undated===1?"it lapses":"they lapse"}.`);
+      if (!parts.length) parts.push("<b>Every paper asked for is held and in date.</b>");
+      return `<div class="pfoot">${parts.join(" ")}</div>`;
+    })();
+
+    const note = document.getElementById("papersNote");
+    if (note) note.textContent = keys.length + " paper" + (keys.length===1?"":"s")
+      + " across " + firms + " supplier" + (firms===1?"":"s");
+  })();
+
   /* ── Spend share by supplier ─────────────────────────────────── */
-  const paid = sp.filter(t=>t.spend>0).sort((a,b)=>b.spend-a.spend);
-  const TOT  = paid.reduce((a,t)=>a+t.spend,0);
+  /* Every supplier who BID, not only those who were paid. The filter was `spend > 0`, so on an
+     account with nothing awarded this card rendered empty - no names, no bars, nothing - while
+     twenty requests sat above it full of real suppliers. Owner, 2026-10-03: *"i want this to show
+     the real suppliers name who bidden even if 0 award and 0 mony"*.
+     `value` is award spend on an awarded board and the sum of this firm's leading bids on one
+     with no awards, which is what makes the bars have a length at all. */
+  sp.forEach(t => {
+    t.value = BASIS === "awarded" ? t.spend
+      : t.offers.filter(o => o.won).reduce((a, o) => a + (o.total || 0), 0);
+    t.leads = t.offers.filter(o => o.won).length;
+  });
+  const paid = sp.filter(t => t.value > 0 || t.offers.length).sort((a,b) => b.value - a.value || b.offers.length - a.offers.length);
+  const TOT  = paid.reduce((a,t)=>a+t.value,0);
 
   /* Shares that are rounded one at a time do not add to 100, and a reader
      who adds them up is exactly the reader this page is for. */
-  const to100 = vals => { const raw = vals.map(v => v/TOT*100), out = raw.map(Math.floor);
+  const to100 = vals => { if (!TOT) return vals.map(() => 0);
+    const raw = vals.map(v => v/TOT*100), out = raw.map(Math.floor);
     let left = 100 - out.reduce((a,b)=>a+b,0);
     raw.map((v,i)=>[v-out[i], i]).sort((a,b)=>b[0]-a[0]).forEach(([,i])=>{ if(left-- > 0) out[i]++; });
     return out; };
@@ -1783,26 +1974,45 @@ for (const id in R) {
   document.getElementById("splitKey").innerHTML = rt.map(([k,label,col],i) =>
     `<div><i style="background:${col}"></i>${label} <b>${sar(CHAN[k].spend)} SAR</b>
      <em>${rpc[i]}%</em></div>`).join("");
-  const share100 = to100(paid.map(t=>t.spend));
+  const share100 = to100(paid.map(t=>t.value));
   document.getElementById("shareBody").innerHTML = paid.map((t,i)=>{
     const share = share100[i];
-    const tag = t.ver ? "Moedatech \u00b7 verified \u00b7 CR" : "your list \u00b7 no CR";
-    const reg = t.reg==="Yes, by you" ? " \u00b7 registered by you" : t.reg==="No" ? " \u00b7 not registered" : "";
+    /* Three facts about the firm, each read off the data rather than implied: where he came from,
+       whether the platform verified him, whether a CR is on file. The old line said
+       "Moedatech \u00b7 verified \u00b7 CR" as one lump whenever `ver` was true, which claimed a CR for a
+       verified supplier that had none. */
+    const tag = [t.src, t.ver ? "verified" : "unverified",
+                 t.cr && t.cr !== "None on file" ? "CR on file" : "no CR",
+                 t.reg === "Yes" ? "your vendor" : "not on your vendor list"].join(" \u00b7 ");
+    /* What he is counted for. On an awarded board, awards. On one with none, the requests where
+       his is the leading bid - stated as leading, never as won. */
+    const lead = BASIS === "awarded"
+      ? `${t.won} award${t.won === 1 ? "" : "s"}`
+      : t.leads ? `leading on ${t.leads} of ${t.offers.length} bids` : `${t.offers.length} bid${t.offers.length === 1 ? "" : "s"}, none leading`;
     return `<div class="row2" data-grp="s:${t.name}" data-x="p-supplier">
       <div class="g"><div class="t">${t.name}</div>
-        <div class="s">${t.won} award${t.won>1?"s":""} \u00b7 ${tag}${reg}</div></div>
+        <div class="s">${lead} \u00b7 ${tag}</div></div>
       <div class="track"><i class="${t.ver?"":"flag"}" style="width:${share}%"></i></div>
-      <div class="pc m">${sar(t.spend)} SAR<small>${share}%</small></div></div>`;
+      <div class="pc m">${sar(t.value)} SAR<small>${share}%</small></div></div>`;
   }).join("");
   /* Derived, every clause of it. This paragraph used to state the fixture's own shape — one
      supplier at the top, two unverified behind it — and kept stating it against live data that
      had neither. A sentence about concentration has to be computed from the concentration. */
+  const sn = document.getElementById("shareNote");
+  if (sn) sn.textContent = BASIS === "awarded"
+    ? "What you awarded, by route and by supplier"
+    : "Nothing is awarded yet, so this counts the LEADING bid on each request";
   const nameless = paid.filter(t=>!t.ver);
   document.getElementById("shareFoot").innerHTML = !paid.length
-    ? "<b>Nothing has been awarded yet, so there is no spend to divide.</b>"
-    : `<b>${paid.length===1
-        ? "One supplier holds all of your spend."
-        : `Your largest supplier holds ${share100[0]}% of your spend, across ${paid.length} suppliers.`}</b>`
+    ? "<b>No supplier has bid on anything in this period.</b>"
+    : `<b>${(() => {
+        /* "Your spend" is a claim about money that has changed hands. On a board counting leading
+           bids none has, and the sentence has to say what it is actually measuring. */
+        const what = BASIS === "awarded" ? "your spend" : "what is on the table";
+        return paid.length === 1
+          ? `One supplier holds all of ${what}.`
+          : `Your largest supplier holds ${share100[0]}% of ${what}, across ${paid.length} suppliers.`;
+      })()}</b>`
       + (nameless.length
         ? ` ${nameless.length} of them ${nameless.length===1?"holds":"hold"} ${nameless.reduce((a,t)=>a+share100[paid.indexOf(t)],0)}% between ${nameless.length===1?"it":"them"} with no verified platform identity`
         : " Every one of them is verified on the platform");
@@ -1816,16 +2026,38 @@ for (const id in R) {
   document.getElementById("chanBody").innerHTML =
     '<div class="ch-h"><span></span><span>Moedatech</span><span>Your own link</span><span>One supplier only</span></div>' +
     `<div class="ch-r"><span>Requests sent</span>${ch.map(c=>"<b>"+c.n+"</b>").join("")}</div>` +
-    `<div class="ch-r"><span>Spend, SAR</span>${ch.map(c=>"<b>"+sar(c.spend)+"</b>").join("")}</div>` +
+    `<div class="ch-r"><span>${BASIS === "awarded" ? "Spend, SAR" : "On the table, SAR"}</span>${ch.map(c=>"<b>"+sar(c.spend)+"</b>").join("")}</div>` +
+    /* Reached, then answered, then the ratio. This is the question the owner asked of this card:
+       how many suppliers got it and how many of them bid. */
+    line("Suppliers reached", c=>c.reachKnown ? c.reached : "not recorded", c=>!c.reachKnown||c.reached>=c.n*3) +
     line("Bids received", c=>c.offers, c=>c.offers/c.n>=3) +
+    line("Answered, of those reached", c=>c.reachKnown===c.n&&c.reached ? Math.round(c.offers/c.reached*100)+"%" : "—",
+         c=>!c.reachKnown||!c.reached||c.offers/c.reached>=0.15) +
     line("Bids per request", c=>(c.offers/c.n).toFixed(1), c=>c.offers/c.n>=3) +
     line("Day rate vs going rate", c=>c.vsN?pct((c.vs/c.vsN-1)*100):"\u2014", c=>!c.vsN||c.vs/c.vsN<=1.02) +
-    line("Winner is a registered company", c=>c.known+" of "+c.n, c=>c.known===c.n);
+    line(BASIS === "awarded" ? "Winner is a registered company" : "Leading bid is a registered company",
+         c=>c.known+" of "+c.n, c=>c.known===c.n);
   /* Also derived. The old sentence asserted that every off-marketplace award went to an
      unregistered supplier and cost over the market; both were true of the fixture and of nothing
      else, and the page went on saying them over real awards that contradicted them. */
   const off = ch.slice(1), offN = off.reduce((a,c)=>a+c.n,0);
   const offKnown = off.reduce((a,c)=>a+c.known,0);
+  if (!ch.length) {
+    document.getElementById("chanFoot").innerHTML =
+      "<b>Nothing has gone out yet, so there is no route to compare.</b>";
+    return;
+  }
+  if (ch.length < 2) {
+    /* Every request went out the same way, so there is nothing to compare it against. A single
+       column under a heading that promises a comparison reads as "the other routes scored zero". */
+    const only = ch[0];
+    document.getElementById("chanFoot").innerHTML =
+      `<b>Every request this period went out the same way: ${only.name.toLowerCase()}.</b>
+       There is no second route to compare it against yet. Share a request by link, or send one to a
+       named supplier, and this card starts answering which route gets you more bids per request and
+       a better price`;
+    return;
+  }
   const mkt = ch[0];
   document.getElementById("chanFoot").innerHTML = !offN
     ? "<b>Everything this period went out through the marketplace.</b> There is no off-platform route to compare it against yet"
@@ -1848,9 +2080,6 @@ for (const id in R) {
    of data the page was handed, and it cannot disagree with the row it was opened from.
    ══════════════════════════════════════════════════════════════════════════════════════════════ */
 
-const day = v => { if (!v) return "\u2014"; const d = new Date(v);
-  return isNaN(d) ? String(v).slice(0, 10)
-    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
 const UNIT = { PER_DAY: "per day", PER_WEEK: "per week", PER_MONTH: "per month", PER_JOB: "per job" };
 
 /* A section of the dossier. `k` is the column that opens on it. */
@@ -1910,6 +2139,13 @@ function requestDossier(r, focus) {
       ["Billable days", r.billable],
       ["Units", "\u00d7" + r.units],
       ["Raised", day(r.created)],
+      ["Bidding closed", r.deadline ? day(r.deadline) : "no deadline set"],
+      ...(r.created && r.deadline
+        ? [["Suppliers had", (() => { const h = (new Date(r.deadline) - new Date(r.created)) / 36e5;
+            return h <= 0 ? "\u2014" : h < 48 ? Math.round(h) + " hours" : Math.round(h / 24) + " days"; })(),
+            (new Date(r.deadline) - new Date(r.created)) / 36e5 < 48]]
+        : []),
+      ...(r.urgency ? [["Urgency", r.urgency]] : []),
       ["Status", r.status || "\u2014"],
       r.edited ? ["Edited after bids had arrived", "Yes", 1] : null,
     ])),
@@ -1917,7 +2153,12 @@ function requestDossier(r, focus) {
     sec("c-reach", "How it went out, and who answered", facts([
       ["Route", r.channel],
       r.sent != null ? ["Suppliers the link was sent to", r.sent] : null,
-      r.opened != null ? ["Suppliers that opened it", r.opened] : ["Suppliers the marketplace matched", "not stored", 1],
+      /* The label follows the ROUTE. A bare count beside three different routes means three
+         different things, and "suppliers reached: 14" on a direct request would be a lie. */
+      r.reach === "opened" ? ["Suppliers that opened it", r.opened]
+        : r.reach === "notified" ? ["Suppliers the dispatch notified", r.opened]
+        : r.reach === "direct" ? ["Suppliers it could reach", "one, by your choice"]
+        : ["Suppliers reached", "not recorded on this request", 1],
       ["Bids received", r.bids.length],
       ["Bids meeting every term", r.bids.filter(b => b.ok).length],
       ["Bids from Moedatech suppliers", r.bids.filter(b => b.onPlatform).length],
@@ -1930,9 +2171,9 @@ function requestDossier(r, focus) {
        ["Whole hire", 1], ["Your terms"], ["Arrived", 1], ["Against the rate", 1]],
       bidRows,
       band
-        ? `The going rate for this machine type is ${sar(band.med)} per day, the median of ${band.n} bids
-           from ${band.firms} supplier${band.firms === 1 ? "" : "s"}, running ${sar(band.lo)} to ${sar(band.hi)}.
-           Every rate above is reduced to one day first, so a weekly quote and a daily one compare.`
+        ? `The going rate for this machine type is ${sar(band.med)} per day — ${BAND(r)}. The middle
+           half of that field runs ${sar(band.lo)} to ${sar(band.hi)}. Every rate above is reduced to one
+           day first, so a weekly quote and a daily one compare.`
         : `Fewer than three bids have landed for this machine type across your account, so there is no
            going rate to compare against. The per-day column still normalises every quote to one day.`),
       r.bids.length + (r.bids.length === 1 ? " bid" : " bids")),
@@ -1986,6 +2227,7 @@ function machineDossier(e) {
       ["Total spend", sar(e.spend) + " SAR"],
       ["Average rate", sar(e.rate) + " per day"],
       ["Going rate", e.med == null ? "too few bids to set one" : sar(e.med) + " per day", e.med == null],
+      ...(e.band ? [["Measured against", e.band]] : []),
       ["Against the going rate", e.vs == null ? "no band" : pct(e.vs), e.vs != null && e.vs >= 5],
     ])),
     sec("e-spend", "Every hire", tbl(
@@ -2017,6 +2259,17 @@ function supplierDossier(t) {
       ["Requests he answered", `${t.offers.length} of ${NREQ}`],
       ["Awards won", t.won, !t.won],
       ["Money awarded to him", sar(t.spend) + " SAR"],
+      /* The registry counts EVERY bid this firm has ever sent you, not only the ones inside the
+         window this board folds. A supplier who bid eleven times last quarter and twice this one
+         reads "2 of 5" above and "13 bids" here, and both are true of different questions. */
+      ...(t.rollup ? [
+        ["Bids he has ever sent you", `${t.rollup.bidsApp + t.rollup.bidsLink}`],
+        ["  through Moedatech", t.rollup.bidsApp],
+        ["  through your shared link", t.rollup.bidsLink],
+        ["Deal rooms opened with him", t.rollup.rooms],
+        ["Awards carrying his name, all time", t.rollup.awards],
+        ["Last time he bid", t.rollup.lastBidAt ? day(t.rollup.lastBidAt) : "never"],
+      ] : [["Lifetime history", "he is not on your supplier list, so none is kept", 1]]),
     ])),
     sec("s-bids", "Every bid he sent", tbl(
       [["Request"], ["Machine"], ["Came in as"], ["Quoted", 1], ["Per day", 1], ["Whole hire", 1],
@@ -2144,8 +2397,11 @@ PANEL["c-position"] = () => `<div class="dtitle">Where each award landed against
 for (const k of Object.keys(CERT)) PANEL[k] = () => { const c = CERT[k];
   return `<div class="dtitle">${c.doc}</div>` +
     dr("Supplier", c.supplier) +
-    dr("Expiry on file", c.expiry, null, c.bad ? " bad" : "") +
     dr("Status", c.state, null, c.bad ? " bad" : "") +
+    /* A paper with no date on file is not a paper that never expires, and the row says which of
+       the two this is rather than printing an empty cell. */
+    dr("Expiry on file", c.expiry ? day(c.expiry) : "none recorded", null, c.bad ? " bad" : "") +
+    dr("Your request asked for it", c.required ? "Yes" : "No") +
     (c.machine ? dr("Machine it covers", c.machine, c.req) : dr("Machine it covers", "none on hire")) +
     (c.hire ? dr("Hire window", c.hire) : "") +
     `<div class="dfoot">${c.note}</div>`;
@@ -2618,7 +2874,16 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   if (launch) launch.onclick = ()=> openPanel("cards");
   const closeX = document.getElementById("agentX");
   if (closeX) closeX.onclick = closePanel;
-  /* Escape closes the explainer drawer, never the rail: the rail is furniture, not an overlay. */
+  /* Escape used to be reserved for the drawer, because the rail was furniture and could not trap
+     anybody. It can now: the host grows this frame over its own header while the rail is open, so
+     a rail with no keyboard way out is a renter who cannot leave the tab he just opened. Escape
+     closes the dossier first and the rail second, never both on one press. */
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (dw.classList.contains("open")) return;   /* the dossier's own handler takes this one */
+    if (panel.classList.contains("open")) closePanel();
+  });
+
 
   function run(q){
     if(!q.trim()) return;

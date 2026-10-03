@@ -48,6 +48,6 @@ describe("the dashboard's own spacing", () => {
     const hub = read("src/components/home/HomeHub.tsx");
     expect(hub.indexOf("<SuppliersPage embedded")).toBeGreaterThan(-1);
     expect(hub.indexOf("<SuppliersPage embedded")).toBeLessThan(hub.indexOf("<ProjectsSurface embedded"));
-    expect(hub).toContain('const VIEWS: View[] = ["requests", "suppliers", "projects"]');
+    expect(hub).toContain('const VIEWS: View[] = ["requests", "suppliers", "governance", "projects"]');
   });
 });

@@ -20,6 +20,7 @@ function item(id: string, status: RequestStatus = "OPEN", qty = 1, imageUrl: str
   return {
     id,
     expiresAt: null,
+    suppliersNotified: null,
     requestGroupId: null,
     projectId: null,
       displayId: `REQ-${id}`,

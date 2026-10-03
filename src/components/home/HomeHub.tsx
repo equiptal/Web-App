@@ -239,10 +239,14 @@ export function HomeHub() {
           a renter deep in the create flow must not be tapped on the shoulder. */}
       <HomeNotificationBubble />
 
-      {/* The hero steps aside for the governance board (owner, 2026-10-03). That board is a full
-          screen of its own — a rail down one side and cards filling the rest — and a banner above
-          it costs the rail the height it needs to reach the top of the window. */}
-      {view !== "governance" && <CtaBanner />}
+      {/* ~~The hero steps aside for the governance board.~~ It was taken away on the reasoning that
+          a banner above the board costs the rail the height it needs to reach the top of the
+          window, and that reasoning was wrong twice over: the rail could not reach the top of the
+          window anyway while it lived inside a frame that started below the header, and the fix
+          for that (the frame grows over the host's chrome while the rail is open) covers a banner
+          just as happily as it covers the header. Owner, 2026-10-03: *"the create request by agent
+          cta is no more exist so i want it back"*. It is on every tab again. */}
+      <CtaBanner />
 
       {/* ── The three tabs (owner, 2026-09-16) ────────────────────────────────────────────────────
           They ARE the section headings: each carries the plate glyph, the name and the count that

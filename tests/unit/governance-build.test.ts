@@ -77,6 +77,7 @@ const request = (over: Partial<RequestListItem> = {}): RequestListItem =>
     createdAt: "2026-08-28T08:00:00Z",
     expiresAt: null,
     bidCount: 1,
+    suppliersNotified: null,
     renteeEditUsed: false,
     requiredCerts: [],
     mobByRentee: null,
@@ -182,23 +183,35 @@ describe("buildGovernance", () => {
     expect(out.R.r1.bids.find((b) => b.firm === "Zahid")?.ok).toBe(1);
   });
 
-  it("leaves marketplace reach null, and never zero", () => {
+  it("reads marketplace reach off the dispatch count, and leaves it null when absent", () => {
     const out = buildGovernance(
       input({
-        requests: [request(), request({ id: "r2", groupRef: "RFQ-1051" })],
+        requests: [
+          request({ suppliersNotified: 14 }),
+          request({ id: "r2", groupRef: "RFQ-1051" }),
+          request({ id: "r3", groupRef: "RFQ-1052" }),
+        ],
         bidsByRequest: {
           r1: [bid({ supplierName: "Zahid", status: "ACCEPTED" })],
           r2: [bid({ supplierName: "Faisal", status: "ACCEPTED" })],
+          r3: [bid({ supplierName: "Nesma", status: "ACCEPTED" })],
         },
-        sharesByRequest: { r2: { sent: 5, opened: 5 } },
+        sharesByRequest: { r3: { sent: 5, opened: 2 } },
       }),
     );
-    // A marketplace request: the platform computes the match and keeps no count of it.
-    expect(out.R.r1.opened).toBeNull();
-    expect(out.R.r1.channel).toBe("Moedatech marketplace");
-    // A link share counts opens, so the denominator is real.
-    expect(out.R.r2.opened).toBe(5);
-    expect(out.R.r2.channel).toBe("Your own shared link");
+    /* The backend has returned `suppliersNotified` on `my-requests` since 2026-09-24. The board
+       printed "suppliers reached not stored" on every marketplace row for as long as nobody
+       mapped it. */
+    expect(out.R.r1.opened).toBe(14);
+    expect(out.R.r1.reach).toBe("notified");
+    /* A payload that predates the field stays NULL. A request nobody saw and a request everybody
+       ignored are different answers, and a zero here says the first about both. */
+    expect(out.R.r2.opened).toBeNull();
+    expect(out.R.r2.reach).toBeNull();
+    // A link share counts opens instead, and says so.
+    expect(out.R.r3.opened).toBe(2);
+    expect(out.R.r3.reach).toBe("opened");
+    expect(out.R.r3.channel).toBe("Your own shared link");
   });
 
   it("calls a direct request what it is: one firm, reach of one", () => {
@@ -247,15 +260,6 @@ describe("buildGovernance", () => {
   it("treats a certificate that lapsed before the hire began as expired, and one after as expiring", () => {
     const unit = (expiry: string) => ({
       equipmentId: "e1",
-      manufacturer: null,
-      modelName: null,
-      year: null,
-      fuelType: null,
-      licensePlateNumber: null,
-      subcategoryName: null,
-      subcategoryNameAr: null,
-      measurementName: null,
-      measurementNameAr: null,
       documentKeys: [{ type: "TUV", key: "k", url: null, verifyStatus: null, expiryDate: expiry }],
       photoKeys: [],
     });
@@ -272,16 +276,79 @@ describe("buildGovernance", () => {
     expect(Object.values(out.CERT).find((c) => c.supplier === "Nesma")?.state).toBe("Expiring");
   });
 
-  it("produces no papers for a link bid, because the platform stores none", () => {
+  it("takes the EARLIEST expiry across the units offered, not the latest", () => {
+    const unit = (id: string, expiry: string) => ({
+      equipmentId: id,
+      documentKeys: [{ type: "TUV", key: "k", url: null, verifyStatus: null, expiryDate: expiry }],
+      photoKeys: [],
+    });
     const out = buildGovernance(
       input({
         requests: [request()],
-        // An off-platform submission carries no offeredUnitsDetail at all.
-        bidsByRequest: { r1: [bid({ supplierName: "Faisal", status: "ACCEPTED", offeredUnitsDetail: undefined })] },
-        sharesByRequest: { r1: { sent: 5, opened: 3 } },
+        bidsByRequest: {
+          r1: [bid({ supplierName: "Zahid", status: "ACCEPTED", offeredUnitsDetail: [unit("e2", "2027-01-01"), unit("e1", "2026-08-20")] as never })],
+        },
       }),
     );
-    expect(out.CERT).toEqual({});
+    /* A fleet is covered only until its first lapse. Reporting the latest would call the hire
+       covered on the strength of one machine while another sits on site uncertified. */
+    expect(out.CERT["r1:TUV"].expiry).toBe("2026-08-20");
+    expect(out.CERT["r1:TUV"].state).toBe("Expired");
+  });
+
+  it("lists a paper the platform holds but records no expiry for, rather than drawing nothing", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        /* No `offeredUnitsDetail` at all, which is every off-platform bid and plenty of in-app
+           ones. The card used to read documents only, so this account drew an EMPTY papers card
+           and read as a supplier holding no certificates. */
+        bidsByRequest: {
+          r1: [bid({ supplierName: "Faisal", status: "ACCEPTED", heldCertCodes: ["TUV"], companyCertCodes: ["SASO"], offeredUnitsDetail: undefined } as never)],
+        },
+      }),
+    );
+    expect(Object.keys(out.CERT).sort()).toEqual(["r1:SASO", "r1:TUV"]);
+    expect(out.CERT["r1:TUV"].state).toBe("On file");
+    expect(out.CERT["r1:TUV"].expiry).toBeNull();
+    /* On file with no date is not a failure, so it is not flagged — but it is not silence either. */
+    expect(out.CERT["r1:TUV"].bad).toBeUndefined();
+    expect(out.CERT["r1:TUV"].note).toMatch(/no expiry date/);
+  });
+
+  it("raises a certificate the request asked for and the bid does not hold", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request({ requiredCerts: ["TUV", "SASO"] as never })],
+        bidsByRequest: {
+          r1: [bid({ supplierName: "Faisal", status: "ACCEPTED", heldCertCodes: ["TUV"], offeredUnitsDetail: undefined } as never)],
+        },
+      }),
+    );
+    expect(out.CERT["r1:TUV"].state).toBe("On file");
+    expect(out.CERT["r1:SASO"].state).toBe("Not held");
+    expect(out.CERT["r1:SASO"].bad).toBe(1);
+    expect(out.CERT["r1:SASO"].required).toBe(1);
+  });
+
+  it("carries the registry's own count of everything a firm has sent, across all time", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        bidsByRequest: { r1: [bid({ supplierName: "Zahid", status: "ACCEPTED", supplierCompanyId: "co-z" })] },
+        registry: [
+          {
+            supplierId: null, companyId: "co-z", crNumber: null, name: "Zahid",
+            vendorRegistered: true, onMoedatech: true, groups: [],
+            rollup: { bidsApp: 9, bidsLink: 2, awards: 3, rooms: 4, lastBidAt: "2026-09-07T10:20:00Z" },
+          },
+        ],
+      }),
+    );
+    /* The board's own arithmetic sees one bid, because it folds one request. The registry has
+       counted eleven. Both are true of different questions, and the card has to say which. */
+    expect(out.R.r1.bids).toHaveLength(1);
+    expect(out.SUPMETA.Zahid.rollup).toEqual({ bidsApp: 9, bidsLink: 2, awards: 3, rooms: 4, lastBidAt: "2026-09-07T10:20:00Z" });
   });
 
   it("reduces every rate to one day before comparing, so a weekly quote is not six times a daily one", () => {
@@ -321,7 +388,7 @@ describe("buildGovernance", () => {
       }),
     );
     // sub-exc saw three bids: 900, 1000, 1400 — median 1000, from three separate firms.
-    expect(out.R.r1.market).toEqual({ med: 1000, n: 3, lo: 900, hi: 1400, firms: 3 });
+    expect(out.R.r1.market).toEqual({ med: 1000, n: 3, lo: 900, hi: 1400, firms: 3, source: "yours" });
     expect(out.R.r3.market).toBeNull();
   });
 
@@ -350,10 +417,10 @@ describe("buildGovernance", () => {
           ],
         },
         registry: [
-          { supplierId: null, companyId: "co-zahid", crNumber: null, name: "Zahid", vendorRegistered: true, onMoedatech: true, groups: ["Earthworks"] },
+          { supplierId: null, companyId: "co-zahid", crNumber: null, name: "Zahid", vendorRegistered: true, onMoedatech: true, groups: ["Earthworks"], rollup: { bidsApp: 9, bidsLink: 2, awards: 3, rooms: 4, lastBidAt: "2026-09-07T10:20:00Z" } },
           /* No ids at all — the only key left is the name, and refusing to use it would report
              every manually added supplier as unregistered. */
-          { supplierId: null, companyId: null, crNumber: null, name: "hand typed co", vendorRegistered: true, onMoedatech: false, groups: [] },
+          { supplierId: null, companyId: null, crNumber: null, name: "hand typed co", vendorRegistered: true, onMoedatech: false, groups: [], rollup: null },
         ],
       }),
     );
@@ -439,5 +506,102 @@ describe("buildGovernance", () => {
     expect([r.sent, r.opened]).toEqual([8, 3]);
     expect(r.winner?.vat).toBe("300123456700003");
     expect(out.SUPMETA.Zahid.city).toBe("Jubail");
+  });
+
+  it("reports on the LEADING bid when nothing has been awarded, and says which it is doing", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request(), request({ id: "r2", groupRef: "RFQ-1043" })],
+        bidsByRequest: {
+          r1: [bid({ supplierName: "Zahid", price: 1000 }), bid({ supplierName: "Nesma", price: 900 })],
+          r2: [bid({ supplierName: "Faisal", price: 1200 })],
+        },
+      }),
+    );
+    /* Twenty requests full of real bids and nothing accepted is the ordinary state of an account,
+       and an award-only board drew a column of zeros beside all of them. */
+    expect(out.basis).toBe("leading");
+    /* The projection never becomes an award: no row is marked awarded and no supplier is credited
+       with a win. Only the WORDING on the money cards changes. */
+    expect(Object.values(out.R).every((r) => !r.awarded)).toBe(true);
+    expect(Object.values(out.R).every((r) => r.winner === null)).toBe(true);
+  });
+
+  it("switches back to awards the moment there is even one", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request(), request({ id: "r2", groupRef: "RFQ-1043" })],
+        bidsByRequest: {
+          r1: [bid({ supplierName: "Zahid", price: 1000, status: "ACCEPTED" })],
+          r2: [bid({ supplierName: "Faisal", price: 1200 })],
+        },
+      }),
+    );
+    /* Mixing a projection into a board that has real awards would make the total unreconcilable
+       with the award table beneath it. */
+    expect(out.basis).toBe("awarded");
+  });
+
+  it("carries the deadline and the urgency the three timing checks read", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request({ expiresAt: "2026-08-29T17:00:00Z", urgency: "ASAP" as never })],
+        bidsByRequest: { r1: [bid({ supplierName: "Zahid", submittedAt: "2026-08-29T23:20:00Z" })] },
+      }),
+    );
+    /* All three were listed as needing fields the platform does not store. It stores all three:
+       `expiresAt`, `createdAt` and `urgency` have been on the request list the whole time. */
+    expect(out.R.r1.deadline).toBe("2026-08-29T17:00:00Z");
+    expect(out.R.r1.created).toBe("2026-08-28T08:00:00Z");
+    expect(out.R.r1.urgency).toBe("ASAP");
+    // The bid landed after the close, which is what the late-bid check compares.
+    expect(out.R.r1.bids[0].at > out.R.r1.deadline!).toBe(true);
+  });
+
+  it("falls back to the measured platform band, and never over his own bids", () => {
+    /* A real subtype from `market-rates.ts`: 589 bids from 47 companies, median 1,385. */
+    const SEEDED = "0f58872b-1bfa-4b84-86db-efe647390586";
+    const item = { name: "Seeded type", nameAr: "", qty: 1, imageUrl: null, imageIsPhoto: false, categoryId: SEEDED };
+    const out = buildGovernance(
+      input({
+        requests: [request({ item: item as never })],
+        /* One bid, so there is no band of his own to compute. */
+        bidsByRequest: { r1: [bid({ supplierName: "Zahid", price: 1000, status: "ACCEPTED" })] },
+      }),
+    );
+    expect(out.R.r1.market?.source).toBe("platform");
+    expect(out.R.r1.market?.med).toBe(1385);
+    expect(out.R.r1.market?.measured).toBe("2026-10-03");
+  });
+
+  it("prefers the renter's own bids over the seeded band when he has enough", () => {
+    const SEEDED = "0f58872b-1bfa-4b84-86db-efe647390586";
+    const item = { name: "Seeded type", nameAr: "", qty: 1, imageUrl: null, imageIsPhoto: false, categoryId: SEEDED };
+    const out = buildGovernance(
+      input({
+        requests: [request({ item: item as never })],
+        bidsByRequest: {
+          r1: [bid({ supplierName: "A", price: 900 }), bid({ supplierName: "B", price: 1000, status: "ACCEPTED" }), bid({ supplierName: "C", price: 1100 })],
+        },
+      }),
+    );
+    /* His three bids are specific to his dates, site and terms. The platform median is 1,385 and
+       must not displace them. */
+    expect(out.R.r1.market?.source).toBe("yours");
+    expect(out.R.r1.market?.med).toBe(1000);
+  });
+
+  it("treats a zero dispatch count as NOT RECORDED, never as nobody reached", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request({ suppliersNotified: 0 })],
+        bidsByRequest: { r1: [bid({ supplierName: "Zahid", status: "ACCEPTED" })] },
+      }),
+    );
+    /* The backend derives this from a batched MatchEvent count and its own changelog says it is
+       0 for any request older than match tracking. "0 suppliers were notified" and "nobody
+       recorded who was notified" are different sentences. */
+    expect(out.R.r1.opened).toBeNull();
+    expect(out.R.r1.reach).toBeNull();
   });
 });

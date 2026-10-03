@@ -71,6 +71,7 @@ type RawSupplier = {
   onMoedatech?: boolean | null;
   kind?: string | null;
   groups?: string[] | null;
+  rollup?: { bidsApp?: number; bidsLink?: number; awards?: number; rooms?: number; lastBidAt?: string | null } | null;
 };
 
 export async function GET(req: Request) {
@@ -133,6 +134,17 @@ export async function GET(req: Request) {
            the renter's separate decision about it. */
         vendorRegistered: s.vendorRegistered === true,
         onMoedatech: s.onMoedatech ?? s.kind === "platform",
+        /* The registry counts EVERY bid this firm has ever sent, not only the ones inside the
+           newest-sixty window the board folds. Two different questions, both worth answering. */
+        rollup: s.rollup
+          ? {
+              bidsApp: s.rollup.bidsApp ?? 0,
+              bidsLink: s.rollup.bidsLink ?? 0,
+              awards: s.rollup.awards ?? 0,
+              rooms: s.rollup.rooms ?? 0,
+              lastBidAt: s.rollup.lastBidAt ?? null,
+            }
+          : null,
         groups: Array.isArray(s.groups) ? s.groups : [],
       }));
 

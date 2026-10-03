@@ -7,6 +7,196 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-03 - The going rate is now a measured platform median, not the renter's own three
+  quotes.** Owner: *"i will not use backend, u query a db one time and use the data"*. Measured
+  read-only against `moedatech_prod` through `scripts/data-job/` in the backend repo (the only
+  in-VPC path; both databases have had `0.0.0.0/0` revoked since 2026-09-04). 2,864 priced bids,
+  every one reduced to a per-day rate with the app's own divisors, grouped by the request's
+  taxonomy subtype. 23 subtypes published, 21 held back. Shipped as
+  `src/lib/governance/market-rates.ts`; the fold uses it ONLY where the renter has fewer than
+  three bids of his own for that type, and `MarketBand.source` says which of the two a card is
+  showing. Files: `src/lib/governance/market-rates.ts`, `src/lib/governance/build.ts`,
+  `public/governance-dashboard.html`.
+  WARNING: it is a SNAPSHOT and every surface that reads it prints its date. It is keyed by
+  taxonomy subtype id, so a renamed subtype keeps its rate but a SPLIT subtype silently inherits
+  its parent's - that is the way this file goes quietly wrong. Re-measure, never hand-edit.
+  WARNING: the first run published at 5 bids with no floor on suppliers and returned entries like
+  `n: 9, firms: 1, lo: 1, hi: 15000` - one firm quoting nonsense into an empty category, not a
+  market rate. The floor is 8 bids from 3 companies. The band is the QUARTILES, not the deciles:
+  at p10/p90 one subtype came back `lo: 288, hi: 12000` around a median of 538, forty times its
+  own middle, which squashes every real bid into the first pixel of the price rail.
+
+- **2026-10-03 - `suppliersNotified` of ZERO means "not recorded", not "nobody was reached".**
+  The backend derives it from a batched `MatchEvent` count, and the backend's own changelog
+  (2026-09-24) says it is 0 for any request older than match tracking - which began 2026-04-06,
+  per the earliest row in `notification_dispatch_logs`. The fold was reading 0 as a real reach of
+  zero and the board would have printed "0 suppliers were notified" on every pre-April request.
+  Files: `src/lib/governance/build.ts`.
+
+- **2026-10-03 - Measured, so the remaining backend asks can be stated as facts rather than
+  guesses.** Against prod, 2026-10-03: `notification_dispatch_logs` holds 63,396 rows over 190
+  requests and 1,835 distinct recipients, so PER-SUPPLIER reach exists and only needs exposing -
+  it is not a schema change. Awards: 25 rows across the whole platform (16 by `is_winner`, 0 by
+  survey), and `projects_with_awards` is **0**, so `Project.awards` is empty everywhere and an
+  award timestamp would have to come from `bids`, not from there. ⚠️ `equipment_requests` has NO
+  `suppliers_notified` column and `equipment_subtypes` is not a table on prod - both were assumed
+  in an earlier draft of the measuring job and both were wrong.
+
+- **2026-10-03 - Six of the seven warnings this page declared impossible were answerable all
+  along.** The comment above `warningsFor` said late bid, bid window, urgency, supplier-just-added,
+  post-bid edit and deal-room renegotiation "need timestamps or audit rows the renter API does not
+  return". `expiresAt`, `createdAt`, `urgency`, `renteeEditUsed` and `openingPrice` were on the
+  request list or the bid the whole time and the board never carried them; the vendor tick came
+  from a registry nobody called. Ten warnings fire, now fourteen.
+  Files: `src/lib/governance/build.ts`, `public/governance-dashboard.html`.
+  WARNING: one IS still out of reach - award-before-bids-closed needs an award timestamp and an
+  actor, and `Project.awards` is a JSON blob carrying neither. It is left unraised rather than
+  guessed. The lesson is not about these six: a surface that declares a question unanswerable must
+  name the field it looked for, so the next reader can check the claim instead of inheriting it.
+
+- **2026-10-03 - The bid window is measured in HOURS, not days.** The platform's shortest window
+  is a matter of hours, and a day count rounds a 20-hour window and a 44-hour one to the same
+  number - which is the difference between a tender nobody could answer and an ordinary one.
+  Files: `public/governance-dashboard.html`.
+
+- **2026-10-03 - The renegotiation warning reads the bid's own opening price, not the deal room.**
+  `DealRoom.lastProposedRate` is not on the renter API, so this catches only the movement the BID
+  records: `openingPrice` set and lower than the price finally quoted. A room that closed above
+  the winning bid without the bid recording it stays invisible, and the card does not pretend
+  otherwise. Files: `public/governance-dashboard.html`.
+
+- **2026-10-03 - The board was award-first, and the account it ships to has 20+ requests, bids on
+  most, and almost nothing awarded.** Every money figure read zero, the supplier share card
+  filtered to `spend > 0` and rendered EMPTY, and the channel card had nothing to divide. Owner:
+  *"i want this to show the real suppliers name who bidden even if 0 award and 0 mony"* and *"the
+  account already has more than 20 requests and most have bids"*. `BoardPayload.basis` is now
+  `"awarded"` when any request has an award and `"leading"` when none does; on `leading` every
+  money card reports the LEADING bid on each request instead of a zero. Files:
+  `src/lib/governance/build.ts`, `public/governance-dashboard.html`.
+  WARNING: this is the one place the board reports something that has not happened, so the
+  projection must never read as a fact. `BoardRequest.awarded` stays false on every row, `winner`
+  stays null, no supplier is credited with a win, and the wording changes throughout - "SAR
+  awarded" becomes "SAR on the table", "2 awards" becomes "leading on 2 of 3 bids", "your spend"
+  becomes "what is on the table". A renter whose dashboard quietly counted leading bids as spend
+  would be reading a forecast as a fact. Awards win whenever there is even one: mixing a
+  projection into a board that has real awards makes the total unreconcilable with its own table.
+
+- **2026-10-03 - The supplier share card filtered itself empty.** `paid = sp.filter(t => t.spend > 0)`
+  meant a board with no awards drew no supplier rows at all, while twenty requests full of real
+  bids sat above it. Every supplier who BID is listed now, including one with no leading bid at
+  all, which renders as a named row at 0 SAR rather than as an absence.
+  Files: `public/governance-dashboard.html`.
+  WARNING: the row's identity line also claimed too much. It read "Moedatech · verified · CR" as
+  one lump whenever `ver` was true, so a verified supplier with no commercial registration on file
+  was shown as having one. Each of the four facts is read separately now.
+
+- **2026-10-03 - A negative market gap was printed with the "above the going rate" label.**
+  "−6,540 above the rate" asks the reader to do the double negative himself, and the card was red
+  for a finding that is good news. The figure prints unsigned and the label carries the direction.
+  Files: `public/governance-dashboard.html`.
+  WARNING: `to100` divides by the total and returned `NaN%` in every row when the total was zero,
+  which is exactly the state this change makes reachable.
+
+- **2026-10-03 - "Suppliers reached" was never missing; the field was simply never mapped.**
+  Owner: *"u check how many suppliers recieved requests and how many bidded"*. The board printed
+  "suppliers reached not stored" on every marketplace row, the blind-spots card named it as a gap,
+  and an earlier entry here proposed persisting a new `matchedSupplierCount` column to fix it.
+  All wrong: `my-requests` has returned `suppliersNotified` on every request since 2026-09-24, and
+  `api/support/intercom/route.ts` was already reading it straight off the raw record. It was absent
+  only from `RequestListItem`. Mapped now, and the channel card gained "Suppliers reached" and
+  "Answered, of those reached". Files: `src/lib/contract/requests.ts`, `src/lib/governance/build.ts`,
+  `public/governance-dashboard.html`.
+  WARNING: null still means NOT RECORDED, never zero - the field is absent on an older payload and
+  on anything never dispatched, and `reach` ("notified" / "opened" / "direct" / null) says which
+  question the number answers. A bare count beside three routes means three different things.
+
+- **2026-10-03 - The papers card was the last hand-written card: three typed fixture rows, drawn
+  over every account.** TUV on a boom lift from Zahid, a registration from Arabian Cranes, an
+  address from Nesma. None came from `CERT`, so no renter's real certificates were ever on screen,
+  and the keys `cert-1..3` matched no record - which is why clicking one opened the explainer
+  instead of the paper. Owner: *"suppliers activities and ceritifcates and papers all dont have
+  real data ... clicking on the chart must show the data details not onboarding"*. Generated now,
+  worst first, every row carrying its own key. Files: `public/governance-dashboard.html`.
+
+- **2026-10-03 - Papers are built from the certificate CODES on the bid, not only from documents
+  that carry an expiry date.** The fold read `offeredUnitsDetail[].documentKeys[].expiryDate` and
+  nothing else, so an account whose papers are on file but undated produced an EMPTY card - which
+  reads as "this supplier holds no certificates", the opposite of the truth. It now folds
+  `requiredCerts` (what you asked for), `heldCertCodes` / `companyCertCodes` / `equipmentCertCodes`
+  (what they hold) and `ownershipDocs`, with the expiry layered on where one exists. Four states:
+  Not held, Expired, Expiring, On file. Files: `src/lib/governance/build.ts`.
+  WARNING: `BoardCert.expiry` is now NULLABLE, and null means the platform holds the document but
+  records no date for it - NOT that it never expires. Where several units are offered the EARLIEST
+  expiry wins: a fleet is covered only until its first lapse, and reporting the latest would call a
+  hire covered on the strength of one machine while another sits on site uncertified.
+
+- **2026-10-03 - A leftover tuple read printed "NaN%" on the channel card and silently zeroed the
+  registered-company count.** When `BoardBid` stopped being a 5-tuple, one of the two aggregation
+  loops kept `won[1]` and `won[0]`. On an object both are `undefined`: the rate average became NaN,
+  and `paidTo` became undefined so `SUPMETA[undefined]` never matched and "winner is a registered
+  company" counted 0 of n forever. Found by sweeping every clickable in the headless harness, not
+  by reading the diff. Files: `public/governance-dashboard.html`.
+  WARNING: the fallback it also removed, `r.money[0][1]`, is "Rate per day" ONLY on a daily quote -
+  a weekly one unshifts a "Quoted as" row in front of it. Read `leadBid(r).perDay`.
+
+- **2026-10-03 - The supplier dossier carries the registry's lifetime roll-up beside the board's
+  own count.** `/agents/renter-suppliers` returns `rollup` (bidsApp, bidsLink, awards, rooms,
+  lastBidAt) covering every bid a firm has ever sent, not only those inside the newest-sixty window
+  this board folds. A supplier who bid eleven times last quarter and twice this one reads "2 of 5
+  requests" from the board and "13 bids" from the registry; both are true of different questions,
+  and the card now says which is which instead of showing one. Files:
+  `src/app/api/me/governance/route.ts`, `src/lib/governance/build.ts`,
+  `public/governance-dashboard.html`.
+
+- **2026-10-03 - A one-column channel comparison is not a comparison.** With every request sent the
+  same way the card drew a single column under a heading promising a split, which reads as "the
+  other routes scored zero". It now says every request went out the same way and what to do to make
+  the card answerable. Files: `public/governance-dashboard.html`.
+  WARNING: the zero-channel case (nothing awarded at all) read `ch[0].name` unguarded and threw,
+  killing every card rendered after it.
+
+- **2026-10-03 - `day()` was declared in the dossier block and called by the papers card, which
+  renders first.** `const` is not hoisted, so it threw "Cannot access 'day' before initialization"
+  and took out every card after it. Hoisted to sit with the other shared helpers. Third instance of
+  this exact trap on this page (`restore()`, 2026-10-02). Files: `public/governance-dashboard.html`.
+  WARNING: the page is one long script with no modules, so declaration ORDER is the contract. A
+  helper used by a render function must be declared above every render function, not next to the
+  code that reads it most.
+
+- **2026-10-03 - The card rail had no door in either direction.** `#agentBtn` (the launcher) and
+  `#agentX` (the close button) were both referenced by the script, both styled in the stylesheet,
+  and NEITHER existed in the markup. Both references were null-guarded, so nothing threw and
+  nothing logged. The rail could be opened only by the auto-open on load and could not be closed
+  by mouse at all; once shut it could not be reopened without reloading the page, and the rail is
+  the only way to put a card on the board. Both are back, and Escape closes it too.
+  Files: `public/governance-dashboard.html`.
+  WARNING: this is what a null-guard hides. `if (launch) launch.onclick = ...` reads as defensive
+  and is, against a missing element that is *supposed* to be optional. Against one that is not, it
+  turns a crash into a feature that quietly is not there.
+
+- **2026-10-03 - The frame grows over the app header while the rail is open, so the panel reaches
+  the top of the screen.** Owner: *"the side panel still doesnt open on full height on top ... i
+  want the panel to be above the header and above the cta"*. The rail cannot paint outside its
+  frame, so the only way it reaches the top of the SCREEN is for the frame to. While the rail is
+  open the frame covers the window and takes `z-index: 40` (the app header is `z-30`); the board
+  pads itself by the same offset (`--hoff`, sent by the host) so its content holds still, and the
+  embedded page's background is already transparent, so the header and the banner show through
+  exactly where they were. Files: `src/components/home/GovernanceBoard.tsx`,
+  `public/governance-dashboard.html`.
+  WARNING: the whole window belongs to the frame while the rail is open, so the header, the banner
+  and the tab row are VISIBLE BUT NOT CLICKABLE. That is the cost of a panel that covers them, and
+  it is why the rail must always be escapable - with the panel auto-opening on arrival, a rail with
+  no way out is a renter who cannot leave the tab he just opened. The alternative, a rail rendered
+  in React, is the only way to have both; it was rejected because the card previews are live scaled
+  clones of the board's own sections and exist only in the board's own document.
+
+- **2026-10-03 - REVERSAL: the Create Request CTA is back on the governance tab.** It was hidden on
+  the reasoning that a banner above the board costs the rail the height it needs to reach the top
+  of the window. Wrong twice over: the rail could not reach the top of the window anyway while it
+  lived in a frame that started below the header, and the fix for that covers a banner as happily
+  as it covers the header. Owner: *"the create request by agent cta is no more exist so i want it
+  back"*. Files: `src/components/home/HomeHub.tsx`.
+
 - **2026-10-03 - The governance frame is pinned to the window and MEASURED, not sized by a typed
   guess.** It was `calc(100vh - 96px)`. The 96 was a guess at the app header plus the tab row; the
   header is 52px and the tab row wraps to two lines on a narrow window, so the rail (which is
