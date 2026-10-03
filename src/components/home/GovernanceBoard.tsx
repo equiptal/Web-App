@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 /** Bumped with every change to the page: Amplify serves `public/` with a long max-age. */
-const V = 27;
+const V = 31;
 
 /** The rail's width, and the padding the board carries so no card hides under it. */
 const RAIL_W = 404;
@@ -59,7 +59,14 @@ export function GovernanceBoard({ className = "" }: { className?: string }) {
       if (e.origin !== window.location.origin) return;
       const d = e.data as { type?: string; px?: number; open?: boolean } | null;
       if (!d) return;
-      if (d.type === "governance:height" && typeof d.px === "number" && d.px > 200) setHeight(d.px);
+      if (d.type === "governance:height" && typeof d.px === "number" && d.px > 200) {
+        /* ⚠️ Both ends damp this. Setting the frame's height reflows the document inside it,
+           which changes its `scrollHeight` by a pixel or two, which reports again — and the two
+           sides oscillate forever with no frame ever presented. It hung a real browser hard
+           enough that `document.title` timed out. The board will not report a move under 4px;
+           this will not act on one either, because one damper is a single point of failure. */
+        setHeight((prev) => (Math.abs(d.px! - prev) < 4 ? prev : d.px!));
+      }
       /* Only the rail frame sends this, and only to be dismissed: its ✕ and Escape ask to be
          hidden, because closing the panel inside its own frame would leave an empty strip on
          screen with no way back. */

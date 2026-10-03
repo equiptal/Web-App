@@ -41,8 +41,15 @@ export const dynamic = "force-dynamic";
 
 /** Newest-first window. Big enough to be a period, small enough to stay inside a request timeout. */
 const MAX_REQUESTS = 60;
-/** In-flight fan-out. The backend is shared with the mobile app; this is a dashboard, not a crawl. */
-const POOL = 6;
+/**
+ * In-flight fan-out. The backend is shared with the mobile app; this is a dashboard, not a crawl.
+ *
+ * Raised from 6 to 14 on 2026-10-03. At 6, an account with 57 requests made 114 round trips
+ * nineteen deep, and the board showed nothing at all until the last of them answered. These are
+ * reads the renter is entitled to make and would make one at a time by clicking through his own
+ * requests; the only thing being spent is concurrency.
+ */
+const POOL = 14;
 
 async function pooled<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
@@ -194,9 +201,15 @@ export async function GET(req: Request) {
 
       const projectNames: Record<string, string | undefined> = {};
       /* `title`, not `name`. A `Project` has no `name` column at all, so reading one gave every
-         row `undefined` and the board fell through to "Unnamed project" on sites that are named. */
-      for (const p of asArray<{ id?: string; title?: string | null; name?: string | null }>(projectsRaw, "projects")) {
-        if (p.id) projectNames[p.id] = p.title ?? p.name ?? undefined;
+         row `undefined` and the board fell through to "Unnamed project" on sites that are named.
+         ⚠️ And most are NOT named: measured on staging, 28 projects carry 3 titles between them,
+         while all 28 carry a `locationLabel`. A column that prints nothing for 25 of 28 sites is
+         a broken column, so an untitled project falls back to WHERE it is, which is what the
+         renter recognises it by anyway. */
+      for (const p of asArray<{ id?: string; title?: string | null; name?: string | null; locationLabel?: string | null }>(projectsRaw, "projects")) {
+        if (!p.id) continue;
+        const named = (p.title ?? p.name ?? "").trim();
+        projectNames[p.id] = named || (p.locationLabel ?? "").trim() || undefined;
       }
 
       const registry: RegistryEntry[] = asArray<RawSupplier>(suppliersRaw, "suppliers").map((s) => ({

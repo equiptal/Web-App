@@ -811,4 +811,33 @@ describe("buildGovernance", () => {
     /* Nothing in the fold produced a hole from the thinner shape. */
     for (const v of Object.values(link!)) expect(Number.isNaN(v as number)).toBe(false);
   });
+
+  it("names the site by its title, then its location, then the request's own address", () => {
+    /* Measured on staging: 28 projects carry 3 titles between them and all 28 carry a location,
+       and every one of the 57 requests has an address label even when filed under no project.
+       A column empty for 25 of 28 sites reads as a defect, not as an unnamed site. */
+    const out = buildGovernance(
+      input({
+        requests: [
+          request({ projectId: "p1" }),
+          request({ id: "r2", groupRef: "RFQ-1043", projectId: "p2" }),
+          request({ id: "r3", groupRef: "RFQ-1044", projectId: null, city: "Jeddah, Saudi Arabia" }),
+          request({ id: "r4", groupRef: "RFQ-1045", projectId: null, city: null }),
+        ],
+        bidsByRequest: {
+          r1: [bid({ supplierName: "A" })], r2: [bid({ supplierName: "B" })],
+          r3: [bid({ supplierName: "C" })], r4: [bid({ supplierName: "D" })],
+        },
+        /* p1 is titled; p2 is one of the 25 that are not, and the route has already substituted
+           its location. */
+        projectNames: { p1: "Jubail Phase 2", p2: "Qiddiya, Riyadh Region, Saudi Arabia" },
+      }),
+    );
+    expect(out.R.r1.project).toBe("Jubail Phase 2");
+    expect(out.R.r2.project).toBe("Qiddiya, Riyadh Region, Saudi Arabia");
+    /* No project at all, but the request still knows where it was going. */
+    expect(out.R.r3.project).toBe("Jeddah, Saudi Arabia");
+    /* Nothing anywhere is still null, not an invented placeholder. */
+    expect(out.R.r4.project).toBeNull();
+  });
 });

@@ -642,7 +642,11 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
       ref,
       machine: machineLabel(req),
       subtype,
-      project: req.projectId ? input.projectNames[req.projectId] ?? "Unnamed project" : null,
+      /* The site, by the best name there is for it: its title, else where it is, else the
+         address the request itself carries. Every one of this renter's 57 requests has an
+         address label even when it is filed under no project at all, so this column is never
+         empty — and an empty column reads as a defect rather than as an unnamed site. */
+      project: (req.projectId ? input.projectNames[req.projectId] : null) || req.city || null,
       start: req.startDate ?? null,
       end: endDate ?? null,
       created: req.createdAt ?? null,

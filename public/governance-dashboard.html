@@ -165,6 +165,16 @@ body.docked #agentBtn{display:none}
 .lib.on::after{content:"\2713";background:var(--navy);border-color:var(--navy);color:#fff;font-size:9px;
   font-weight:800;display:grid;place-items:center;line-height:1}
 .lib-f{margin-top:6px;font-size:11.5px;color:var(--muted)}
+/* Paging. Five rows is what fits beside the other cards without the board becoming a column of
+   one table, and a reader who wants the sixth asks for it. */
+.pager{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--border);
+  font-size:11.5px;color:var(--muted);background:var(--surface2)}
+.pager .pg{margin-inline-start:auto;display:flex;gap:4px}
+.pager button{font:inherit;font-size:12px;font-weight:700;line-height:1;width:24px;height:24px;
+  border:1px solid var(--border);background:var(--surface);border-radius:4px;cursor:pointer;
+  color:var(--navy)}
+.pager button:disabled{color:var(--muted-light);cursor:default}
+.pager button:not(:disabled):hover{border-color:var(--brand);color:var(--brand-deep)}
 /* Demo mode announces itself, every pixel of the way across the top. A governance board that
    invents an award and does not say so is the worst thing this page could be. */
 #demobar{position:sticky;top:0;z-index:60;background:var(--danger);color:#fff;font-size:12px;
@@ -1365,7 +1375,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.27";
+const BUILD = "2026-10-03.31";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -1485,16 +1495,42 @@ function adopt(d) {
   BASIS = d.basis || "awarded";
 }
 
+/* Belt and braces: the deck reports its height when it changes, and this reports it once the
+   first render is done. A board that draws correctly inside a frame nobody resized is invisible
+   below the fold, which is indistinguishable from a board that failed. */
+function reportHeightSoon() {
+  if (RAIL) return;
+  for (const ms of [0, 150, 600, 1500]) {
+    setTimeout(() => {
+      const h = Math.ceil(document.documentElement.scrollHeight);
+      try { if (window.parent !== window) window.parent.postMessage({ type: "governance:height", px: h }, location.origin); }
+      catch (e) { /* a host on another origin is not one we talk to */ }
+    }, ms);
+  }
+}
+
+/* The fan-out takes seconds on a large account and the board is blank until it lands. A blank
+   board and a broken board look identical, so it says which it is. */
+function sayLoading() {
+  if (RAIL) return;
+  const el = document.getElementById("scope");
+  if (el) el.textContent = "Reading your requests and every bid on them…";
+}
+
 async function boot() {
+  sayLoading();
   /* The RAIL frame never fetches. `/api/me/governance` fans out two calls per request, and
      asking for all of it twice to draw one picker would double the cost of opening the tab. It
      waits for the board frame to publish instead, and gives up gracefully if it never does. */
   if (RAIL) {
-    for (let i = 0; i < 100; i++) {
+    /* Poll fast and briefly. The board's fan-out is the slow part and the rail cannot speed it
+       up, but it can stop ADDING to the wait: 25ms beats 100ms to the payload by a tenth of a
+       second on a warm load, and the ceiling is what matters on a cold one. */
+    for (let i = 0; i < 480; i++) {
       let raw = null;
       try { raw = sessionStorage.getItem(PAYLOAD_KEY); } catch (e) { /* private window */ }
       if (raw) { try { adopt(JSON.parse(raw)); } catch (e) { /* half-written, try again */ } break; }
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 25));
     }
     main();
     return;
@@ -1537,6 +1573,7 @@ async function boot() {
   if (!Object.keys(R).length) console.warn("[governance] nothing drawable:",
     (d.skipped || []).slice(0, 10));
   main();
+  reportHeightSoon();
 }
 
 function main() {
@@ -1609,6 +1646,56 @@ const BAND = r => !r.market ? "no rate for this machine type yet"
    that; the renter's own band is not the market, it is what he personally was quoted, and
    calling that "the marketplace rate" would be the lie this split exists to avoid. */
 const RATE_WORD = r => r.market && r.market.source === "platform" ? "the marketplace rate" : "your own quotes for this machine";
+
+/* ⚠️ Declared HERE, with the other shared helpers. `const` is not hoisted and the cards call
+   this during the first render, which happens well before the drill-down block further down
+   is evaluated — putting it there threw "Cannot access 'PER_PAGE' before initialization" and
+   killed every card. Fourth instance of this trap on this page; declaration ORDER is the
+   contract in a single script with no modules. */
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   Paging.
+
+   Every list on this board is as long as the renter's account: 57 requests, 111 suppliers, 17
+   machine types. Printed whole, one card became the page and the rest of the board scrolled off
+   the bottom. Owner, 2026-10-03: *"show 5 ... then make them pagings and others as <>"*.
+
+   One helper for all of them, driven off the rows that are ALREADY in the DOM — it hides rather
+   than re-renders, so the dossier still opens off the row element and a filter chip that hid a
+   row stays hidden. Rows the chip hid are not counted or paged over.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+const PER_PAGE = 5;
+function pageRows(body, label) {
+  if (!body) return;
+  const host = body.tagName === "TBODY" ? body.closest("table").parentNode : body;
+  let bar = host.parentNode.querySelector(":scope > .pager");
+  const all = () => [...body.children].filter((r) => !r.dataset.hiddenByFilter);
+  let page = 0;
+
+  function draw() {
+    const rows = all();
+    const pages = Math.max(1, Math.ceil(rows.length / PER_PAGE));
+    if (page >= pages) page = pages - 1;
+    rows.forEach((r, i) => { r.hidden = i < page * PER_PAGE || i >= (page + 1) * PER_PAGE; });
+    if (rows.length <= PER_PAGE) { if (bar) bar.remove(), (bar = null); return; }
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.className = "pager";
+      host.parentNode.insertBefore(bar, host.nextSibling);
+    }
+    const from = page * PER_PAGE + 1, to = Math.min(rows.length, (page + 1) * PER_PAGE);
+    bar.innerHTML = `<span>${from}–${to} of ${rows.length} ${label}</span>`
+      + `<span class="pg"><button data-pg="-1"${page === 0 ? " disabled" : ""} aria-label="Previous">‹</button>`
+      + `<button data-pg="1"${page >= pages - 1 ? " disabled" : ""} aria-label="Next">›</button></span>`;
+    bar.onclick = (e) => {
+      const b = e.target.closest("[data-pg]"); if (!b) return;
+      page += Number(b.dataset.pg); draw();
+    };
+  }
+  draw();
+  /* The filter chips hide rows; the pager has to re-page over what is left rather than page over
+     rows nobody can see. */
+  body.__repage = draw;
+}
 
 const med   = r => r.market ? r.market.med : null;
 const vsMed = (rate, r) => r.market ? (rate / r.market.med - 1) * 100 : null;
@@ -1727,6 +1814,7 @@ for (const id in R) {
          <span class="cb"><i class="${e.vs>=5?"bad":""}" style="width:${e.rate/topRate*100}%"></i></span></td>
        <td class="r" data-x="e-vsmkt"><span class="delta ${cls(e.vs)}">${dpct(e.vs)}</span></td>
      </tr>`).join("");
+  pageRows(document.getElementById("eqBody"), "machine types");
   const over = eq.filter(e=>e.vs!=null && e.vs>=5).sort((a,b)=>b.vs-a.vs);
   const noBand = eq.filter(e=>e.vs==null);
   const pjSum = Object.values(PROJ).sort((a,b)=>b.spend-a.spend).map(j=>{
@@ -1765,6 +1853,7 @@ for (const id in R) {
            style="width:${t.ok/t.offers.length*100}%"></i></span></td>
        <td class="r" data-x="s-price"><span class="delta ${cls(t.vs)}">${dpct(t.vs)}</span></td>
      </tr>`).join("");
+  pageRows(document.getElementById("supBody"), "suppliers");
   const quiet = sp.filter(t=>!t.won && t.offers.length>=3)[0];
   /* ── The four figures ────────────────────────────────────────
      Typed figures drift from the table under them the first time a bid
@@ -2020,10 +2109,18 @@ for (const id in R) {
         [...bar.children].forEach(c => c.classList.toggle("on", c === t));
         /* `hidden` rather than removing the row: the dossier is opened off the row element, and
            a filter that detached them would make a warning in another card unopenable. */
-        rows.forEach(tr => { tr.hidden = !pick[2](tr); });
+        rows.forEach(tr => {
+          const keep = pick[2](tr);
+          /* Marked rather than only hidden, so the pager can tell "the filter removed this" from
+             "this is on another page" and page over the right set. */
+          if (keep) delete tr.dataset.hiddenByFilter; else tr.dataset.hiddenByFilter = "1";
+          tr.hidden = !keep;
+        });
+        if (body.__repage) body.__repage();
       };
     }
 
+    pageRows(body, "requests");
     const head = document.querySelector('[data-card="awards"] .note');
     /* "Decided" was a lie once the board started carrying live requests too. Say how many
        were awarded and how many are still out: those are different questions, and a reader
@@ -2078,6 +2175,7 @@ for (const id in R) {
       return `<div class="pfoot">${parts.join(" ")}</div>`;
     })();
 
+    pageRows(body, "papers");
     const note = document.getElementById("papersNote");
     if (note) note.textContent = keys.length + " paper" + (keys.length===1?"":"s")
       + " across " + firms + " supplier" + (firms===1?"":"s");
@@ -2143,6 +2241,7 @@ for (const id in R) {
   /* Derived, every clause of it. This paragraph used to state the fixture's own shape — one
      supplier at the top, two unverified behind it — and kept stating it against live data that
      had neither. A sentence about concentration has to be computed from the concentration. */
+  pageRows(document.getElementById("shareBody"), "suppliers");
   const sn = document.getElementById("shareNote");
   if (sn) sn.textContent = BASIS === "awarded"
     ? "What you awarded, by route and by supplier"
@@ -2953,17 +3052,39 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
      Only this document can: it reports its own content height and re-reports it whenever a card
      is shown, hidden, resized or re-ordered. Without this the host would need a guess, and a
      guess is what put a fixed overlay on top of the page in the first place. */
+  /* ⚠️ THIS LOOPS IF IT IS NOT DAMPED, and the loop hangs the tab.
+     The host sets the frame's height to whatever is reported. Resizing the frame changes this
+     document's viewport, which reflows it, which changes `scrollHeight` by a pixel or two, which
+     fires the ResizeObserver, which reports again — and the two sides oscillate forever with no
+     frame ever presented. Found by hanging a real browser hard enough that even
+     `document.title` timed out.
+     Two dampers: report only a change worth acting on, and never more than once per frame. */
+  let lastSent = 0, pending = false;
   function measure(){
-    if (RAIL) return;
-    const h = Math.ceil(document.documentElement.scrollHeight);
-    try { if (window.parent !== window) window.parent.postMessage({ type: "governance:height", px: h }, location.origin); }
-    catch (e) { /* a host on another origin is not one we talk to */ }
+    if (RAIL || pending) return;
+    pending = true;
+    requestAnimationFrame(() => {
+      pending = false;
+      const h = Math.ceil(document.documentElement.scrollHeight);
+      /* 4px, not 1: a scrollbar appearing or a sub-pixel reflow is not a height change, and
+         treating it as one is exactly what starts the oscillation. */
+      if (Math.abs(h - lastSent) < 4) return;
+      lastSent = h;
+      try { if (window.parent !== window) window.parent.postMessage({ type: "governance:height", px: h }, location.origin); }
+      catch (e) { /* a host on another origin is not one we talk to */ }
+    });
   }
   /* Fonts and images land after the first layout and both change the height.
      ⚠️ Guarded: an unguarded constructor throws where `ResizeObserver` is absent, and because
      this runs inside `main()` the throw took every card after it with it. The headless harness
      has no ResizeObserver, which is exactly the kind of environment that finds this. */
-  if (typeof ResizeObserver === "function") new ResizeObserver(() => measure()).observe(document.documentElement);
+  /* ⚠️ Observe the BODY, never `documentElement`. Inside a frame `<html>` is the frame's own box
+     — the host sets it, content overflowing it does not change it — so an observer on it never
+     fires at all and the frame sat at its initial 900px with the board clipped inside. Measured
+     in Chrome: 0 callbacks against a 20px content change. `body` grows with its content.
+     `scrollHeight` on documentElement is still the right NUMBER; it was only the trigger that
+     was dead. */
+  if (typeof ResizeObserver === "function") new ResizeObserver(() => measure()).observe(document.body);
   window.addEventListener("load", measure);
 
   const STORE = "moedatech.board";
@@ -3127,7 +3248,12 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
       for (const [id, sp] of Object.entries(saved.span || {})) if (byId(id) && sp) byId(id).style.setProperty("--sp", sp);
       drawLib();
     }
-    else { apply(DEFAULT, DEFAULT.slice()); }
+    else {
+      /* Empty board, full picker. `apply` hides every card; without the `drawLib` beside it the
+         rail opened on an empty list and the reader had nothing to tick. */
+      apply(DEFAULT, DEFAULT.slice());
+      drawLib();
+    }
   })();
 
   setPeriod("");
