@@ -182,6 +182,27 @@ body.docked #agentBtn{display:none}
 .lib.on::after{content:"\2713";background:var(--navy);border-color:var(--navy);color:#fff;font-size:9px;
   font-weight:800;display:grid;place-items:center;line-height:1}
 .lib-f{margin-top:6px;font-size:11.5px;color:var(--muted)}
+
+/* ── Loading ──────────────────────────────────────────────────────
+   ⚠️ Until this existed the page sat on its EMPTY CARD SHELLS while the fetch ran: zeroes in
+   the figures, headers over empty tables, "0 requests". That is indistinguishable from an
+   account with no data at all, and it reads as a fault rather than as a wait. The shells are
+   held back now and this stands in their place. */
+#loading{display:none;padding:34px 0 10px}
+html.loading #loading{display:block}
+/* Everything the fetch will fill is held back, so nothing empty is ever shown as if it were an
+   answer. The head stays: it carries the title. */
+html.loading .wrap > section, html.loading #deck, html.loading .away-bar{display:none !important}
+#loading .lbar{height:3px;border-radius:999px;background:var(--surface3);overflow:hidden;max-width:360px}
+#loading .lbar i{display:block;width:40%;height:100%;border-radius:999px;background:var(--brand);
+  animation:lslide 1.1s ease-in-out infinite}
+@keyframes lslide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+#loading .lt{margin-top:14px;font-size:14px;font-weight:700;color:var(--navy)}
+#loading .ls{margin-top:4px;font-size:12px;color:var(--muted);max-width:52ch;line-height:1.55}
+@media (prefers-reduced-motion:reduce){ #loading .lbar i{animation:none;width:100%} }
+/* The rail has nothing to draw until the board publishes, and an empty picker reads as a picker
+   with no cards in it. */
+#cardPane .libload{padding:18px 2px;font-size:12px;color:var(--muted);line-height:1.55}
 /* Paging. Five rows is what fits beside the other cards without the board becoming a column of
    one table, and a reader who wants the sixth asks for it. */
 .pager{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--border);
@@ -566,6 +587,13 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
 
 <div class="wrap">
 
+
+  <div id="loading">
+    <div class="lbar"><i></i></div>
+    <div class="lt">Reading your requests</div>
+    <div class="ls">Every bid on every request, with the papers and the suppliers behind them.
+      On an account with a few hundred bids this takes a moment</div>
+  </div>
 
   <div class="head">
     <div>
@@ -1402,7 +1430,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.49";
+const BUILD = "2026-10-04.02";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -1539,9 +1567,23 @@ function reportHeightSoon() {
 /* The fan-out takes seconds on a large account and the board is blank until it lands. A blank
    board and a broken board look identical, so it says which it is. */
 function sayLoading() {
-  if (RAIL) return;
+  document.documentElement.classList.add("loading");
+  if (RAIL) {
+    const pane = document.getElementById("cardPane");
+    if (pane && !pane.children.length) {
+      pane.innerHTML = '<div class="libload">Reading your board\u2026<br>The cards appear here once '
+        + 'your requests and their bids have loaded</div>';
+    }
+    return;
+  }
   const el = document.getElementById("scope");
-  if (el) el.textContent = "Reading your requests and every bid on them…";
+  if (el) el.textContent = "Reading your requests\u2026";
+}
+
+/* Cleared on EVERY path out of the fetch, the failures included: `fail()` writes its own
+   message into the page and would otherwise write it underneath a bar that never stops. */
+function doneLoading() {
+  document.documentElement.classList.remove("loading");
 }
 
 async function boot() {
@@ -1604,6 +1646,7 @@ async function boot() {
 }
 
 function main() {
+  doneLoading();
 
 const sar = n => n.toLocaleString("en-US");
 
