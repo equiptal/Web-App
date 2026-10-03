@@ -7,6 +7,58 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-03 - The board dropped 60% of the marketplace for want of an end date.** 52 of this
+  renter's 57 requests, and 390 of 655 platform wide, carry a start date and a rental basis with
+  NO end: an open-ended hire, which is a real business state, not bad data. The fold refused to
+  price them and dropped the whole request, so an account with 214 real bids drew an empty board.
+  They are priced for ONE CYCLE of their own basis now (MONTHLY 30, WEEKLY 7, DAILY 1) and every
+  surface says "open ended, priced for one month". Files: `src/lib/governance/build.ts`,
+  `public/governance-dashboard.html`.
+  WARNING: a one-cycle figure is not a commitment and must never be summed as the cost of the
+  hire. With no basis to assume from, nothing is assumed and the row shows unpriced.
+
+- **2026-10-03 - Nothing is filtered out of the board any more: not by date, not by status, not
+  by whether anybody bid.** A request nobody answered is not an absence of data - you asked
+  twelve suppliers and none replied - and dropping it made the board agree with itself about a
+  market that had ignored him. Files: `src/lib/governance/build.ts`.
+
+- **2026-10-03 - Every card shows five rows and pages.** One helper over the rows already in the
+  DOM, so the dossier still opens off the row element. Files: `public/governance-dashboard.html`.
+  WARNING: `pageRows` had to be hoisted to sit with the shared helpers - the cards call it during
+  the first render, and `const` is not hoisted. FOURTH instance of that trap on this page. The
+  hoist then cut the function in half because the match for its closing brace hit a NESTED one;
+  the orphaned tail still PARSED, so the syntax check passed and the page silently rendered
+  nothing. Only a row count caught it.
+
+- **2026-10-03 - The iframe height handshake oscillated and hung the browser.** Setting the
+  frame's height reflows the document inside it, changing `scrollHeight` by a pixel or two,
+  which reports again. It hung a tab hard enough that `document.title` timed out. Both ends now
+  ignore a move under 4px and the board reports at most once per frame. One damper would have
+  been a single point of failure. Files: `public/governance-dashboard.html`,
+  `src/components/home/GovernanceBoard.tsx`.
+  WARNING: the observer also watched `document.documentElement`, and inside a frame `<html>` IS
+  the frame's box - the host sets it and content overflowing it never changes it. Measured: zero
+  callbacks against a 20px content change, so the frame sat at its initial 900px with a 2,669px
+  board clipped inside. Observe `body`.
+
+- **2026-10-03 - The project column was empty because the projects are unnamed, not missing.**
+  Measured on staging: 41 of 57 requests carry a `project_id`, 28 projects exist, and 3 of them
+  have a title. All 28 carry a location and all 57 requests carry an address label. The column
+  names the site by its title, else its location, else the request's own address, so it is never
+  empty. Files: `src/app/api/me/governance/route.ts`, `src/lib/governance/build.ts`.
+
+- **2026-10-03 - The agent answers in prose, and its three headline answers are WRITTEN.** The
+  reply was an answer followed by a Cards / Grain / Scope / Measures table; owner: *"i want text
+  answers outputs not like this"*. The three suggested questions now return the owner's own
+  wording verbatim, for demonstrating the agent. Files: `public/governance-dashboard.html`.
+  WARNING: those three strings are the ONLY figures on this page not derived from the renter's
+  data. They live in one `SCRIPTED` array inside the Ask panel and nothing else may read them -
+  the moment a written figure reaches a card, the board stops being worth believing. Computed
+  versions of all three exist in history at build `.39`.
+  WARNING: the supplier matcher used `includes` on a first name, so `"al"` matched "usu-AL
+  marketplace" and "loc-AL content" and scoped two of the three questions to Al Faisal Rentals.
+  Whole words only.
+
 - **2026-10-03 - The going rate is now a measured platform median, not the renter's own three
   quotes.** Owner: *"i will not use backend, u query a db one time and use the data"*. Measured
   read-only against `moedatech_prod` through `scripts/data-job/` in the backend repo (the only
