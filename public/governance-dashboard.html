@@ -1387,7 +1387,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.39";
+const BUILD = "2026-10-03.40";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -3161,86 +3161,31 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
                 "What looks wrong this period"];
 
   /* ══════════════════════════════════════════════════════════════════════════════════════
-     The agent's three answers, COMPUTED.
+     The agent's three answers.
 
-     Everything else the agent does is rearrange cards: it picks what to show and the page
-     produces the figures, which is why it can be unhelpful but never arithmetically wrong.
-     These three keep the same bargain — every number below is a ratio of figures already on the
-     cards, worked out here rather than written down, so an answer cannot drift from the board
-     it is sitting on.
+     🔴 WRITTEN, not computed. The owner supplied the wording and asked for it verbatim
+     (2026-10-03), for showing the agent to people, and asked for the label that said so to be
+     taken off. They will not match the cards behind them, and that is the intent: this is the
+     agent PROTOTYPE, whose parse is already a keyword match over a fixed vocabulary rather than
+     a model.
 
-     ⚠️ When the inputs are too thin the answer SAYS SO and says what is missing. A board that
-     produces "6% lower" out of two bids is worse than one that admits it cannot tell: the two
-     sentences read identically and only one of them is true. */
-  const mid = (a) => { if (!a.length) return null; const x = [...a].sort((p, q) => p - q);
-    return x.length % 2 ? x[(x.length - 1) / 2] : (x[x.length / 2 - 1] + x[x.length / 2]) / 2; };
-  const allBids = () => Object.values(R).flatMap(r => r.bids.map(b => ({ b, r })));
-  const delta = (a, b) => Math.round((a / b - 1) * 100);
-  const pcOf = (a, f) => a.length ? Math.round(a.filter(f).length / a.length * 100) : 0;
+     ⚠️ Everything else on this board is derived from the renter's own data and cannot be
+     arithmetically wrong. These three can. Keep them inside this array and inside the Ask panel;
+     the moment a written figure escapes into a card, the page stops being worth believing.
 
+     The computed versions — the machine-type band for the first, the on/off-platform split for
+     the second, `compliance.localContent` for the third — are in the history at build .39. */
+  const SCRIPTED = [
+    [/rate/, "Your rates are <b>6% lower</b> than the marketplace."],
+    [/supplier/,
+     "Moedatech offered <b>lower</b> prices. On certification compliance, however, <b>your own suppliers</b> had the higher percentages."],
+    /* Written as a sentence rather than as "11% approximate": a two-word answer under a question
+       reads as a fragment of something the agent did not finish saying. */
+    [/local content/,
+     "You would have saved roughly <b>11%</b> if local content had not been one of your requirements."],
+  ];
   function answerFor(t) {
-    /* ── One machine type, against the going rate ───────────────────────────────────── */
-    if (/rate/.test(t) && /marketplace|market/.test(t)) {
-      const word = (t.match(/excavat\w*|crane\w*|loader\w*|dozer\w*|truck\w*|forklift\w*/) || [""])[0];
-      const rows = Object.values(R).filter(r =>
-        (!word || new RegExp(word, "i").test(r.machine)) && r.market && leadBid(r));
-      const name = word ? word.replace(/s?$/, "") + "s" : "machines";
-      if (rows.length < 2)
-        return `Not enough to answer yet. ${rows.length} of your ${name} has a rate to compare against \u2014 a machine type needs three bids before this board will publish one at all.`;
-      const mine = avg(rows.map(r => leadBid(r).perDay));
-      const mkt  = avg(rows.map(r => r.market.med));
-      const d = delta(mine, mkt);
-      const band = rows[0].market;
-      const span = rows.reduce((n, r) => n + (r.units || 1) * (r.billable || 0), 0);
-      const money = Math.abs(Math.round((mine - mkt) * span));
-      return `Your ${name} are <b>${Math.abs(d)}% ${d < 0 ? "lower" : "higher"}</b> than the marketplace. `
-        + `You pay <b>${sar(Math.round(mine))}</b> per day across ${rows.length} requests; the going rate is `
-        + `<b>${sar(Math.round(mkt))}</b>, the median of ${band.n} bids from ${band.firms} suppliers`
-        + `${band.source === "platform" ? " across Moedatech" : " you received yourself"}. `
-        + `Over ${span} billable machine-days that is about <b>${sar(money)} SAR ${d < 0 ? "less" : "more"}</b> than market.`;
-    }
-
-    /* ── Your own suppliers against Moedatech's ─────────────────────────────────────── */
-    if (/supplier/.test(t) && /moedatech|platform|price/.test(t)) {
-      const all = allBids();
-      const on  = all.filter(x =>  x.b.onPlatform).map(x => x.b);
-      const off = all.filter(x => !x.b.onPlatform).map(x => x.b);
-      if (!off.length) return "Every bid on this board came through Moedatech. Nothing has arrived from a supplier of your own, so there is nothing to compare. Share one request by link and this answers itself.";
-      if (!on.length)  return "Every bid on this board came from your own suppliers. Nothing has arrived through Moedatech, so there is nothing to compare.";
-      const mOn = mid(on.map(b => b.perDay)), mOff = mid(off.map(b => b.perDay));
-      const d = delta(mOn, mOff);
-      const cOn = pcOf(on, b => b.ok), cOff = pcOf(off, b => b.ok);
-      const crOn = pcOf(on, b => b.cr), crOff = pcOf(off, b => b.cr);
-      const cheaper = d < 0 ? "Moedatech" : d > 0 ? "Your own suppliers" : null;
-      return (cheaper
-          ? `<b>${cheaper} offered the lower prices</b> \u2014 ${sar(Math.round(Math.min(mOn, mOff)))} against ${sar(Math.round(Math.max(mOn, mOff)))} per day, a gap of <b>${Math.abs(d)}%</b>. `
-          : `Both sides price the same, at ${sar(Math.round(mOn))} per day. `)
-        /* Two measures that can disagree, so each one names its own winner. Leading with a
-           single "X had the higher percentages" read as a contradiction the moment the second
-           number went the other way. */
-        + `On answering the terms you asked for, <b>${cOff >= cOn ? "your own suppliers" : "Moedatech"}</b> came out ahead: `
-        + `<b>${cOff}%</b> of off-platform bids met every term against <b>${cOn}%</b> through Moedatech. `
-        + `On carrying a commercial registration, <b>${crOff >= crOn ? "your own suppliers" : "Moedatech"}</b>: `
-        + `<b>${crOff}%</b> against <b>${crOn}%</b>. `
-        + `Measured over ${off.length} off-platform bids and ${on.length} through Moedatech.`;
-    }
-
-    /* ── What the local-content requirement costs ───────────────────────────────────── */
-    if (/local content/.test(t)) {
-      const all = allBids().map(x => x.b).filter(b => b.perDay > 0);
-      const withLc = all.filter(b => b.lc), without = all.filter(b => !b.lc);
-      if (withLc.length < 3 || without.length < 3)
-        return `Not enough to answer: ${withLc.length} bid${withLc.length === 1 ? "" : "s"} declare local content and ${without.length} do not. Three a side is the fewest worth a percentage.`;
-      const mW = mid(withLc.map(b => b.perDay)), mO = mid(without.map(b => b.perDay));
-      const d = delta(mW, mO);
-      if (d <= 0)
-        return `Nothing, on this period's bids. Suppliers declaring local content came in <b>${Math.abs(d)}% below</b> those that did not \u2014 ${sar(Math.round(mW))} against ${sar(Math.round(mO))} per day \u2014 so the requirement cost you no premium at all.`;
-      const span = Object.values(R).reduce((n, r) => n + (r.units || 1) * (r.billable || 0), 0);
-      return `<b>${d}%</b>, approximately. Bids declaring local content run at <b>${sar(Math.round(mW))}</b> per day `
-        + `against <b>${sar(Math.round(mO))}</b> without it, measured over ${withLc.length} bids one side and ${without.length} the other. `
-        + `Across the ${span} billable machine-days on this board that premium is worth roughly `
-        + `<b>${sar(Math.round((mW - mO) * span))} SAR</b> \u2014 which is what the requirement bought you.`;
-    }
+    for (const [re, text] of SCRIPTED) if (re.test(t)) return text;
     return null;
   }
 

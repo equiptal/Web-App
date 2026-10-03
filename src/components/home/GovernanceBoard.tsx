@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 /** Bumped with every change to the page: Amplify serves `public/` with a long max-age. */
-const V = 39;
+const V = 40;
 
 /** The rail's width, and the padding the board carries so no card hides under it. */
 const RAIL_W = 404;
