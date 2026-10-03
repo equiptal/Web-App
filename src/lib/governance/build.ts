@@ -306,6 +306,18 @@ const didWin = (b: BidCard) => b.status === "ACCEPTED" || b.wonViaSurvey === tru
 const metEveryTerm = (b: BidCard): 0 | 1 => (b.conflictCount === 0 ? 1 : 0);
 
 /**
+ * Did this offer come from a Moedatech account, or from outside the platform.
+ *
+ * ⚠️ NOT `supplierId != null`. `submissionToBidCard` gives every off-platform submission a
+ * SYNTHETIC `supplierId` of `link-<id>` so the comparison can treat each one as its own column,
+ * so that test called every link bid a Moedatech bid and the channel card reported zero
+ * off-platform offers on accounts full of them. `viaSharedLink` is the real flag, and
+ * `converted` is a link submission the backend later materialised into a first-class app bid —
+ * still off-platform in origin, which is what this board is counting.
+ */
+const onPlatform = (b: BidCard): 0 | 1 => (b.viaSharedLink || b.converted ? 0 : 1);
+
+/**
  * The rate reduced to one day.
  *
  * Every comparison on this board — against the market, between two bids, across a machine type —
@@ -548,8 +560,8 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
         /* A bid's route is the REQUEST's route for everything except a link submission, which can
            arrive on a request that also went to the marketplace. `supplierId` is the tell: an
            off-platform submission has no Moedatech user behind it. */
-        route: b.supplierId ? channel : CHANNEL.link,
-        onPlatform: b.supplierId ? 1 : 0,
+        route: onPlatform(b) ? channel : CHANNEL.link,
+        onPlatform: onPlatform(b),
         verified: b.verified ? 1 : 0,
         registered: reg?.vendorRegistered ? 1 : 0,
         cr: b.supplierCrNumber ?? reg?.crNumber ?? null,
@@ -611,7 +623,7 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
       winner: !win ? null : {
         name: win.supplierName,
         route: channel === CHANNEL.market ? "Marketplace bid" : channel === CHANNEL.link ? "Submitted through your shared link" : "Direct request, nobody else could bid",
-        acct: win.supplierId ? "Yes" : "No",
+        acct: onPlatform(win) ? "Yes" : "No",
         ver: win.verified ? "Yes" : "No",
         cr: win.supplierCrNumber || "None on file",
         vat: win.supplierVatNumber || "None on file",
@@ -630,7 +642,7 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
          with a thinner projection must not erase a registration number an earlier one had. */
       if (!SUPMETA[name] || (SUPMETA[name].cr === "None on file" && (b.supplierCrNumber || reg?.crNumber))) {
         SUPMETA[name] = {
-          src: b.supplierId ? "Moedatech" : "Your list",
+          src: onPlatform(b) ? "Moedatech" : "Off platform",
           ver: b.verified ? 1 : 0,
           cr: b.supplierCrNumber || reg?.crNumber || "None on file",
           vat: b.supplierVatNumber || "None on file",

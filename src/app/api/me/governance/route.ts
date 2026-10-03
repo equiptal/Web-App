@@ -3,6 +3,7 @@ import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-a
 import { agentsGet } from "@/lib/api/agents-relay";
 import { extractRequestList, mapRequestListItem } from "@/lib/contract/requests";
 import { mapBidList, bidSizeCounts } from "@/lib/contract/bids";
+import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 import { buildGovernance, type GovernanceInput, type RegistryEntry } from "@/lib/governance/build";
 
 export const dynamic = "force-dynamic";
@@ -100,12 +101,58 @@ export async function GET(req: Request) {
           heldByRequest[r.id] = bidSizeCounts(bidsRaw).larger;
         }
 
-        /* Only a shared request has recipients. Asking on every request would be one wasted call
-           per row, and a 404 here is an answer ("never shared"), not a failure. */
-        const sharesRaw = await call(`/requests/${encodeURIComponent(r.id)}/shares`).catch(() => null);
-        const shares = Array.isArray((sharesRaw as { shares?: unknown[] } | null)?.shares) ? (sharesRaw as { shares: Array<{ openedAt?: string | null }> }).shares : null;
-        if (shares?.length) {
-          sharesByRequest[r.id] = { sent: shares.length, opened: shares.filter((s) => s.openedAt).length };
+        /* ── The off-platform half of the field ────────────────────────────────────────────
+           ⚠️ Shared-link submissions are NOT in `/marketplace/requests/:id/bids`. They live on
+           their own agents endpoint, and this route never called it — so for as long as the
+           board has existed it has drawn only the app bids and reported "0 bids from
+           off-platform suppliers" on accounts that had them. Owner, 2026-10-03: *"how no bids
+           from the link? these are easy data from bids and from bid submission offplatfrom"*.
+
+           It also carries `openedCount`, which is the link's own reach, so asking for it makes
+           the separate `/shares` call unnecessary on most requests. */
+        const subRaw = await agentsGet<{
+          submissions?: LinkBidSubmission[];
+          openedCount?: number;
+        }>(`/requests/${encodeURIComponent(r.id)}/bid-submissions`).catch(() => null);
+        const submissions = Array.isArray(subRaw?.submissions) ? subRaw.submissions : [];
+        if (submissions.length) {
+          /* One card per submission, from the same mapper the comparison and My Bids use, so an
+             off-platform offer is counted, priced and compared exactly as they count it. */
+          bidsByRequest[r.id] = [
+            ...(bidsByRequest[r.id] ?? []),
+            ...submissions.map((sub) => ({
+              ...submissionToBidCard(sub),
+              /* ⚠️ The shared mapper does not carry these across, because the surfaces it was
+                 written for (the comparison matrix, My Bids) do not show them. The SUBMISSION
+                 carries all three — an off-platform supplier types his CR, VAT and national
+                 address into the bid form — and this board's whole question is whether the firm
+                 you paid is identifiable. Without the overlay every link supplier reads "no CR
+                 on file", which is a wrong answer that looks exactly like a real finding.
+                 Overlaid here rather than in the mapper: it is shared with two other surfaces
+                 and this is the only one that asks. */
+              supplierCrNumber: sub.crNumber ?? null,
+              supplierVatNumber: sub.vatNumber ?? null,
+              supplierNationalAddress: sub.nationalAddress ?? null,
+              supplierCity: sub.city ?? null,
+              supplierEmail: sub.contactEmail ?? null,
+            })),
+          ];
+        }
+
+        /* Only a shared request has recipients, and the submissions call has already told us
+           whether this is one. Asking on every request would be one wasted round trip per row,
+           and a 404 here is an answer ("never shared"), not a failure. */
+        const shared = submissions.length > 0 || (subRaw?.openedCount ?? 0) > 0;
+        if (shared) {
+          const sharesRaw = await call(`/requests/${encodeURIComponent(r.id)}/shares`).catch(() => null);
+          const shares = Array.isArray((sharesRaw as { shares?: unknown[] } | null)?.shares) ? (sharesRaw as { shares: Array<{ openedAt?: string | null }> }).shares : null;
+          sharesByRequest[r.id] = {
+            /* How many it was SENT to is only known from the share rows. `openedCount` is the
+               link's own counter and is the better "opened" of the two: a link forwarded on by
+               the first recipient is opened by someone who was never sent it. */
+            sent: shares?.length ?? submissions.length,
+            opened: subRaw?.openedCount ?? shares?.filter((x) => x.openedAt).length ?? 0,
+          };
         }
       });
 

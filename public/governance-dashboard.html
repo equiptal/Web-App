@@ -41,6 +41,11 @@ table{border-collapse:collapse;width:100%}
    the same task, so covering the board to pick for it is the wrong trade. */
 body{transition:padding-inline-end .2s ease}
 body.docked{padding-inline-end:404px}
+/* The rail lives in its own frame now, so the board frame never draws one and never docks for
+   one: the HOST narrows the board's frame instead, which is the only thing that knows where the
+   rail actually is. */
+html.embed #agent, html.embed #agentBtn { display:none !important }
+html.embed body.docked { padding-inline-end:0 }
 body.docked #dw{inset-inline-end:404px}
 @media (max-width:1180px){ body.docked{padding-inline-end:0} body.docked #dw{inset-inline-end:0} }
 .head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
@@ -141,9 +146,15 @@ body.docked #agentBtn{display:none}
 .lib-g{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
   margin:10px 0 -2px}
 .lib-g:first-child{margin-top:0}
-.lib-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.lib{position:relative;display:block;border:1px solid var(--border);border-radius:7px;overflow:hidden;
-  cursor:pointer;background:var(--surface)}
+/* `grid-auto-rows: 1fr` so both tiles in a row take the height of the taller one. Without it a
+   one-line title and a three-line title sat side by side at different heights, which reads as
+   two different kinds of thing rather than as two cards. The thumbnails were always uniform; the
+   label under them was not. */
+.lib-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;grid-auto-rows:1fr}
+.lib{position:relative;display:flex;flex-direction:column;border:1px solid var(--border);
+  border-radius:7px;overflow:hidden;cursor:pointer;background:var(--surface)}
+/* The title takes whatever height is left, so the thumbnails line up across the row. */
+.lib .lib-t{flex:1}
 .lib:hover{border-color:var(--muted-light)}
 .lib.on{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy)}
 .lib input{position:absolute;opacity:0;pointer-events:none}
@@ -232,6 +243,17 @@ body.arrange .slot{cursor:grab}
 /* Embedded: no page chrome of its own, and the overlays track the visible slice the host
    reports rather than a viewport this document no longer has. */
 html.embed, html.embed body { background:transparent; overflow:visible }
+
+/* ── The rail, as its own frame ───────────────────────────────────── */
+/* Everything but the picker is hidden rather than left unbuilt: the previews are live clones of
+   these very sections, so they have to exist, laid out, in this document. `visibility:hidden` on
+   a positioned copy rather than `display:none`, because a cloned node with no layout measures
+   zero and the previews scale by measured width. */
+html.railonly body { background:transparent; overflow:hidden }
+html.railonly .wrap { position:fixed; inset-block-start:0; inset-inline-start:0; width:1280px;
+  visibility:hidden; pointer-events:none; z-index:-1 }
+html.railonly #dw, html.railonly #scrim, html.railonly #agentBtn { display:none !important }
+html.railonly #agent { transform:none; box-shadow:none; border-inline-start:0 }
 /* No centring and no max-width: the board is the page here, so the title sits at the left
    edge and the cards run to the rail. A centred 1460px column inside a frame that is already
    the content width just draws a narrow strip with air on both sides. */
@@ -1339,13 +1361,20 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.22";
+const BUILD = "2026-10-03.24";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
    so nothing here has to be told where the screen is. */
-const EMBED = new URLSearchParams(location.search).get("embed") === "1";
+const QS = new URLSearchParams(location.search);
+const EMBED = QS.get("embed") === "1";
+/* The rail, as its own frame. It runs the whole page — the fold, the deck, the previews — and
+   shows only the picker. Hiding the board rather than not building it is deliberate: the
+   previews ARE the board's own sections, scaled, and a frame that never drew them would be back
+   to drawing pictures of cards. */
+const RAIL = QS.get("rail") === "1";
 if (EMBED) document.documentElement.classList.add("embed");
+if (RAIL) document.documentElement.classList.add("railonly");
 
 /* The host owns the frame's geometry and is the only thing that knows what sits above it. */
 window.addEventListener("message", (e) => {
@@ -1371,7 +1400,29 @@ function fail(msg, detail) {
   else document.body.append(p);
 }
 
+const PAYLOAD_KEY = "moedatech.governance.payload";
+
+/** Draw from a payload, whichever frame produced it. */
+function adopt(d) {
+  R = d.R || {}; SUPMETA = d.SUPMETA || {}; CERT = d.CERT || {}; WINDOW_INFO = d.window || null;
+  BASIS = d.basis || "awarded";
+}
+
 async function boot() {
+  /* The RAIL frame never fetches. `/api/me/governance` fans out two calls per request, and
+     asking for all of it twice to draw one picker would double the cost of opening the tab. It
+     waits for the board frame to publish instead, and gives up gracefully if it never does. */
+  if (RAIL) {
+    for (let i = 0; i < 100; i++) {
+      let raw = null;
+      try { raw = sessionStorage.getItem(PAYLOAD_KEY); } catch (e) { /* private window */ }
+      if (raw) { try { adopt(JSON.parse(raw)); } catch (e) { /* half-written, try again */ } break; }
+      await new Promise(r => setTimeout(r, 100));
+    }
+    main();
+    return;
+  }
+
   let res;
   try {
     res = await fetch("/api/me/governance", { credentials: "same-origin", headers: { accept: "application/json" } });
@@ -1386,8 +1437,11 @@ async function boot() {
   if (!res.ok) { console.error("[governance] HTTP " + res.status); fail("Could not read your data", "The server answered " + res.status + "."); main(); return; }
 
   const d = await res.json();
-  R = d.R || {}; SUPMETA = d.SUPMETA || {}; CERT = d.CERT || {}; WINDOW_INFO = d.window || null;
-  BASIS = d.basis || "awarded";
+  adopt(d);
+  /* Published for the rail frame. `sessionStorage` and not `localStorage`: this is one tab's
+     view of one account, and leaving it on disk for the next person to open the browser is a
+     copy of a renter's commercial position nobody asked to keep. */
+  try { sessionStorage.setItem(PAYLOAD_KEY, JSON.stringify(d)); } catch (e) { /* over quota */ }
   console.log("[governance] " + res.status + " · " + Object.keys(R).length + " requests, "
     + Object.keys(SUPMETA).length + " suppliers, " + Object.keys(CERT).length + " papers, "
     + ((d.skipped || []).length) + " skipped");
@@ -1463,10 +1517,14 @@ const MONEY_PREFIX = () => BASIS === "awarded" ? "" : "Leading bids · ";
 /* Two different bands can sit behind the same number, and they answer different questions.
    "12% over" means one thing against the renter's own three quotes and another against 589 bids
    from 47 companies, so every surface that prints a comparison also prints which one it used. */
-const BAND = r => !r.market ? "no going rate for this machine type yet"
+const BAND = r => !r.market ? "no rate for this machine type yet"
   : r.market.source === "platform"
-    ? `the platform median, ${r.market.n} bids from ${r.market.firms} suppliers, measured ${day(r.market.measured)}`
-    : `the median of the ${r.market.n} bids you received for this type, from ${r.market.firms} supplier${r.market.firms === 1 ? "" : "s"}`;
+    ? `the marketplace rate: the median of ${r.market.n} bids from ${r.market.firms} suppliers across Moedatech, measured ${day(r.market.measured)}`
+    : `the median of the ${r.market.n} bids YOU received for this type, from ${r.market.firms} supplier${r.market.firms === 1 ? "" : "s"}`;
+/* Two words for two different claims. The platform band IS the marketplace rate and is called
+   that; the renter's own band is not the market, it is what he personally was quoted, and
+   calling that "the marketplace rate" would be the lie this split exists to avoid. */
+const RATE_WORD = r => r.market && r.market.source === "platform" ? "the marketplace rate" : "your own quotes for this machine";
 
 const med   = r => r.market ? r.market.med : null;
 const vsMed = (rate, r) => r.market ? (rate / r.market.med - 1) * 100 : null;
@@ -1710,7 +1768,7 @@ for (const id in R) {
     for (const t of missed) out.push(["f-waived", "Awarded without " + t[0] + ", which the request asked for"]);
 
     if (r.market && price > r.market.med * 1.1)
-      out.push(["f-overmarket", "Day rate is " + Math.round((price / r.market.med - 1) * 100) + "% above the going rate for this machine"]);
+      out.push(["f-overmarket", "Day rate is " + Math.round((price / r.market.med - 1) * 100) + "% above " + RATE_WORD(r)]);
 
     if (r.bids.length === 1)
       out.push(["f-single", r.channel.indexOf("Direct") === 0 ? "Sent to one supplier, so nobody else could bid" : "Only one supplier bid"]);
@@ -1811,7 +1869,7 @@ for (const id in R) {
         const where = r.bids.length === 1 ? "Only bid"
           : price === prices[0] ? "Cheapest bid"
           : price === prices[prices.length - 1] ? "Most expensive" : "Mid-field";
-        note = `<span class="posnote">${where} \u00b7 <b class="${vs > 0 ? "up" : "dn"}">${Math.abs(vs)}% ${vs > 0 ? "over" : "under"} the going rate</b></span>`;
+        note = `<span class="posnote">${where} \u00b7 <b class="${vs > 0 ? "up" : "dn"}">${Math.abs(vs)}% ${vs > 0 ? "over" : "under"} ${r.market.source === "platform" ? "market" : "your own quotes"}</b></span>`;
       } else {
         /* Fewer than three bids for this machine type across the whole account. Naming the reason
            matters: "no listings" blamed a catalogue the band no longer comes from. */
@@ -1819,7 +1877,7 @@ for (const id in R) {
         const where = r.bids.length === 1 ? "Only bid"
           : price === prices[0] ? "Cheapest bid"
           : price === prices[prices.length - 1] ? "Most expensive" : "Mid-field";
-        note = `<span class="posnote">${where} \u00b7 <span class="na">too few bids on this machine type to set a rate</span></span>`;
+        note = `<span class="posnote">${where} \u00b7 <span class="na">no rate on file for this machine type</span></span>`;
       }
 
       const w = r.winner || { name: "Not awarded yet", ver: "No", cr: "None on file" };
@@ -2651,6 +2709,22 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   const KPI = ["spend","cheapest","saved","market"];
   const DEFAULT = KPI.concat(["awards","money","papers","channel",
                               "equipment","suppliers"]);
+  /* The other frame changed the board. `storage` fires in every OTHER document on the origin,
+     never in the one that wrote, so this cannot loop: the writer re-renders itself directly and
+     the listener re-renders the reader. */
+  window.addEventListener("storage", (e) => {
+    if (e.key !== STORE || !e.newValue) return;
+    let saved = null;
+    try { saved = JSON.parse(e.newValue); } catch (err) { return; }
+    if (!saved) return;
+    apply(saved.order.filter(byId), saved.off.filter(byId));
+    for (const [id, sp] of Object.entries(saved.span || {})) {
+      const x = byId(id); if (x && sp) x.style.setProperty("--sp", sp);
+    }
+    drawLib();
+    measure();
+  });
+
   const resetBtn = document.getElementById("resetL");
   if (resetBtn) resetBtn.onclick = ()=>{
     apply(DEFAULT, []); setPeriod("");
@@ -2782,6 +2856,23 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
       (q ? 330 : 660) + '">' + c.innerHTML + '</span></span>');
   }
 
+  /* ⚠️ The board frame is IN the host's flow now, so the host cannot know how tall to make it.
+     Only this document can: it reports its own content height and re-reports it whenever a card
+     is shown, hidden, resized or re-ordered. Without this the host would need a guess, and a
+     guess is what put a fixed overlay on top of the page in the first place. */
+  function measure(){
+    if (RAIL) return;
+    const h = Math.ceil(document.documentElement.scrollHeight);
+    try { if (window.parent !== window) window.parent.postMessage({ type: "governance:height", px: h }, location.origin); }
+    catch (e) { /* a host on another origin is not one we talk to */ }
+  }
+  /* Fonts and images land after the first layout and both change the height.
+     ⚠️ Guarded: an unguarded constructor throws where `ResizeObserver` is absent, and because
+     this runs inside `main()` the throw took every card after it with it. The headless harness
+     has no ResizeObserver, which is exactly the kind of environment that finds this. */
+  if (typeof ResizeObserver === "function") new ResizeObserver(() => measure()).observe(document.documentElement);
+  window.addEventListener("load", measure);
+
   const STORE = "moedatech.board";
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify({
       order: slots().map(x=>x.dataset.card),
@@ -2817,9 +2908,9 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     /* A card you just chose goes to the end of the board, where you are
        looking, rather than back into the slot it happened to be authored in. */
     if (cb.checked) deck.append(sl);
-    redrawAway(); drawLib(); save();
+    redrawAway(); drawLib(); save(); measure();
   });
-  deck.addEventListener("click", e => { if(e.target.closest("[data-hide]")) { drawLib(); save(); } });
+  deck.addEventListener("click", e => { if(e.target.closest("[data-hide]")) { drawLib(); save(); measure(); } });
 
   /* ── The panel ───────────────────────────────────────────────── */
   const panel = document.getElementById("agent"), body = document.getElementById("chBody");
@@ -2860,12 +2951,16 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   }
   function openPanel(which){
     close();                       /* one drawer at a time, they share the edge */
+    /* In its own frame the rail is the whole document, so there is nothing here to push aside:
+       the HOST narrows the board's frame instead, which is the only thing that knows where this
+       one sits. */
     panel.classList.add("open"); panel.setAttribute("aria-hidden","false");
-    document.body.classList.add("docked");
+    if (!RAIL) document.body.classList.add("docked");
     pane(typeof which === "string" ? which : "cards");
     tellHost(true);
   }
   function closePanel(){
+    if (RAIL) { tellHost(false); return; }   /* the host hides the whole frame */
     panel.classList.remove("open"); panel.setAttribute("aria-hidden","true");
     document.body.classList.remove("docked");
     tellHost(false);
@@ -2932,6 +3027,8 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     /* Open on arrival, whether or not a board was saved (owner, 2026-10-03). The launcher
        stays for reopening it after a close. */
     setTimeout(() => openPanel("cards"), 0);
+    /* In rail mode the ✕ and Escape ask the HOST to hide this frame; closing the panel inside it
+       would leave an empty 404px strip on screen with no way back. */
     if (saved) {
       apply(saved.order.filter(byId), saved.off.filter(byId));
       for (const [id, sp] of Object.entries(saved.span || {})) if (byId(id) && sp) byId(id).style.setProperty("--sp", sp);

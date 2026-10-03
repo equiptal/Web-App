@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildGovernance, type GovernanceInput } from "@/lib/governance/build";
 import type { RequestListItem } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
+import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
 
 /**
  * The governance board holds no numbers of its own: every card, every figure and every drill-down
@@ -603,5 +604,93 @@ describe("buildGovernance", () => {
        recorded who was notified" are different sentences. */
     expect(out.R.r1.opened).toBeNull();
     expect(out.R.r1.reach).toBeNull();
+  });
+
+  it("reads off-platform from viaSharedLink, never from a synthetic supplier id", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        bidsByRequest: {
+          r1: [
+            bid({ supplierName: "Zahid", status: "ACCEPTED" }),
+            /* What `submissionToBidCard` actually produces: a SYNTHETIC `supplierId` so the
+               comparison can treat each submission as its own column. Testing `supplierId != null`
+               called every one of these a Moedatech bid, and the channel card reported zero
+               off-platform offers on accounts that were full of them. */
+            bid({ supplierName: "Desert Plant", supplierId: "link-abc", supplierCompanyId: null, viaSharedLink: true } as never),
+            /* A link submission the backend later materialised into a real app bid. It has a deal
+               room and an account, and it is STILL off-platform in origin, which is what this
+               board counts. */
+            bid({ supplierName: "Converted Co", converted: true } as never),
+          ],
+        },
+      }),
+    );
+    const by = Object.fromEntries(out.R.r1.bids.map((b) => [b.firm, b]));
+    expect(by.Zahid.onPlatform).toBe(1);
+    expect(by["Desert Plant"].onPlatform).toBe(0);
+    expect(by["Converted Co"].onPlatform).toBe(0);
+    expect(by["Desert Plant"].route).toBe("Your own shared link");
+    expect(out.SUPMETA["Desert Plant"].src).toBe("Off platform");
+    expect(out.SUPMETA.Zahid.src).toBe("Moedatech");
+  });
+
+  it("folds a REAL off-platform submission, through the same mapper the route uses", () => {
+    /* Not a hand-written BidCard pretending to be a link bid: the actual output of
+       `submissionToBidCard`, so this breaks if that mapper's shape moves. */
+    const sub: LinkBidSubmission = {
+      id: "sub-1",
+      requestId: "r1",
+      createdAt: "2026-09-06T09:00:00Z",
+      companyName: "Desert Plant Hire",
+      crNumber: "1010998877",
+      vatNumber: "300999888700003",
+      nationalAddress: "RQAA4821",
+      city: "Jubail",
+      items: [
+        {
+          requestItemId: "i1",
+          numberOfUnits: 1,
+          offeredUnits: 1,
+          priceUnit: "PER_DAY",
+          rentalRate: 880,
+          deliveryPrice: 1500,
+          returnPrice: 1500,
+        },
+      ],
+    } as LinkBidSubmission;
+
+    /* The same overlay the route applies: the mapper drops the identity fields because the
+       surfaces it was written for do not show them, and this board's whole question is whether
+       the firm you paid is identifiable. */
+    const linkBid = {
+      ...submissionToBidCard(sub),
+      supplierCrNumber: sub.crNumber ?? null,
+      supplierVatNumber: sub.vatNumber ?? null,
+      supplierNationalAddress: sub.nationalAddress ?? null,
+      supplierCity: sub.city ?? null,
+    } as BidCard;
+
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        bidsByRequest: { r1: [bid({ supplierName: "Zahid", price: 1000, status: "ACCEPTED" }), linkBid] },
+      }),
+    );
+
+    const link = out.R.r1.bids.find((b) => b.firm === "Desert Plant Hire");
+    expect(link).toBeDefined();
+    expect(link!.onPlatform).toBe(0);
+    expect(link!.route).toBe("Your own shared link");
+    expect(link!.perDay).toBe(880);
+    /* Priced on the same calculation as an app bid: 9 billable days plus both legs. */
+    expect(link!.total).toBe(880 * 9 + 3000);
+    /* And identifiable, which is the point. */
+    expect(link!.cr).toBe("1010998877");
+    expect(out.SUPMETA["Desert Plant Hire"].cr).toBe("1010998877");
+    expect(out.SUPMETA["Desert Plant Hire"].vat).toBe("300999888700003");
+    expect(out.SUPMETA["Desert Plant Hire"].src).toBe("Off platform");
+    /* Nothing in the fold produced a hole from the thinner shape. */
+    for (const v of Object.values(link!)) expect(Number.isNaN(v as number)).toBe(false);
   });
 });

@@ -1,127 +1,136 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+/** Bumped with every change to the page: Amplify serves `public/` with a long max-age. */
+const V = 24;
+
+/** The rail's width, and the padding the board carries so no card hides under it. */
+const RAIL_W = 404;
 
 /**
- * The governance board, pinned to the window rather than sized by a guess.
+ * The governance board: one frame in the page, one frame over it.
  *
- * ── Why it is fixed, and measured ───────────────────────────────────────────────────────────────
+ * ── Why two frames ─────────────────────────────────────────────────────────────────────────────
  *
- * The rail lives inside the frame and is `position: fixed`, so it reaches the frame's edges and no
- * further. The frame was `calc(100vh - 96px)` — a typed guess at the height of the app header plus
- * the tab row above it. Two things were wrong with that. The 96 was never checked against what the
- * header actually measures (52px, plus a banner and a tab row that both wrap on a narrow window),
- * so the rail stopped short of the bottom of the screen by whatever the guess was out by. And a
- * guess cannot follow chrome that changes height, which is exactly what happens at the width where
- * the tabs wrap.
+ * Two requirements that one frame cannot meet together.
  *
- * So the frame runs from the bottom of whatever sits above it to the bottom of the window, and
- * that distance is MEASURED off a zero-height anchor left in the normal flow.
+ * The BOARD has to sit in this page's normal flow (owner, 2026-10-03: *"the dashboard itself must
+ * be in the page not floating above"*). It was `position: fixed` for a few hours, which meant it
+ * contributed no layout height at all and painted over everything below it on the tab.
  *
- * ── Why the frame grows over the host's own header while the rail is open ───────────────────────
+ * The RAIL has to reach the top of the SCREEN, over the app header (owner, same day: *"i want the
+ * panel to be above the header and above the cta"*). Inside a frame, `position: fixed` anchors to
+ * THAT frame's box — so a frame tall enough to hold the board in flow gives the rail a 5,000px
+ * viewport to be "full height" of, and the rail runs off the bottom of the world.
  *
- * Owner, 2026-10-03: *"the side panel still doesnt open on full height on top … i want the panel
- * to be above the header and above the cta"*. The rail cannot paint outside its frame, so the only
- * way it reaches the top of the SCREEN is for the frame to reach the top of the screen. While the
- * rail is open the frame therefore covers the window entirely and sits above the app header; the
- * board page holds its content still by padding itself by the same offset, and its top strip is
- * transparent, so the header and the banner show through exactly where they were.
+ * So the same page is loaded twice. `?embed=1` draws the board and hides the rail; `?rail=1` draws
+ * the rail and hides the board. The board frame is an ordinary block in the flow, sized to the
+ * height it reports; the rail frame is a fixed strip above everything.
  *
- * ⚠️ **The whole window belongs to the frame while the rail is open, so the header, the banner and
- * the tab row are visible but not clickable.** That is the cost of a panel that covers them, and
- * it is why the rail now closes on Escape as well as on its ✕ (`2026-10-03.17`): a renter who
- * opened the tab and found the picker over his navigation must always have a way back out. The
- * moment it closes the frame drops below the header again and everything is live.
+ * ── Why not a rail written in React ────────────────────────────────────────────────────────────
  *
- * ── Why the rail is still inside the frame ──────────────────────────────────────────────────────
+ * The card picker's previews are live, scaled clones of the board's own sections. A React rail
+ * would have to draw pictures of the cards instead, which is the thing that got rebuilt once
+ * already. Loading the page twice keeps them real: each frame builds its own deck, so each has a
+ * genuine set of sections to clone.
  *
- * Moving it into React is the only way to have it cover the header AND leave the header clickable.
- * It would cost the card picker its previews: those are live, scaled clones of the board's own
- * sections, so they exist only in the document the board is in. A picker that showed drawings of
- * the cards instead of the cards is the thing that got rebuilt once already.
+ * ⚠️ **The fan-out route is still called once.** The board frame fetches and publishes the payload
+ * to `sessionStorage`; the rail frame waits for it rather than asking again. The chosen cards
+ * travel the other way through `localStorage` and a `storage` event, which fires in every other
+ * document on the origin but never in the one that wrote — so the two cannot loop.
  */
 export function GovernanceBoard({ className = "" }: { className?: string }) {
-  const anchor = useRef<HTMLDivElement>(null);
-  const frame = useRef<HTMLIFrameElement>(null);
-  /* The initial value is the old guess, used for exactly one frame before the measurement lands.
-     Starting at 0 would flash a full-height board up behind the header. */
-  const [top, setTop] = useState(96);
-  const [railOpen, setRailOpen] = useState(false);
-
-  useLayoutEffect(() => {
-    const el = anchor.current;
-    if (!el) return;
-    const measure = () => {
-      const t = el.getBoundingClientRect().top;
-      /* `display: none` on the hidden tab reports 0 for everything. Keeping the last good value
-         rather than collapsing to the top of the window means switching away and back does not
-         flash the board over the header. */
-      if (t > 0) setTop(Math.round(t));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(document.body);
-    window.addEventListener("resize", measure);
-    /* Nothing scrolls on this tab — the frame holds the only scrollbar — but a browser that
-       restores a scroll position on load would otherwise leave the measurement stale. */
-    window.addEventListener("scroll", measure, { passive: true });
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure);
-    };
-  }, []);
+  /* A first guess, replaced by the frame's own measurement within a frame or two. Starting at
+     zero collapses the tab and makes the page jump as it fills. */
+  const [height, setHeight] = useState(900);
+  const [railOpen, setRailOpen] = useState(true);
+  /* The rail frame is mounted only once the board has published its payload. Starting both at
+     the same moment leaves the rail polling an empty key for a board that has not fetched yet. */
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
-      /* Same-origin only. The board is served from `public/`, so anything from elsewhere claiming
-         to be it is not it. */
+      /* Same-origin only. The board is served from `public/`, so anything from elsewhere
+         claiming to be it is not it. */
       if (e.origin !== window.location.origin) return;
-      const d = e.data as { type?: string; open?: boolean } | null;
-      if (d && d.type === "governance:rail") setRailOpen(!!d.open);
+      const d = e.data as { type?: string; px?: number; open?: boolean } | null;
+      if (!d) return;
+      if (d.type === "governance:height" && typeof d.px === "number" && d.px > 200) {
+        setHeight(d.px);
+        setReady(true);
+      }
+      /* Only the rail frame sends this, and only to be dismissed: its ✕ and Escape ask to be
+         hidden, because closing the panel inside its own frame would leave an empty strip on
+         screen with no way back. */
+      if (d.type === "governance:rail") setRailOpen(!!d.open);
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, []);
 
-  /* How much of the frame is now sitting over the host's chrome. The board pads itself by it so
-     the cards stay where the reader last saw them instead of jumping up under the header. */
-  const overlap = railOpen ? top : 0;
-  useEffect(() => {
-    frame.current?.contentWindow?.postMessage(
-      { type: "governance:offset", px: overlap },
-      window.location.origin,
-    );
-  }, [overlap]);
+  const reopen = useCallback(() => setRailOpen(true), []);
 
   return (
     <>
-      {/* Zero height, in the flow, purely to be measured. */}
-      <div ref={anchor} aria-hidden className="h-0" />
       <iframe
-        ref={frame}
-        /* Bumped with every change to the page. Amplify serves `public/` with a long max-age, so a
-           stale `v` is not a cosmetic slip: the browser keeps the old board and the new route's
-           payload is read by code that predates it. */
-        src="/governance-dashboard.html?embed=1&v=22"
+        src={`/governance-dashboard.html?embed=1&v=${V}`}
         title="Governance and compliance"
-        className={"block " + className}
-        /* ⚠️ Sized explicitly, never by `inset`. An `<iframe>` is a REPLACED element with an
-           intrinsic 300x150, so on an absolutely positioned one `width: auto` resolves to 300px
-           and the `right`/`bottom` offsets are simply dropped as over-constrained. It rendered as
-           a 300px box in the corner with the rail squeezed inside it. The containing block of a
-           fixed element is the viewport, so these percentages are of the window.
-           The app header is `z-30`; 40 clears it, and only while the rail is open. */
+        /* In the flow, sized to what it reports. `block` because an inline frame sits on the text
+           baseline and leaves a few pixels of descender gap beneath it.
+           The board narrows while the rail is over it, so no card sits under the panel that is
+           describing it. */
+        className={"block w-full " + className}
         style={{
-          position: "fixed",
-          insetInlineStart: 0,
-          top: railOpen ? 0 : top,
-          width: "100%",
-          height: railOpen ? "100%" : `calc(100% - ${top}px)`,
-          zIndex: railOpen ? 40 : 0,
           border: 0,
+          height,
+          paddingInlineEnd: railOpen ? RAIL_W : 0,
+          transition: "padding 0.18s ease",
         }}
       />
+
+      {ready && railOpen && (
+        <iframe
+          src={`/governance-dashboard.html?rail=1&v=${V}`}
+          title="Cards and questions"
+          className="bg-surface"
+          /* Fixed to the WINDOW, not to the board: that is the whole reason it is a second frame.
+             The app header is `z-30`, so 40 clears it. */
+          style={{
+            position: "fixed",
+            insetBlockStart: 0,
+            insetInlineEnd: 0,
+            /* ⚠️ Sized explicitly. An `<iframe>` is a REPLACED element with an intrinsic
+               300x150, so `inset-block: 0` does NOT stretch it — the offsets are dropped as
+               over-constrained and it renders 150px tall in the corner. Same trap that caught
+               the board frame; it catches every iframe. */
+            height: "100%",
+            width: RAIL_W,
+            maxWidth: "100vw",
+            border: 0,
+            zIndex: 40,
+            /* A border, not a shadow. This app has none: a card is its border and a floating
+               layer is separated by its scrim (`OVERLAY` / `SCRIM` in `src/lib/ds.ts`). The rail
+               is a dock rather than a modal, so it takes the border. */
+            borderInlineStart: "1px solid var(--border-strong)",
+          }}
+        />
+      )}
+
+      {ready && !railOpen && (
+        /* The way back in. The rail is the only way to put a card on the board, so a board with
+           it shut and no launcher is a page the reader cannot change. */
+        <button
+          type="button"
+          onClick={reopen}
+          className="fixed bottom-6 end-6 z-40 flex items-center gap-2 rounded-full bg-navy px-5 py-3 text-body font-extrabold text-white transition hover:bg-navy-mid"
+        >
+          <span aria-hidden className="text-brand-light">
+            ▤
+          </span>{" "}
+          Cards
+        </button>
+      )}
     </>
   );
 }
