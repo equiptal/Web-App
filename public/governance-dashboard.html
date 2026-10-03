@@ -41,7 +41,6 @@ table{border-collapse:collapse;width:100%}
    the same task, so covering the board to pick for it is the wrong trade. */
 body{transition:padding-inline-end .2s ease}
 body.docked{padding-inline-end:404px}
-body.docked #agentBtn{opacity:0;pointer-events:none}
 body.docked #dw{inset-inline-end:404px}
 @media (max-width:1180px){ body.docked{padding-inline-end:0} body.docked #dw{inset-inline-end:0} }
 .head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
@@ -237,7 +236,8 @@ html.embed .wrap { max-width:none; padding:0 0 8px }
    here is unreachable rather than merely ugly. Nothing is allowed to widen the page. */
 html.embed, html.embed body { max-width:100%; overflow-x:clip }
 html.embed #deck, html.embed .slot, html.embed .two > * { min-width:0 }
-html.embed #agent { position:absolute; inset-block:auto; inset-inline-end:0;
+html.embed #agent { position:absolute; inset-block:auto; inset-inline-end:0; box-shadow:none;
+  border-inline-start:1px solid var(--border);
   top:var(--vtop,0); height:var(--vh,100vh) }
 html.embed #dw { position:absolute; inset-block:auto; inset-inline-end:0;
   top:var(--vtop,0); height:var(--vh,100vh) }
@@ -265,7 +265,7 @@ html.embed.placed #agentBtn { display:flex; position:absolute; inset-block-end:a
 .blank b{display:block;font-size:var(--lead);color:var(--navy)}
 .blank p{max-width:46ch;margin:7px auto 15px;font-size:12.5px;color:var(--muted);line-height:1.6}
 .blank button{margin:0 3px}
-.away-bar{display:none;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:16px;
+.away-bar{display:none !important;display:none;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:16px;
   padding:9px 12px;background:var(--surface2);border:1px dashed var(--border-strong);border-radius:var(--radius)}
 body.cust .away-bar.has{display:flex}
 .away-bar span{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
@@ -606,17 +606,12 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
 
 </div>
 
-<button id="agentBtn" aria-label="Choose cards or ask about your data">
-  <span class="am">&#9670;</span>Cards
-</button>
-
 <aside id="agent" aria-hidden="true">
   <header>
     <div style="flex:1;min-width:0">
       <div class="kind">Cards and questions</div>
       <h3>Your board</h3>
     </div>
-    <button id="agentX" aria-label="Close">&#10005;</button>
   </header>
   <div class="ch-tabs">
     <button class="ct on" data-pane="cards">Cards</button>
@@ -1282,7 +1277,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.8";
+const BUILD = "2026-10-03.9";
 console.log("[governance] page build " + BUILD);
 
 /* ── Embedded in the app shell ───────────────────────────────────────────────────────────────
@@ -2014,9 +2009,10 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   const wrap = document.querySelector(".wrap");
   const sections = [...wrap.querySelectorAll("section")];
   const deck = document.createElement("div"); deck.id = "deck";
+  /* No away-bar: cards leave and return through the rail's tick, which is the one place
+     that knows the whole list. A second door here only ever disagreed with it. */
   const away = document.createElement("div"); away.className = "away-bar";
-  away.innerHTML = '<span>Put away</span>';
-  sections[0].before(away); away.after(deck);
+  sections[0].before(deck);
 
   for (const sec of sections){
     const two = sec.querySelector(".two, .four");
@@ -2040,7 +2036,7 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
       slot.draggable = true;
       const locked = LOCKED.includes(id);
       slot.innerHTML = '<div class="slot-h"><span class="grip">⠿</span>' + (NAMES[id]||id) +
-        (locked ? '<span class="lock">Always shown</span>' : '<button data-hide="'+id+'">Put away</button>') +
+        (locked ? '<span class="lock">Always shown</span>' : '') +
         '</div><span class="rs" title="Drag to resize"></span>';
       slot.append(part);
       deck.append(slot);
@@ -2131,9 +2127,8 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
 
   const blank = document.createElement("div");
   blank.className = "blank";
-  blank.innerHTML = '<b>Build your board</b><p>Pick the cards you want</p>' +
-    '<button class="btn primary" id="blankPick">Choose cards</button>' +
-    '<button class="btn" id="blankAll">Show everything</button>';
+  blank.innerHTML = '<b>Build your board</b><p>Tick the cards you want in the panel on the right</p>' +
+    '<button class="btn primary" id="blankAll">Show everything</button>';
   deck.after(blank);
 
 
@@ -2349,9 +2344,11 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     panel.classList.remove("open"); panel.setAttribute("aria-hidden","true");
     document.body.classList.remove("docked");
   }
-  document.getElementById("agentBtn").onclick = ()=> openPanel("cards");
-  document.getElementById("agentX").onclick = closePanel;
-  document.addEventListener("keydown", e=>{ if(e.key==="Escape") closePanel(); });
+  const launch = document.getElementById("agentBtn");
+  if (launch) launch.onclick = ()=> openPanel("cards");
+  const closeX = document.getElementById("agentX");
+  if (closeX) closeX.onclick = closePanel;
+  /* Escape closes the explainer drawer, never the rail: the rail is furniture, not an overlay. */
 
   function run(q){
     if(!q.trim()) return;
@@ -2384,7 +2381,6 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     }
   }
 
-  document.getElementById("blankPick").onclick = ()=> openPanel("cards");
   document.getElementById("blankAll").onclick  = ()=> { apply(DEFAULT, []); drawLib(); save(); };
 
   /* Export is the browser's own print-to-PDF. The reader arranged this board, so what prints
