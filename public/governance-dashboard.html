@@ -643,7 +643,7 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
             <th data-x="c-winner">Awarded to</th>
             <th class="r" data-x="c-terms">Your terms met</th>
             <th class="r" data-x="c-value">Value, SAR</th>
-            <th data-x="c-position">Against the other bids, and the market</th>
+            <th data-x="c-position">Against bids and market</th>
             <th data-x="c-findings">Warnings</th>
           </tr>
         </thead>
@@ -1428,7 +1428,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-04.04";
+const BUILD = "2026-10-04.06";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -2106,7 +2106,7 @@ for (const id in R) {
         const where = r.bids.length === 1 ? "Only bid"
           : price === prices[0] ? "Cheapest bid"
           : price === prices[prices.length - 1] ? "Most expensive" : "Mid-field";
-        note = `<span class="posnote">${where} \u00b7 <b class="${vs > 0 ? "up" : "dn"}">${Math.abs(vs)}% ${vs > 0 ? "over" : "under"} ${r.market.source === "platform" ? "market" : "your own quotes"}</b></span>`;
+        note = `<span class="posnote">${where} · ${vs === 0 ? "<b>level</b>" : `<b class="${vs > 0 ? "up" : "dn"}">${vs > 0 ? "+" : "−"}${Math.abs(vs)}%</b>`} ${r.market.source === "platform" ? "vs market" : "vs your quotes"}</span>`;
       } else {
         /* Fewer than three bids for this machine type across the whole account. Naming the reason
            matters: "no listings" blamed a catalogue the band no longer comes from. */
@@ -2114,7 +2114,7 @@ for (const id in R) {
         const where = r.bids.length === 1 ? "Only bid"
           : price === prices[0] ? "Cheapest bid"
           : price === prices[prices.length - 1] ? "Most expensive" : "Mid-field";
-        note = `<span class="posnote">${where} \u00b7 <span class="na">no rate on file for this machine type</span></span>`;
+        note = `<span class="posnote">${where} \u00b7 <span class="na">no rate on file</span></span>`;
       }
 
       const w = r.winner || { name: "Not awarded yet", ver: "No", cr: "None on file" };
