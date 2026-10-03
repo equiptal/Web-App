@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-authed";
+import { agentsGet } from "@/lib/api/agents-relay";
 import { extractRequestList, mapRequestListItem } from "@/lib/contract/requests";
 import { mapBidList, bidSizeCounts } from "@/lib/contract/bids";
-import { buildGovernance, type GovernanceInput, type MarketBand } from "@/lib/governance/build";
+import { buildGovernance, type GovernanceInput, type RegistryEntry } from "@/lib/governance/build";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +18,21 @@ export const dynamic = "force-dynamic";
  * would put that reconciliation in the browser, over payloads that arrived at different moments,
  * and the first stale one would show a total that does not match its own rows.
  *
+ * ── Two backends, and the bug that came of forgetting it ────────────────────────────────────────
+ *
+ * The requests and their bids live on **app-backend**, reached with `call`. The renter's projects
+ * and his own supplier registry live on **agents-backend**, reached with {@link agentsGet}. This
+ * route asked `call` for `/projects` and `/renter-suppliers` for a while. Both 404'd, both failures
+ * were swallowed by the `.catch(() => null)` that is there for genuinely optional data, and the
+ * board drew every row as "Unnamed project" and every firm as "not registered" — wrong answers
+ * that are indistinguishable from a renter who has simply filled neither in.
+ *
  * ── Cost ────────────────────────────────────────────────────────────────────────────────────────
  *
- * One call for the request list, then two per request. That is a fan-out, and it is bounded here
- * rather than left to grow: {@link MAX_REQUESTS} caps how many requests are folded, newest first,
- * and {@link POOL} caps how many are in flight. A renter with four hundred requests gets the most
- * recent window and a note saying so, not a route that takes a minute and times out behind a proxy.
+ * One call for the request list, then two per request, plus two flat. That is a fan-out, and it is
+ * bounded here rather than left to grow: {@link MAX_REQUESTS} caps how many requests are folded,
+ * newest first, and {@link POOL} caps how many are in flight. A renter with four hundred requests
+ * gets the most recent window and a note saying so, not a route that times out behind a proxy.
  *
  * Read-only. It writes nothing, and every call it makes is one the renter could make himself.
  */
@@ -42,6 +52,26 @@ async function pooled<T, R>(items: T[], n: number, fn: (item: T) => Promise<R>):
   );
   return out;
 }
+
+/** The agents backend returns a bare array on some handlers and `{ items: [] }` on others. */
+function asArray<T>(raw: unknown, key: string): T[] {
+  if (Array.isArray(raw)) return raw as T[];
+  const inner = raw && typeof raw === "object" ? (raw as Record<string, unknown>)[key] : null;
+  return Array.isArray(inner) ? (inner as T[]) : [];
+}
+
+/** The registry row as the agents backend sends it. Everything but the name is optional. */
+type RawSupplier = {
+  id?: string;
+  supplierId?: string | number | null;
+  companyId?: string | null;
+  crNumber?: string | null;
+  name?: string | null;
+  vendorRegistered?: boolean | null;
+  onMoedatech?: boolean | null;
+  kind?: string | null;
+  groups?: string[] | null;
+};
 
 export async function GET(req: Request) {
   return withAuthedBackend(req, async (call) => {
@@ -78,40 +108,41 @@ export async function GET(req: Request) {
         }
       });
 
-      /* The market band per machine type, from the live listings. Absent for a subtype nobody
-         lists, and the board prints no comparison rather than comparing against an empty set. */
-      const marketBySubtype: Record<string, MarketBand | undefined> = {};
-      const subtypes = [...new Set(requests.map((r) => r.item?.categoryId).filter((x): x is string => !!x))];
-      await pooled(subtypes, POOL, async (id) => {
-        const raw = await call(`/stores?subcategoryId=${encodeURIComponent(id)}&limit=100`).catch(() => null);
-        const rows = (raw as { stores?: Array<{ price?: number | null }> } | null)?.stores ?? [];
-        const prices = rows.map((s) => s.price).filter((p): p is number => typeof p === "number" && p > 0).sort((a, b) => a - b);
-        if (prices.length >= 3) {
-          marketBySubtype[id] = { med: prices[Math.floor(prices.length / 2)], n: prices.length, lo: prices[0], hi: prices[prices.length - 1] };
-        }
-      });
+      /* ── The two agents-backend reads ──────────────────────────────────────────────────────────
+         Flat, not per request, and fired together: neither depends on the other and each is one
+         call for the whole board. */
+      const [projectsRaw, suppliersRaw] = await Promise.all([
+        agentsGet<unknown>("/projects"),
+        agentsGet<unknown>("/renter-suppliers"),
+      ]);
 
       const projectNames: Record<string, string | undefined> = {};
-      const projectsRaw = await call(`/projects`).catch(() => null);
-      for (const p of (projectsRaw as { projects?: Array<{ id: string; name?: string }> } | null)?.projects ?? []) {
-        projectNames[p.id] = p.name;
+      /* `title`, not `name`. A `Project` has no `name` column at all, so reading one gave every
+         row `undefined` and the board fell through to "Unnamed project" on sites that are named. */
+      for (const p of asArray<{ id?: string; title?: string | null; name?: string | null }>(projectsRaw, "projects")) {
+        if (p.id) projectNames[p.id] = p.title ?? p.name ?? undefined;
       }
 
-      const suppliersRaw = await call(`/renter-suppliers`).catch(() => null);
-      const registeredSupplierIds = new Set<string>(
-        ((suppliersRaw as { suppliers?: Array<{ companyId?: string | null }> } | null)?.suppliers ?? [])
-          .map((s) => s.companyId)
-          .filter((x): x is string => !!x),
-      );
+      const registry: RegistryEntry[] = asArray<RawSupplier>(suppliersRaw, "suppliers").map((s) => ({
+        supplierId: s.supplierId != null ? String(s.supplierId) : null,
+        companyId: s.companyId ?? null,
+        crNumber: s.crNumber ?? null,
+        name: s.name ?? "",
+        /* The registry's own boolean. Being on the list is not the same as being an approved
+           vendor — a firm lands on it the moment it bids through a shared link, and the tick is
+           the renter's separate decision about it. */
+        vendorRegistered: s.vendorRegistered === true,
+        onMoedatech: s.onMoedatech ?? s.kind === "platform",
+        groups: Array.isArray(s.groups) ? s.groups : [],
+      }));
 
       const payload = buildGovernance({
         requests,
         bidsByRequest,
         sharesByRequest,
         heldByRequest,
-        marketBySubtype,
         projectNames,
-        registeredSupplierIds,
+        registry,
       });
 
       return NextResponse.json({

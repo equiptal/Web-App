@@ -355,12 +355,33 @@ body.arrange .away-bar.has{display:flex}
   color:var(--muted-dark);background:var(--surface2)}
 
 /* ── Drawer ───────────────────────────────────────────────────────── */
-#scrim{position:fixed;inset:0;background:transparent;pointer-events:none;z-index:40}
-#scrim.open{pointer-events:auto}
-#dw{position:fixed;inset-block:0;inset-inline-end:0;width:min(450px,100vw);background:var(--surface);
-  border-inline-start:1px solid var(--border-strong);z-index:50;display:flex;flex-direction:column;
-  transform:translateX(100%);transition:transform .2s ease}
-#dw.open{transform:translateX(0)}
+#scrim{position:fixed;inset:0;background:rgba(18,28,38,.52);opacity:0;pointer-events:none;
+  transition:opacity .15s ease;z-index:40}
+#scrim.open{opacity:1;pointer-events:auto}
+/* Centred on the BOARD, not on the window. The rail is fixed to the right edge at z-index 55,
+   above this, so a modal centred on the viewport slid its right-hand column underneath it and
+   the third column of every fact grid was unreadable while the rail was open. `body.docked` is
+   already set by `openPanel`, so the one class answers it. */
+#dw{position:fixed;z-index:50;inset-inline:0;top:50%;margin-inline:auto;
+  width:min(1020px,calc(100vw - 28px));max-height:min(88vh,920px);
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:8px;
+  box-shadow:0 20px 56px -14px rgba(18,28,38,.42),0 2px 8px rgba(18,28,38,.10);
+  display:flex;flex-direction:column;overflow:hidden;
+  opacity:0;pointer-events:none;transform:translateY(-47%) scale(.99);
+  /* ⚠️ `visibility` is deliberately NOT in the transition. With it there, Chrome kept a pending
+     transition on the element for as long as the dialog was open and `Page.captureScreenshot`
+     timed out after thirty seconds every time - the page was responsive, it simply never
+     presented a frame. The cost is that closing snaps rather than fades. */
+  transition:opacity .15s ease,transform .15s ease}
+#dw:not(.open){visibility:hidden}
+#dw.open{opacity:1;pointer-events:auto;transform:translateY(-50%) scale(1)}
+body.docked #dw{inset-inline-end:min(400px,100vw);
+  width:min(1020px,calc(100vw - min(400px,100vw) - 28px))}
+@media (max-width:720px){
+  #dw,body.docked #dw{width:100vw;max-height:100vh;height:100%;inset-inline:0;top:0;
+    border-radius:0;border:0;transform:none;transition:opacity .15s ease}
+  #dw.open{transform:none}
+}
 #dw header{padding:16px 20px 13px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start}
 #dw header .kind{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 #dw header h3{font-size:var(--lead);line-height:1.3}
@@ -404,6 +425,45 @@ body.arrange .away-bar.has{display:flex}
 .det .dr.win .bar i{background:#fff}
 .det .bar i.m{border-radius:1px;width:2px;height:10px;top:1px;background:var(--brand-deep)}
 .det .dfoot{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5}
+
+/* ── The dossier ──────────────────────────────────────────────────── */
+.ds{margin-bottom:20px}
+.ds:last-child{margin-bottom:4px}
+.ds > h5{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:7px;display:flex;align-items:baseline;gap:8px}
+.ds > h5 em{font-style:normal;font-weight:700;letter-spacing:0;text-transform:none;
+  font-size:11px;color:var(--muted-light)}
+/* The first section is the column the reader clicked, so it is marked rather than merely first. */
+.ds:first-child > h5{color:var(--brand-deep)}
+.ds:first-child > h5::before{content:"";width:3px;align-self:stretch;background:var(--brand);
+  border-radius:2px;margin-inline-end:2px}
+
+.dfacts{display:grid;grid-template-columns:repeat(auto-fit,minmax(236px,1fr));gap:0 18px}
+.df{display:flex;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px solid var(--border-hair);
+  font-size:12px}
+.df span{flex:1;min-width:0;color:var(--muted-dark)}
+.df b{font-weight:700;font-variant-numeric:tabular-nums;text-align:end}
+.df.bad b{color:var(--danger-deep)}
+
+.dtbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.dtbl th{text-align:start;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--muted);padding:0 8px 5px;border-bottom:1px solid var(--border-strong);white-space:nowrap}
+.dtbl td{padding:7px 8px;border-bottom:1px solid var(--border-hair);vertical-align:top}
+.dtbl th.r,.dtbl td.r{text-align:end;font-variant-numeric:tabular-nums}
+.dtbl tr:last-child td{border-bottom:0}
+.dtbl tr.win td{background:var(--surface2)}
+.dtbl tr.win td:first-child{box-shadow:inset 2px 0 0 var(--brand)}
+.dtbl tr.no td{background:var(--danger-soft)}
+.dtbl td.ok{color:var(--ok-deep)}
+.dtbl td.no{color:var(--danger-deep)}
+.dtbl .s2{display:block;font-size:10px;color:var(--muted-light);font-weight:400;margin-top:1px}
+.dtbl .tg{display:inline-block;font-style:normal;font-size:9.5px;font-weight:700;margin-inline-start:5px;
+  padding:1px 5px;border-radius:3px;background:var(--surface3);color:var(--muted-dark);
+  vertical-align:1px;letter-spacing:.02em}
+
+.dwarn{margin:0;padding-inline-start:16px}
+.dwarn li{font-size:12px;line-height:1.55;margin-bottom:3px;color:var(--danger-deep)}
+.dnone{font-size:12px;color:var(--muted)}
 .ex{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;font-size:12px}
 .ex .eh{background:var(--surface2);padding:7px 10px;font-weight:700;border-bottom:1px solid var(--border)}
 .ex .er{display:flex;gap:9px;padding:6px 10px;border-bottom:1px solid var(--border-hair);align-items:baseline}
@@ -470,11 +530,11 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
   <section data-card="awards">
     <div class="sec-head">
       <h2>Award decision record</h2>
-      <span class="note">7 requests decided this period · 6 carry a warning</span>
-      <div class="tabs">
-        <span class="tab on">All 7</span><span class="tab">Needs an answer 6</span>
-        <span class="tab">Urgent 2</span><span class="tab">Price</span><span class="tab">Papers</span><span class="tab">Timing</span>
-      </div>
+      <span class="note">Reading your requests…</span>
+      <!-- Built from the warnings the rows actually raised. The six typed chips that stood here
+           ("All 7", "Needs an answer 6", "Urgent 2") were the fixture's counts, and they kept
+           claiming them over live data: a renter with three requests read "All 7". -->
+      <div class="tabs" id="awardTabs"></div>
     </div>
     <div class="card scroll">
       <table style="min-width:1300px">
@@ -618,14 +678,14 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
 </aside>
 
 <div id="scrim"></div>
-<aside id="dw" aria-hidden="true">
+<aside id="dw" role="dialog" aria-modal="true" aria-hidden="true">
   <header>
     <div style="flex:1;min-width:0"><div class="kind" id="dwKind"></div><h3 id="dwTitle"></h3>
       <div class="answers" id="dwAns"></div></div>
     <button id="dwClose" aria-label="Close">✕</button>
   </header>
   <div class="scrollbody">
-    <div class="blk" id="dwDetBlk"><h4 id="dwDetH">The numbers behind this</h4><div class="det" id="dwDet"></div></div>
+    <div class="blk" id="dwDetBlk"><div class="det" id="dwDet"></div></div>
     <div class="blk" id="dwExBlk"><h4>Worked example</h4><div class="ex" id="dwEx"></div></div>
     <details class="how" id="dwHow">
       <summary>What this is, and where it comes from</summary>
@@ -649,7 +709,7 @@ const X = {
 /* ── The five figures ──────────────────────────────────────────────── */
 "k-spend":{k:"Figure",t:"Where the money went",
  q:"where our money goes",
- what:"Everything awarded this period, split by how it was bought and by which firm took it",
+ what:"Everything awarded this period, split by how it was bought and by which supplier took it",
  why:"The split is the answer, not the total. Money that moved through open competition was tested by the market. Money that went direct or through your own link was not",
  ex:{head:"703,300 SAR, three routes",rows:[
   ["Marketplace, 3 or more bids","556,140","79%"],
@@ -658,8 +718,8 @@ const X = {
   out:"One riyal in five was spent without a competitive field behind it"},
  chain:[["Each award records its own money","Rate, mobilization, demobilization, units and rental basis, on the project's award book"],
   ["The hire length comes from the request","End date inclusive, Fridays excluded, the same calculation the quotation prices with"],
-  ["The route comes from the winning bid","A marketplace bid, a submission through your shared link, or a direct request that named one firm"],
-  ["Firms are grouped through bidSupplierKey","Company first, then member, then the raw name, so colleagues of one firm count once"]],
+  ["The route comes from the winning bid","A marketplace bid, a submission through your shared link, or a direct request that named one supplier"],
+  ["Suppliers are grouped through bidSupplierKey","Company first, then member, then the raw name, so colleagues of one supplier count once"]],
  f:["Award.rateAmount","Award.units","BidSource","RequestType","bidSupplierKey"],s:"live"},
 
 "k-cheapest":{k:"Figure",t:"Awards that took the cheapest bid meeting your terms",
@@ -711,7 +771,7 @@ const X = {
 
 "p-route":{k:"Panel",t:"How the money was bought",
  q:"where our money goes",
- what:"Spend split by the route the winning offer travelled: the open marketplace, your own shared link, or a direct request naming one firm",
+ what:"Spend split by the route the winning offer travelled: the open marketplace, your own shared link, or a direct request naming one supplier",
  why:"Direct and link spending is not wrong, it is untested. Nobody competed for it, so there is no evidence the price was right and no second supplier to fall back on",
  ex:{head:"Competition behind each riyal",rows:[
   ["Marketplace with 3 or more bids","556,140","tested"],
@@ -720,14 +780,14 @@ const X = {
   out:"147,160 SAR, one fifth of the period, was spent with fewer than three offers on the table"},
  chain:[["A broadcast request reaches every supplier stocking that machine","Dispatch decides, and any of them may bid"],
   ["A shared link reaches whoever the renter sends it to","Those submissions arrive separately from marketplace bids"],
-  ["A direct request names one firm","And nobody else is notified or can see it"],
+  ["A direct request names one supplier","And nobody else is notified or can see it"],
   ["The award is attributed to whichever route its winner came from","And the bid count on that request decides whether it counts as competed"]],
  f:["BidSource","RequestType","fetchBids","fetchRequestSubmissions"],s:"live"},
 
 "p-supplier":{k:"Panel",t:"Share by supplier",
  q:"where our money goes",
- what:"What each firm took as a share of everything awarded, with its identity checks on the same row",
- why:"Concentration alone is not a finding. Concentration in firms nobody outside your office can confirm exist is the thing to read, which is why the two sit together",
+ what:"What each supplier took as a share of everything awarded, with its identity checks on the same row",
+ why:"Concentration alone is not a finding. Concentration in suppliers nobody outside your office can confirm exist is the thing to read, which is why the two sit together",
  ex:{head:"This period against the last",rows:[
   ["Zahid Tractor","43%","was 26%",1],
   ["Al Faisal Rentals","22%","was 19%"],
@@ -737,8 +797,8 @@ const X = {
   out:"One supplier went from a quarter of your spend to nearly half in one period"},
  chain:[["Each award records a supplier and its money","On the project's award book"],
   ["Value per award","Rate plus haulage, times units, times billable days, Fridays excluded"],
-  ["Firms are grouped once through bidSupplierKey","Company, then member, then the raw name"],
-  ["The identity checks are read per firm","And a row failing any of them is marked"]],
+  ["Suppliers are grouped once through bidSupplierKey","Company, then member, then the raw name"],
+  ["The identity checks are read per supplier","And a row failing any of them is marked"]],
  f:["Award.supplierName","Award.rateAmount","bidSupplierKey","crNumber"],s:"live"},
 
 /* ── Q4 panel ──────────────────────────────────────────────────────── */
@@ -752,33 +812,33 @@ const X = {
 
 "c-reach":{k:"Column",t:"Who answered",
  q:"how many suppliers received each request",
- what:"How many offers arrived, through which channel, and what else is known about reach: firms that opened your shared link without bidding, and machines the size filter held back",
+ what:"How many offers arrived, through which channel, and what else is known about reach: suppliers that opened your shared link without bidding, and machines the size filter held back",
  why:"The denominator behind everything to the right. Cheapest of five is a strong result. Cheapest of one is not a result at all, and the price scale beside it cannot tell you which you are looking at",
  ex:{head:"Reach across the period",rows:[
   ["Moedatech marketplace","5 requests","3 to 5 bids each"],
   ["Your own shared link","1 request","5 opened, 2 bid",1],
   ["Direct to one named firm","1 request","1 bid possible",1],
   ["Suppliers the marketplace matched","not stored","see the blind spots",1]],
-  out:"Two of seven requests were answered by fewer than three firms, and both of those were routed away from the marketplace"},
+  out:"Two of seven requests were answered by fewer than three suppliers, and both of those were routed away from the marketplace"},
  chain:[["A broadcast request goes to the marketplace","Dispatch notifies every supplier stocking that machine, and any of them may bid"],
   ["A shared link goes wherever the renter sends it","By email, WhatsApp or a copied URL. Those submissions arrive separately from marketplace bids, and openedCount records how many looked"],
-  ["A direct request names one firm","Nobody else is notified or can see it, so one bid is the ceiling"],
+  ["A direct request names one supplier","Nobody else is notified or can see it, so one bid is the ceiling"],
   ["Larger machines are held back by default","The backend reports the count it withheld, taken before the filter runs"]],
  f:["fetchBids","fetchRequestSubmissions","openedCount","RequestType","sizeCounts.larger"],s:"part"},
 
 "c-winner":{k:"Column",t:"Awarded to",
  q:"was the winner from Moedatech, from my list, or vendor registered",
- what:"The firm that took the work, how its offer reached you, and how well it is known: a Moedatech account, the platform's verification, and a commercial registration on file",
+ what:"The supplier that took the work, how its offer reached you, and how well it is known: a Moedatech account, the platform's verification, and a commercial registration on file",
  why:"They are three different strengths of evidence and only one of them is yours. An account means a real platform identity with a registered fleet. Verified means the platform reviewed the papers. A CR means it can be tied to a legal entity. Your own vendor tick means none of those, only that somebody here decided to work with them",
  ex:{head:"The three checks, per supplier",rows:[
-  ["Marketplace · verified · CR","3 firms","70% of spend"],
+  ["Marketplace · verified · CR","3 suppliers","70% of spend"],
   ["Your own link · no CR","Faisal Heavy","8%",1],
   ["Direct · no CR","Al Faisal","22%",1]],
   out:"Two of five suppliers hold no platform identity at all. Nobody outside your office has confirmed either of them exists, and they carry 30 percent of your spend"},
  chain:[["Bidders are resolved to a company","bidSupplierKey folds company, then member, then name, so colleagues count once"],
-  ["The route comes from the winning offer","A marketplace bid, a submission through your own shared link, or a direct request naming one firm"],
+  ["The route comes from the winning offer","A marketplace bid, a submission through your own shared link, or a direct request naming one supplier"],
   ["Three identity facts are read","The platform's verification, whether a CR is on file, and your own vendor tick"],
-  ["A row can also say the records disagree","When the accepted bid and the recorded award name different firms"]],
+  ["A row can also say the records disagree","When the accepted bid and the recorded award name different suppliers"]],
  f:["bidSupplierKey","BidSource","RequestType","verified","crNumber"],s:"live"},
 
 "c-terms":{k:"Column",t:"Terms",
@@ -905,7 +965,7 @@ const X = {
 
 "f-window":{k:"Finding",t:"A 24 hour bid window",
  what:"The shortest window the platform offers, on a 59,800 SAR hire",
- why:"A day is not long enough for a supplier who was not already expecting the request. It is the quietest way to run a tender only one firm can answer, and it breaks no rule",
+ why:"A day is not long enough for a supplier who was not already expecting the request. It is the quietest way to run a tender only one supplier can answer, and it breaks no rule",
  ex:{head:"Window against the field it drew",rows:[
   ["1 week · RFQ-1058","5 bids",""],
   ["72 hours · RFQ-1042","4 bids",""],
@@ -931,10 +991,10 @@ const X = {
   ["The awarded rate is priced to the same unit","And compared"]],
  f:["StoreEquipment.price","StoreEquipment.priceUnit","subcategoryId"],s:"live"},
 
-"f-single":{k:"Finding",t:"A single bid, sent direct to one firm",
+"f-single":{k:"Finding",t:"A single bid, sent direct to one supplier",
  what:"A direct request is visible to the named supplier alone, so exactly one bid was ever possible",
- why:"Legitimate for an urgent replacement or a machine only one firm holds. It stops being legitimate as a habit, which is why the rate is what matters",
- chain:[["A direct request starts from a supplier's store page","Pressing a machine there seeds a request naming that firm"],
+ why:"Legitimate for an urgent replacement or a machine only one supplier holds. It stops being legitimate as a habit, which is why the rate is what matters",
+ chain:[["A direct request starts from a supplier's store page","Pressing a machine there seeds a request naming that supplier"],
   ["Dispatch skips it","No other supplier is notified or can see it"],
   ["So the bid count reports the routing, not the market's interest",""]],
  f:["RequestType","DirectTarget.supplierId"],s:"live"},
@@ -1057,19 +1117,19 @@ const X = {
 
 "p-channel":{k:"Panel",t:"Moedatech against offline suppliers",
  q:"is the marketplace buying better than our own list",
- what:"Six measures on the same seven requests, split by the route each one went out by: the open marketplace, a link you emailed yourself, or a request sent to one named firm",
+ what:"Six measures on the same seven requests, split by the route each one went out by: the open marketplace, a link you emailed yourself, or a request sent to one named supplier",
  why:"It is the only comparison on this page that tests the platform rather than a supplier. If buying off the marketplace is cheaper and better answered, the marketplace is not earning its place. On this period it is the other way round",
  ex:{head:"What each row means",rows:[
   ["Requests sent","5 \u00b7 1 \u00b7 1","how many went out by each route"],
-  ["Bids received","19 \u00b7 2 \u00b7 1","how many firms actually answered"],
+  ["Bids received","19 \u00b7 2 \u00b7 1","how many suppliers actually answered"],
   ["Bids per request","3.8 \u00b7 2.0 \u00b7 1.0","the size of the field you had to choose from"],
   ["Day rate vs market rate","0% \u00b7 +6% \u00b7 +21%","what you paid per day against the going rate",1],
   ["Winner is a registered company","4 of 5 \u00b7 0 of 1 \u00b7 0 of 1","has a commercial registration on file"]],
-  out:"Every request you kept off the marketplace drew fewer bids, cost more per day, and went to a firm with no registration"},
- chain:[["The route is read off each request","Marketplace, a link you shared, or a direct request naming one firm"],
+  out:"Every request you kept off the marketplace drew fewer bids, cost more per day, and went to a supplier with no registration"},
+ chain:[["The route is read off each request","Marketplace, a link you shared, or a direct request naming one supplier"],
   ["Bids are counted per route","App bids and link submissions together"],
   ["The day rate is compared to the market median","For that machine type and size, then averaged across the route's awards"],
-  ["Registration is read off the firm the AWARD names","Not the firm whose bid was accepted, because the award is what the invoice follows"]],
+  ["Registration is read off the supplier the AWARD names","Not the supplier whose bid was accepted, because the award is what the invoice follows"]],
  f:["RequestType","BidSource","Bid.price","StoreEquipment.price","supplierCrNumber"],s:"live"},
 
 "e-type":{k:"Column",t:"Equipment",
@@ -1127,51 +1187,51 @@ const X = {
 
 "s-name":{k:"Column",t:"Supplier",
  q:"who are our most active and most compatible suppliers",
- what:"Every firm that has bid to you in the period, with how it is known underneath",
+ what:"Every supplier that has bid to you in the period, with how it is known underneath",
  why:"The supplier view answers a different question from the award view. An award tells you about one decision, this tells you who is worth keeping",
- chain:[["The supplier list read returns a rollup per firm","Bids through the app, bids through your link, awards won, and the date they last bid, all in one call"],
-  ["Firms are folded through bidSupplierKey","Company first, then member, so colleagues of one firm count once"]],
+ chain:[["The supplier list read returns a rollup per supplier","Bids through the app, bids through your link, awards won, and the date they last bid, all in one call"],
+  ["Suppliers are folded through bidSupplierKey","Company first, then member, so colleagues of one supplier count once"]],
  f:["listRenterSuppliers","SupplierRollup","bidSupplierKey"],s:"live"},
 
 "s-bids":{k:"Column",t:"Bid on",
  q:"who are our most active suppliers",
- what:"How many of this period's requests this firm put an offer into, out of the requests that existed",
- why:"Activity is the cheapest loyalty signal there is. A firm answering nearly everything you post is worth protecting, and one who has gone quiet is worth a call before he stops bidding altogether",
+ what:"How many of this period's requests this supplier put an offer into, out of the requests that existed",
+ why:"Activity is the cheapest loyalty signal there is. A supplier answering nearly everything you post is worth protecting, and one who has gone quiet is worth a call before he stops bidding altogether",
  ex:{head:"Who is actually engaged",rows:[
   ["Zahid Tractor","5 of 7","2 won"],
   ["Nesma Heavy Equipment","5 of 7","2 won"],
   ["Durrah Machinery","5 of 7","0 won",1],
   ["Faisal Heavy Equip. Est.","1 of 7","1 won"]],
-  out:"Three firms answer nearly everything you post. Losing any of them would thin every future field"},
- chain:[["Counted from the bids themselves","Every bid on every request this period, grouped by firm"],
-  ["Read against 7, the requests that existed","Not against invitations: how many firms the marketplace matched to a request is not stored, so a firm that never saw a request looks the same as one who ignored it"]],
+  out:"Three suppliers answer nearly everything you post. Losing any of them would thin every future field"},
+ chain:[["Counted from the bids themselves","Every bid on every request this period, grouped by supplier"],
+  ["Read against 7, the requests that existed","Not against invitations: how many suppliers the marketplace matched to a request is not stored, so a supplier that never saw a request looks the same as one who ignored it"]],
  f:["Bid.supplierId","SupplierRollup.bidsApp","SupplierRollup.bidsLink"],s:"part"},
 
 "s-how":{k:"Column",t:"How his bids came in",
- q:"is this firm active on Moedatech or only off it",
- what:"Of the bids this firm made, how many arrived through the marketplace, how many through a link you emailed, and how many as a direct request naming him",
+ q:"is this supplier active on Moedatech or only off it",
+ what:"Of the bids this supplier made, how many arrived through the marketplace, how many through a link you emailed, and how many as a direct request naming him",
  why:"It separates a supplier who is genuinely on the platform from one who only ever answers when you write to him personally. The second kind is a dependency: he is invisible to every request you post, so he only competes when someone remembers to invite him",
- ex:{head:"Where each firm answers you",rows:[
+ ex:{head:"Where each supplier answers you",rows:[
   ["Zahid Tractor","5 on Moedatech","never needed an invitation"],
   ["Durrah Machinery","4 on Moedatech · 1 by your link",""],
   ["Al Faisal Rentals","2 on Moedatech · 1 direct",""],
   ["Faisal Heavy Equip. Est.","1 by your link","only ever reached by email",1]],
   out:"Four of six answer on the marketplace. The two with no registration are the two who mostly do not"},
  chain:[["Each bid carries the route of its request","A marketplace bid, a link submission, or a direct request"],
-  ["Counted per firm across the period","The backend already splits this as bidsApp and bidsLink"]],
+  ["Counted per supplier across the period","The backend already splits this as bidsApp and bidsLink"]],
  chain_note:"",
  f:["BidSource","RequestType","SupplierRollup.bidsApp","SupplierRollup.bidsLink"],s:"live"},
 
 "s-won":{k:"Column",t:"Won",
- what:"Awards this firm has taken, against the bids it made",
- why:"A firm bidding often and never winning is the row to read twice. It means either the field is being padded, or a willing supplier is being wasted and is about to stop trying",
+ what:"Awards this supplier has taken, against the bids it made",
+ why:"A supplier bidding often and never winning is the row to read twice. It means either the field is being padded, or a willing supplier is being wasted and is about to stop trying",
  chain:[["Awards carrying this supplier are counted","From the rollup"],
   ["Read against the bid count beside it","The ratio is what matters, not either number alone"]],
  f:["SupplierRollup.awards","SupplierRollup.bidsApp"],s:"live"},
 
 "s-terms":{k:"Column",t:"All terms met",
  q:"who are our most compatible suppliers",
- what:"Of the offers this firm made, how many answered yes to every requirement the request stated",
+ what:"Of the offers this supplier made, how many answered yes to every requirement the request stated",
  why:"The best single measure of fit. A cheap supplier who misses a term is not cheap, he is a different purchase, and this column says so before you award rather than after",
  ex:{head:"Compatibility across the period",rows:[
   ["Zahid Tractor","5 of 5","every term, every offer"],
@@ -1185,9 +1245,9 @@ const X = {
  f:["requiredTerms","t3Declarations","confirmations","computeBidQuality"],s:"live"},
 
 "s-price":{k:"Column",t:"vs market",
- what:"Where this firm usually prices, against the marketplace rate for whatever it is offering",
+ what:"Where this supplier usually prices, against the marketplace rate for whatever it is offering",
  why:"Read beside the terms column it separates the two kinds of good supplier: the one who is cheap and the one who is reliable. Al Faisal meets everything and prices 14 percent high",
- chain:[["Each of the firm's bids is compared to the market median","For that subtype and size"],
+ chain:[["Each of the supplier's bids is compared to the market median","For that subtype and size"],
   ["Averaged across its bids","Weighted by the value of the request"]],
  f:["Bid.price","StoreEquipment.price","subcategoryId"],s:"live"},
 
@@ -1269,7 +1329,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.12";
+const BUILD = "2026-10-03.16";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -1333,44 +1393,81 @@ const sar = n => n.toLocaleString("en-US");
    table ended up showing compatibility scores no bid supported.
    ══════════════════════════════════════════════════════════════════ */
 
-/* Account standing rides on a winner record, not on a bid, so firms who
+/* Account standing rides on a winner record, not on a bid, so suppliers who
    never won would otherwise have no standing to show at all. */
 
 const ROUTE_SHORT = {"Moedatech marketplace":"on Moedatech",
                      "Your own shared link":"by your link",
                      "Direct to one named firm":"direct"};
 
+/* The LEADING bid: the winner where there is one, else the cheapest that met every term, else
+   simply the cheapest. It prices a row and names the supplier in the supplier columns. It is NEVER
+   counted as money awarded: `r.awarded` gates every figure that says SAR. */
+const leadBid = r => r.bids.find(b => b.won)
+  || r.bids.filter(b => b.ok).sort((a, b) => a.perDay - b.perDay)[0]
+  || r.bids.slice().sort((a, b) => a.perDay - b.perDay)[0]
+  || null;
+
+/* Every rate on this page is a PER-DAY rate. `b.price` is the headline the supplier wrote, which
+   may be weekly or monthly; `b.perDay` is that figure reduced to one day. Comparing headlines
+   called a 6,000-per-week quote six times a 1,000-per-day one, which is the same price. */
+
+/* The market band is absent whenever fewer than three bids landed for that machine type, which is
+   the ordinary state of a young account rather than a failure. Every comparison reads it through
+   these, and prints nothing rather than dividing by a band that is not there. */
+const med   = r => r.market ? r.market.med : null;
+const vsMed = (rate, r) => r.market ? (rate / r.market.med - 1) * 100 : null;
+/* An average over the rows that HAVE a band. Mixing in the ones that do not, as zeroes, dragged
+   every machine type toward "90% under market" the moment one hire had no comparison. */
+const avg = (xs) => xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+
+/* `warningsFor` is declared inside the render closure, next to the table it fills. The dossier
+   needs the same list, and a second copy of those rules would be a second opinion about the same
+   request. The closure hands this one out instead. */
+let warningsOf = () => [];
+
 const num  = t => +String(t).replace(/[^0-9.]/g,"");
 const base = m => m.replace(/ ×\d+$/,"");
 const pct  = v => { const r=Math.round(v); return (r>0?"+":r<0?"−":"") + Math.abs(r) + "%"; };
 const list = a => a.length<2 ? a.join("") : a.slice(0,-1).join(", ") + " and " + a[a.length-1];
-const cls  = v => Math.round(v)>=5 ? "up" : Math.round(v)<=-3 ? "dn" : "flat";
+const cls  = v => v==null ? "flat" : Math.round(v)>=5 ? "up" : Math.round(v)<=-3 ? "dn" : "flat";
+/* A comparison that has no band behind it says so. Printing it as "0%" claimed the rate sat
+   exactly on a market rate that was never computed. */
+const dpct = v => v==null ? '<span class="na">no band</span>' : pct(v);
 
 const EQ = {}, SUP = {};
 for (const id in R) {
-  const r = R[id], won = r.bids.find(b=>b[4]), rate = num(r.money[0][1]);
+  const r = R[id], won = leadBid(r); if (!won) continue;
+  /* The leading bid's own per-day rate, never `r.money[0][1]`. That row is "Rate per day" only
+     when the quote was daily; a weekly quote pushes a "Quoted as" row in front of it, and reading
+     slot zero then charged the whole hire at a weekly figure. */
+  const rate = won.perDay;
 
   const e = EQ[base(r.machine)] || (EQ[base(r.machine)] = {type:base(r.machine), hires:[], spend:0});
-  e.hires.push({id, ref:r.ref, sup:won[0], rate, units:r.units, days:r.billable, proj:r.project,
-                total:num(r.total), med:r.market.med, lo:r.market.lo, hi:r.market.hi, n:r.market.n});
+  e.hires.push({id, ref:r.ref, sup:won.firm, rate, units:r.units, days:r.billable, proj:r.project,
+                total:num(r.total), med:med(r), lo:r.market&&r.market.lo, hi:r.market&&r.market.hi,
+                n:r.market&&r.market.n, firms:r.market&&r.market.firms});
   e.spend += num(r.total);
 
   /* Who the money went to is the AWARD record, not the accepted bid. They agree
      on six of the seven; on RFQ-1064 they do not, and that disagreement is the
      finding. Attributing by bid would have the supplier card crediting Nesma for
      a hire the award, and the invoice, put on Al Faisal. */
-  const paidTo = r.award || won[0];
+  const paidTo = r.award || won.firm;
   for (const b of r.bids) {
-    const t = SUP[b[0]] || (SUP[b[0]] = Object.assign({name:b[0], offers:[], won:0, ok:0, spend:0}, SUPMETA[b[0]]));
-    t.offers.push({id, ref:r.ref, machine:r.machine, price:b[1], med:r.market.med,
-                   won:b[0]===paidTo, held:b[4]&&b[0]!==paidTo, ok:b[3], route:r.channel,
-                   best:Math.min(...r.bids.map(x=>x[1])), paid:num(r.total), disputed:!!r.disputed});
-    if (b[0]===paidTo) { t.won++; t.spend += num(r.total); }
-    if (b[3]) t.ok++;
+    const t = SUP[b.firm] || (SUP[b.firm] = Object.assign({name:b.firm, offers:[], won:0, ok:0, spend:0}, SUPMETA[b.firm]));
+    t.offers.push({id, ref:r.ref, machine:r.machine, price:b.perDay, quoted:b.price, unit:b.unit,
+                   med:med(r), won:b.firm===paidTo, held:b.won&&b.firm!==paidTo, ok:b.ok,
+                   route:b.route, missed:b.missed, total:b.total, at:b.at,
+                   best:Math.min(...r.bids.map(x=>x.perDay)), paid:num(r.total), disputed:!!r.disputed});
+    /* Only an ACTUAL award counts as a win or as spend. The leading bid on a live request
+       names the supplier in its row; it does not hand that supplier the money. */
+    if (b.firm===paidTo && r.awarded) { t.won++; t.spend += num(r.total); }
+    if (b.ok) t.ok++;
   }
-  /* The award can name a firm that never bid. It has not happened in this
+  /* The award can name a supplier that never bid. It has not happened in this
      period, but a supplier row that silently omits a hire would be worse. */
-  if (!r.bids.some(b=>b[0]===paidTo)) {
+  if (r.awarded && !r.bids.some(b=>b.firm===paidTo)) {
     const t = SUP[paidTo] || (SUP[paidTo] = Object.assign({name:paidTo, offers:[], won:0, ok:0, spend:0}, SUPMETA[paidTo]));
     t.won++; t.spend += num(r.total);
   }
@@ -1378,26 +1475,34 @@ for (const id in R) {
 const NREQ = Object.keys(R).length;
 for (const k in EQ) { const e=EQ[k];
   e.proj = [...new Set(e.hires.map(h=>h.proj))].join(", ");
-  e.rate = Math.round(e.hires.reduce((a,h)=>a+h.rate,0)/e.hires.length);
-  e.med  = Math.round(e.hires.reduce((a,h)=>a+h.med ,0)/e.hires.length);
-  e.vs   = (e.rate/e.med-1)*100;
+  e.rate = Math.round(avg(e.hires.map(h=>h.rate)));
+  /* Averaged over the hires that HAVE a band, and null when none of them do. A hire with no
+     comparison is not a hire priced at zero, and averaging it in as one said so. */
+  const eMed = avg(e.hires.filter(h=>h.med!=null).map(h=>h.med));
+  e.med = eMed==null ? null : Math.round(eMed);
+  e.vs  = e.med==null ? null : (e.rate/e.med-1)*100;
 }
 for (const k in SUP) { const t=SUP[k];
-  t.vs = (t.offers.reduce((a,o)=>a+o.price/o.med,0)/t.offers.length - 1)*100;
+  const cmp = t.offers.filter(o=>o.med!=null).map(o=>o.price/o.med);
+  t.vs = cmp.length ? (avg(cmp)-1)*100 : null;
 }
 
 const PROJ = {}, CHAN = {};
 for (const id in R) {
-  const r = R[id], won = r.bids.find(b=>b[4]), rate = num(r.money[0][1]), paidTo = r.award || won[0];
+  const r = R[id], won = leadBid(r); if (!won) continue;
+  const rate = r.money.length ? num(r.money[0][1]) : won[1], paidTo = r.award || won[0];
 
   const j = PROJ[r.project] || (PROJ[r.project] = {name:r.project, hires:[], spend:0});
   j.hires.push({id, ref:r.ref, type:base(r.machine), sup:paidTo, rate,
-                med:r.market.med, total:num(r.total)});
+                med:med(r), total:num(r.total)});
   j.spend += num(r.total);
 
-  const c = CHAN[r.channel] || (CHAN[r.channel] = {name:r.channel, n:0, spend:0, offers:0, vs:0, known:0,
+  const c = CHAN[r.channel] || (CHAN[r.channel] = {name:r.channel, n:0, spend:0, offers:0, vs:0, vsN:0, known:0,
                                                    reached:0, reachKnown:0});
-  c.n++; c.spend += num(r.total); c.offers += r.bids.length; c.vs += rate/r.market.med;
+  c.n++; c.spend += num(r.total); c.offers += r.bids.length;
+  /* Summed over the requests that have a band, counted separately, so the average divides by the
+     rows it was actually built from rather than by every row in the channel. */
+  if (r.market) { c.vs += rate/r.market.med; c.vsN++; }
   if ((SUPMETA[paidTo]||{}).cr && SUPMETA[paidTo].cr !== "None on file") c.known++;
 }
 
@@ -1409,7 +1514,7 @@ for (const id in R) {
     pjOrder.indexOf(a.proj) - pjOrder.indexOf(b.proj) || b.spend-a.spend);
   /* One scale across every row, so a long bar is an expensive machine and
      never an expensive project. */
-  const topRate = Math.max(...eq.map(e=>e.rate));
+  const topRate = Math.max(1, ...eq.map(e=>e.rate));
   document.getElementById("eqBody").innerHTML = eq.map(e=>
     `<tr data-grp="e:${e.type}">
        <td data-x="e-type">${e.type}</td>
@@ -1418,18 +1523,26 @@ for (const id in R) {
        <td class="r money" data-x="e-spend">${sar(e.spend)}</td>
        <td class="r" data-x="e-rate">${sar(e.rate)}
          <span class="cb"><i class="${e.vs>=5?"bad":""}" style="width:${e.rate/topRate*100}%"></i></span></td>
-       <td class="r" data-x="e-vsmkt"><span class="delta ${cls(e.vs)}">${pct(e.vs)}</span></td>
+       <td class="r" data-x="e-vsmkt"><span class="delta ${cls(e.vs)}">${dpct(e.vs)}</span></td>
      </tr>`).join("");
-  const over = eq.filter(e=>e.vs>=5).sort((a,b)=>b.vs-a.vs);
+  const over = eq.filter(e=>e.vs!=null && e.vs>=5).sort((a,b)=>b.vs-a.vs);
+  const noBand = eq.filter(e=>e.vs==null);
   const pjSum = Object.values(PROJ).sort((a,b)=>b.spend-a.spend).map(j=>{
-    const v = j.hires.reduce((a,h)=>a+(h.rate/h.med-1),0)/j.hires.length*100;
-    return `${j.name} <b>${sar(j.spend)} SAR</b> over ${j.hires.length} hires, ${pct(v)} against market`;
+    const cmp = j.hires.filter(h=>h.med!=null).map(h=>h.rate/h.med-1);
+    const v = cmp.length ? avg(cmp)*100 : null;
+    return `${j.name||"No project"} <b>${sar(j.spend)} SAR</b> over ${j.hires.length} hire${j.hires.length===1?"":"s"}`
+      + (v==null ? "" : `, ${pct(v)} against market`);
   }).join(" \u00b7 ");
   document.getElementById("eqFoot").innerHTML =
     (over.length
       ? `<b>${list(over.map(e=>e.type))} ${over.length>1?"are the ones":"is the one"} to renegotiate.</b>
          You pay ${list(over.map(e=>pct(e.vs)))} over the marketplace rate${over.length>1?" for them":""}.`
-      : `<b>Every machine type sits at or under the marketplace rate.</b>`) +
+      : noBand.length===eq.length
+      ? `<b>No machine type has three bids behind it yet, so none can be compared.</b>`
+      : `<b>Every machine type that can be compared sits at or under the going rate.</b>`) +
+    (noBand.length && noBand.length!==eq.length
+      ? `<br>${list(noBand.map(e=>e.type))} drew fewer than three bids, so there is no band to compare them to`
+      : "") +
     `<br>${pjSum}` +
     (eq.every(e=>e.hires.length===1)
       ? "<br>One hire per machine type this period, so each rate is that hire. It becomes a framework number once a type repeats" : "");
@@ -1437,9 +1550,9 @@ for (const id in R) {
   const sp = Object.values(SUP).sort((a,b)=>b.offers.length-a.offers.length || b.won-a.won);
   document.getElementById("supBody").innerHTML = sp.map(t=>
     `<tr data-grp="s:${t.name}">
-       <td data-x="s-name">${t.name}<span class="sub${t.ver?"":" bad"}">${t.src} · ${t.ver?"verified":"no CR"}</span></td>
+       <td data-x="s-name">${t.name}<span class="sub${t.ver?"":" bad"}">${t.src} · ${t.ver?"verified":"unverified"} · ${t.cr&&t.cr!=="None on file"?"CR on file":"no CR"}${t.reg==="Yes"?" · your vendor":""}</span></td>
        <td class="r" data-x="s-bids">${t.offers.length}<small> of ${NREQ}</small>
-         <span class="cb"><i style="width:${t.offers.length/NREQ*100}%"></i></span></td>
+         <span class="cb"><i style="width:${NREQ?t.offers.length/NREQ*100:0}%"></i></span></td>
        <td data-x="s-how">${(()=>{
          const by = {}; t.offers.forEach(o => by[ROUTE_SHORT[o.route]] = (by[ROUTE_SHORT[o.route]]||0)+1);
          return Object.entries(by).map(([k,v])=>v+" "+k).join(" \u00b7 ");
@@ -1448,7 +1561,7 @@ for (const id in R) {
        <td class="r" data-x="s-terms"><span class="rk ${t.ok===t.offers.length?"ok":t.ok/t.offers.length>=0.7?"warn":"bad"}">${t.ok} of ${t.offers.length}</span>
          <span class="cb"><i class="${t.ok===t.offers.length?"":t.ok/t.offers.length>=0.7?"warn":"bad"}"
            style="width:${t.ok/t.offers.length*100}%"></i></span></td>
-       <td class="r" data-x="s-price"><span class="delta ${cls(t.vs)}">${pct(t.vs)}</span></td>
+       <td class="r" data-x="s-price"><span class="delta ${cls(t.vs)}">${dpct(t.vs)}</span></td>
      </tr>`).join("");
   const quiet = sp.filter(t=>!t.won && t.offers.length>=3)[0];
   /* ── The four figures ────────────────────────────────────────
@@ -1456,13 +1569,17 @@ for (const id in R) {
      changes. These are the same seven awards the spine renders. ── */
   let awarded = 0, overpaid = 0, mktGap = 0, tookCheapest = 0;
   for (const id in R) {
-    const r = R[id], rate = num(r.money[0][1]), span = r.units * r.billable;
+    const r = R[id];
+    if (!r.awarded) continue;          /* the money figures count awards, and nothing else */
+    const won = leadBid(r), rate = won.perDay, span = r.units * r.billable;
     awarded += num(r.total);
-    mktGap  += (rate - r.market.med) * span;
+    /* Only the awards that HAVE a band contribute to the market gap. Treating a missing median as
+       zero turned every uncomparable hire into a full-price overpayment. */
+    if (r.market) mktGap += (rate - r.market.med) * span;
     /* Only offers that answered yes to every stated term can stand in for
        the one that won. A cheaper offer that missed a term is not a saving,
        it is a different purchase. */
-    const fit = r.bids.filter(b => b[3]).map(b => b[1]);
+    const fit = r.bids.filter(b => b.ok).map(b => b.perDay);
     const best = fit.length ? Math.min(...fit) : null;
     if (best != null && rate > best) overpaid += (rate - best) * span;
     else tookCheapest++;
@@ -1486,34 +1603,43 @@ for (const id in R) {
      renter API does not return. They are named in the blind-spots card instead of
      being guessed at. */
   function warningsFor(id, r) {
-    const out = [], won = r.bids.find(b => b[4]);
+    const out = [], won = leadBid(r);
     if (!won) return out;
-    const price = won[1], prices = r.bids.map(b => b[1]).sort((a, b) => a - b);
+    /* A live request cannot be judged on who won it, so the award-dependent checks below are
+       gated on `r.awarded`. The rest — missed terms, a thin field, an unregistered bidder —
+       are true the moment the bids arrive and are raised straight away. */
+    const price = won.perDay, prices = r.bids.map(b => b.perDay).sort((a, b) => a - b);
     const rank = prices.indexOf(price) + 1;
 
-    if (r.bids.length > 1 && price === prices[prices.length - 1])
+    if (r.awarded && r.bids.length > 1 && price === prices[prices.length - 1])
       out.push(["f-rank", "The dearest of " + r.bids.length + " bids was chosen"]);
-    else if (rank > 1)
+    else if (r.awarded && rank > 1)
       out.push(["f-rank", "The " + ["", "", "second", "third", "fourth", "fifth"][rank] + " cheapest of " + r.bids.length + " was chosen"]);
 
     const missed = r.terms.filter(t => !t[2]);
     for (const t of missed) out.push(["f-waived", "Awarded without " + t[0] + ", which the request asked for"]);
 
     if (r.market && price > r.market.med * 1.1)
-      out.push(["f-overmarket", "Day rate is " + Math.round((price / r.market.med - 1) * 100) + "% above the marketplace rate"]);
+      out.push(["f-overmarket", "Day rate is " + Math.round((price / r.market.med - 1) * 100) + "% above the going rate for this machine"]);
 
     if (r.bids.length === 1)
-      out.push(["f-single", r.channel.indexOf("Direct") === 0 ? "Sent to one firm, so nobody else could bid" : "Only one firm bid"]);
+      out.push(["f-single", r.channel.indexOf("Direct") === 0 ? "Sent to one supplier, so nobody else could bid" : "Only one supplier bid"]);
 
-    if (r.winner && r.winner.cr === "None on file")
-      out.push(["f-nocr", "Winner is not a registered company"]);
+    if (r.awarded && r.winner && r.winner.cr === "None on file")
+      out.push(["f-nocr", "Winner has no commercial registration on file"]);
+    /* True the moment the bids land, and nothing to do with who won: an edit after the field was
+       already in changes what the earlier bids were answering. */
+    if (r.edited && r.bids.length)
+      out.push(["f-edited", "The request was edited after bids had already arrived"]);
+    if (r.awarded && r.winner && r.winner.reg === "No")
+      out.push(["f-justadded", "Awarded to a supplier who is not on your approved vendor list"]);
 
     if (r.bids.length >= 3) {
       const spread = (prices[prices.length - 1] - prices[0]) / prices[0] * 100;
       if (spread < 2) out.push(["f-tightgap", "All " + r.bids.length + " bids landed within " + spread.toFixed(1) + "% of each other"]);
     }
 
-    if (r.disputed) out.push(["f-mismatch", "The award names a different firm from the bid that was accepted"]);
+    if (r.disputed) out.push(["f-mismatch", "The award names a different supplier from the bid that was accepted"]);
 
     for (const k in CERT) {
       if (CERT[k].req === r.ref && CERT[k].bad)
@@ -1522,14 +1648,19 @@ for (const id in R) {
     return out;
   }
 
+  warningsOf = warningsFor;
+
   (function spine() {
     const body = document.getElementById("awardBody");
     if (!body) return;
-    const ids = Object.keys(R).sort((a, b) => num(R[b].total) - num(R[a].total));
+    /* Awarded first by value, then the live ones. A reader scanning for money finds it at the
+       top; a reader scanning for what is still out finds it in one block underneath. */
+    const ids = Object.keys(R).sort((a, b) =>
+      (R[b].awarded ? 1 : 0) - (R[a].awarded ? 1 : 0) || num(R[b].total) - num(R[a].total));
     let flagged = 0;
 
     body.innerHTML = ids.map(id => {
-      const r = R[id], won = r.bids.find(b => b[4]), price = won ? won[1] : 0;
+      const r = R[id], won = leadBid(r), price = won ? won.perDay : 0;
       const warns = warningsFor(id, r);
       if (warns.length) flagged++;
       const met = r.terms.filter(t => t[2]).length, all = r.terms.length;
@@ -1539,34 +1670,42 @@ for (const id in R) {
          machines share no axis. */
       let rail = "", note = "";
       if (r.market) {
-        const lo = Math.min(r.market.lo, ...r.bids.map(b => b[1]));
-        const hi = Math.max(r.market.hi, ...r.bids.map(b => b[1]));
+        const lo = Math.min(r.market.lo, ...r.bids.map(b => b.perDay));
+        const hi = Math.max(r.market.hi, ...r.bids.map(b => b.perDay));
         const at = v => ((v - lo) / (hi - lo || 1) * 100).toFixed(1) + "%";
         rail = `<div class="rail"><i style="left:0%;width:100%"></i>
           <b class="mkt" style="left:${at(r.market.med)}"></b>
           <b class="awd" style="left:${at(price)}"></b></div>`;
         const vs = Math.round((price / r.market.med - 1) * 100);
-        const prices = r.bids.map(b => b[1]).sort((a, b) => a - b);
+        const prices = r.bids.map(b => b.perDay).sort((a, b) => a - b);
         const where = r.bids.length === 1 ? "Only bid"
           : price === prices[0] ? "Cheapest bid"
           : price === prices[prices.length - 1] ? "Most expensive" : "Mid-field";
-        note = `<span class="posnote">${where} \u00b7 <b class="${vs > 0 ? "up" : "dn"}">${Math.abs(vs)}% ${vs > 0 ? "over" : "under"} market</b></span>`;
+        note = `<span class="posnote">${where} \u00b7 <b class="${vs > 0 ? "up" : "dn"}">${Math.abs(vs)}% ${vs > 0 ? "over" : "under"} the going rate</b></span>`;
       } else {
-        note = `<span class="posnote"><span class="na">no marketplace listings for this machine</span></span>`;
+        /* Fewer than three bids for this machine type across the whole account. Naming the reason
+           matters: "no listings" blamed a catalogue the band no longer comes from. */
+        const prices = r.bids.map(b => b.perDay).sort((a, b) => a - b);
+        const where = r.bids.length === 1 ? "Only bid"
+          : price === prices[0] ? "Cheapest bid"
+          : price === prices[prices.length - 1] ? "Most expensive" : "Mid-field";
+        note = `<span class="posnote">${where} \u00b7 <span class="na">too few bids on this machine type to set a rate</span></span>`;
       }
 
-      const w = r.winner || { name: "\u2014", ver: "No", cr: "None on file" };
-      const route = r.channel.indexOf("Moedatech") === 0 ? "Marketplace" : r.channel.indexOf("Your own") === 0 ? "Your own link" : "Direct to one firm";
+      const w = r.winner || { name: "Not awarded yet", ver: "No", cr: "None on file" };
+      const route = r.channel.indexOf("Moedatech") === 0 ? "Marketplace" : r.channel.indexOf("Your own") === 0 ? "Your own link" : "Direct to one supplier";
       const idTag = w.cr === "None on file" ? "no CR" : "CR";
 
-      return `<tr data-row="${id}">
+      /* The warning keys ride on the row. A filter that re-ran `warningsFor` would be a second
+         opinion about the same request, and the two would drift the first time a rule changed. */
+      return `<tr data-row="${id}" data-w="${warns.map(w => w[0]).join(" ")}" data-aw="${r.awarded ? 1 : 0}">
         <td data-x="c-request"><span class="ref">${r.ref}</span><span class="sub">${r.machine} \u00b7 ${r.days} days</span></td>
         <td data-x="c-reach"><span class="rk ${rk(r.bids.length)}">${r.bids.length} bid${r.bids.length === 1 ? "" : "s"}</span>
-          <span class="sub">${route}${r.opened == null ? " \u00b7 firms reached not stored" : ""}</span>
-          ${r.held ? `<span class="sub2">${r.held} larger held back</span>` : r.opened != null && r.channel.indexOf("Your own") === 0 ? `<span class="sub2">${r.opened} firms opened it</span>` : ""}</td>
+          <span class="sub">${route}${r.opened == null ? " \u00b7 suppliers reached not stored" : ""}</span>
+          ${r.held ? `<span class="sub2">${r.held} larger held back</span>` : r.opened != null && r.channel.indexOf("Your own") === 0 ? `<span class="sub2">${r.opened} suppliers opened it</span>` : ""}</td>
         <td data-x="c-winner">${w.name}<span class="sub${w.cr === "None on file" ? " bad" : ""}">${route} \u00b7 ${w.ver === "Yes" ? "verified" : "unverified"} \u00b7 ${idTag}</span></td>
         <td class="r" data-x="c-terms"><span class="rk ${met === all ? "ok" : met / (all || 1) >= 0.8 ? "warn" : "bad"}">${met} of ${all}</span></td>
-        <td class="r" data-x="c-value">${r.total}<span class="sub">${sar(price)} /day${r.units > 1 ? " \u00d7" + r.units : ""}</span></td>
+        <td class="r" data-x="c-value">${r.awarded ? r.total : '<span class="na">not awarded</span>'}<span class="sub">${sar(price)} /day${r.units > 1 ? " \u00d7" + r.units : ""}${r.awarded ? "" : " \u00b7 leading bid"}</span></td>
         <td data-x="c-position"><div class="pos" data-x="c-position">${rail}${note}</div></td>
         <td data-x="c-findings">${warns.length
           ? warns.map(([k, t]) => `<span class="f" data-x="${k}">${t}</span>`).join("")
@@ -1574,8 +1713,50 @@ for (const id in R) {
       </tr>`;
     }).join("");
 
-    const head = document.querySelector('.slot[data-card="awards"] .note');
-    if (head) head.textContent = `${ids.length} request${ids.length === 1 ? "" : "s"} decided this period \u00b7 ${flagged} carr${flagged === 1 ? "ies" : "y"} a warning`;
+    /* ── The chips ────────────────────────────────────────────────────────────────────────
+       Four groups over the warning keys, plus "not awarded". A chip whose count is zero is not
+       rendered at all: a filter that can only ever empty the table is noise, and showing it as
+       "Papers 0" invites the reader to click it and conclude the page is broken. */
+    const GROUPS = [
+      ["price",  "Price",       ["f-rank", "f-overmarket", "f-tightgap"]],
+      ["papers", "Papers",      ["f-waived", "f-certexp"]],
+      ["who",    "Who bid",     ["f-nocr", "f-justadded", "f-mismatch", "f-single"]],
+      ["timing", "Timing",      ["f-edited", "f-latebid", "f-window", "f-earlyaward", "f-urgent"]],
+    ];
+    const rows = [...body.rows];
+    const has = (tr, keys) => keys.some(k => (" " + tr.dataset.w + " ").indexOf(" " + k + " ") > -1);
+    const chips = [["all", "All", () => true]];
+    const flaggedN = rows.filter(tr => tr.dataset.w).length;
+    if (flaggedN) chips.push(["warn", "Carry a warning", tr => !!tr.dataset.w]);
+    for (const [k, label, keys] of GROUPS) {
+      if (rows.some(tr => has(tr, keys))) chips.push([k, label, tr => has(tr, keys)]);
+    }
+    const liveN = rows.filter(tr => tr.dataset.aw === "0").length;
+    if (liveN && liveN < rows.length) chips.push(["live", "Still out to bid", tr => tr.dataset.aw === "0"]);
+
+    const bar = document.getElementById("awardTabs");
+    if (bar) {
+      bar.innerHTML = chips.map(([k, label, f], i) =>
+        `<span class="tab${i ? "" : " on"}" data-tab="${k}">${label} ${rows.filter(f).length}</span>`).join("");
+      bar.onclick = (e) => {
+        const t = e.target.closest(".tab"); if (!t) return;
+        const pick = chips.find(c => c[0] === t.dataset.tab); if (!pick) return;
+        [...bar.children].forEach(c => c.classList.toggle("on", c === t));
+        /* `hidden` rather than removing the row: the dossier is opened off the row element, and
+           a filter that detached them would make a warning in another card unopenable. */
+        rows.forEach(tr => { tr.hidden = !pick[2](tr); });
+      };
+    }
+
+    const head = document.querySelector('[data-card="awards"] .note');
+    /* "Decided" was a lie once the board started carrying live requests too. Say how many
+       were awarded and how many are still out: those are different questions, and a reader
+       who sees "7 decided" beside four zero figures is owed the second one. */
+    const done = ids.filter(x => R[x].awarded).length, live = ids.length - done;
+    if (head) head.textContent =
+      `${ids.length} request${ids.length === 1 ? "" : "s"} \u00b7 ${done} awarded`
+      + (live ? ` \u00b7 ${live} still out to bid` : "")
+      + (flagged ? ` \u00b7 ${flagged} carr${flagged === 1 ? "ies" : "y"} a warning` : "");
   })();
 
   /* ── Spend share by supplier ─────────────────────────────────── */
@@ -1591,10 +1772,10 @@ for (const id in R) {
 
   /* ── How it was bought ───────────────────────────────────────── */
   /* The same three names everywhere. "Direct" on its own told a reader
-     nothing; the thing that matters is that one firm was the only firm. */
+     nothing; the thing that matters is that one supplier was the only supplier. */
   const ROUTE = [["Moedatech marketplace","Moedatech marketplace","var(--navy-mid)"],
                  ["Your own shared link","Your own link, sent by you","var(--warn)"],
-                 ["Direct to one named firm","One firm only, nobody else could bid","var(--danger)"]];
+                 ["Direct to one named firm","One supplier only, nobody else could bid","var(--danger)"]];
   const rt  = ROUTE.filter(([k]) => CHAN[k]);
   const rpc = to100(rt.map(([k]) => CHAN[k].spend));
   document.getElementById("splitBar").innerHTML = rt.map(([k,,col],i) =>
@@ -1613,11 +1794,18 @@ for (const id in R) {
       <div class="track"><i class="${t.ver?"":"flag"}" style="width:${share}%"></i></div>
       <div class="pc m">${sar(t.spend)} SAR<small>${share}%</small></div></div>`;
   }).join("");
-  const top = paid[0], nameless = paid.filter(t=>!t.ver);
-  document.getElementById("shareFoot").innerHTML =
-    `<b>One supplier holds ${share100[0]}% of your spend.</b>
-     ${nameless.length} more hold ${nameless.reduce((a,t)=>a+share100[paid.indexOf(t)],0)}% between them
-     and neither has a platform identity`;
+  /* Derived, every clause of it. This paragraph used to state the fixture's own shape — one
+     supplier at the top, two unverified behind it — and kept stating it against live data that
+     had neither. A sentence about concentration has to be computed from the concentration. */
+  const nameless = paid.filter(t=>!t.ver);
+  document.getElementById("shareFoot").innerHTML = !paid.length
+    ? "<b>Nothing has been awarded yet, so there is no spend to divide.</b>"
+    : `<b>${paid.length===1
+        ? "One supplier holds all of your spend."
+        : `Your largest supplier holds ${share100[0]}% of your spend, across ${paid.length} suppliers.`}</b>`
+      + (nameless.length
+        ? ` ${nameless.length} of them ${nameless.length===1?"holds":"hold"} ${nameless.reduce((a,t)=>a+share100[paid.indexOf(t)],0)}% between ${nameless.length===1?"it":"them"} with no verified platform identity`
+        : " Every one of them is verified on the platform");
 
   /* ── Moedatech against your own suppliers ────────────────────── */
   const CO = ["Moedatech marketplace","Your own shared link","Direct to one named firm"];
@@ -1626,190 +1814,265 @@ for (const id in R) {
   const line = (label, f, ok) => `<div class="ch-r"><span>${label}</span>` +
     ch.map(c=>bad(f(c), ok(c))).join("") + "</div>";
   document.getElementById("chanBody").innerHTML =
-    '<div class="ch-h"><span></span><span>Moedatech</span><span>Your own link</span><span>One firm only</span></div>' +
+    '<div class="ch-h"><span></span><span>Moedatech</span><span>Your own link</span><span>One supplier only</span></div>' +
     `<div class="ch-r"><span>Requests sent</span>${ch.map(c=>"<b>"+c.n+"</b>").join("")}</div>` +
     `<div class="ch-r"><span>Spend, SAR</span>${ch.map(c=>"<b>"+sar(c.spend)+"</b>").join("")}</div>` +
     line("Bids received", c=>c.offers, c=>c.offers/c.n>=3) +
     line("Bids per request", c=>(c.offers/c.n).toFixed(1), c=>c.offers/c.n>=3) +
-    line("Day rate vs market rate", c=>pct((c.vs/c.n-1)*100), c=>c.vs/c.n<=1.02) +
+    line("Day rate vs going rate", c=>c.vsN?pct((c.vs/c.vsN-1)*100):"\u2014", c=>!c.vsN||c.vs/c.vsN<=1.02) +
     line("Winner is a registered company", c=>c.known+" of "+c.n, c=>c.known===c.n);
+  /* Also derived. The old sentence asserted that every off-marketplace award went to an
+     unregistered supplier and cost over the market; both were true of the fixture and of nothing
+     else, and the page went on saying them over real awards that contradicted them. */
   const off = ch.slice(1), offN = off.reduce((a,c)=>a+c.n,0);
-  document.getElementById("chanFoot").innerHTML =
-    `<b>${offN===2?"Both":"All "+offN} awards bought outside the marketplace went to a firm with no
-     commercial registration.</b> Both also cost more than the market rate, and on one of them nobody else could bid`;
+  const offKnown = off.reduce((a,c)=>a+c.known,0);
+  const mkt = ch[0];
+  document.getElementById("chanFoot").innerHTML = !offN
+    ? "<b>Everything this period went out through the marketplace.</b> There is no off-platform route to compare it against yet"
+    : `<b>${offN} request${offN===1?"":"s"} went out away from the marketplace.</b> `
+      + `${offKnown} of ${offN} ${offKnown===1?"has":"have"} a commercial registration on file`
+      + (mkt && mkt.n ? `, against ${mkt.known} of ${mkt.n} on the marketplace` : "")
+      + (off.some(c=>c.name.indexOf("Direct")===0) ? ". On the direct ones nobody else could bid" : "");
 
 })();
 
-/* One renderer per column, for a grouped row. Same contract as DETAIL:
-   it returns the real rows behind the figure, never a restatement of it. */
-const GDETAIL = {
- "e-type": e => `<div class="dtitle">Every hire of this machine type</div>` +
-   e.hires.map(h=>`<div class="dr"><span class="a">${h.ref} · ${h.proj}</span>
-     <span class="b">${sar(h.rate)}/day</span><span class="c">×${h.units} · ${h.days} billable days</span></div>`).join("") +
-   `<div class="dfoot">Open the same request in the award table above for the bids behind each hire</div>`,
+/* ══════════════════════════════════════════════════════════════════════════════════════════════
+   THE DOSSIER: one record, whole, per row.
 
- "e-hires": e => GDETAIL["e-type"](e),
+   Clicking a cell used to open that COLUMN — the same figure restated, for every row of the
+   table. It answered "what is in this column" when the reader had already read the column and
+   was asking about the row he had his finger on. Every cell of a row now opens the same thing,
+   the whole record, and the column he clicked is simply the section it opens on.
 
- "e-project": e => `<div class="dtitle">Where this machine type was hired</div>` +
-   e.hires.map(h=>`<div class="dr"><span class="a">${h.proj}</span>
-     <span class="b">${sar(h.rate)}/day</span><span class="c">${h.ref} \u00b7 ${h.sup}</span></div>`).join("") +
-   `<div class="dfoot">${e.hires.length>1
-     ? "Hired on " + new Set(e.hires.map(h=>h.proj)).size + " projects, so the rate beside this is the average"
-     : "One hire this period, on one project"}</div>`,
+   Nothing here fetches. The fold already carries every bid whole, so the dossier is a rendering
+   of data the page was handed, and it cannot disagree with the row it was opened from.
+   ══════════════════════════════════════════════════════════════════════════════════════════════ */
 
- "e-spend": e => `<div class="dtitle">What this machine type cost, hire by hire</div>` +
-   e.hires.map(h=>`<div class="dr"><span class="a">${h.ref}</span><span class="b">${sar(h.total)}</span>
-     <span class="c">${sar(h.rate)} × ${h.units} × ${h.days}</span></div>`).join("") +
-   `<div class="dr win"><span class="a">All hires</span><span class="b">${sar(e.spend)} SAR</span></div>
-    <div class="dfoot">Fridays are already out of the billable day count. Nothing here is a forecast</div>`,
+const day = v => { if (!v) return "\u2014"; const d = new Date(v);
+  return isNaN(d) ? String(v).slice(0, 10)
+    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); };
+const UNIT = { PER_DAY: "per day", PER_WEEK: "per week", PER_MONTH: "per month", PER_JOB: "per job" };
 
- "e-rate": e => `<div class="dtitle">Your rate per day, against the marketplace</div>` +
-   e.hires.map(h=>`<div class="dr"><span class="a">${h.ref} · ${h.sup}</span><span class="b">${sar(h.rate)}</span>
-     <span class="c">market ${sar(h.med)}</span></div>`).join("") +
-   `<div class="dr win"><span class="a">${e.hires.length>1?"Average of "+e.hires.length+" hires":"This hire"}</span>
-      <span class="b">${sar(e.rate)}</span><span class="c">market ${sar(e.med)}</span></div>
-    <div class="dfoot">Market figure is the median of ${e.hires[0].n} live listings for this type,
-      ${sar(e.hires[0].lo)} to ${sar(e.hires[0].hi)} per day</div>`,
+/* A section of the dossier. `k` is the column that opens on it. */
+const sec = (k, title, body, sub) => !body ? "" :
+  `<section class="ds" data-sec="${k}"><h5>${title}${sub ? `<em>${sub}</em>` : ""}</h5>${body}</section>`;
+const facts = rows => `<div class="dfacts">` + rows.filter(Boolean).map(
+  ([a, b, bad]) => `<div class="df${bad ? " bad" : ""}"><span>${a}</span><b>${b}</b></div>`).join("") + `</div>`;
+const tbl = (heads, rows, foot) => !rows.length ? "" :
+  `<table class="dtbl"><thead><tr>${heads.map(h =>
+    `<th${h[1] ? ' class="r"' : ""}>${h[0]}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>` +
+  (foot ? `<div class="dfoot">${foot}</div>` : "");
 
- "e-vsmkt": e => {
-   const lo=Math.min(e.hires[0].lo,e.rate), hi=Math.max(e.hires[0].hi,e.rate);
-   const at=v=>((v-lo)/(hi-lo)*100).toFixed(1)+"%";
-   return `<div class="dtitle">Where your rate sits in the market band</div>
-     <div class="dr win"><span class="a">You pay</span>
-       <span class="bar"><i style="left:${at(e.rate)}"></i></span><span class="b">${sar(e.rate)}</span></div>
-     <div class="dr mkt"><span class="a">Marketplace median <em>${e.hires[0].n} listings</em></span>
-       <span class="bar"><i class="m" style="left:${at(e.med)}"></i></span><span class="b">${sar(e.med)}</span></div>
-     <div class="dfoot">${pct(e.vs)} against the median. Listings run ${sar(e.hires[0].lo)} to
-       ${sar(e.hires[0].hi)} per day, so the band itself is ${Math.round((e.hires[0].hi/e.hires[0].lo-1)*100)}% wide</div>`;
- },
+/* ── One request, whole ───────────────────────────────────────────────────────────────────── */
+function requestDossier(r, focus) {
+  const won = leadBid(r);
+  const prices = r.bids.map(b => b.perDay).sort((a, b) => a - b);
+  const band = r.market;
+  const lo = band ? Math.min(band.lo, prices[0]) : prices[0];
+  const hi = band ? Math.max(band.hi, prices[prices.length - 1]) : prices[prices.length - 1];
+  const at = v => (((v - lo) / (hi - lo || 1)) * 100).toFixed(1) + "%";
+  const warns = warningsOf(null, r);
 
- "s-name": t => `<div class="dtitle">How well this firm is known</div>
-   <div class="dr"><span class="a">Where he came from</span><span class="b">${t.src}</span></div>
-   <div class="dr${t.ver?"":" bad"}"><span class="a">Verified by the platform</span><span class="b">${t.ver?"Yes":"No"}</span></div>
-   <div class="dr${t.cr==="None on file"?" bad":""}"><span class="a">Commercial registration</span><span class="b">${t.cr}</span></div>
-   <div class="dr"><span class="a">Registered as your vendor</span><span class="b">${t.reg}</span></div>
-   <div class="dr win"><span class="a">Money awarded to him this period</span>
-     <span class="b">${sar(t.spend)} SAR</span></div>`,
+  const bidRows = r.bids.slice().sort((a, b) => a.perDay - b.perDay).map(b => {
+    const vs = vsMed(b.perDay, r);
+    return `<tr class="${b.won ? "win" : ""}">
+      <td>${b.firm}${b.registered ? '<i class="tg">your vendor</i>' : ""}
+        ${b.machine ? `<span class="s2">${b.machine}${b.year ? " \u00b7 " + b.year : ""}</span>` : ""}</td>
+      <td>${ROUTE_SHORT[b.route] || b.route}<span class="s2">${b.cr ? "CR " + b.cr : b.onPlatform ? "no CR on file" : "off platform · no CR"}</span></td>
+      <td class="r">${sar(b.price)}${b.unit !== "PER_DAY" ? `<span class="s2">${UNIT[b.unit] || b.unit}</span>` : ""}</td>
+      <td class="r">${sar(b.perDay)}${b.from ? `<span class="s2">opened at ${sar(b.from)}</span>` : ""}</td>
+      <td class="r">\u00d7${b.units}</td>
+      <td class="r">${sar(b.total)}</td>
+      <td class="${b.ok ? "ok" : "no"}">${b.ok ? "all met" : b.missed.length ? b.missed.join(", ") : "a term missed"}</td>
+      <td class="r">${day(b.at)}</td>
+      <td class="r">${b.won ? "<b>awarded</b>" : vs == null ? "\u2014" : pct(vs)}</td>
+    </tr>`;
+  });
 
- "s-how": t => `<div class="dtitle">How each of his bids reached you</div>` +
-   t.offers.map(o=>`<div class="dr${o.won?" win":""}"><span class="a">${o.ref} · ${o.machine}</span>
-     <span class="b">${ROUTE_SHORT[o.route]}</span><span class="c">${o.won?"won":"lost"}</span></div>`).join("") +
-   `<div class="dfoot">${t.offers.filter(o=>o.route==="Moedatech marketplace").length} of ${t.offers.length}
-     came in through the marketplace. A firm who only ever answers a link or a direct request never
-     competes for anything you post, so he is only in the field when somebody remembers him</div>`,
+  const papers = r.bids.flatMap(b => b.docs.map(d => [b.firm, d]))
+    .filter(([, d]) => d.expiry)
+    .map(([firm, d]) => {
+      const lapsed = r.start && d.expiry < r.start;
+      return `<tr class="${lapsed ? "no" : ""}"><td>${d.type}</td><td>${firm}</td>
+        <td class="r">${day(d.expiry)}</td>
+        <td class="r">${lapsed ? "lapsed before the hire began" : "in date"}</td></tr>`;
+    });
 
- "s-bids": t => `<div class="dtitle">Every request he answered</div>` +
-   t.offers.map(o=>`<div class="dr${o.won?" win":""}"><span class="a">${o.ref} · ${o.machine}</span>
-     <span class="b">${sar(o.price)}</span><span class="c">${o.won?"won":"lost"}</span></div>`).join("") +
-   `<div class="dr bad"><span class="a">Requests he did not answer</span><span class="b">${NREQ-t.offers.length}</span></div>
-    <div class="dfoot">Whether he was shown those ${NREQ-t.offers.length} is not stored. A firm the marketplace
-      never matched looks identical here to one who saw the request and ignored it</div>`,
+  return [
+    sec("c-request", "The request", facts([
+      ["Reference", r.ref],
+      ["Machine", r.machine],
+      ["Project", r.project || "Not filed under a project"],
+      ["Site", r.city || "Not given"],
+      ["Hire window", r.start && r.end ? `${day(r.start)} to ${day(r.end)}` : "Not set"],
+      ["Calendar days", r.days],
+      ["Fridays inside it, not billed", "\u2212" + r.fri],
+      ["Billable days", r.billable],
+      ["Units", "\u00d7" + r.units],
+      ["Raised", day(r.created)],
+      ["Status", r.status || "\u2014"],
+      r.edited ? ["Edited after bids had arrived", "Yes", 1] : null,
+    ])),
 
- "s-won": t => `<div class="dtitle">Won and lost, and by how much</div>` +
-   t.offers.map(o=>`<div class="dr${o.won?" win":""}"><span class="a">${o.ref}</span>
-     <span class="b">${sar(o.price)}</span>
-     <span class="c">${o.won?"won":"cheapest was "+sar(o.best)+(o.price>o.best?" · "+pct((o.price/o.best-1)*100):"")}</span></div>`).join("") +
-   `<div class="dfoot">${t.won} of ${t.offers.length} taken.
-     ${!t.won&&t.offers.length>=3?"A firm who answers this often and never wins is either padding the field or about to stop answering":"Read the ratio, not either number alone"}</div>`,
+    sec("c-reach", "How it went out, and who answered", facts([
+      ["Route", r.channel],
+      r.sent != null ? ["Suppliers the link was sent to", r.sent] : null,
+      r.opened != null ? ["Suppliers that opened it", r.opened] : ["Suppliers the marketplace matched", "not stored", 1],
+      ["Bids received", r.bids.length],
+      ["Bids meeting every term", r.bids.filter(b => b.ok).length],
+      ["Bids from Moedatech suppliers", r.bids.filter(b => b.onPlatform).length],
+      ["Bids from off-platform suppliers", r.bids.filter(b => !b.onPlatform).length],
+      r.held ? ["Larger machines held back, never shown to you", r.held, 1] : null,
+    ])),
 
- "s-terms": t => `<div class="dtitle">Did each offer answer every requirement</div>` +
-   t.offers.map(o=>`<div class="dr${o.ok?"":" bad"}"><span class="a">${o.ref} · ${o.machine}</span>
-     <span class="b">${o.ok?"all terms":"missed a term"}</span><span class="tick">${o.ok?"✓":"✗"}</span></div>`).join("") +
-   `<div class="dfoot">${t.ok} of ${t.offers.length} bids answered everything asked.
-     Open the matching request in the award table for the term-by-term answers</div>`,
+    sec("c-position", "Every bid received", tbl(
+      [["Supplier"], ["Came in as"], ["Quoted", 1], ["Per day", 1], ["Units", 1],
+       ["Whole hire", 1], ["Your terms"], ["Arrived", 1], ["Against the rate", 1]],
+      bidRows,
+      band
+        ? `The going rate for this machine type is ${sar(band.med)} per day, the median of ${band.n} bids
+           from ${band.firms} supplier${band.firms === 1 ? "" : "s"}, running ${sar(band.lo)} to ${sar(band.hi)}.
+           Every rate above is reduced to one day first, so a weekly quote and a daily one compare.`
+        : `Fewer than three bids have landed for this machine type across your account, so there is no
+           going rate to compare against. The per-day column still normalises every quote to one day.`),
+      r.bids.length + (r.bids.length === 1 ? " bid" : " bids")),
 
- "s-price": t => `<div class="dtitle">His price against the market, offer by offer</div>` +
-   t.offers.map(o=>`<div class="dr${o.won?" win":""}"><span class="a">${o.ref} · ${o.machine}</span>
-     <span class="b">${sar(o.price)}</span>
-     <span class="c">market ${sar(o.med)} · ${pct((o.price/o.med-1)*100)}</span></div>`).join("") +
-   `<div class="dr win"><span class="a">Across ${t.offers.length} bids</span><span class="b">${pct(t.vs)}</span></div>
-    <div class="dfoot">Every bid compared to the median listing for that machine, not to the other bids.
-      A firm can be cheapest in a weak field and still price above the market</div>`
-};
+    sec("c-winner", "Who was awarded", !r.winner
+      ? facts([["Awarded", "Not yet", 1], ["Leading bid", won ? `${won.firm} at ${sar(won.perDay)} per day` : "\u2014"]])
+      : facts([
+          ["Supplier", r.winner.name],
+          ["How the offer reached you", r.winner.route],
+          ["Moedatech account", r.winner.acct, r.winner.acct !== "Yes"],
+          ["Verified by the platform", r.winner.ver, r.winner.ver !== "Yes"],
+          ["Commercial registration", r.winner.cr, r.winner.cr === "None on file"],
+          ["VAT number", r.winner.vat, r.winner.vat === "None on file"],
+          ["National address", r.winner.address, r.winner.address === "None on file"],
+          ["On your approved vendor list", r.winner.reg, r.winner.reg !== "Yes"],
+        ])),
 
+    sec("c-terms", "Your terms, against the leading bid", tbl(
+      [["Term"], ["What the bid answered"], ["", 1]],
+      r.terms.map(t => `<tr class="${t[2] ? "" : "no"}"><td>${t[0]}</td><td>${t[1]}</td>
+        <td class="r">${t[2] ? "\u2713" : "\u2717"}</td></tr>`),
+      `${r.terms.filter(t => t[2]).length} of ${r.terms.length} met. A term answered by an uploaded
+       document counts as answered`)),
 
-/* One renderer per column. Each returns the REAL rows for that request. */
-const DETAIL = {
- "c-position": r => {
-   const lo = Math.min(r.market.lo, ...r.bids.map(b=>b[1]));
-   const hi = Math.max(r.market.hi, ...r.bids.map(b=>b[1]));
-   const at = v => ((v-lo)/(hi-lo)*100).toFixed(1)+"%";
-   const rows = r.bids.slice().sort((a,b)=>a[1]-b[1]).map(b =>
-     `<div class="dr${b[4]?" win":""}"><span class="a">${b[0]}${b[3]?"":' <em>failed a term</em>'}</span>
-      <span class="bar"><i style="left:${at(b[1])}"></i></span>
-      <span class="b">${sar(b[1])}</span></div>`).join("");
-   return `<div class="dtitle">Every bid received, cheapest first</div>${rows}
-     <div class="dr mkt"><span class="a">Marketplace median <em>${r.market.n} live listings</em></span>
-       <span class="bar"><i class="m" style="left:${at(r.market.med)}"></i></span>
-       <span class="b">${sar(r.market.med)}</span></div>
-     <div class="dfoot">Listings for this machine run ${sar(r.market.lo)} to ${sar(r.market.hi)} per day.
-       Prices normalised to one cycle, Fridays excluded</div>`;
- },
- "c-terms": r => `<div class="dtitle">What your request asked for, and what the winner answered</div>` +
-   r.terms.map(t=>`<div class="dr${t[2]?"":" bad"}"><span class="a">${t[0]}</span>
-     <span class="b">${t[1]}</span><span class="tick">${t[2]?"✓":"✗"}</span></div>`).join("") +
-   `<div class="dfoot">${r.terms.filter(t=>t[2]).length} of ${r.terms.length} met. A term answered by an
-     uploaded document counts as answered</div>`,
- "c-reach": r => `<div class="dtitle">Who the request reached, and who answered</div>
-   <div class="dr"><span class="a">Channel</span><span class="b">${r.channel}</span></div>
-   ${r.opened?`<div class="dr"><span class="a">Firms that opened the link</span><span class="b">${r.opened}</span></div>`:""}
-   <div class="dr"><span class="a">Offers received</span><span class="b">${r.bids.length}</span></div>
-   ${r.held?`<div class="dr bad"><span class="a">Larger machines held back, never shown</span><span class="b">${r.held}</span></div>`:""}
-   <div class="dr bad"><span class="a">Suppliers the marketplace matched</span><span class="b">not stored</span></div>
-   <div class="dtitle" style="margin-top:12px">In the order they arrived</div>` +
-   r.bids.slice().sort((a,b)=>a[2]<b[2]?-1:1).map((b,i)=>
-     `<div class="dr${b[4]?" win":""}"><span class="a">${i+1} · ${b[0]}</span>
-      <span class="b">${sar(b[1])}</span><span class="c">${b[2]}</span></div>`).join(""),
- "c-winner": r => `<div class="dtitle">How well this firm is known</div>
-   <div class="dr"><span class="a">How the offer reached you</span><span class="b">${r.winner.route}</span></div>
-   <div class="dr${r.winner.acct==="Yes"?"":" bad"}"><span class="a">Moedatech account</span><span class="b">${r.winner.acct}</span></div>
-   <div class="dr${r.winner.ver==="Yes"?"":" bad"}"><span class="a">Verified by the platform</span><span class="b">${r.winner.ver}</span></div>
-   <div class="dr${r.winner.cr==="None on file"||r.winner.cr==="Unanswerable"?" bad":""}"><span class="a">Commercial registration</span><span class="b">${r.winner.cr}</span></div>
-   <div class="dr"><span class="a">Registered as your vendor</span><span class="b">${r.winner.reg}</span></div>`,
- "c-value": r => `<div class="dtitle">How the value is built</div>` +
-   r.money.map(m=>`<div class="dr"><span class="a">${m[0]}</span><span class="b">${m[1]}</span></div>`).join("") +
-   `<div class="dr win"><span class="a">Total for the hire</span><span class="b">${r.total} SAR</span></div>` +
-   (r.note?`<div class="dfoot">${r.note}</div>`:""),
- "c-request": r => `<div class="dtitle">This request</div>
-   <div class="dr"><span class="a">Machine</span><span class="b">${r.machine}</span></div>
-   <div class="dr"><span class="a">Hire length</span><span class="b">${r.days} days</span></div>
-   <div class="dr"><span class="a">Fridays inside it, not billed</span><span class="b">${r.fri}</span></div>
-   <div class="dr"><span class="a">Billable days</span><span class="b">${r.billable}</span></div>
-   <div class="dr"><span class="a">Units</span><span class="b">×${r.units}</span></div>
-   <div class="dr"><span class="a">Sent as</span><span class="b">${r.channel}</span></div>`,
- "c-findings": r => `<div class="dtitle">Everything checked on this request</div>
-   <div class="dr"><span class="a">Bids received</span><span class="b">${r.bids.length}</span></div>
-   <div class="dr"><span class="a">Bids meeting every term</span><span class="b">${r.bids.filter(b=>b[3]).length}</span></div>
-   <div class="dr"><span class="a">Your terms met by the winner</span><span class="b">${r.terms.filter(t=>t[2]).length} of ${r.terms.length}</span></div>
-   <div class="dr"><span class="a">Awarded against the market</span><span class="b">${sar(r.bids.find(b=>b[4])[1])} vs ${sar(r.market.med)}</span></div>`
-};
+    sec("c-value", "How the value is built", r.awarded
+      ? facts(r.money.map(m => [m[0], m[1]]).concat([["Total for the hire", r.total + " SAR"]]))
+      : facts([
+          ["Awarded", "Not yet", 1],
+          ["Leading bid, whole hire", won ? sar(won.total) + " SAR" : "\u2014"],
+        ]) + `<div class="dfoot">Nothing is counted as money awarded until a bid is accepted. The
+          figure above is what the leading bid would cost, not what you have committed</div>`),
 
-/* The new cards ask old questions at a new grain, so they reuse the renderers
-   rather than growing a second copy that can disagree with the first. */
-GDETAIL["p-supplier"] = GDETAIL["s-name"];
+    sec("c-papers", "Papers on the machines offered", tbl(
+      [["Document"], ["Supplier"], ["Expires", 1], ["", 1]], papers,
+      `Expiry is measured against the hire window, not against today. An off-platform submission
+       carries no machine record, so a supplier who bid by link contributes no papers here`)),
 
-/* A warning is a claim about one request. Clicking it should land on the
-   evidence for that claim, not on a description of the rule that raised it. */
-for (const [warn, evidence] of Object.entries({
-  "f-waived":"c-terms",     "f-certexp":"c-terms",      "f-rank":"c-position",
+    sec("c-findings", "Warnings", warns.length
+      ? `<ul class="dwarn">${warns.map(([, t]) => `<li>${t}</li>`).join("")}</ul>`
+      : `<div class="dnone">Nothing on this request tripped a check</div>`),
+  ];
+}
+
+/* ── One machine type, whole ──────────────────────────────────────────────────────────────── */
+function machineDossier(e) {
+  return [
+    sec("e-type", "This machine type", facts([
+      ["Machine", e.type],
+      ["Hires this period", e.hires.length],
+      ["Projects it was hired on", e.proj || "None filed"],
+      ["Total spend", sar(e.spend) + " SAR"],
+      ["Average rate", sar(e.rate) + " per day"],
+      ["Going rate", e.med == null ? "too few bids to set one" : sar(e.med) + " per day", e.med == null],
+      ["Against the going rate", e.vs == null ? "no band" : pct(e.vs), e.vs != null && e.vs >= 5],
+    ])),
+    sec("e-spend", "Every hire", tbl(
+      [["Request"], ["Project"], ["Supplier"], ["Rate", 1], ["Units", 1], ["Billable days", 1],
+       ["Whole hire", 1], ["Against the rate", 1]],
+      e.hires.map(h => `<tr><td>${h.ref}</td><td>${h.proj || "\u2014"}</td><td>${h.sup}</td>
+        <td class="r">${sar(h.rate)}</td><td class="r">\u00d7${h.units}</td><td class="r">${h.days}</td>
+        <td class="r">${sar(h.total)}</td>
+        <td class="r">${h.med == null ? "\u2014" : pct((h.rate / h.med - 1) * 100)}</td></tr>`),
+      "Fridays are already out of the billable day count. Nothing here is a forecast"),
+      e.hires.length + (e.hires.length === 1 ? " hire" : " hires")),
+  ];
+}
+
+/* ── One supplier, whole ──────────────────────────────────────────────────────────────────── */
+function supplierDossier(t) {
+  const cmp = t.offers.filter(o => o.med != null);
+  return [
+    sec("s-name", "Who this supplier is", facts([
+      ["Name", t.name],
+      ["Where he came from", t.src],
+      ["Verified by the platform", t.ver ? "Yes" : "No", !t.ver],
+      ["Commercial registration", t.cr, t.cr === "None on file"],
+      ["VAT number", t.vat || "\u2014", t.vat === "None on file"],
+      ["National address", t.address || "\u2014", t.address === "None on file"],
+      ["City", t.city || "Not given"],
+      ["On your approved vendor list", t.reg, t.reg !== "Yes"],
+      (t.groups && t.groups.length) ? ["You file him under", t.groups.join(", ")] : null,
+      ["Requests he answered", `${t.offers.length} of ${NREQ}`],
+      ["Awards won", t.won, !t.won],
+      ["Money awarded to him", sar(t.spend) + " SAR"],
+    ])),
+    sec("s-bids", "Every bid he sent", tbl(
+      [["Request"], ["Machine"], ["Came in as"], ["Quoted", 1], ["Per day", 1], ["Whole hire", 1],
+       ["Your terms"], ["Outcome", 1], ["Against the rate", 1]],
+      t.offers.slice().sort((a, b) => (a.at < b.at ? -1 : 1)).map(o => `<tr class="${o.won ? "win" : ""}">
+        <td>${o.ref}</td><td>${o.machine}</td><td>${ROUTE_SHORT[o.route] || o.route}</td>
+        <td class="r">${sar(o.quoted)}${o.unit !== "PER_DAY" ? `<span class="s2">${UNIT[o.unit] || o.unit}</span>` : ""}</td>
+        <td class="r">${sar(o.price)}</td><td class="r">${sar(o.total)}</td>
+        <td class="${o.ok ? "ok" : "no"}">${o.ok ? "all met" : (o.missed && o.missed.length ? o.missed.join(", ") : "a term missed")}</td>
+        <td class="r">${o.won ? "<b>won</b>" : "lost"}</td>
+        <td class="r">${o.med == null ? "\u2014" : pct((o.price / o.med - 1) * 100)}</td></tr>`),
+      `${t.ok} of ${t.offers.length} bids answered everything asked`
+      + (cmp.length ? `. Across the ${cmp.length} comparable to a going rate he prices ${dpct(t.vs)}` : "")
+      + `. Whether he was shown the other ${NREQ - t.offers.length} request${NREQ - t.offers.length === 1 ? "" : "s"} is not stored,
+         so a supplier the marketplace never matched looks identical to one who ignored it`)),
+  ];
+}
+
+/* Every cell of a row opens the same dossier; the column it was opened from leads. */
+function dossier(sections, focus) {
+  const hit = sections.filter(Boolean).filter(x => x.indexOf(`data-sec="${focus}"`) > -1);
+  const rest = sections.filter(Boolean).filter(x => x.indexOf(`data-sec="${focus}"`) === -1);
+  return hit.concat(rest).join("");
+}
+
+/* A warning is a claim about one request. Clicking it opens that request's dossier on the
+   section holding the evidence for the claim, not on a description of the rule that raised it. */
+const EVIDENCE = {
+  "f-waived":"c-terms",     "f-certexp":"c-papers",     "f-rank":"c-position",
   "f-overmarket":"c-position", "f-tightgap":"c-position",
   "f-earlyaward":"c-reach", "f-latebid":"c-reach",      "f-window":"c-reach",
   "f-single":"c-reach",
   "f-nocr":"c-winner",      "f-justadded":"c-winner",   "f-mismatch":"c-winner",
-  "f-urgent":"c-request",   "f-edited":"c-request",     "f-reneg":"c-value"
-})) DETAIL[warn] = DETAIL[evidence];
+  "f-urgent":"c-request",   "f-edited":"c-request",     "f-reneg":"c-value",
+  /* The grouped grains. A machine dossier has two sections and a supplier dossier two, so the
+     six machine columns and the six supplier columns fold onto the one that answers each. */
+  "e-type":"e-type",        "e-project":"e-type",       "e-hires":"e-type",
+  "e-vsmkt":"e-type",       "e-rate":"e-spend",         "e-spend":"e-spend",
+  "s-name":"s-name",        "p-supplier":"s-name",
+  "s-bids":"s-bids",        "s-how":"s-bids",           "s-won":"s-bids",
+  "s-terms":"s-bids",       "s-price":"s-bids"
+};
 
 /* A click on a figure or a panel used to open an explanation, because there
    was no row under the cursor to open. These compute the rows instead, from
    the same seven awards, so every click on this page lands on data. */
-const AW = Object.keys(R).map(id => {
-  const r = R[id], rate = num(r.money[0][1]), span = r.units * r.billable;
-  const fit = r.bids.filter(b=>b[3]).map(b=>b[1]);
+const AW = Object.keys(R).filter(id => R[id].awarded).map(id => {
+  const r = R[id], rate = leadBid(r).perDay, span = r.units * r.billable;
+  const fit = r.bids.filter(b=>b.ok).map(b=>b.perDay);
   const best = fit.length ? Math.min(...fit) : null;
   return {id, ref:r.ref, machine:base(r.machine), route:r.channel, rate, span,
-          value:num(r.total), med:r.market.med, best,
+          value:num(r.total), med:med(r), best,
           over: best!=null && rate>best ? (rate-best)*span : 0,
-          gap: (rate-r.market.med)*span, bids:r.bids.length};
+          /* Null, not zero. An award with no band behind it has an UNKNOWN gap, and a zero in this
+             slot was summed into the figure at the top as though it had been checked. */
+          gap: r.market ? (rate-r.market.med)*span : null, bids:r.bids.length};
 });
 const dr = (a,b,c,k="") => `<div class="dr${k}"><span class="a">${a}</span>` +
   `<span class="b">${b}</span>` + (c!=null ? `<span class="c">${c}</span>` : "") + `</div>`;
@@ -1820,7 +2083,7 @@ const PANEL = {
  "k-spend": () => `<div class="dtitle">Every award this period</div>` +
    AW.slice().sort((a,b)=>b.value-a.value).map(a =>
      dr(`${a.ref} \u00b7 ${a.machine}`, sar(a.value), ROUTE_SHORT[a.route])).join("") +
-   dr("All seven", sar(AW.reduce((t,a)=>t+a.value,0)) + " SAR", null, " win") +
+   dr(`All ${AW.length}`, sar(AW.reduce((t,a)=>t+a.value,0)) + " SAR", null, " win") +
    `<div class="dfoot">Rate times units times billable days, Fridays excluded, the same calculation
      the quotation prices with</div>`,
 
@@ -1830,8 +2093,8 @@ const PANEL = {
         a.best==null ? "no bid met every term"
         : a.over ? "cheapest that did: " + sar(a.best) : "that was the cheapest",
         a.over ? " bad" : "")).join("") +
-   `<div class="dfoot">${AW.filter(a=>!a.over).length} of ${AW.length}. RFQ-1051 counts here because no
-     bid on it met every term, so there was no cheaper compliant bid to miss</div>`,
+   `<div class="dfoot">${AW.filter(a=>!a.over).length} of ${AW.length}. An award counts here when no
+     bid on its request met every term, because there was then no cheaper compliant bid to miss</div>`,
 
  "k-save": () => `<div class="dtitle">Where the money went above a cheaper qualifying bid</div>` +
    AW.filter(a=>a.over).map(a =>
@@ -1841,13 +2104,17 @@ const PANEL = {
    `<div class="dfoot">Only bids that answered yes to every stated term can stand in for the one that
      won. A cheaper bid that missed a term is a different purchase, not a saving</div>`,
 
- "k-market": () => `<div class="dtitle">Your day rate against the marketplace, per award</div>` +
-   AW.slice().sort((a,b)=>b.gap-a.gap).map(a =>
+ "k-market": () => `<div class="dtitle">Your day rate against the going rate, per award</div>` +
+   AW.slice().filter(a=>a.gap!=null).sort((a,b)=>b.gap-a.gap).map(a =>
      dr(`${a.ref} \u00b7 ${a.machine}`, (a.gap>0?"+":"") + sar(a.gap),
-        `${sar(a.rate)} vs market ${sar(a.med)}`, a.gap>0 ? " bad" : "")).join("") +
-   dr("Across the period", "+" + sar(AW.reduce((t,a)=>t+a.gap,0)) + " SAR", null, " win") +
-   `<div class="dfoot">The under-market hires are included. A total that counted only the overpayments
-     would flatter nothing and mislead everyone</div>`,
+        `${sar(a.rate)} vs ${sar(a.med)}`, a.gap>0 ? " bad" : "")).join("") +
+   AW.filter(a=>a.gap==null).map(a =>
+     dr(`${a.ref} \u00b7 ${a.machine}`, "\u2014", "too few bids on this type")).join("") +
+   dr(`Across ${AW.filter(a=>a.gap!=null).length} comparable award${AW.filter(a=>a.gap!=null).length===1?"":"s"}`,
+      (AW.reduce((t,a)=>t+(a.gap||0),0)>0?"+":"") + sar(AW.reduce((t,a)=>t+(a.gap||0),0)) + " SAR", null, " win") +
+   `<div class="dfoot">The under-rate hires are included. A total that counted only the overpayments
+     would flatter nothing and mislead everyone. The going rate is the median of every bid you
+     received for that machine type, so an award with fewer than three behind it is left out</div>`,
 
  "p-route": () => Object.keys(CHAN).map(k => {
    const rows = AW.filter(a=>a.route===k);
@@ -1862,8 +2129,8 @@ PANEL["p-channel"] = PANEL["p-route"];
 PANEL["c-position"] = () => `<div class="dtitle">Where each award landed against its field</div>` +
   AW.slice().sort((a,b)=>b.gap-a.gap).map(a =>
     dr(`${a.ref} \u00b7 ${a.machine}`, sar(a.rate) + "/day",
-       `cheapest ${a.best!=null?sar(a.best):"\u2014"} \u00b7 market ${sar(a.med)}`,
-       a.rate > a.med ? " bad" : "")).join("") +
+       `cheapest ${a.best!=null?sar(a.best):"\u2014"} \u00b7 ${a.med!=null?"going rate "+sar(a.med):"no band"}`,
+       a.med!=null && a.rate > a.med ? " bad" : "")).join("") +
   `<div class="dfoot">Open a single row for the bids behind it, in the order they arrived</div>`;
 
 /* A blind spot still has records behind it: the ones it cannot speak for.
@@ -1876,7 +2143,7 @@ PANEL["c-position"] = () => `<div class="dtitle">Where each award landed against
 
 for (const k of Object.keys(CERT)) PANEL[k] = () => { const c = CERT[k];
   return `<div class="dtitle">${c.doc}</div>` +
-    dr("Firm", c.firm) +
+    dr("Supplier", c.supplier) +
     dr("Expiry on file", c.expiry, null, c.bad ? " bad" : "") +
     dr("Status", c.state, null, c.bad ? " bad" : "") +
     (c.machine ? dr("Machine it covers", c.machine, c.req) : dr("Machine it covers", "none on hire")) +
@@ -1900,29 +2167,43 @@ const dw=document.getElementById("dw"), scrim=document.getElementById("scrim"), 
 let lastEl=null;
 const STATE={live:["live","Runs on data you already have"],part:["part","Partly available, one piece missing"],blocked:["blocked","Needs something the platform does not store"]};
 
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   One click, one record.
+
+   A cell inside a row opens that ROW's dossier, every section of it, led by the section the
+   clicked column belongs to. A header or a legend, which belong to no row, still opens the
+   column or the panel — there is no record under them to open.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
 function open(key,el){
-  const x=X[key]; if(!x) return;
+  const x=X[key]||{k:"Record",t:"",q:"",what:"",why:"",chain:[],f:[],s:"live"};
   const rowEl = el.closest("[data-row]"), grpEl = el.closest("[data-grp]");
   const r = rowEl ? R[rowEl.dataset.row] : null;
   /* A grouped row names its own grain in the key: e: a machine type,
-     s: a supplier. Same renderer contract, different grain. */
+     s: a supplier. Same contract, different grain. */
   const g = grpEl ? (grpEl.dataset.grp[0]==="e" ? EQ : SUP)[grpEl.dataset.grp.slice(2)] : null;
-  const det = (r && DETAIL[key]) ? DETAIL[key](r)
-            : (g && GDETAIL[key]) ? GDETAIL[key](g)
+  /* A warning opens the request it is a claim about, on the section holding its evidence. */
+  const focus = EVIDENCE[key] || key;
+  const det = r ? dossier(requestDossier(r, focus), focus)
+            : (g && grpEl.dataset.grp[0]==="e") ? dossier(machineDossier(g), focus)
+            : g ? dossier(supplierDossier(g), focus)
             : (el.tagName === "TH") ? columnDetail(el)
             : PANEL[key] ? PANEL[key]() : null;
-  const detHead = r ? (r.ref + " \u00b7 " + r.machine) : g ? (g.type || g.name) : x.t;
+  const head = r ? (r.ref + " \u00b7 " + r.machine) : g ? (g.type || g.name) : x.t;
+  const sub  = r ? [r.project, r.start && r.end ? `${day(r.start)} to ${day(r.end)}` : null,
+                    r.awarded ? `awarded \u00b7 ${r.total} SAR` : "not awarded yet"].filter(Boolean).join(" \u00b7 ")
+             : g ? (g.hires ? `${g.hires.length} hire${g.hires.length===1?"":"s"} \u00b7 ${sar(g.spend)} SAR`
+                            : `${g.offers.length} bid${g.offers.length===1?"":"s"} \u00b7 ${g.won} won`)
+             : (x.q ? "Answers: " + x.q : "");
   if(lastEl) lastEl.classList.remove("on");
   lastEl=el; el.classList.add("on");
-  document.getElementById("dwKind").textContent=x.k;
-  document.getElementById("dwTitle").textContent=x.t;
-  document.getElementById("dwAns").textContent = x.q ? ("Answers: " + x.q) : "";
+  document.getElementById("dwKind").textContent = r ? "Request" : g ? (grpEl.dataset.grp[0]==="e" ? "Machine type" : "Supplier") : x.k;
+  document.getElementById("dwTitle").textContent = head;
+  document.getElementById("dwAns").textContent = sub;
   document.getElementById("dwWhat").textContent=x.what;
   document.getElementById("dwWhy").textContent=x.why;
   const db=document.getElementById("dwDetBlk");
   if(det){
     db.style.display="";
-    document.getElementById("dwDetH").textContent = detHead;
     document.getElementById("dwDet").innerHTML = det;
   } else db.style.display="none";
   const exb=document.getElementById("dwExBlk");
@@ -1939,7 +2220,11 @@ function open(key,el){
   st.className="state "+c[0]; st.textContent=c[1];
   ask.style.display=(x.k.indexOf("finding")>-1||x.k==="Blocking"||x.k.indexOf("Pattern")>-1)?"":"none";
   /* The fold opens by itself only when there is nothing else to read. */
-  document.getElementById("dwHow").open = !det && !(x.ex);
+  /* The fold holds the rule, not the record. A dossier already answers the question the rule
+     describes, so it stays shut there and opens only where there was nothing else to read. */
+  const how = document.getElementById("dwHow");
+  how.style.display = (X[key] ? "" : "none");
+  how.open = !det && !(x.ex);
   dw.classList.add("open"); dw.setAttribute("aria-hidden","false"); scrim.classList.add("open");
   dw.querySelector(".scrollbody").scrollTop=0;
 }
@@ -1948,9 +2233,12 @@ function close(){
   if(lastEl){lastEl.classList.remove("on"); lastEl=null;}
 }
 document.addEventListener("click",(e)=>{
+  /* Inside the modal nothing drills further: its own cells carry no `data-x`, and a stray match
+     would reopen the dialog on top of itself. */
+  if(e.target.closest("#dw")) return;
   const el=e.target.closest("[data-x]");
   if(el){open(el.dataset.x,el); return;}
-  if(!e.target.closest("#dw")) close();
+  close();
 });
 document.getElementById("dwClose").addEventListener("click",close);
 scrim.addEventListener("click",close);
@@ -2121,9 +2409,14 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
      by machine type is not a filter on this page, it is a different
      grain, and the two grouped tables below already hold it. ───── */
   function setPeriod(v){
-    const n = Object.keys(R).length, w = WINDOW_INFO;
-    const base = n + (n === 1 ? " award" : " awards") +
-      (w && w.capped ? " \u00b7 newest " + w.max + " requests" : "");
+    /* "5 awards" over five requests of which three were awarded is the page's own headline
+       contradicting its own table two inches below it. Count both, and say which is which. */
+    const ids = Object.keys(R), done = ids.filter(id => R[id].awarded).length, w = WINDOW_INFO;
+    const base = !ids.length ? "Nothing to show yet"
+      : ids.length + (ids.length === 1 ? " request" : " requests")
+        + " \u00b7 " + done + " awarded"
+        + (ids.length - done ? " \u00b7 " + (ids.length - done) + " still out to bid" : "")
+        + (w && w.capped ? " \u00b7 newest " + w.max + " only" : "");
     document.getElementById("scope").textContent = v ? v + " \u00b7 " + base : base;
   }
 
@@ -2207,11 +2500,11 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
      Kept to one line each: the tile is 180px wide and the reader is choosing,
      not reading. */
   const CAP = {
-    money:      "The channel split, then each firm's share",
+    money:      "The channel split, then each supplier's share",
     channel:    "Five measures, split by how the award was bought",
     awards:     "Each award against your terms, the bids and the market",
     equipment:  "Day rate per machine type, per site, against the market",
-    suppliers:  "Bids made, awards won, and terms met, per firm",
+    suppliers:  "Bids made, awards won, and terms met, per supplier",
     papers:     "Running out on machines you are hiring now",
   };
 
@@ -2303,15 +2596,23 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   }
   document.querySelectorAll(".ct").forEach(b=> b.onclick = ()=> pane(b.dataset.pane));
 
+  /* The host cannot see inside this frame, and the rail is the one thing above it that changes
+     what the page around it should look like. Same-origin only; the host checks the origin back. */
+  function tellHost(open){
+    try { if (window.parent !== window) window.parent.postMessage({ type: "governance:rail", open }, window.location.origin); }
+    catch (e) { /* A host on another origin is not one we talk to. */ }
+  }
   function openPanel(which){
     close();                       /* one drawer at a time, they share the edge */
     panel.classList.add("open"); panel.setAttribute("aria-hidden","false");
     document.body.classList.add("docked");
     pane(typeof which === "string" ? which : "cards");
+    tellHost(true);
   }
   function closePanel(){
     panel.classList.remove("open"); panel.setAttribute("aria-hidden","true");
     document.body.classList.remove("docked");
+    tellHost(false);
   }
   const launch = document.getElementById("agentBtn");
   if (launch) launch.onclick = ()=> openPanel("cards");

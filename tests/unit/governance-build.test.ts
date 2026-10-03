@@ -25,7 +25,10 @@ const bid = (over: Partial<BidCard> & Pick<BidCard, "supplierName">): BidCard =>
     price: 1000,
     mobPrice: null,
     demobPrice: null,
-    priceUnit: "DAY",
+    /* The backend sends `PER_DAY`, never `DAY`. The difference is not cosmetic: an unrecognized
+       basis takes `computeRentalTotal`'s fallback, which bills every CALENDAR day including the
+       Fridays, so a fixture saying "DAY" quietly priced a ten-day hire at ten days. */
+    priceUnit: "PER_DAY",
     duration: null,
     numberOfUnits: 1,
     unitsOffered: 1,
@@ -87,9 +90,8 @@ const input = (over: Partial<GovernanceInput> = {}): GovernanceInput => ({
   bidsByRequest: {},
   sharesByRequest: {},
   heldByRequest: {},
-  marketBySubtype: {},
   projectNames: {},
-  registeredSupplierIds: new Set<string>(),
+  registry: [],
   ...over,
 });
 
@@ -109,7 +111,7 @@ describe("buildGovernance", () => {
     expect(row.total).toBe("9,000");
   });
 
-  it("drops a request nobody awarded, and says why instead of drawing an empty row", () => {
+  it("keeps a request that has bids but no award, and marks it unawarded", () => {
     const out = buildGovernance(
       input({
         requests: [request(), request({ id: "r2", groupRef: "RFQ-1043" })],
@@ -119,11 +121,27 @@ describe("buildGovernance", () => {
         },
       }),
     );
-    expect(Object.keys(out.R)).toEqual(["r1"]);
-    /* The statuses that WERE present are named. Without them, "no bid accepted yet" on every row
-       of an account that plainly has awards is indistinguishable from an account with none, and
-       the first is a bug in what this reads while the second is the truth. */
-    expect(out.skipped).toEqual([{ ref: "RFQ-1043", why: "no bid accepted yet (1 bids: SUBMITTED)" }]);
+    /* Both rows survive. Who bid, by which route, whether they met the terms and what papers
+       they carry are answerable the moment bids land — an account mid-flight is the normal case,
+       and dropping it left the whole board empty for a renter who simply had not awarded yet. */
+    expect(Object.keys(out.R).sort()).toEqual(["r1", "r2"]);
+    expect(out.R.r1.awarded).toBe(true);
+    expect(out.R.r2.awarded).toBe(false);
+    /* No winner is named on the unawarded one, and it carries no money. */
+    expect(out.R.r2.winner).toBeNull();
+    expect(out.R.r2.total).toBe("0");
+    expect(out.skipped).toEqual([]);
+  });
+
+  it("still drops a request that drew no bids at all", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        bidsByRequest: {},
+      }),
+    );
+    expect(out.R).toEqual({});
+    expect(out.skipped).toEqual([{ ref: "RFQ-1042", why: "no bids received" }]);
   });
 
   it("drops a request with no dates rather than pricing it from a guess", () => {
@@ -145,7 +163,7 @@ describe("buildGovernance", () => {
       }),
     );
     expect(out.R.r1.winner?.name).toBe("Zahid");
-    expect(out.R.r1.bids[0][4]).toBe(1);
+    expect(out.R.r1.bids[0].won).toBe(1);
   });
 
   it("marks a bid non-compliant on any conflict, never a share of terms", () => {
@@ -160,8 +178,8 @@ describe("buildGovernance", () => {
         },
       }),
     );
-    expect(out.R.r1.bids.find((b) => b[0] === "Cheap")?.[3]).toBe(0);
-    expect(out.R.r1.bids.find((b) => b[0] === "Zahid")?.[3]).toBe(1);
+    expect(out.R.r1.bids.find((b) => b.firm === "Cheap")?.ok).toBe(0);
+    expect(out.R.r1.bids.find((b) => b.firm === "Zahid")?.ok).toBe(1);
   });
 
   it("leaves marketplace reach null, and never zero", () => {
@@ -250,8 +268,8 @@ describe("buildGovernance", () => {
         },
       }),
     );
-    expect(Object.values(out.CERT).find((c) => c.firm === "Zahid")?.state).toBe("Expired");
-    expect(Object.values(out.CERT).find((c) => c.firm === "Nesma")?.state).toBe("Expiring");
+    expect(Object.values(out.CERT).find((c) => c.supplier === "Zahid")?.state).toBe("Expired");
+    expect(Object.values(out.CERT).find((c) => c.supplier === "Nesma")?.state).toBe("Expiring");
   });
 
   it("produces no papers for a link bid, because the platform stores none", () => {
@@ -264,5 +282,162 @@ describe("buildGovernance", () => {
       }),
     );
     expect(out.CERT).toEqual({});
+  });
+
+  it("reduces every rate to one day before comparing, so a weekly quote is not six times a daily one", () => {
+    /* PER_WEEK divides by 6, which is the app's own divisor: a six-day billing week with Friday out. */
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        bidsByRequest: {
+          r1: [
+            bid({ supplierName: "Weekly", price: 6000, priceUnit: "PER_WEEK" }),
+            bid({ supplierName: "Daily", price: 1100, status: "ACCEPTED" }),
+          ],
+        },
+      }),
+    );
+    const weekly = out.R.r1.bids.find((b) => b.firm === "Weekly")!;
+    expect(weekly.price).toBe(6000);
+    expect(weekly.perDay).toBe(1000);
+    /* And the headline is still shown as quoted, so the figure matches the supplier's own paper. */
+    expect(weekly.unit).toBe("PER_WEEK");
+  });
+
+  it("takes the market band from the renter's own bids, and publishes none under three of them", () => {
+    const out = buildGovernance(
+      input({
+        requests: [
+          request(),
+          request({ id: "r2", groupRef: "RFQ-1043" }),
+          request({ id: "r3", groupRef: "RFQ-1044", item: { name: "Tower Crane", nameAr: "", qty: 1, imageUrl: null, imageIsPhoto: false, categoryId: "sub-crane" } }),
+        ],
+        bidsByRequest: {
+          r1: [bid({ supplierName: "A", price: 900 }), bid({ supplierName: "B", price: 1000, status: "ACCEPTED" })],
+          r2: [bid({ supplierName: "C", price: 1400 })],
+          /* One machine type with a single bid: a band of one is not a market. */
+          r3: [bid({ supplierName: "D", price: 7000, status: "ACCEPTED" })],
+        },
+      }),
+    );
+    // sub-exc saw three bids: 900, 1000, 1400 — median 1000, from three separate firms.
+    expect(out.R.r1.market).toEqual({ med: 1000, n: 3, lo: 900, hi: 1400, firms: 3 });
+    expect(out.R.r3.market).toBeNull();
+  });
+
+  it("counts three bids from one firm as one opinion, and says so", () => {
+    const one = (price: number, name: string) =>
+      bid({ supplierName: name, price, supplierCompanyId: "co-same" });
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        bidsByRequest: { r1: [one(900, "A"), one(1000, "B"), one(1100, "C")] },
+      }),
+    );
+    expect(out.R.r1.market?.n).toBe(3);
+    expect(out.R.r1.market?.firms).toBe(1);
+  });
+
+  it("reads the vendor tick off the registry, and matches a hand-typed row by name", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        bidsByRequest: {
+          r1: [
+            bid({ supplierName: "Zahid", status: "ACCEPTED", supplierCompanyId: "co-zahid" }),
+            bid({ supplierName: "Hand Typed Co", supplierId: null, supplierCompanyId: null }),
+            bid({ supplierName: "Stranger" }),
+          ],
+        },
+        registry: [
+          { supplierId: null, companyId: "co-zahid", crNumber: null, name: "Zahid", vendorRegistered: true, onMoedatech: true, groups: ["Earthworks"] },
+          /* No ids at all — the only key left is the name, and refusing to use it would report
+             every manually added supplier as unregistered. */
+          { supplierId: null, companyId: null, crNumber: null, name: "hand typed co", vendorRegistered: true, onMoedatech: false, groups: [] },
+        ],
+      }),
+    );
+    expect(out.R.r1.bids.find((b) => b.firm === "Zahid")?.registered).toBe(1);
+    expect(out.R.r1.bids.find((b) => b.firm === "Hand Typed Co")?.registered).toBe(1);
+    expect(out.R.r1.bids.find((b) => b.firm === "Stranger")?.registered).toBe(0);
+    expect(out.R.r1.winner?.reg).toBe("Yes");
+    expect(out.SUPMETA.Zahid.groups).toEqual(["Earthworks"]);
+  });
+
+  it("names the terms a bid missed rather than only counting them", () => {
+    const term = (key: string, labelEn: string, state: "matched" | "conflict") => ({ key, labelEn, labelAr: "", state });
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        bidsByRequest: {
+          r1: [
+            bid({
+              supplierName: "Zahid",
+              status: "ACCEPTED",
+              conflictCount: 2,
+              terms: {
+                equipment: [term("year", "Minimum year", "conflict")],
+                contract: [term("pay", "Payment terms", "conflict"), term("fuel", "Fuel on supplier", "matched")],
+                supplier: [],
+              } as never,
+            }),
+          ],
+        },
+      }),
+    );
+    const b = out.R.r1.bids[0];
+    expect(b.ok).toBe(0);
+    expect(b.missed).toEqual(["Minimum year", "Payment terms"]);
+    expect(b.met).toEqual(["Fuel on supplier"]);
+    /* And the request-level term list carries the named failures too, so the drill-down and the
+       count on the row cannot disagree about which terms were at issue. */
+    expect(out.R.r1.terms).toContainEqual(["Payment terms", "Not met", 0]);
+  });
+
+  it("prices every losing bid too, so a row can show what the other offers would have cost", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        bidsByRequest: {
+          r1: [bid({ supplierName: "Zahid", price: 1000, status: "ACCEPTED" }), bid({ supplierName: "Nesma", price: 800 })],
+        },
+      }),
+    );
+    expect(out.R.r1.total).toBe("9,000");
+    expect(out.R.r1.bids.find((b) => b.firm === "Nesma")?.total).toBe(7200);
+  });
+
+  it("shows an opening price only when the room actually moved it", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request()],
+        bidsByRequest: {
+          r1: [
+            bid({ supplierName: "Moved", price: 1000, openingPrice: 1200, status: "ACCEPTED" }),
+            bid({ supplierName: "Never", price: 900, openingPrice: 900 }),
+          ],
+        },
+      }),
+    );
+    expect(out.R.r1.bids.find((b) => b.firm === "Moved")?.from).toBe(1200);
+    /* "From 900 to 900" reads as a negotiation that happened and achieved nothing. */
+    expect(out.R.r1.bids.find((b) => b.firm === "Never")?.from).toBeNull();
+  });
+
+  it("carries the window and the route detail a drill-down needs without a second fetch", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request({ city: "Dammam", renteeEditUsed: true })],
+        bidsByRequest: { r1: [bid({ supplierName: "Zahid", status: "ACCEPTED", supplierCity: "Jubail", supplierVatNumber: "300123456700003" })] },
+        sharesByRequest: { r1: { sent: 8, opened: 3 } },
+      }),
+    );
+    const r = out.R.r1;
+    expect([r.start, r.end]).toEqual(["2026-09-01", "2026-09-10"]);
+    expect(r.city).toBe("Dammam");
+    expect(r.edited).toBe(true);
+    expect([r.sent, r.opened]).toEqual([8, 3]);
+    expect(r.winner?.vat).toBe("300123456700003");
+    expect(out.SUPMETA.Zahid.city).toBe("Jubail");
   });
 });

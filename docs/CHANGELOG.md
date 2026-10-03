@@ -7,6 +7,100 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-03 - The governance frame is pinned to the window and MEASURED, not sized by a typed
+  guess.** It was `calc(100vh - 96px)`. The 96 was a guess at the app header plus the tab row; the
+  header is 52px and the tab row wraps to two lines on a narrow window, so the rail (which is
+  `position: fixed` inside the frame and can reach no further than it) stopped short of the bottom
+  of the screen by whatever the guess was out by, and by a different amount at different widths.
+  The frame now runs from a zero-height anchor left in the normal flow to the bottom of the window,
+  re-measured on resize. Files: `src/components/home/GovernanceBoard.tsx`.
+  WARNING: an `<iframe>` is a REPLACED element with an intrinsic 300x150. On an absolutely
+  positioned one, `width: auto` resolves to 300px and the `right`/`bottom` offsets are dropped as
+  over-constrained - `inset: 0` alone rendered a 300px box in the corner with the rail squeezed
+  inside it. It has to be sized explicitly (`width: 100%`, `height: calc(100% - <top>px)`).
+  The rail stays INSIDE the frame deliberately: moving it into React would let it cover the app
+  header, and would cost the card picker its previews, which are live scaled clones of the board's
+  own sections and only exist in the board's own document.
+
+- **2026-10-03 - The award table's filter chips were the fixture's counts, typed into the markup.**
+  "All 7", "Needs an answer 6", "Urgent 2", "Price", "Papers", "Timing" - a renter with three
+  requests read "All 7". They are built from the warnings the rows actually raised now, in four
+  groups, and a chip whose count is zero is not rendered at all: a filter that can only empty the
+  table invites the reader to click it and conclude the page is broken. Each row carries its
+  warning keys in `data-w`, so the filter reads what the table already decided rather than
+  re-running the rules and drifting from them. Files: `public/governance-dashboard.html`.
+  WARNING: filtering sets `hidden` rather than detaching rows. The dossier is opened off the row
+  element, so a filter that removed them would make a warning cited in another card unopenable.
+
+- **2026-10-03 - The board's own headline contradicted its table: "5 awards" over five requests of
+  which three were awarded.** `setPeriod` counted `Object.keys(R).length`, which has been every
+  request, not every award, since un-awarded requests were kept. Reads
+  "5 requests · 3 awarded · 2 still out to bid" now. Files: `public/governance-dashboard.html`.
+
+- **2026-10-03 - Governance board: the BFF read two endpoints off the wrong backend, so projects
+  and the vendor registry were silently empty.** `/projects` and `/renter-suppliers` live on
+  **agents-backend**, not app-backend. The route asked `call` (app-backend) for both; both 404'd,
+  both were swallowed by the `.catch(() => null)` that is there for genuinely optional data, and
+  every row drew "Unnamed project" and every supplier "not registered". Those are also exactly what
+  a renter who has filled in neither would see, which is why it survived a review. Added
+  `agentsGet` beside `relayAsRenter` (same auth, returns DATA rather than a `NextResponse`, because
+  a route that COMBINES several upstreams cannot work with a response in its hand).
+  Files: `src/lib/api/agents-relay.ts`, `src/app/api/me/governance/route.ts`.
+  WARNING: two more field errors rode with it - `Project` has no `name` column, the field is
+  `title`; and "registered as your vendor" is `renter_suppliers.vendor_registered`, a real boolean,
+  not membership of the list (a firm joins the list the moment it bids through a shared link).
+
+- **2026-10-03 - The market band now comes from the renter's own bids, not from `/stores`
+  listings.** Owner: *"check the bids of the same equipment in the db and find the average or
+  median"*. A listing is an asking price nobody has tested; a bid is a price a supplier agreed to be
+  held to on this renter's dates, site and terms. Grouped by `request_equipment_items.subtype_id`,
+  every rate reduced to one day first, and **not published under three bids** - two have a midpoint,
+  not a median. `MarketBand.firms` counts the distinct suppliers behind it, because three bids from
+  one firm is still one opinion. Files: `src/lib/governance/build.ts`.
+  WARNING: `market` is now null far more often, and every caller had to learn it. A missing band is
+  not a gap of zero: `AW.gap` is null rather than 0, and summing zeroes into the market figure had
+  been counting every uncomparable hire as a full-price overpayment.
+
+- **2026-10-03 - `computeCycleTotals` was never actually running; the fold passed `days`, which is
+  not one of its fields.** `CycleInput` takes `durationDays` and `startDate`. Passing `days` left
+  `duration` null on every call, so the total silently fell through to the `rate x units x
+  chargedDays` fallback. That fallback happens to be right for a PER_DAY quote, which is why seven
+  requests of fixture data agreed with it and the test passed. It is wrong for every weekly or
+  monthly quote. Files: `src/lib/governance/build.ts`, `tests/unit/governance-build.test.ts`.
+  WARNING: the test fixture said `priceUnit: "DAY"`. The backend sends `PER_DAY`. `"DAY"` is not a
+  known rental unit, so `computeRentalTotal` takes its unrecognized-unit path and bills every
+  CALENDAR day - Fridays included. Fixing the plumbing turned a 9,000 into a 10,000 and exposed the
+  fixture, not a regression.
+
+- **2026-10-03 - Every rate on the board is now a per-day rate; headline rates were being compared
+  across bases.** `b.price` is what the supplier wrote and may be weekly or monthly; `b.perDay` is
+  that figure through `rentalDivisor`. Comparing headlines called a 6,000-per-week quote six times a
+  1,000-per-day one, which is the same price. The headline is still shown, labelled, so a reader
+  checking against the supplier's own quotation meets his own number first.
+  Files: `src/lib/governance/build.ts`, `public/governance-dashboard.html`.
+
+- **2026-10-03 - The drill-down is a modal showing the whole ROW, not a side drawer showing one
+  COLUMN.** Owner: *"show a modal not a side panel of details, and show details maybe per row not
+  per column"*. The 450px drawer answered "what is in this column, for every row" when the reader
+  had already read the column and was pointing at a row. Every cell of a row now opens the same
+  dossier - the request, how it went out, every bid as a real table, the winner's identity, the
+  terms, the money, the papers, the warnings - led by the section the clicked column belongs to.
+  `BoardBid` changed from a 5-slot tuple to an object carrying the whole bid, which is what made the
+  dossier possible without a second fetch. Files: `public/governance-dashboard.html`,
+  `src/lib/governance/build.ts`.
+  WARNING: `GDETAIL` (100 lines of per-column group renderers) is now unreachable and was deleted,
+  not left in place. `EVIDENCE` maps every clickable key onto a section that exists; a key with no
+  section silently rendered the dossier in its natural order and ignored where the reader clicked.
+
+- **2026-10-03 - Four card footers stated the FIXTURE's findings as fact over live data.** "One
+  supplier holds 62% ... and neither has a platform identity", "Both awards bought outside the
+  marketplace went to a supplier with no commercial registration", "All seven", "RFQ-1051 counts
+  here because". Each was true of the seven-request fixture and of nothing since. All four are
+  derived now. Files: `public/governance-dashboard.html`.
+  WARNING: a sentence about concentration has to be computed from the concentration. A hard-coded
+  finding beside live figures is worse than no finding: it reads as the page's conclusion about
+  the numbers next to it.
+
 - **2026-10-03 - CORRECTION: "firms reached" needs no new column; the count is already stored.**
   Earlier entries and the blind-spots card say the marketplace match count is computed and
   discarded, and that the fix is to persist `matchedSupplierCount` on the request. That was wrong.
