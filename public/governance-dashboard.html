@@ -1402,7 +1402,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.47";
+const BUILD = "2026-10-03.49";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -2871,7 +2871,12 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
       const span = isWide(part) ? "full" : authored;
       const slot = document.createElement("div");
       slot.className = "slot " + span;
-      slot.style.setProperty("--sp", span === "quarter" ? 1 : span === "full" ? 4 : 2);
+      const base = span === "quarter" ? 1 : span === "full" ? 4 : 2;
+      /* ⚠️ The span the card was BUILT with, kept separately. `fillRows` grows the last card on
+         a short row, and without a base to return to that growth is cumulative: tick four cards
+         on one at a time and the first one widens on every pass until it owns the row. */
+      slot.dataset.sp = String(base);
+      slot.style.setProperty("--sp", base);
       slot.dataset.card = id;
       slot.draggable = true;
       const locked = LOCKED.includes(id);
@@ -2966,9 +2971,41 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   function widenTables(){
     slots().forEach(sl => {
       const head = sl.querySelector("thead tr");
-      if (head && head.children.length >= 5 && Number(sl.style.getPropertyValue("--sp")) < 4) {
-        sl.style.setProperty("--sp", 4);
+      /* A wide table's floor belongs in the BASE: it is a property of the card, not of where it
+         happens to land in the grid. */
+      if (head && head.children.length >= 5) sl.dataset.sp = "4";
+      if (Number(sl.dataset.sp || 2) > Number(sl.style.getPropertyValue("--sp") || 0)) {
+        sl.style.setProperty("--sp", sl.dataset.sp);
       }
+    });
+    fillRows();
+  }
+
+  /* ⚠️ No card is left alone on a half-empty row.
+     Widening the six-column tables to the full four columns pushed the channel comparison onto
+     a row of its own, where it kept its authored span of two and left the other half of the
+     board blank. Owner, 2026-10-03: *"these have wasted white space"*.
+
+     So the LAST card on any under-filled row grows to close it. Walked in DOM order against a
+     four-column grid, which is how the grid itself places them, and a card is never shrunk —
+     only the gap after it is taken. */
+  function fillRows(){
+    const COLS = 4;
+    const vis = slots().filter(x => !x.classList.contains("away"));
+    /* From the BASE every time, never from what the last pass left behind. */
+    const sp = (x) => Math.min(COLS, Math.max(1, Number(x.dataset.sp) || 2));
+    vis.forEach(x => x.style.setProperty("--sp", sp(x)));
+    let col = 0;
+    vis.forEach((sl, i) => {
+      let w = sp(sl);
+      if (col + w > COLS) col = 0;              /* it wrapped to a new row */
+      const next = vis[i + 1];
+      const endsRow = !next || col + w + sp(next) > COLS;
+      if (endsRow && col + w < COLS) {
+        w = COLS - col;                         /* take the gap, never give any back */
+        sl.style.setProperty("--sp", w);
+      }
+      col = (col + w) % COLS;
     });
   }
 
