@@ -134,6 +134,8 @@ export interface BoardBid {
   onPlatform: 0 | 1;
   verified: 0 | 1;
   registered: 0 | 1;
+  /** Carries a local-content declaration. The agent prices what that requirement costs. */
+  lc: 0 | 1;
   cr: string | null;
   vat: string | null;
   address: string | null;
@@ -620,6 +622,7 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
         onPlatform: onPlatform(b),
         verified: b.verified ? 1 : 0,
         registered: reg?.vendorRegistered ? 1 : 0,
+        lc: b.compliance?.localContent ? 1 : 0,
         cr: b.supplierCrNumber ?? reg?.crNumber ?? null,
         vat: b.supplierVatNumber ?? null,
         address: b.supplierNationalAddress ?? null,
