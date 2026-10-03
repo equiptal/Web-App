@@ -221,7 +221,14 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
        a request list, not on a page about awards, so it is named in `skipped` rather than drawn as
        an empty row that reads like a finding. */
     if (!win) {
-      skipped.push({ ref, why: bids.length ? "no bid accepted yet" : "no bids received" });
+      /* Name the statuses that WERE there. "No bid accepted yet" on every row of an account
+         that plainly has awards means this test is looking at the wrong field, and without the
+         statuses beside it there is no way to tell that from a genuinely undecided account.
+         The database carries `bids.is_winner` as well as the status, and the renter contract
+         does not expose it — if these come back full of EXPIRED or CLOSED on requests that were
+         in fact awarded, that missing field is the reason. */
+      const seen = [...new Set(bids.map((b) => b.status))].join("/");
+      skipped.push({ ref, why: bids.length ? `no bid accepted yet (${bids.length} bids: ${seen})` : "no bids received" });
       continue;
     }
 

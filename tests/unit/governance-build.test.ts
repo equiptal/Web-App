@@ -120,7 +120,10 @@ describe("buildGovernance", () => {
       }),
     );
     expect(Object.keys(out.R)).toEqual(["r1"]);
-    expect(out.skipped).toEqual([{ ref: "RFQ-1043", why: "no bid accepted yet" }]);
+    /* The statuses that WERE present are named. Without them, "no bid accepted yet" on every row
+       of an account that plainly has awards is indistinguishable from an account with none, and
+       the first is a bug in what this reads while the second is the truth. */
+    expect(out.skipped).toEqual([{ ref: "RFQ-1043", why: "no bid accepted yet (1 bids: SUBMITTED)" }]);
   });
 
   it("drops a request with no dates rather than pricing it from a guess", () => {

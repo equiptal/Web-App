@@ -236,17 +236,8 @@ html.embed .wrap { max-width:none; padding:0 0 8px }
    here is unreachable rather than merely ugly. Nothing is allowed to widen the page. */
 html.embed, html.embed body { max-width:100%; overflow-x:clip }
 html.embed #deck, html.embed .slot, html.embed .two > * { min-width:0 }
-html.embed #agent { position:absolute; inset-block:auto; inset-inline-end:0; box-shadow:none;
-  border-inline-start:1px solid var(--border);
-  top:var(--vtop,0); height:var(--vh,100vh) }
-html.embed #dw { position:absolute; inset-block:auto; inset-inline-end:0;
-  top:var(--vtop,0); height:var(--vh,100vh) }
-html.embed #scrim { position:absolute; inset-block:auto;
-  top:var(--vtop,0); height:var(--vh,100vh) }
-/* Hidden until the host has said where the visible slice is: see the note in the script. */
-html.embed #agentBtn { display:none }
-html.embed.placed #agentBtn { display:flex; position:absolute; inset-block-end:auto; inset-inline-end:22px;
-  top:calc(var(--vtop,0px) + var(--vh,100vh) - 64px) }
+/* The frame is the viewport, so the rail, the drawer and the scrim keep their own
+   `position: fixed` and meet the screen edges with no margin and no computed offsets. */
 /* Docking is kept in the frame: it is the page's full width, so the board narrowing while the
    panel is open is better than the panel sitting on top of the cards it is describing. Below the
    breakpoint the base rule already drops back to an overlay. */
@@ -1277,37 +1268,13 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.9";
+const BUILD = "2026-10-03.10";
 console.log("[governance] page build " + BUILD);
 
-/* ── Embedded in the app shell ───────────────────────────────────────────────────────────────
-   Two scrollbars is the complaint this answers. The host sizes the frame to whatever height
-   this document reports, so this document never scrolls and the browser does it once.
-
-   The catch, and the reason for the second message: once the frame is as tall as its content,
-   `position: fixed` in here anchors to the WHOLE document rather than to what is on screen, so
-   the Cards panel and its launcher would sit in the first screenful and scroll out of reach.
-   The host sends the visible slice and they are positioned against it instead. */
+/* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
+   so nothing here has to be told where the screen is. */
 const EMBED = new URLSearchParams(location.search).get("embed") === "1";
-if (EMBED) {
-  document.documentElement.classList.add("embed");
-  const post = () => {
-    const h = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-    parent.postMessage({ t: "gov:h", h }, location.origin);
-  };
-  /* Height changes when cards are picked, when the agent rearranges and when a card's own
-     content arrives, so it is observed rather than measured once. */
-  new ResizeObserver(post).observe(document.documentElement);
-  window.addEventListener("load", post);
-  window.addEventListener("message", (e) => {
-    if (e.origin !== location.origin) return;
-    const d = e.data;
-    if (!d || d.t !== "gov:view") return;
-    document.documentElement.style.setProperty("--vtop", (d.top || 0) + "px");
-    document.documentElement.style.setProperty("--vh", (d.h || 0) + "px");
-    document.documentElement.classList.add("placed");
-  });
-}
+if (EMBED) document.documentElement.classList.add("embed");
 
 let R = {}, SUPMETA = {}, CERT = {}, WINDOW_INFO = null;
 
@@ -1339,16 +1306,12 @@ async function boot() {
     + Object.keys(SUPMETA).length + " suppliers, " + Object.keys(CERT).length + " papers, "
     + ((d.skipped || []).length) + " skipped");
 
-  if (!Object.keys(R).length) {
-    /* The honest empty state. `skipped` carries why each request was left out, which is the
-       difference between "you bought nothing" and "nothing you bought can be checked yet". */
-    const why = (d.skipped || []).slice(0, 6).map(x => x.ref + ": " + x.why).join(" \u00b7 ");
-    fail("No award on this account can be checked yet",
-         (d.skipped || []).length
-           ? "Of " + (d.skipped || []).length + " request" + ((d.skipped || []).length === 1 ? "" : "s")
-             + ", none has both an accepted bid and the dates needed to price it. " + why
-           : "This account has no awarded requests in the period.");
-  }
+  /* No banner when there is nothing to check. The figures read zero and the cards are
+     empty, which says it already; a paragraph of explanation on top of that was noise
+     the owner asked to be rid of. The reason per request is still in `skipped`, and the
+     console prints it. */
+  if (!Object.keys(R).length) console.warn("[governance] nothing drawable:",
+    (d.skipped || []).slice(0, 10));
   main();
 }
 
