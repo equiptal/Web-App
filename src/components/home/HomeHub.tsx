@@ -239,7 +239,10 @@ export function HomeHub() {
           a renter deep in the create flow must not be tapped on the shoulder. */}
       <HomeNotificationBubble />
 
-      <CtaBanner />
+      {/* The hero steps aside for the governance board (owner, 2026-10-03). That board is a full
+          screen of its own — a rail down one side and cards filling the rest — and a banner above
+          it costs the rail the height it needs to reach the top of the window. */}
+      {view !== "governance" && <CtaBanner />}
 
       {/* ── The three tabs (owner, 2026-09-16) ────────────────────────────────────────────────────
           They ARE the section headings: each carries the plate glyph, the name and the count that
@@ -279,8 +282,10 @@ export function HomeHub() {
           mounted only for the accounts that can open it, and only once the tab has been chosen —
           it fans out across every request to build itself, which is not a cost to pay for a reader
           who never presses it. */}
+      {/* Full-bleed: the board breaks out of this column's padding so the rail meets the right
+          edge of the window rather than stopping at a gutter. */}
       {canGovernance && seenGovernance && (
-        <div className={cx(view !== "governance" && "hidden")}>
+        <div className={cx("-mx-4 sm:-mx-6 lg:-mx-8", view !== "governance" && "hidden")}>
           <GovernanceBoard />
         </div>
       )}

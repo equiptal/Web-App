@@ -190,8 +190,6 @@ th:first-child,td:first-child{min-width:230px}
   border-radius:var(--radius);padding:8px 11px;color:var(--navy);background:var(--surface2)}
 .ask-in:focus{outline:none;border-color:var(--brand);background:var(--surface)}
 .fl-n{flex:1;min-width:0;font-size:11.5px;color:var(--muted)}
-.cust{display:flex;align-items:center;gap:6px;font-size:12px;
-  font-weight:600;color:var(--muted-dark);cursor:pointer}
 
 /* the deck: every panel is a card that can move or be put away */
 #deck{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;align-items:stretch}
@@ -208,7 +206,7 @@ th:first-child,td:first-child{min-width:230px}
    the same mode that arms dragging, so an ordinary reader cannot catch it. */
 .rs{position:absolute;inset-block:0;inset-inline-end:-11px;width:16px;cursor:col-resize;z-index:3;
   display:none;align-items:center;justify-content:center}
-body.cust .rs{display:flex}
+body.arrange .rs{display:flex}
 .rs::before{content:"";width:3px;height:38px;border-radius:2px;background:var(--border-strong)}
 .rs:hover::before{background:var(--brand);height:52px}
 @media (max-width:1100px){ #deck{grid-template-columns:1fr 1fr}
@@ -217,10 +215,10 @@ body.cust .rs{display:flex}
 .slot-h{display:none;align-items:center;gap:8px;padding:5px 9px;margin-bottom:6px;
   background:var(--surface2);border:1px dashed var(--border-strong);border-radius:var(--radius);
   font-size:11px;font-weight:700;color:var(--muted-dark)}
-body.cust .slot-h{display:flex;opacity:0;transition:opacity .12s}
-body.cust .slot:hover .slot-h,
-body.cust .slot:focus-within .slot-h{opacity:1}
-body.cust .slot{cursor:grab}
+body.arrange .slot-h{display:flex;opacity:0;transition:opacity .12s}
+body.arrange .slot:hover .slot-h,
+body.arrange .slot:focus-within .slot-h{opacity:1}
+body.arrange .slot{cursor:grab}
 .slot.drag{opacity:.4}
 .slot.over{outline:2px dashed var(--brand);outline-offset:4px;border-radius:var(--radius)}
 .slot-h .grip{color:var(--muted-light);letter-spacing:-2px}
@@ -231,7 +229,10 @@ body.cust .slot{cursor:grab}
 /* Embedded: no page chrome of its own, and the overlays track the visible slice the host
    reports rather than a viewport this document no longer has. */
 html.embed, html.embed body { background:transparent; overflow:visible }
-html.embed .wrap { max-width:none; padding:0 0 8px }
+/* No centring and no max-width: the board is the page here, so the title sits at the left
+   edge and the cards run to the rail. A centred 1460px column inside a frame that is already
+   the content width just draws a narrow strip with air on both sides. */
+html.embed .wrap { max-width:none !important; margin:0 !important; padding:18px 20px 24px }
 /* The frame is sized to its CONTENT height and told not to scroll, so horizontal overflow
    here is unreachable rather than merely ugly. Nothing is allowed to widen the page. */
 html.embed, html.embed body { max-width:100%; overflow-x:clip }
@@ -258,7 +259,7 @@ html.embed #deck, html.embed .slot, html.embed .two > * { min-width:0 }
 .blank button{margin:0 3px}
 .away-bar{display:none !important;display:none;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:16px;
   padding:9px 12px;background:var(--surface2);border:1px dashed var(--border-strong);border-radius:var(--radius)}
-body.cust .away-bar.has{display:flex}
+body.arrange .away-bar.has{display:flex}
 .away-bar span{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .away-bar button{font:inherit;font-size:11.5px;border:1px solid var(--border);background:var(--surface);
   border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--muted-dark)}
@@ -1268,7 +1269,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.10";
+const BUILD = "2026-10-03.12";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -1279,11 +1280,16 @@ if (EMBED) document.documentElement.classList.add("embed");
 let R = {}, SUPMETA = {}, CERT = {}, WINDOW_INFO = null;
 
 function fail(msg, detail) {
-  const d = document.getElementById("deck") || document.querySelector(".wrap");
   const p = document.createElement("div");
   p.className = "blank on";
   p.innerHTML = "<b>" + msg + "</b><p>" + (detail || "") + "</p>";
-  if (d) d.before(p);
+  /* Inside the page's own column. `fail` can run before main(), when #deck does not exist,
+     and the old fallback put the message BESIDE .wrap rather than in it. */
+  const deck = document.getElementById("deck");
+  const wrap = document.querySelector(".wrap");
+  if (deck) deck.before(p);
+  else if (wrap) wrap.append(p);
+  else document.body.append(p);
 }
 
 async function boot() {
@@ -2070,7 +2076,7 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     document.addEventListener("pointerup", up);
   });
 
-  document.body.classList.add("cust");
+  document.body.classList.add("arrange");
   slots().forEach((x) => { x.draggable = true; });
 
   const custBox = document.getElementById("custOn");

@@ -21,11 +21,11 @@
 export function GovernanceBoard({ className = "" }: { className?: string }) {
   return (
     <iframe
-      src="/governance-dashboard.html?embed=1&v=10"
+      src="/governance-dashboard.html?embed=1&v=12"
       title="Governance and compliance"
       /* Tall enough to be the screen, short enough to leave the tab row above it in view. */
       className={"block w-full " + className}
-      style={{ border: 0, height: "calc(100vh - 150px)", minHeight: 520 }}
+      style={{ border: 0, height: "calc(100vh - 96px)", minHeight: 520 }}
     />
   );
 }
