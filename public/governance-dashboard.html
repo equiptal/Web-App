@@ -222,6 +222,8 @@ body.docked #agentBtn{display:none}
 .ans{font-size:13px;line-height:1.55;padding:10px 12px;border-inline-start:3px solid var(--brand);
   background:var(--surface2);border-radius:0 var(--radius) var(--radius) 0}
 .ans b{font-weight:800;color:var(--brand-deep)}
+/* One quiet line under the answer, where a specification table used to be. */
+.said{font-size:11.5px;color:var(--muted);line-height:1.5}
 .chips{display:flex;flex-direction:column;gap:5px;align-items:flex-start;margin-top:2px}
 .chips button{font:inherit;font-size:11.5px;border:1px solid var(--border);background:var(--surface);
   border-radius:999px;padding:5px 11px;cursor:pointer;color:var(--muted-dark);text-align:start}
@@ -1387,7 +1389,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.40";
+const BUILD = "2026-10-03.42";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -2982,7 +2984,15 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     let show = null, grain = "One row per request",
         scope = "", measures = [], why = "", open = null;
 
-    const sup = SUPPLIERS.find(x => t.includes(x.toLowerCase().split(" ")[0]));
+    /* ⚠️ Whole WORDS, matched against a set rather than with `includes`. `includes("al")`
+       matched "usu-AL marketplace" and "loc-AL content", so two of the three suggested questions
+       were scoped to Al Faisal Rentals and opened his row. A short first name is too thin on its
+       own, so a supplier whose first word is under four letters has to be named in full. */
+    const words = new Set(t.split(/[^a-z0-9]+/).filter(Boolean));
+    const sup = SUPPLIERS.find(x => {
+      const parts = x.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+      return parts[0].length >= 4 ? words.has(parts[0]) : parts.every(p => words.has(p));
+    });
     if (sup){
       show = ["suppliers","awards"].concat(KPI);
       grain = "One row per supplier";
@@ -3260,22 +3270,28 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
     if (spec.order) apply(spec.order, DEFAULT.filter(c=>!spec.show.includes(c)));
     setPeriod(spec.period); drawLib(); save();
 
-    const row = (l,v)=> '<div class="sr"><i>' + l + '</i><span>' + v + '</span></div>';
-    /* The ANSWER first, and the cards it rearranged after it as the working. A reader who asked
-       "how much would I have saved" wants the number, not a list of cards to go and read. */
+    /* ── The reply is TEXT ─────────────────────────────────────────────────────────────
+       It used to be an answer followed by a specification: a table of Cards / Grain / Scope /
+       Measures and a paragraph about what the agent had decided. That was built to show how the
+       thing works, and it reads as machinery rather than as an answer. Owner, 2026-10-03:
+       *"i want text answers outputs not like this"*.
+
+       So: the answer, in prose, and at most one quiet line naming what the board now shows. The
+       rearranging still happens — it is just not narrated. */
     const ans = answerFor(q.toLowerCase());
     if (ans) say('<div class="ans">' + ans + '</div>');
-    say('<b>' + spec.why + '</b>' +
-      '<div class="spec">' +
-        row("Cards", (spec.show||[]).map(c=>'<code>'+NAMES[c]+'</code>').join("") || "<i>unchanged</i>") +
-        row("Grain", spec.grain) +
-        (spec.scope ? row("Scope", spec.scope) : "") +
-        (spec.period ? row("Period", spec.period) : "") +
-        (spec.measures.length ? row("Measures", spec.measures.map(m=>'<code>'+m+'</code>').join("")) : "") +
-        '<div class="note">This is the whole of what the agent decided. It picked the cards, the order and ' +
-        'the grain. It computed nothing: every figure on the page is still produced by the same code as before, ' +
-        'so the agent can be unhelpful but it cannot be arithmetically wrong</div>' +
-      '</div>');
+    else if (spec.why) say('<div class="ans">' + spec.why + '.</div>');
+
+    /* A question that got an ANSWER needs no commentary: the reader asked how much he would
+       have saved, not which cards were rearranged on his behalf. The line is for the questions
+       that only move cards, where what moved IS the answer. */
+    const names = ans ? [] : (spec.show || []).map(c => NAMES[c]).filter(Boolean);
+    if (names.length) {
+      const list2 = names.length < 2 ? names[0]
+        : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+      say('<div class="said">The board behind this now shows ' + list2.toLowerCase()
+        + (spec.scope ? ', for ' + spec.scope : '') + '.</div>');
+    }
 
     /* A named supplier gets his own row opened, so the answer is the
        data and not a description of where to find it. */
