@@ -590,9 +590,7 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
 
   <div id="loading">
     <div class="lbar"><i></i></div>
-    <div class="lt">Reading your requests</div>
-    <div class="ls">Every bid on every request, with the papers and the suppliers behind them.
-      On an account with a few hundred bids this takes a moment</div>
+    <div class="lt">Reading your requests and their bids</div>
   </div>
 
   <div class="head">
@@ -645,7 +643,7 @@ ol.chain code{font-family:var(--mono);font-size:11px;background:var(--surface2);
             <th data-x="c-winner">Awarded to</th>
             <th class="r" data-x="c-terms">Your terms met</th>
             <th class="r" data-x="c-value">Value, SAR</th>
-            <th data-x="c-position">Your price vs the field</th>
+            <th data-x="c-position">Against the other bids, and the market</th>
             <th data-x="c-findings">Warnings</th>
           </tr>
         </thead>
@@ -1430,7 +1428,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-04.02";
+const BUILD = "2026-10-04.04";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -1894,25 +1892,11 @@ for (const id in R) {
   pageRows(document.getElementById("eqBody"), "machine types");
   const over = eq.filter(e=>e.vs!=null && e.vs>=5).sort((a,b)=>b.vs-a.vs);
   const noBand = eq.filter(e=>e.vs==null);
-  const pjSum = Object.values(PROJ).sort((a,b)=>b.spend-a.spend).map(j=>{
-    const cmp = j.hires.filter(h=>h.med!=null).map(h=>h.rate/h.med-1);
-    const v = cmp.length ? avg(cmp)*100 : null;
-    return `${j.name||"No project"} <b>${sar(j.spend)} SAR</b> over ${j.hires.length} hire${j.hires.length===1?"":"s"}`
-      + (v==null ? "" : `, ${pct(v)} against market`);
-  }).join(" \u00b7 ");
-  document.getElementById("eqFoot").innerHTML =
-    (over.length
-      ? `<b>${list(over.map(e=>e.type))} ${over.length>1?"are the ones":"is the one"} to renegotiate.</b>
-         You pay ${list(over.map(e=>pct(e.vs)))} over the going rate${over.length>1?" for them":""}.`
-      : noBand.length===eq.length
-      ? `<b>No machine type has three bids behind it yet, so none can be compared.</b>`
-      : `<b>Every machine type that can be compared sits at or under the going rate.</b>`) +
-    (noBand.length && noBand.length!==eq.length
-      ? `<br>${list(noBand.map(e=>e.type))} drew fewer than three bids, so there is no band to compare them to`
-      : "") +
-    `<br>${pjSum}` +
-    (eq.every(e=>e.hires.length===1)
-      ? "<br>One hire per machine type this period, so each rate is that hire. It becomes a framework number once a type repeats" : "");
+  document.getElementById("eqFoot").innerHTML = over.length
+    ? `<b>${list(over.map(e=>e.type))} ${over.length>1?"are":"is"} over the going rate</b>, by ${list(over.map(e=>pct(e.vs)))}`
+    : noBand.length === eq.length
+    ? `<b>No machine type has three bids behind it yet</b>, so none can be compared`
+    : `<b>Every machine type sits at or under the going rate</b>`;
 
   const sp = Object.values(SUP).sort((a,b)=>b.offers.length-a.offers.length || b.won-a.won);
   document.getElementById("supBody").innerHTML = sp.map(t=>
@@ -2325,19 +2309,12 @@ for (const id in R) {
     ? "What you awarded, by route and by supplier"
     : "Nothing is awarded yet, so this counts the LEADING bid on each request";
   const nameless = paid.filter(t=>!t.ver);
+  /* "Your spend" is a claim about money that has changed hands; on a board counting leading
+     bids none has. The word follows the basis. */
   document.getElementById("shareFoot").innerHTML = !paid.length
-    ? "<b>No supplier has bid on anything in this period.</b>"
-    : `<b>${(() => {
-        /* "Your spend" is a claim about money that has changed hands. On a board counting leading
-           bids none has, and the sentence has to say what it is actually measuring. */
-        const what = BASIS === "awarded" ? "your spend" : "what is on the table";
-        return paid.length === 1
-          ? `One supplier holds all of ${what}.`
-          : `Your largest supplier holds ${share100[0]}% of ${what}, across ${paid.length} suppliers.`;
-      })()}</b>`
-      + (nameless.length
-        ? ` ${nameless.length} of them ${nameless.length===1?"holds":"hold"} ${nameless.reduce((a,t)=>a+share100[paid.indexOf(t)],0)}% between ${nameless.length===1?"it":"them"} with no verified platform identity`
-        : " Every one of them is verified on the platform");
+    ? "<b>No supplier has bid on anything in this period</b>"
+    : `<b>Your largest supplier holds ${share100[0]}%</b> of ${BASIS === "awarded" ? "your spend" : "what is on the table"}, across ${paid.length} suppliers`
+      + (nameless.length ? ` \u00b7 ${nameless.length} unverified` : "");
 
   /* ── Moedatech against your own suppliers ────────────────────── */
   const CO = ["Moedatech marketplace","Your own shared link","Direct to one named firm"];
@@ -2375,19 +2352,15 @@ for (const id in R) {
        column under a heading that promises a comparison reads as "the other routes scored zero". */
     const only = ch[0];
     document.getElementById("chanFoot").innerHTML =
-      `<b>Every request this period went out the same way: ${only.name.toLowerCase()}.</b>
-       There is no second route to compare it against yet. Share a request by link, or send one to a
-       named supplier, and this card starts answering which route gets you more bids per request and
-       a better price`;
+      `<b>Every request went out the same way: ${only.name.toLowerCase()}</b> \u00b7 nothing to compare against yet`;
     return;
   }
   const mkt = ch[0];
   document.getElementById("chanFoot").innerHTML = !offN
-    ? "<b>Everything this period went out through the marketplace.</b> There is no off-platform route to compare it against yet"
-    : `<b>${offN} request${offN===1?"":"s"} went out away from the marketplace.</b> `
-      + `${offKnown} of ${offN} ${offKnown===1?"has":"have"} a commercial registration on file`
-      + (mkt && mkt.n ? `, against ${mkt.known} of ${mkt.n} on the marketplace` : "")
-      + (off.some(c=>c.name.indexOf("Direct")===0) ? ". On the direct ones nobody else could bid" : "");
+    ? "<b>Everything went out through the marketplace</b> \u00b7 no other route to compare"
+    : `<b>${offN} request${offN===1?"":"s"} went out away from the marketplace</b> \u00b7 `
+      + `${offKnown} of ${offN} with a commercial registration`
+      + (mkt && mkt.n ? `, against ${mkt.known} of ${mkt.n} on it` : "");
 
 })();
 
@@ -3044,7 +3017,12 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
       if (col + w > COLS) col = 0;              /* it wrapped to a new row */
       const next = vis[i + 1];
       const endsRow = !next || col + w + sp(next) > COLS;
-      if (endsRow && col + w < COLS) {
+      /* ⚠️ A FIGURE CARD IS NEVER STRETCHED. It holds one number over one label, so a figure
+         given half the board is a number adrift in white space. Owner, 2026-10-04: *"show them
+         always as square normal card size"*. Only the cards with content worth the width take
+         the gap at the end of a row. */
+      const fixed = sl.classList.contains("quarter");
+      if (!fixed && endsRow && col + w < COLS) {
         w = COLS - col;                         /* take the gap, never give any back */
         sl.style.setProperty("--sp", w);
       }
@@ -3309,11 +3287,12 @@ document.addEventListener("keydown",(e)=>{if(e.key==="Escape")close();});
   /* ── The panel ───────────────────────────────────────────────── */
   const panel = document.getElementById("agent"), body = document.getElementById("chBody");
   /* The owner's own three, in his own words, so the chip and the answer read as one exchange. */
+  /* The owner's three, and only those. The two that were here beside them ("Where can we save
+     money", "What looks wrong this period") only rearrange cards and answer nothing, so beside
+     three questions that give a number they read as filler. Typing either still works. */
   const SUGS = ["Compare my excavator rates versus usual marketplace rate",
                 "Compare my suppliers prices versus Moedatech prices",
-                "How much money would I have saved if I didn't need local content",
-                "Where can we save money",
-                "What looks wrong this period"];
+                "How much money would I have saved if I didn't need local content"];
 
   /* ══════════════════════════════════════════════════════════════════════════════════════
      The agent's three answers.
