@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 /** Bumped with every change to the page: Amplify serves `public/` with a long max-age. */
-const V = 24;
+const V = 27;
 
 /** The rail's width, and the padding the board carries so no card hides under it. */
 const RAIL_W = 404;
@@ -45,9 +45,12 @@ export function GovernanceBoard({ className = "" }: { className?: string }) {
      zero collapses the tab and makes the page jump as it fills. */
   const [height, setHeight] = useState(900);
   const [railOpen, setRailOpen] = useState(true);
-  /* The rail frame is mounted only once the board has published its payload. Starting both at
-     the same moment leaves the rail polling an empty key for a board that has not fetched yet. */
-  const [ready, setReady] = useState(false);
+  /* ⚠️ The rail mounts WITH the board, not after it.
+     It was gated on the board publishing its payload, which meant the picker appeared a second
+     or two into the tab — so opening Governance showed a bare board and the panel arrived late,
+     as if something had gone wrong. Owner, 2026-10-03: *"show the side panel opened once the
+     governance clicked"*. It polls `sessionStorage` for up to ten seconds and draws its chrome
+     immediately, so starting it early costs nothing and it is on screen from the first paint. */
 
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
@@ -56,10 +59,7 @@ export function GovernanceBoard({ className = "" }: { className?: string }) {
       if (e.origin !== window.location.origin) return;
       const d = e.data as { type?: string; px?: number; open?: boolean } | null;
       if (!d) return;
-      if (d.type === "governance:height" && typeof d.px === "number" && d.px > 200) {
-        setHeight(d.px);
-        setReady(true);
-      }
+      if (d.type === "governance:height" && typeof d.px === "number" && d.px > 200) setHeight(d.px);
       /* Only the rail frame sends this, and only to be dismissed: its ✕ and Escape ask to be
          hidden, because closing the panel inside its own frame would leave an empty strip on
          screen with no way back. */
@@ -89,7 +89,7 @@ export function GovernanceBoard({ className = "" }: { className?: string }) {
         }}
       />
 
-      {ready && railOpen && (
+      {railOpen && (
         <iframe
           src={`/governance-dashboard.html?rail=1&v=${V}`}
           title="Cards and questions"
@@ -117,7 +117,7 @@ export function GovernanceBoard({ className = "" }: { className?: string }) {
         />
       )}
 
-      {ready && !railOpen && (
+      {!railOpen && (
         /* The way back in. The rail is the only way to put a card on the board, so a board with
            it shut and no launcher is a page the reader cannot change. */
         <button

@@ -165,6 +165,10 @@ body.docked #agentBtn{display:none}
 .lib.on::after{content:"\2713";background:var(--navy);border-color:var(--navy);color:#fff;font-size:9px;
   font-weight:800;display:grid;place-items:center;line-height:1}
 .lib-f{margin-top:6px;font-size:11.5px;color:var(--muted)}
+/* Demo mode announces itself, every pixel of the way across the top. A governance board that
+   invents an award and does not say so is the worst thing this page could be. */
+#demobar{position:sticky;top:0;z-index:60;background:var(--danger);color:#fff;font-size:12px;
+  font-weight:700;padding:8px 20px;line-height:1.4}
 
 /* The preview IS the card, rendered once and scaled down. A drawing of a
    card is a second thing to keep in step with the first, and it answers
@@ -1361,7 +1365,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.24";
+const BUILD = "2026-10-03.27";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
@@ -1373,6 +1377,8 @@ const EMBED = QS.get("embed") === "1";
    previews ARE the board's own sections, scaled, and a frame that never drew them would be back
    to drawing pictures of cards. */
 const RAIL = QS.get("rail") === "1";
+/* ⚠️ OFF unless the URL asks. See `demo()`. */
+const DEMO = QS.get("demo") === "1";
 if (EMBED) document.documentElement.classList.add("embed");
 if (RAIL) document.documentElement.classList.add("railonly");
 
@@ -1402,8 +1408,79 @@ function fail(msg, detail) {
 
 const PAYLOAD_KEY = "moedatech.governance.payload";
 
+/**
+ * Overlay synthetic AWARDS, off-platform bids and link shares on the renter's REAL requests.
+ *
+ * 🔴 **Never on unless `?demo=1` is in the URL, and the page says so in a banner while it is.**
+ * This is a governance board: its whole value is that a figure on it is a fact about money. A
+ * mode that invents awards is a mode that invents findings, so it has to be impossible to be in
+ * by accident and impossible to miss once you are.
+ *
+ * Why it exists: this account has 57 real requests, 111 real bids and 54 real suppliers, and
+ * ZERO awards, zero shared-link submissions and zero share links. Every card that depends on an
+ * award or on a second route is therefore empty on real data, and there is no way to look at
+ * those cards without either waiting for the business to produce one or making one up.
+ *
+ * It only ever ADDS, and only where the account is empty: if a request already has an award this
+ * leaves it alone. Nothing here is written anywhere — it mutates the in-memory payload after the
+ * fetch and before the first render.
+ */
+function demo(d) {
+  const ids = Object.keys(d.R || {}).filter((id) => d.R[id].bids.length && d.R[id].priced);
+  if (!ids.length) return d;
+
+  ids.forEach((id, n) => {
+    const r = d.R[id];
+
+    /* Every third request gets an award, and it is the LEADING bid on it rather than a random
+       one: a demo that awarded the dearest bid every time would make the board look broken. */
+    if (n % 3 === 0 && !r.awarded) {
+      const lead = r.bids.filter((b) => b.ok).sort((a, b) => a.perDay - b.perDay)[0]
+        || r.bids.slice().sort((a, b) => a.perDay - b.perDay)[0];
+      if (lead) {
+        lead.won = 1;
+        r.awarded = true;
+        r.total = Math.round(lead.total).toLocaleString("en-US");
+        r.money = [["Rate per day", Math.round(lead.perDay).toLocaleString("en-US")],
+                   ["Units", "×" + lead.units],
+                   ["Billable days", r.billable],
+                   ["Total for the hire", r.total]];
+        r.winner = { name: lead.firm, route: lead.route, acct: lead.onPlatform ? "Yes" : "No",
+                     ver: lead.verified ? "Yes" : "No", cr: lead.cr || "None on file",
+                     vat: lead.vat || "None on file", address: lead.address || "None on file",
+                     reg: lead.registered ? "Yes" : "No" };
+      }
+    }
+
+    /* Every fourth request also drew an off-platform offer, so the channel comparison has a
+       second column and the papers card has a supplier with no machine record behind it. */
+    if (n % 4 === 1) {
+      const base = r.bids[0];
+      if (base) {
+        const perDay = Math.round(base.perDay * 0.92);
+        r.bids.push({
+          firm: "Demo Offline Plant", price: perDay, perDay, unit: "PER_DAY", units: base.units,
+          at: base.at, ok: 0, won: 0, missed: ["Fuel"], met: ["Operator included"],
+          route: "Your own shared link", onPlatform: 0, verified: 0, registered: 0,
+          cr: "1010" + String(100000 + n), vat: null, address: null, city: "Dammam",
+          machine: null, year: null, mob: null, demob: null,
+          total: Math.round(perDay * (r.billable || 0) * base.units), from: null, docs: [],
+        });
+        r.channel = "Your own shared link";
+        r.sent = 6; r.opened = 3; r.reach = "opened";
+        d.SUPMETA["Demo Offline Plant"] = { src: "Off platform", ver: 0, cr: "1010" + String(100000 + n),
+          vat: "None on file", address: "None on file", city: "Dammam", reg: "No", groups: [], rollup: null };
+      }
+    }
+  });
+
+  d.basis = Object.values(d.R).some((r) => r.awarded) ? "awarded" : "leading";
+  return d;
+}
+
 /** Draw from a payload, whichever frame produced it. */
 function adopt(d) {
+  if (DEMO) d = demo(d);
   R = d.R || {}; SUPMETA = d.SUPMETA || {}; CERT = d.CERT || {}; WINDOW_INFO = d.window || null;
   BASIS = d.basis || "awarded";
 }
@@ -1442,6 +1519,13 @@ async function boot() {
      view of one account, and leaving it on disk for the next person to open the browser is a
      copy of a renter's commercial position nobody asked to keep. */
   try { sessionStorage.setItem(PAYLOAD_KEY, JSON.stringify(d)); } catch (e) { /* over quota */ }
+  if (DEMO) {
+    const bar = document.createElement("div");
+    bar.id = "demobar";
+    bar.textContent = "Demo mode · awards, off-platform offers and link shares on this page are INVENTED. "
+      + "Requests, bids, suppliers, rates and papers are real. Remove ?demo=1 to see the account as it is.";
+    document.body.prepend(bar);
+  }
   console.log("[governance] " + res.status + " · " + Object.keys(R).length + " requests, "
     + Object.keys(SUPMETA).length + " suppliers, " + Object.keys(CERT).length + " papers, "
     + ((d.skipped || []).length) + " skipped");
@@ -1508,7 +1592,7 @@ const day = v => { if (!v) return "\u2014"; const d = new Date(v);
    what the leading bid would cost. An account mid-flight is the ordinary case, and a board that
    counted only awards drew a column of zeros beside twenty requests full of real bids.
    `BASIS` says which of the two every money card is reporting, and every label follows it. */
-const VAL = r => { if (r.awarded) return num(r.total); const b = leadBid(r); return b ? b.total : 0; };
+const VAL = r => { if (!r.priced) return 0; if (r.awarded) return num(r.total); const b = leadBid(r); return b ? b.total : 0; };
 /* The vocabulary. "Awarded" is a fact about the past; "on the table" is a figure about offers
    that are still open, and the two must never be printed in the same words. */
 const MONEY_WORD   = () => BASIS === "awarded" ? "awarded" : "on the table";
@@ -1691,6 +1775,9 @@ for (const id in R) {
     /* On an awarded board, awards only. On a board with none, every request with a bid, priced at
        its leading bid - which is the whole point of `BASIS`. */
     if (BASIS === "awarded" && !r.awarded) continue;
+    /* An open-ended hire has no end date, so it has no total. It still appears in every other
+       card: who bid, by what route, against which terms. Only the money skips it. */
+    if (!r.priced) continue;
     const won = leadBid(r); if (!won) continue;
     const rate = won.perDay, span = r.units * r.billable;
     awarded += VAL(r);
@@ -1887,14 +1974,14 @@ for (const id in R) {
       /* The warning keys ride on the row. A filter that re-ran `warningsFor` would be a second
          opinion about the same request, and the two would drift the first time a rule changed. */
       return `<tr data-row="${id}" data-w="${warns.map(w => w[0]).join(" ")}" data-aw="${r.awarded ? 1 : 0}">
-        <td data-x="c-request"><span class="ref">${r.ref}</span><span class="sub">${r.machine} \u00b7 ${r.days} days</span></td>
+        <td data-x="c-request"><span class="ref">${r.ref}</span><span class="sub">${r.machine} \u00b7 ${!r.priced ? "open ended" : r.window === "one-cycle" ? "open ended · priced for one " + String(r.basis || "cycle").toLowerCase().replace(/ly$/, "") : r.days + " days"}</span></td>
         <td data-x="c-reach"><span class="rk ${rk(r.bids.length)}">${r.bids.length} bid${r.bids.length === 1 ? "" : "s"}</span>
           <span class="sub">${route}${r.opened == null ? " \u00b7 suppliers reached not recorded" : ""}</span>
           ${r.opened != null ? `<span class="sub2">${REACH(r)}</span>` : ""}
           ${r.held ? `<span class="sub2">${r.held} larger held back</span>` : ""}</td>
-        <td data-x="c-winner">${w.name}<span class="sub${w.cr === "None on file" ? " bad" : ""}">${route} \u00b7 ${w.ver === "Yes" ? "verified" : "unverified"} \u00b7 ${idTag}</span></td>
-        <td class="r" data-x="c-terms"><span class="rk ${met === all ? "ok" : met / (all || 1) >= 0.8 ? "warn" : "bad"}">${met} of ${all}</span></td>
-        <td class="r" data-x="c-value">${r.awarded ? r.total : '<span class="na">not awarded</span>'}<span class="sub">${sar(price)} /day${r.units > 1 ? " \u00d7" + r.units : ""}${r.awarded ? "" : " \u00b7 leading bid"}</span></td>
+        <td data-x="c-winner">${!r.bids.length ? '<span class="na">nobody bid</span>' : `${w.name}<span class="sub${w.cr === "None on file" ? " bad" : ""}">${route} · ${w.ver === "Yes" ? "verified" : "unverified"} · ${idTag}</span>`}</td>
+        <td class="r" data-x="c-terms">${!r.bids.length ? '<span class="na">—</span>' : `<span class="rk ${met === all ? "ok" : met / (all || 1) >= 0.8 ? "warn" : "bad"}">${met} of ${all}</span>`}</td>
+        <td class="r" data-x="c-value">${!r.priced ? '<span class="na">no end date</span>' : r.awarded ? r.total : '<span class="na">not awarded</span>'}<span class="sub">${sar(price)} /day${r.units > 1 ? " \u00d7" + r.units : ""}${r.awarded ? "" : " \u00b7 leading bid"}</span></td>
         <td data-x="c-position"><div class="pos" data-x="c-position">${rail}${note}</div></td>
         <td data-x="c-findings">${warns.length
           ? warns.map(([k, t]) => `<span class="f" data-x="${k}">${t}</span>`).join("")
@@ -2191,10 +2278,16 @@ function requestDossier(r, focus) {
       ["Machine", r.machine],
       ["Project", r.project || "Not filed under a project"],
       ["Site", r.city || "Not given"],
-      ["Hire window", r.start && r.end ? `${day(r.start)} to ${day(r.end)}` : "Not set"],
-      ["Calendar days", r.days],
-      ["Fridays inside it, not billed", "\u2212" + r.fri],
-      ["Billable days", r.billable],
+      ["Hire window", r.start && r.end ? `${day(r.start)} to ${day(r.end)}`
+        : r.start ? `from ${day(r.start)}, open ended` : "Not set"],
+      ...(r.window === "one-cycle"
+        ? [["Priced for", `one ${String(r.basis || "cycle").toLowerCase().replace(/ly$/, "")}, because the request states no end date`, 1]]
+        : []),
+      /* An open-ended hire has no day count at all, and three blank rows read as a bug. */
+      ...(r.priced
+        ? [["Calendar days", r.days], ["Fridays inside it, not billed", "−" + r.fri],
+           ["Billable days", r.billable]]
+        : [["Hire length", "no end date on the request, so the hire cannot be priced", 1]]),
       ["Units", "\u00d7" + r.units],
       ["Raised", day(r.created)],
       ["Bidding closed", r.deadline ? day(r.deadline) : "no deadline set"],

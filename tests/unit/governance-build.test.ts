@@ -3,6 +3,7 @@ import { buildGovernance, type GovernanceInput } from "@/lib/governance/build";
 import type { RequestListItem } from "@/lib/contract/requests";
 import type { BidCard } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { linkTermVerdict } from "@/lib/governance/link-conflicts";
 
 /**
  * The governance board holds no numbers of its own: every card, every figure and every drill-down
@@ -135,26 +136,117 @@ describe("buildGovernance", () => {
     expect(out.skipped).toEqual([]);
   });
 
-  it("still drops a request that drew no bids at all", () => {
+  it("keeps a request that drew no bids at all: that IS the finding", () => {
+    const out = buildGovernance(input({ requests: [request({ suppliersNotified: 12 })], bidsByRequest: {} }));
+    /* Owner, 2026-10-03: *"dont filter the requests date or status so it must appear"*. A request
+       nobody answered is not an absence of data — you asked twelve suppliers and none replied,
+       which is the most actionable row on the page. Dropping it made the board agree with itself
+       about a market that had ignored him. */
+    expect(Object.keys(out.R)).toEqual(["r1"]);
+    expect(out.skipped).toEqual([]);
+    const r = out.R.r1;
+    expect(r.bids).toEqual([]);
+    expect(r.winner).toBeNull();
+    expect(r.awarded).toBe(false);
+    expect(r.total).toBe("0");
+    /* The reach still answers, which is the whole point of keeping it. */
+    expect(r.opened).toBe(12);
+    /* And nothing downstream reads a bid that is not there. */
+    expect(r.terms).toEqual([]);
+    expect(r.units).toBe(1);
+  });
+
+  it("prices an open-ended hire for ONE CYCLE of its own basis, and says so", () => {
+    const out = buildGovernance(
+      input({
+        /* 52 of this renter's 57 requests: a start date, a basis, and no end. Refusing to price
+           them left every money card at zero across an account with 214 real bids. */
+        requests: [request({ endDate: null, durationDays: null, rentalType: "MONTHLY" })],
+        bidsByRequest: { r1: [bid({ supplierName: "Zahid", price: 1000, status: "ACCEPTED" })] },
+      }),
+    );
+    const r = out.R.r1;
+    expect(r.priced).toBe(true);
+    expect(r.window).toBe("one-cycle");
+    expect(r.basis).toBe("MONTHLY");
+    /* 1 Sep + 30 days inclusive = 30 Sep, which holds four Fridays. */
+    expect(r.days).toBe(30);
+    expect(r.billable).toBe(26);
+    expect(r.total).toBe("26,000");
+  });
+
+  it("leaves an open-ended hire unpriced when the request states no basis either", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request({ endDate: null, durationDays: null, rentalType: null })],
+        bidsByRequest: { r1: [bid({ supplierName: "Zahid", price: 1000 })] },
+      }),
+    );
+    /* Nothing to assume from, so nothing is assumed. The row still appears. */
+    expect(out.R.r1.priced).toBe(false);
+    expect(out.R.r1.window).toBe("stated");
+    expect(out.R.r1.bids).toHaveLength(1);
+  });
+
+  it("keeps a junk rate off the band without hiding the bid", () => {
+    const out = buildGovernance(
+      input({
+        requests: [request(), request({ id: "r2", groupRef: "RFQ-1043" }), request({ id: "r3", groupRef: "RFQ-1044" })],
+        bidsByRequest: {
+          /* Staging carries bids at 0 and at 130,000 SAR a day. The median survives them; `lo`
+             and `hi` do not, and they are what the price rail is drawn against. */
+          r1: [bid({ supplierName: "A", price: 600 }), bid({ supplierName: "Junk", price: 130000 })],
+          r2: [bid({ supplierName: "B", price: 650 })],
+          r3: [bid({ supplierName: "C", price: 700 })],
+        },
+      }),
+    );
+    expect(out.R.r1.market).toEqual({ med: 650, n: 3, lo: 600, hi: 700, firms: 3, source: "yours" });
+    /* Still on its own row: it was really submitted. */
+    expect(out.R.r1.bids.map((b) => b.firm).sort()).toEqual(["A", "Junk"]);
+  });
+
+  it("KEEPS an open-ended hire and shows it unpriced, rather than dropping it", () => {
+    const out = buildGovernance(
+      input({
+        /* 390 of 655 requests on the platform have no end date, and 52 of this renter's 57. It
+           is a real business state: you hire from the 17th, monthly, until you send it back.
+           Dropping them left him an empty board and 52 lines in a console nobody reads. */
+        requests: [request({ endDate: null, durationDays: null, rentalType: null })],
+        bidsByRequest: { r1: [bid({ supplierName: "Zahid", price: 1000 }), bid({ supplierName: "Nesma", price: 900 })] },
+      }),
+    );
+    expect(Object.keys(out.R)).toEqual(["r1"]);
+    expect(out.skipped).toEqual([]);
+    const r = out.R.r1;
+    expect(r.priced).toBe(false);
+    /* No day count is invented. */
+    expect([r.days, r.fri, r.billable]).toEqual([null, null, null]);
+    /* And no money: a total needs an end date. */
+    expect(r.total).toBe("0");
+    expect(r.money).toEqual([]);
+    expect(r.bids.every((b) => b.total === 0)).toBe(true);
+    /* Everything the page is actually for still answers. */
+    expect(r.bids).toHaveLength(2);
+    expect(r.bids.map((b) => b.perDay).sort((x, y) => x - y)).toEqual([900, 1000]);
+    expect(r.channel).toBe("Moedatech marketplace");
+  });
+
+  it("never lets a zero or junk price become the leading bid", () => {
     const out = buildGovernance(
       input({
         requests: [request()],
-        bidsByRequest: {},
+        /* Staging carries bids at 0 and at 5 SAR a day. The lead is the cheapest, so one
+           data-entry error became the leading bid and priced the whole hire at nothing. */
+        bidsByRequest: {
+          r1: [bid({ supplierName: "Junk", price: 0 }), bid({ supplierName: "Real", price: 950 })],
+        },
       }),
     );
-    expect(out.R).toEqual({});
-    expect(out.skipped).toEqual([{ ref: "RFQ-1042", why: "no bids received" }]);
-  });
-
-  it("drops a request with no dates rather than pricing it from a guess", () => {
-    const out = buildGovernance(
-      input({
-        requests: [request({ startDate: null })],
-        bidsByRequest: { r1: [bid({ supplierName: "Zahid", status: "ACCEPTED" })] },
-      }),
-    );
-    expect(out.R).toEqual({});
-    expect(out.skipped[0].why).toMatch(/cannot be priced/);
+    /* It is still SHOWN in the field — it was really submitted — it just cannot stand in. */
+    expect(out.R.r1.bids.map((b) => b.firm).sort()).toEqual(["Junk", "Real"]);
+    expect(out.R.r1.units).toBe(1);
+    expect(out.R.r1.terms.length).toBeGreaterThan(0);
   });
 
   it("counts a survey-reported winner, not only a deal-room accept", () => {
@@ -656,15 +748,33 @@ describe("buildGovernance", () => {
           rentalRate: 880,
           deliveryPrice: 1500,
           returnPrice: 1500,
+          /* What the renter asked of this item, and what the supplier answered on the form. */
+          requiredTerms: { operator: "Included", fuel: "On supplier", equipmentCert: "TUV" },
+          confirmations: { operator: true, fuel: false, "equipmentCert::TUV": true },
         },
       ],
-    } as LinkBidSubmission;
+      /* Through `unknown`: the per-code confirmation keys (`equipmentCert::TUV`) are real and
+         documented on `LinkBidConfirmations`, but they are an index convention rather than
+         declared members, so the literal does not structurally match. */
+    } as unknown as LinkBidSubmission;
 
     /* The same overlay the route applies: the mapper drops the identity fields because the
        surfaces it was written for do not show them, and this board's whole question is whether
        the firm you paid is identifiable. */
+    const verdict = linkTermVerdict(sub.items[0]);
     const linkBid = {
       ...submissionToBidCard(sub),
+      /* The mapper hard-codes `conflictCount: 0`; the route derives it from the answers above. */
+      conflictCount: verdict.missed.length,
+      matchCount: verdict.met.length,
+      terms: {
+        equipment: [],
+        contract: [
+          ...verdict.met.map((labelEn) => ({ key: labelEn, labelEn, labelAr: "", state: "matched" as const })),
+          ...verdict.missed.map((labelEn) => ({ key: labelEn, labelEn, labelAr: "", state: "conflict" as const })),
+        ],
+        supplier: [],
+      },
       supplierCrNumber: sub.crNumber ?? null,
       supplierVatNumber: sub.vatNumber ?? null,
       supplierNationalAddress: sub.nationalAddress ?? null,
@@ -690,6 +800,14 @@ describe("buildGovernance", () => {
     expect(out.SUPMETA["Desert Plant Hire"].cr).toBe("1010998877");
     expect(out.SUPMETA["Desert Plant Hire"].vat).toBe("300999888700003");
     expect(out.SUPMETA["Desert Plant Hire"].src).toBe("Off platform");
+    /* ⚠️ The point of the whole exercise: it answered No to fuel, so it did NOT meet every term.
+       With the mapper's hard-coded zero this read `ok: 1` and counted toward the compliance
+       figure and the cheapest-compliant count. */
+    expect(link!.ok).toBe(0);
+    expect(link!.missed).toEqual(["Fuel"]);
+    expect(link!.met).toEqual(["Operator included", "Equipment certificate: TÜV"]);
+    /* And so the cheapest bid on the request is no longer the one that stands in as compliant. */
+    expect(out.R.r1.bids.filter((b) => b.ok).map((b) => b.firm)).toEqual(["Zahid"]);
     /* Nothing in the fold produced a hole from the thinner shape. */
     for (const v of Object.values(link!)) expect(Number.isNaN(v as number)).toBe(false);
   });

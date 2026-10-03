@@ -174,9 +174,43 @@ export interface BoardRequest {
   urgency: string | null;
   status: string | null;
   city: string | null;
-  days: number;
-  fri: number;
-  billable: number;
+  /**
+   * The hire window, when there is one.
+   *
+   * ⚠️ NULL on an open-ended hire, which is the MAJORITY of requests: 390 of 655 on the platform
+   * and 52 of this renter's 57 carry a start date, a rental basis (MONTHLY / WEEKLY / DAILY) and
+   * no end date at all. That is a real business state, not bad data — you hire the machine from
+   * the 17th, monthly, until you send it back.
+   */
+  days: number | null;
+  fri: number | null;
+  billable: number | null;
+  /**
+   * Whether the hire can be priced at all.
+   *
+   * The fold used to DROP a request it could not price, which threw away every open-ended hire
+   * on the board — the renter saw an empty page and 52 lines of "cannot be priced" in a console
+   * nobody reads. Only the MONEY needs an end date. Who bid, by what route, against which terms,
+   * with what papers, at what rate per day: all of it is answerable without one, and all of it
+   * is what this page is for.
+   */
+  priced: boolean;
+  /**
+   * Whether the hire window is the one on the request, or ONE CYCLE assumed from its rental
+   * basis because the request is open ended.
+   *
+   * 52 of this renter's 57 requests, and 390 of 655 platform wide, carry a start date and a
+   * basis (MONTHLY / WEEKLY / DAILY) with no end. Refusing to price them left every money card
+   * at zero across an account with 214 real bids. Pricing one cycle answers the question the
+   * reader is actually asking — "what does this machine cost me" — and the board says in plain
+   * words that it is one month, not the whole hire.
+   *
+   * ⚠️ A one-cycle figure is NOT a commitment and must never be summed as though it were the
+   * cost of the hire. Everywhere it is shown it carries its basis.
+   */
+  window: "stated" | "one-cycle";
+  /** MONTHLY · WEEKLY · DAILY, when the request states one. */
+  basis: string | null;
   units: number;
   channel: string;
   /** Firms the link was sent to. Null on any route that is not a shared link. */
@@ -472,7 +506,13 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
     const subtype = req.item?.categoryId;
     if (!subtype) continue;
     for (const b of input.bidsByRequest[req.id] ?? []) {
+      /* ⚠️ A rate outside this range is a data-entry error, not a price: staging carries bids at
+         0 and at 130,000 SAR a day. The median survives them; `lo` and `hi` do not, and they are
+         what the price rail is drawn against. The bid is still shown on its own row — it was
+         really submitted — it just does not get to set the market. */
       if (!b.price || b.price <= 0) continue;
+      const perDayCheck = perDayRate(b.price, b.priceUnit);
+      if (perDayCheck < 100 || perDayCheck > 50000) continue;
       const list = byType.get(subtype) ?? [];
       list.push({ perDay: perDayRate(b.price, b.priceUnit), firm: b.supplierCompanyId || b.supplierId || b.supplierName });
       byType.set(subtype, list);
@@ -511,28 +551,44 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
     const win = bids.find(didWin) ?? null;
     const ref = req.groupRef || req.code || req.displayId;
 
-    if (!win && !bids.length) {
-      /* Name the statuses that WERE there. "No bid accepted yet" on every row of an account that
-         plainly has awards means this test is reading the wrong field, and without the statuses
-         beside it there is no way to tell that from a genuinely undecided account. */
-      skipped.push({ ref, why: "no bids received" });
-      continue;
-    }
+    /* ⚠️ NOTHING is filtered out any more — not by status, not by date, not by whether anybody
+       bid. Owner, 2026-10-03: *"dont filter the requests date or status so it must appear"*.
+       A request that drew no bids is not an absence of data, it is the finding: you asked and
+       nobody answered. Dropping it made the board agree with itself about a market that had
+       ignored him. The row carries `bids: []`, prices nothing, and says so. */
 
     /* With no award, the LEADING bid stands in for pricing the row: the cheapest that met every
        term, else simply the cheapest. It is never counted as money awarded — `awarded` stays false
        and every money figure skips it — but it is what lets the rate, the route and the supplier
        columns say something true about a request still out to the market. */
-    const fit = bids.filter(metEveryTerm);
+    /* ⚠️ Priced bids only, for the LEAD. Staging carries bids at 0 and at 5 SAR a day, and the
+       lead is the cheapest — so one data-entry error became the leading bid on its request and
+       priced the whole hire at nothing. A bid with no usable price is still shown in the field;
+       it just cannot stand in for the award. */
+    const usable = bids.filter((b) => (b.price ?? 0) > 0);
+    const pool = usable.length ? usable : bids;
+    const fit = pool.filter(metEveryTerm);
     const byPrice = (a: BidCard, b: BidCard) =>
       perDayRate(a.price ?? Infinity, a.priceUnit) - perDayRate(b.price ?? Infinity, b.priceUnit);
-    const lead = win ?? [...(fit.length ? fit : bids)].sort(byPrice)[0];
+    /* Null on a request nobody bid on, which is now a row like any other. */
+    const lead: BidCard | null = win ?? [...(fit.length ? fit : pool)].sort(byPrice)[0] ?? null;
 
-    const charged = computeChargedDays({ startDate: req.startDate, endDate: req.endDate, rentalBasis: null });
-    if (!charged.known) {
-      skipped.push({ ref, why: "no start or end date, so it cannot be priced" });
-      continue;
+    /* An open-ended hire is priced for ONE CYCLE of its own rental basis rather than refused.
+       The basis is on the request; the end date is what is missing, and a renter who asks for a
+       machine "monthly from the 17th" is asking what a month costs. */
+    const CYCLE: Record<string, number> = { MONTHLY: 30, WEEKLY: 7, DAILY: 1 };
+    const cycleDays = CYCLE[String(req.rentalType ?? "").toUpperCase()] ?? null;
+    let endDate = req.endDate;
+    let window: "stated" | "one-cycle" = "stated";
+    if (!endDate && req.startDate && cycleDays) {
+      const d = new Date(req.startDate);
+      /* Inclusive: a one-day hire starts and ends on the same date. */
+      d.setUTCDate(d.getUTCDate() + cycleDays - 1);
+      endDate = d.toISOString().slice(0, 10);
+      window = "one-cycle";
     }
+    const charged = computeChargedDays({ startDate: req.startDate, endDate, rentalBasis: null });
+    const priced = charged.known;
 
     const share = input.sharesByRequest[req.id];
     const channel = channelOf(req, !!share?.sent);
@@ -572,7 +628,7 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
         year: b.equipment?.year ?? null,
         mob: b.mobPrice,
         demob: b.demobPrice,
-        total: cycleTotal(req, b, units, charged),
+        total: priced ? cycleTotal({ ...req, endDate }, b, units, charged) : 0,
         /* Only when the room actually moved it. Equal values mean the price never changed, and
            "from 4,500 to 4,500" reads as a negotiation that happened and achieved nothing. */
         from: b.openingPrice != null && b.openingPrice !== b.price ? b.openingPrice : null,
@@ -588,17 +644,20 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
       subtype,
       project: req.projectId ? input.projectNames[req.projectId] ?? "Unnamed project" : null,
       start: req.startDate ?? null,
-      end: req.endDate ?? null,
+      end: endDate ?? null,
       created: req.createdAt ?? null,
       deadline: req.expiresAt ?? null,
       urgency: req.urgency ?? null,
       status: req.status ?? null,
       city: req.city ?? null,
-      days: charged.totalDays,
-      fri: charged.fridays,
-      billable: charged.chargedDays,
+      days: priced ? charged.totalDays : null,
+      fri: priced ? charged.fridays : null,
+      billable: priced ? charged.chargedDays : null,
+      priced,
+      window,
+      basis: req.rentalType ?? null,
       awarded: !!win,
-      units: lead.unitsOffered || lead.numberOfUnits || req.item?.qty || 1,
+      units: lead ? lead.unitsOffered || lead.numberOfUnits || req.item?.qty || 1 : req.item?.qty || 1,
       channel,
       sent: channel === CHANNEL.link ? share?.sent ?? 0 : null,
       opened:
@@ -630,9 +689,9 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
         address: win.supplierNationalAddress || "None on file",
         reg: lookup(win)?.vendorRegistered ? "Yes" : "No",
       },
-      money: win ? moneyRows(win, winUnits, charged) : [],
+      money: win && priced ? moneyRows(win, winUnits, charged) : [],
       /* Zero, not the leading bid's value. Money awarded means money awarded. */
-      total: win ? sar(cycleTotal(req, win, winUnits, charged)) : "0",
+      total: win && priced ? sar(cycleTotal({ ...req, endDate }, win, winUnits, charged)) : "0",
     };
 
     for (const b of bids) {
@@ -668,7 +727,7 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
        ⚠️ An off-platform shared-link bid carries no machine record, so it contributes no expiry
        dates at all. It can still answer 1 and 2, which is why those come first. */
     const expiryOf = new Map<string, string>();
-    for (const unit of lead.offeredUnitsDetail ?? []) {
+    for (const unit of lead?.offeredUnitsDetail ?? []) {
       for (const doc of unit.documentKeys ?? []) {
         if (!doc.expiryDate) continue;
         /* The EARLIEST expiry across the units offered. A fleet is only covered until its first
@@ -680,9 +739,9 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
     }
 
     const held = new Set<string>([
-      ...(lead.heldCertCodes ?? []),
-      ...(lead.companyCertCodes ?? []),
-      ...(lead.equipmentCertCodes ?? []),
+      ...(lead?.heldCertCodes ?? []),
+      ...(lead?.companyCertCodes ?? []),
+      ...(lead?.equipmentCertCodes ?? []),
     ]);
     const asked = new Set<string>(req.requiredCerts ?? []);
     const hire = req.startDate && req.endDate ? `${req.startDate} to ${req.endDate}` : null;
@@ -704,7 +763,7 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
 
       CERT[`${req.id}:${code}`] = {
         doc: code,
-        supplier: lead.supplierName,
+        supplier: lead?.supplierName ?? "nobody",
         state,
         machine: machineLabel(req),
         req: ref,
@@ -718,10 +777,10 @@ export function buildGovernance(input: GovernanceInput): BoardPayload {
 
     /* Ownership papers are not certificates and carry no expiry, but "no registration document on
        file for the machine you are paying for" is the same kind of finding. */
-    for (const doc of lead.ownershipDocs ?? []) {
+    for (const doc of lead?.ownershipDocs ?? []) {
       CERT[`${req.id}:own:${doc.key}`] = {
         doc: doc.labelEn,
-        supplier: lead.supplierName,
+        supplier: lead?.supplierName ?? "nobody",
         state: "On file",
         machine: machineLabel(req),
         req: ref,

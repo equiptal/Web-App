@@ -4,6 +4,7 @@ import { agentsGet } from "@/lib/api/agents-relay";
 import { extractRequestList, mapRequestListItem } from "@/lib/contract/requests";
 import { mapBidList, bidSizeCounts } from "@/lib/contract/bids";
 import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link-bids";
+import { linkTermVerdict, linkTermsWereStated } from "@/lib/governance/link-conflicts";
 import { buildGovernance, type GovernanceInput, type RegistryEntry } from "@/lib/governance/build";
 
 export const dynamic = "force-dynamic";
@@ -120,8 +121,34 @@ export async function GET(req: Request) {
              off-platform offer is counted, priced and compared exactly as they count it. */
           bidsByRequest[r.id] = [
             ...(bidsByRequest[r.id] ?? []),
-            ...submissions.map((sub) => ({
+            ...submissions.map((sub) => {
+              const item = sub.items?.[0] ?? null;
+              const verdict = linkTermVerdict(item);
+              const stated = linkTermsWereStated(item);
+              return ({
               ...submissionToBidCard(sub),
+              /* ⚠️ The mapper returns `conflictCount: 0` for EVERY submission. That is right for
+                 the comparison and My Bids, which list the confirmations one row each, and wrong
+                 here: this is the one surface that counts rather than lists, so a hard zero
+                 recorded every off-platform bid as having met every term and flattered both the
+                 compliance figure and the cheapest-compliant count. Derived from the supplier's
+                 own Yes/No answers instead — see `link-conflicts.ts`. */
+              conflictCount: verdict.missed.length,
+              matchCount: verdict.met.length,
+              /* Named, not just counted, so the row's drill-down can say WHICH terms failed. The
+                 fold reads `terms` for exactly that. */
+              terms: {
+                equipment: [],
+                contract: [
+                  ...verdict.met.map((labelEn) => ({ key: labelEn, labelEn, labelAr: "", state: "matched" as const })),
+                  ...verdict.missed.map((labelEn) => ({ key: labelEn, labelEn, labelAr: "", state: "conflict" as const })),
+                ],
+                supplier: [],
+              },
+              /* ⚠️ A request that stated no terms leaves the bid UNJUDGED, which is not the same
+                 as compliant. Recording it as having met everything is the bug this is fixing one
+                 level down, so it is marked and the board can say "no terms were stated". */
+              note: stated ? null : "No terms were stated on this request, so this bid was never judged against any",
               /* ⚠️ The shared mapper does not carry these across, because the surfaces it was
                  written for (the comparison matrix, My Bids) do not show them. The SUBMISSION
                  carries all three — an off-platform supplier types his CR, VAT and national
@@ -135,7 +162,8 @@ export async function GET(req: Request) {
               supplierNationalAddress: sub.nationalAddress ?? null,
               supplierCity: sub.city ?? null,
               supplierEmail: sub.contactEmail ?? null,
-            })),
+            });
+            }),
           ];
         }
 
