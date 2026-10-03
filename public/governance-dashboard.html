@@ -23,6 +23,14 @@
   --label:11px; --body:13px; --lead:15px; --head:19px; --radius:6px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+/* 🔴 `[hidden]` is only `display:none` in the UA sheet, so ANY rule here that sets `display`
+   beats it. `.row2` is `display:flex` and `.ch-r` is `display:grid`, so the pager hid five rows
+   out of ninety-eight and every one of them stayed on screen: the attribute was set, the row
+   was visible, and the footer underneath said "1-5 of 98" over a full list.
+   ⚠️ It also defeated the harness, which asserted `!el.hidden` — the PROPERTY, which was
+   perfectly true. Check `getComputedStyle().display` when the question is "can the reader see
+   it". */
+[hidden]{display:none !important}
 body{font-family:var(--font-sans);font-size:var(--body);line-height:1.5;color:var(--navy);
   background:var(--background);-webkit-font-smoothing:antialiased}
 h1,h2{font-weight:800;line-height:1.25}
@@ -110,7 +118,7 @@ th:first-child,td:first-child{min-width:230px}
 .none{font-size:12px;color:var(--muted-light)}
 
 /* One scale per row: where the award sits among its own bids, and against the market */
-.pos{width:176px;display:inline-block;text-align:start}
+.pos{width:176px;max-width:100%;display:inline-block;text-align:start}
 .rail{position:relative;height:16px}
 .rail::before{content:"";position:absolute;top:7px;left:0;right:0;height:2px;background:var(--surface3);border-radius:2px}
 .rail i{position:absolute;top:6px;height:4px;background:var(--border-strong);border-radius:2px}
@@ -118,8 +126,13 @@ th:first-child,td:first-child{min-width:230px}
 .rail b.awd{position:absolute;top:3px;width:10px;height:10px;border-radius:999px;background:var(--navy);
   margin-inline-start:-5px;border:2px solid #fff;box-shadow:0 0 0 1px var(--navy)}
 .rail b.awd.bad{background:var(--danger);box-shadow:0 0 0 1px var(--danger)}
-.posnote{font-size:11px;color:var(--muted);display:block;margin-top:1px;white-space:nowrap}
-.sub2{display:block;color:var(--muted-light);font-size:10.5px;margin-top:2px;white-space:nowrap}
+/* ⚠️ Was `white-space:nowrap` in a 176px cell. The sentence grew past it ("Cheapest bid · 43%
+   under your own quotes") and ran straight over the Warnings column beside it — the text was
+   not clipped, it was PAINTED ON TOP of the next cell. It wraps now, and the cell it lives in
+   is the one that gets taller. */
+.posnote{font-size:11px;color:var(--muted);display:block;margin-top:2px;line-height:1.35;
+  white-space:normal;overflow-wrap:anywhere}
+.sub2{display:block;color:var(--muted-light);font-size:10.5px;margin-top:2px;overflow-wrap:anywhere}
 #agentBtn{position:fixed;inset-block-end:22px;inset-inline-end:22px;z-index:45;display:flex;align-items:center;gap:8px;
   background:var(--navy);color:#fff;border:0;border-radius:999px;padding:11px 19px;cursor:pointer;
   font:inherit;font-size:13px;font-weight:700;box-shadow:0 3px 14px rgba(28,39,56,.26)}
@@ -1389,7 +1402,7 @@ const X = {
    ══════════════════════════════════════════════════════════════════ */
 /* Bumped whenever this file changes. It is the first thing in the console, so "which version am
    I actually looking at" is never a guess — a cached copy answers with an older string. */
-const BUILD = "2026-10-03.43";
+const BUILD = "2026-10-03.45";
 console.log("[governance] page build " + BUILD);
 
 /* Embedded in the app shell: no page chrome of its own. The frame is viewport-height,
