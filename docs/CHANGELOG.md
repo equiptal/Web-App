@@ -26,6 +26,17 @@ reversal, or the reason an odd-looking line is load-bearing.
   `src/components/map/panel/machine-panel-model.ts`, `src/lib/i18n/{en,ar}.ts`, tests
   `tuv-saso-cert` (new), `machine-card`. Verified: tsc 0, lint clean, 3954 pass; the 6 failing also
   fail on clean `main`. NOT seen in a browser.
+- **2026-10-05 - Fonts are files in the repo; the build no longer fetches Google Fonts. BUILT, NOT
+  committed.** Amplify main jobs 80 (`999ebe0d`) and 82 (`c487d706`) failed in `src/app/layout.tsx`:
+  `next/font ... Cannot read properties of null (reading '1')`. `next/font/google` downloads every
+  family during `next build`, and when Google answers with a font URL that has no file extension the
+  loader's regex returns null. Job 81 between them, same layout and lock file, passed, so it looked
+  like our code and was not. Now `next/font/local` over seven woff2 files in `src/app/fonts` (the
+  same files Google served: latin, arabic for Almarai, variable where the family is), with the same
+  CSS variables, weights and preload flags. Verified: `next build` passes locally, 7 fonts emitted,
+  all five `--font-*` variables defined. Files: `src/app/layout.tsx`, `src/app/fonts/*`.
+  ⚠️ The Material icon stylesheets in `<head>` still load from Google at RUNTIME; that cannot
+  fail a build. ⚠️ Updating a font now means replacing its file by hand.
 - **2026-10-04 - Date fields: our own calendar; a backwards pick is refused with a red note. BUILT,
   NOT committed.** The native `<input type="date">` bounded start by `max = end` and end by
   `min = start`, so later days were greyed out and a renter read the start field as broken. The

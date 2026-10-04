@@ -1,6 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
-import { Almarai, IBM_Plex_Sans, Inter, JetBrains_Mono, Oswald } from "next/font/google";
+// ── Fonts are files in `src/app/fonts`, not a fetch from Google (2026-10-05) ────────────────────
+// ~~`next/font/google`~~ downloads every family from fonts.googleapis.com DURING `next build`, so a bad
+// answer from Google fails the deploy: Amplify jobs 80 and 82 on main died in this file with
+// `next/font ... Cannot read properties of null (reading '1')` (a font URL with no extension) while the
+// build between them, same layout, passed. The files are the same woff2 Google served (latin, or
+// arabic for Almarai; variable where the family is), so faces, weights and CSS variables are unchanged.
+import localFont from "next/font/local";
 import "./globals.css";
 import { LocaleProvider } from "@/lib/i18n";
 import { SessionProvider } from "@/lib/session";
@@ -47,7 +53,7 @@ import { seasonAt } from "@/lib/season";
  * Latin only. Oswald has no Arabic, and `--font-hero` in `globals.css` names the Arabic face
  * behind it so an Arabic headline lands on Plex Arabic rather than on whatever the browser picks.
  */
-const oswald = Oswald({ variable: "--font-oswald", subsets: ["latin"], weight: ["500", "600", "700"] });
+const oswald = localFont({ variable: "--font-oswald", src: [{ path: "./fonts/oswald-latin-500-700.woff2", weight: "500 700", style: "normal" }] });
 
 /* ── The three faces the token file names (owner, 2026-09-04) ──────────────────────────────────
  *
@@ -60,21 +66,29 @@ const oswald = Oswald({ variable: "--font-oswald", subsets: ["latin"], weight: [
  *   · The Arabic face was IBM Plex Sans Arabic (owner, 2026-08-19), picked because the RTL
  *     prototype is drawn in it. Almarai is a different Arabic face and RTL screens will shift.
  *
- * Both are self-hosted by `next/font` at build time, so neither is an external request in
+ * Both are self-hosted (`src/app/fonts`), so neither is an external request, at build or in
  * production. Almarai ships 300/400/700/800 and has no 500: `globals.css` maps `font-weight: 500`
  * to 700 inside `[lang='ar']`, so an Arabic `font-medium` heading keeps its emphasis instead of
  * quietly rendering as body text.
  *
  * Weights follow the token file — 400/500 Latin, 400/700 Arabic — plus the 600 and 800 this app's
  * own scale asks for and the file does not mention. */
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
-const almarai = Almarai({ variable: "--font-almarai", subsets: ["arabic"], weight: ["400", "700", "800"], preload: false });
+const inter = localFont({ variable: "--font-inter", src: [{ path: "./fonts/inter-latin-400-800.woff2", weight: "400 800", style: "normal" }] });
+const almarai = localFont({
+  variable: "--font-almarai",
+  preload: false,
+  src: [
+    { path: "./fonts/almarai-arabic-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/almarai-arabic-700.woff2", weight: "700", style: "normal" },
+    { path: "./fonts/almarai-arabic-800.woff2", weight: "800", style: "normal" },
+  ],
+});
 /* Data codes only — an RFQ number, a model number — and nothing else reads it: `.keep-mono` is the
  * single opt-in. Numeric alignment everywhere else comes from `tabular-nums`, which Inter carries. */
-const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"], weight: ["400", "500"], preload: false });
+const jetbrains = localFont({ variable: "--font-jetbrains-mono", preload: false, src: [{ path: "./fonts/jetbrains-mono-latin-400-500.woff2", weight: "400 500", style: "normal" }] });
 /* Plex stays loaded ONLY for `--font-plex`, which the quotation and the clipboard card still name.
  * It is no longer any screen's face. */
-const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600", "700"], preload: false });
+const plex = localFont({ variable: "--font-plex", preload: false, src: [{ path: "./fonts/ibm-plex-sans-latin-400-700.woff2", weight: "400 700", style: "normal" }] });
 
 const siteUrl = "https://web.moedatech.net";
 
