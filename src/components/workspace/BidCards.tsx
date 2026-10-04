@@ -943,7 +943,15 @@ function BidCardTile({
         />
       )}
       {subOpen && (
-        <SharedBidSubmissionModal bid={card} submission={submission} ar={ar} L={L} onClose={() => setSubOpen(false)} />
+        <SharedBidSubmissionModal
+          bid={card}
+          submission={submission}
+          ar={ar}
+          L={L}
+          onClose={() => setSubOpen(false)}
+          requestDurationDays={durationDays}
+          requestStartDate={startDate}
+        />
       )}
       {/* The band stays disabled while the sheet is up; the offers poll picks up a sent counter. */}
       {sheetRoom && <CounterSheet roomId={sheetRoom} onExit={() => { setSheetRoom(null); setCountering(false); }} />}

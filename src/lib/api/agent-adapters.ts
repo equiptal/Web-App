@@ -145,7 +145,7 @@ export async function mansourReason(res: Response): Promise<string | undefined> 
  * `capacity_advisory` and `missing_required_fields`. See plan.md Q5 for the mapping rationale.
  * SNAPSHOT (2026-06-10): re-sync with src/lib/contract/agent.ts if Mansour's output changes.
  */
-export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
+export function agentOutputToDraft(out: RFQAgentOutput, opts: { renterSaidOperator?: boolean } = {}): AgentDraft {
   const items = (out.line_items ?? []).map((li, idx) => toItem(li, idx));
   // Surface the agent's per-item capacity guidance (the question it raised for an unresolved size)
   // next to "pick a size to approve". Keyed by the same line-item index toItem used (id "a<idx>").
@@ -175,6 +175,16 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
    * What is NOT a guess, and stays: an operator the RFQ evidenced some other way — a certificate it
    * named, a nationality, a head count, a night shift. Those cannot be inferred from an equipment
    * line, so their presence IS the mention.
+   *
+   * ⚠️ **Nor an operator the renter TYPED** (owner, 2026-10-05: *"when i write with operator to the
+   * agent the operator panel is not open"*). The agent labels its own READING «suggested» too:
+   * «crawler excavator 20 ton with operator» came back `operator_included: true` with
+   * `{field: "line_items[0].operator_included", note: "suggested"}`, and this guard took the note at
+   * its word and turned the operator off. `renterSaidOperator` is the renter's own text naming one
+   * (`mentionsOperator`), so the note cannot outrank it. It is request-wide, not per line: the agent
+   * does not echo which words belong to which line, so «3 excavators with operator and 2 forklifts»
+   * keeps a «suggested» operator on the forklifts too. A guessed operator costs a priced term; a
+   * dropped one ignores what was typed, which is the report.
    */
   const mentionedOperator = (li: RFQLineItem, it: EquipmentItem): boolean =>
     it.operator.certificate.length > 0 ||
@@ -193,7 +203,7 @@ export function agentOutputToDraft(out: RFQAgentOutput): AgentDraft {
   (out.line_items ?? []).forEach((li, idx) => {
     const it = items[idx];
     if (!it || it.operatorNeeded !== "yes") return;
-    if (mentionedOperator(li, it) || !agentGuessedOperator(idx)) return;
+    if (opts.renterSaidOperator || mentionedOperator(li, it) || !agentGuessedOperator(idx)) return;
     it.operatorNeeded = "no";
     it.operator = { ...it.operator, fatRequired: null, fatFood: null, fatAccommodationTransport: null };
   });

@@ -85,7 +85,8 @@ describe("draftBidForm", () => {
 
     expect(rows["Mobilization"]).toBe("Renter");
     expect(rows["Demobilization"]).toBe("Supplier");
-    expect(rows["Fuel"]).toBe("Renter · diesel");
+    // The fuel type in words, not the code (staging report W4, 2026-10-05).
+    expect(rows["Fuel"]).toBe("Renter · Diesel");
   });
 
   it("Given no equipment yet, Then it answers null rather than a card with nothing on it", () => {

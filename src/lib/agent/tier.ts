@@ -59,6 +59,22 @@ const PARAGRAPH_CHARS = 180;
  * Kept deliberately narrow. A false positive costs two seconds; a false negative loses a commercial
  * term the renter typed and will not be told about. Both languages, because the intake takes both.
  */
+/**
+ * The operator words, on their own, because a second reader needs them: `agentOutputToDraft` keeps an
+ * operator the renter TYPED even when the agent labels it «suggested» (owner, 2026-10-05).
+ */
+export const OPERATOR_WORDS = ["operator", "driver", "مشغل", "مشغّل", "سائق"] as const;
+
+/** A refusal: «without operator» names the word and means the opposite. Mirrors the agent's own
+ *  `OPERATOR_NO` (`equipment-quick-match.ts`), plus the Arabic it does not have. */
+const OPERATOR_REFUSAL = /without (an? )?(operator|driver)|no (operator|driver)|equipment only|dry hire|bare rental|(بدون|بلا|من غير) (ال)?(مشغل|مشغّل|سائق)/;
+
+/** The renter's text ASKS for an operator: names one, and does not refuse one. Lower-cased substring. */
+export function mentionsOperator(text: string): boolean {
+  const t = text.toLowerCase();
+  return OPERATOR_WORDS.some((w) => t.includes(w)) && !OPERATOR_REFUSAL.test(t);
+}
+
 const TERM_WORDS = [
   /* ~~Certificates — "tuv", "aramco", "cert", "certified"…~~ **Off this list.** They were the
      reported case and they are now read in the BROWSER (`quick-certs.ts`), because
@@ -68,7 +84,7 @@ const TERM_WORDS = [
      Now: three seconds, with the cert. */
 
   // Operator, and the fields that hang off one — an open question the fast path answers with nothing.
-  "operator", "driver", "مشغل", "مشغّل", "سائق",
+  ...OPERATOR_WORDS,
   // Who moves it, who fuels it.
   "delivery", "deliver", "return", "pickup", "pick up", "haulage",
   "fuel", "diesel", "petrol",

@@ -10,8 +10,10 @@ import { mansourGetHeaders } from "@/lib/api/mansour-relay";
  *  - Real: proxies GET {MANSOUR_URL}/rfq/jobs/:id, adapts the result → UI view-model when done.
  *  - Mock (id "mock" / unconfigured): returns the fixture draft immediately.
  */
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // Set by `processRfq` when the renter's text names an operator — see `agentOutputToDraft`.
+  const opts = { renterSaidOperator: new URL(req.url).searchParams.get("op") === "1" };
 
   if (id === "mock" || !useRealAgent || !serverEnv.mansourUrl) {
     return NextResponse.json({ status: "done", draft: buildMockDraft() });
@@ -39,13 +41,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       const reason = reasonFromBody(raw);
       if (out.line_items.length > 0) {
         console.warn("[agent] job flagged error but has a usable extraction — salvaging. reason:", reason ?? "");
-        return NextResponse.json({ status: "done", draft: agentOutputToDraft(out) });
+        return NextResponse.json({ status: "done", draft: agentOutputToDraft(out, opts) });
       }
       console.error("[agent] job errored (no extraction):", reason ?? "");
       return NextResponse.json({ status: "error", code: "network", detail: reason });
     }
     if (isExtractionEmpty(raw)) return NextResponse.json({ status: "error", code: "empty" }); // AC-09
-    return NextResponse.json({ status: "done", draft: agentOutputToDraft(extractAgentOutput(raw)) });
+    return NextResponse.json({ status: "done", draft: agentOutputToDraft(extractAgentOutput(raw), opts) });
   } catch (err) {
     console.error("[agent] poll job failed:", err);
     return NextResponse.json({ status: "error", code: "network", detail: err instanceof Error ? err.message : undefined });

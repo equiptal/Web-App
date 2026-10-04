@@ -46,6 +46,17 @@ function toCert(raw: string): CertCode | null {
   return null;
 }
 /**
+ * One certificate code, in the reader's language, or null when it is not one this enum names.
+ *
+ * For surfaces that printed the backend's code as it came (staging report W4, 2026-10-05:
+ * «شهادة المعدة: aramco», a «tuv» chip in the drawer, «Aramco Certified» on an Arabic quotation).
+ * Null rather than the raw code, so each caller keeps its own fallback for a code it cannot name.
+ */
+export function certLabel(raw: string, lang: "en" | "ar"): string | null {
+  const c = toCert(raw);
+  return c ? CERT_LABEL[c][lang] : null;
+}
+/**
  * Whether a set of HELD cert codes answers a requested one. Every code answers itself; TÜV (SASO) is
  * also answered by a plain TÜV, because nothing checks the issuer against SASO's list yet (2026-10,
  * app parity `documentFamilyFor`).

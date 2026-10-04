@@ -23,7 +23,7 @@
  * file stays testable without a renderer.
  */
 
-import { requestedMinYear } from "@/lib/contract/bids";
+import { certLabel, requestedMinYear } from "@/lib/contract/bids";
 import type { RequestItem, RequestRecord } from "@/lib/contract/requests";
 import { customEquipmentLabel } from "@/lib/contract/requests";
 
@@ -194,7 +194,8 @@ export function itemDetailRows(it: RequestItem, ar: boolean, L: Pick): Row[] {
         const y = requestedMinYear(it as unknown as Record<string, unknown>);
         return y == null ? null : L(`${y} or newer`, `${y} فأحدث`);
       })()],
-    [L("Safety certificates", "شهادات السلامة"), it.safetyCertifications?.length ? it.safetyCertifications.join(" · ") : null],
+    // Named, not the code: the drawer showed a «tuv» chip (staging report W4, 2026-10-05).
+    [L("Safety certificates", "شهادات السلامة"), it.safetyCertifications?.length ? it.safetyCertifications.map((c) => certLabel(c, ar ? "ar" : "en") ?? c).join(" · ") : null],
     [L("Notes", "ملاحظات"), it.additionalNotes],
   ]);
 }

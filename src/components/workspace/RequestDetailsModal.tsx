@@ -12,6 +12,7 @@ import {
   setShareLinkLogo,
 } from "@/lib/api/client";
 import { CERT_LABEL } from "@/lib/contract/bids";
+import { urgencyLabel } from "@/lib/contract/labels";
 import { cancelFailureLine, cancelRetryWorthIt, directTarget, publicTaxonomyUrl, statusMeta, type RequestGroup, type RequestListItem, type RequestRecord } from "@/lib/contract/requests";
 import { itemDetailRows, requestDetailRows, requestFieldFormatters, type Row } from "@/lib/contract/request-fields";
 import { requestActions } from "@/lib/contract/workspace";
@@ -216,10 +217,12 @@ export function RequestDetailsModal({
     if (a && b) return `${a} – ${b}`;
     return a ?? b ?? "";
   })();
-  /** The urgency the renter chose, made readable — `FAR_FUTURE` is not a word. */
+  /** The urgency the renter chose, made readable — `FAR_FUTURE` is not a word. Through the shared
+   *  `urgencyLabel`, which has the Arabic: ~~title-casing the code~~ printed «Soon» on an Arabic
+   *  screen (staging report W4, 2026-10-05). */
   const urgency = (() => {
     const raw = (subjectRecord as { urgency?: string | null } | null)?.urgency ?? null;
-    return raw ? raw.replace(/[_-]+/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : "";
+    return raw ? urgencyLabel(raw, L) : "";
   })();
   // The Supplier OS host, not this app's origin — so no `typeof window` guard and no SSR-empty value.
   const shareUrl = bidShareUrl(group.id);

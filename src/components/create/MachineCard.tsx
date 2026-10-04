@@ -414,10 +414,21 @@ export function MachineCard({
               is a decision, not a value. Calling that «* Required» told him the request demanded
               something it does not. They still block, and a refusal still shakes them — which is
               the whole of what the canvas is entitled to say about a field the request never asked
-              for. */}
+              for.
+
+              ── A star, still no word (owner, 2026-10-05) ───────────────────────────────────────
+              Staging report W1: *"Required fields are not starred, and pressing the button shows no
+              error"*, the button only scrolled back to an unmarked card. The owner's ruling: *"star
+              only and keep it with the shake on refusal too"*. So each gets the fuel chip's star
+              strip while it is UNANSWERED (no value and never touched: «No certificate» / «Any year»
+              store as absent and count as answers, as `gates.ts` reads them), and `word` stays off
+              so the strip never says «Required». */}
           <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">
             <div className="min-w-0 max-w-[58%]">
               <div className={shake("safety_certificates") ? "shake-error" : undefined}>
+                {overrides.safetyCerts.length === 0 && !isTouched(state.draft!, prov.key("safety_certificates")) && (
+                  <OverlayRequired title={t.create.machineCard.certName} />
+                )}
                 {/* More than one, because the field has always been an array everywhere else — on the
                     draft, on the wire, and on the bid form where a supplier confirms each cert on its
                     own row. Only this control disagreed, so a renter needing TÜV AND Aramco could ask
@@ -520,6 +531,10 @@ export function MachineCard({
               />
             </div>
             <div className={`min-w-0 max-w-[48%] ${shake("equipment_year") ? "shake-error" : ""}`}>
+              {/* Star only, as the certificate (owner, 2026-10-05). */}
+              {!overrides.equipmentYear && !isTouched(state.draft!, prov.key("equipment_year")) && (
+                <OverlayRequired title={t.create.machineCard.minYearName} />
+              )}
               <SearchSelect
                 value={overrides.equipmentYear}
                 placeholder={t.create.machineCard.minYear}

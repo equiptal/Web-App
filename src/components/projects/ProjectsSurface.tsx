@@ -60,7 +60,7 @@ import { RenameDialog } from "./RenameDialog";
 import { MoveDialog } from "./MoveDialog";
 import { DocumentsDialog } from "./DocumentsDialog";
 import { ConflictDialog, periodConflicts } from "./ConflictDialog";
-import { projectTitle } from "@/lib/contract/project";
+import { basisFromWire, projectTitle } from "@/lib/contract/project";
 import { EMPTY_WHEN } from "@/lib/contract/work-order";
 import type { Taxonomy } from "@/lib/contract/taxonomy";
 
@@ -955,8 +955,9 @@ export function ProjectsSurface({
                      menu asked "is there an award?" and the answer it got from `award` did not match
                      the answer baked into the handlers. One decision, in one place, cannot disagree
                      with itself. */
-                  onAward: () => setAwarding({ group, item }),
-                  onChangeAward: () => setAwarding({ group, item }),
+                  // A fresh dialog starts without the last refusal (it is shown inside it, see below).
+                  onAward: () => { setNotice(null); setAwarding({ group, item }); },
+                  onChangeAward: () => { setNotice(null); setAwarding({ group, item }); },
                   /* A mark on a machine nobody supplies is a mark on the renter's OWN fleet.
 
                      There is nowhere else to put it: a mark lives on an award, and an award needs a
@@ -1123,14 +1124,22 @@ export function ProjectsSurface({
              to weekly on a monthly site priced its award «per month» and nothing said so. The group
              carries its own `when.rentalBasis` — a request took a copy at submit, a work order was
              given one on its form — so that is what the money is quoted against, and the site is
-             only the fallback for a row that states nothing. */
+             only the fallback for a row that states nothing.
+
+             ⚠️ Through `basisFromWire` (staging report W2, 2026-10-05): a REQUEST row carries the
+             marketplace's own enum, `MONTHLY`, and the awards endpoint accepts only `monthly`, so the
+             award was refused with a 422. The dialog's label test missed it the same way, so a weekly
+             request read «per month». */
           defaultBasis={
-            (awarding.group.when?.rentalBasis as Award["rentalBasis"]) ??
+            basisFromWire(awarding.group.when?.rentalBasis) ??
             (chart?.project.defaults.timing.rentalBasis as Award["rentalBasis"]) ??
             "monthly"
           }
           onSave={(lines) => void award(lines)}
           saving={saving}
+          /* The refusal belongs INSIDE the dialog: on the page it was drawn behind the scrim, and the
+             dialog looked unchanged (staging report W2). */
+          error={notice}
         />
       )}
 

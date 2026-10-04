@@ -25,6 +25,24 @@ import type { BidPreview } from "@/lib/api/bidPreview";
 import { bidCardDetails } from "@/lib/bidCardDetails";
 import type { BidFormData, BidFormItem } from "@/lib/contract/link-bids";
 import { partyToken } from "@/lib/contract/labels";
+import { certLabel } from "@/lib/contract/bids";
+import { certCodesFromValue } from "@/lib/contract/link-bids";
+import { en } from "@/lib/i18n/en";
+import { ar } from "@/lib/i18n/ar";
+
+/**
+ * A fuel type and a certificate list in the message's language (staging report W4, 2026-10-05).
+ * They went out as the codes the form carries, so an Arabic message to a supplier read
+ * «الوقود: على المؤجّر · diesel» and «شهادة المعدة: aramco». An unknown value is kept as it came.
+ */
+function fuelWord(v: string, lang: "en" | "ar"): string {
+  const k = v.trim().toLowerCase() as keyof typeof en.options.fuelType;
+  return (lang === "ar" ? ar : en).options.fuelType[k] ?? v.trim().toLowerCase();
+}
+function certWords(v: string | null | undefined, lang: "en" | "ar"): string | null {
+  const codes = certCodesFromValue(v);
+  return codes.length ? codes.map((c) => certLabel(c, lang) ?? c).join(lang === "ar" ? "، " : ", ") : null;
+}
 
 export interface BidCardTerm {
   label: string;
@@ -405,11 +423,11 @@ export function bidCardModel(
         { label: t.terms.demob, value: party(i.returnBy, lang) },
         { label: t.terms.food, value: party(i.requiredTerms?.fatFood, lang) },
         { label: t.terms.accom, value: party(i.requiredTerms?.fatTransport, lang) },
-        { label: t.terms.fuel, value: fuel && fuelType ? `${fuel} · ${fuelType.toLowerCase()}` : fuel },
+        { label: t.terms.fuel, value: fuel && fuelType ? `${fuel} · ${fuelWord(fuelType, lang)}` : fuel },
         // "any" is the absence of a requirement, not a requirement to be any age.
         { label: t.terms.year, value: year && year.toLowerCase() !== "any" ? year : null },
-        { label: t.terms.certEquipment, value: equipmentCert || null },
-        { label: t.terms.certOperator, value: operatorCert || null },
+        { label: t.terms.certEquipment, value: certWords(equipmentCert, lang) },
+        { label: t.terms.certOperator, value: certWords(operatorCert, lang) },
       ] as { label: string; value: string | null }[]
     ).flatMap((r) => (r.value ? [{ label: r.label, value: r.value }] : []));
   };

@@ -2,6 +2,7 @@ import type { AgentDraft, RfqRequestPayload, Taxonomy } from "@/lib/contract";
 import { SOURCE_HEADER as TAXONOMY_SOURCE_HEADER } from "@/lib/contract/taxonomy";
 import type { CancelReport, RequestListItem, RequestRecord, RequestStatus } from "@/lib/contract/requests";
 import { isCancelledStatus } from "@/lib/contract/requests";
+import { mentionsOperator } from "@/lib/agent/tier";
 import type { BidCard, BidSizeCounts } from "@/lib/contract/bids";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import type { CompanyDocsPayload } from "@/lib/contract/company-documents";
@@ -182,7 +183,10 @@ export async function processRfq(input: ProcessInput): Promise<AgentDraft> {
   while (Date.now() < deadline) {
     let res: Response;
     try {
-      res = await fetch(`/api/agent/jobs/${encodeURIComponent(jobId)}`, { cache: "no-store" });
+      /* `op=1`: the renter's own text names an operator, so the adapter must not undo the agent's «yes»
+         over a «suggested» label (see `agentOutputToDraft`). A flag, not the text: a poll is a GET. */
+      const op = input.text && mentionsOperator(input.text) ? "?op=1" : "";
+      res = await fetch(`/api/agent/jobs/${encodeURIComponent(jobId)}${op}`, { cache: "no-store" });
     } catch {
       throw new ApiError("network");
     }

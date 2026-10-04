@@ -7,6 +7,51 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-05 - Staging issues report (W1-W4), fixed on main. BUILT, NOT committed.** From
+  `moedatech-web-staging-issues.html`. (W1) Year and certificate get the fuel chip's star strip while
+  unanswered, no red word; owner: *"star only and keep it with the shake on refusal too"*, softening
+  the 2026-09-03 «don't say required» ruling. (W2) The private award sent the request row's
+  `MONTHLY` and the awards endpoint 422'd on anything but `monthly`; now `basisFromWire`, which also
+  fixes a weekly row labelled «per month». Its refusal is shown inside the dialog, not behind the
+  scrim. (W3a) The off-platform quote viewer prorated only by the share form's own dates, so a form
+  without them priced one day while the card priced 13; it now falls back to the request's window,
+  and prints Latin digits (`ar-EG` printed Eastern Arabic). (W3b) A submission answering two machines
+  showed both lines on each machine's tab, so the forklift's 9,000 sat in the excavator comparison
+  and «lowest cost» starred its supplier; lines are now filtered by `requestId`. (W4) Arabic for the
+  share text's fuel type and certificates, the drawer's urgency and certificate chip, and the quote
+  viewer's contract terms («net_0», «72 hours»), YES/NO and certificate names, through the shared
+  `labels.ts` and a new `certLabel` in `contract/bids.ts`. Files: `MachineCard.tsx`,
+  `ProjectsSurface.tsx`, `AwardDialog.tsx`, `SharedBidSubmissionModal.tsx`, `BidCards.tsx`,
+  `RequestsWorkspace.tsx`, `RequestDetailsModal.tsx`, `bidCardModel.ts`, `contract/bids.ts`,
+  `contract/request-fields.ts`, tests. ⚠️ Not on main, nothing to do: the Railway share link is
+  staging's `NEXT_PUBLIC_OS_APP_URL`. ⚠️ Backend, not fixable here: notifications in English (the web
+  sends `language=ar`), «حفار» without «جنزير» (the form's `labelAr`), the share image's Arabic word
+  order (the backend's own image), the English recommendation reason (agent), W5's 15-20 min delay.
+  ⚠️ W3a's cause is inferred from the code; CEX-010956 itself was not opened.
+- **2026-10-05 - Switching the operator ON fills an EMPTY operator cert from the machine's certs.
+  BUILT on `main`, NOT committed.** Owner: a renter who wrote "with Aramco" without an operator,
+  then switched the operator on by hand, got no operator cert (the agent cert rule only runs when
+  the parse lands). Now `PATCH_ITEM` with `operatorNeeded: "yes"` fills an empty operator cert via
+  `operatorCertsFor` from the machine's chips (its own list, else the request-wide one): TÜV /
+  TÜV (SASO) ⇒ TÜV, Aramco ⇒ SPSP. App parity `_seedOperatorCertsFromEquipment`. ⚠️ The one owner-
+  approved exception to "renter clicks are never derived from": it only fills an EMPTY field, never
+  overwrites a chosen operator cert, and a machine with no cert gives none. Files:
+  `src/lib/store/rfq-store.tsx`, `tests/unit/cert-rule.test.ts`. Verified: tsc 0, lint clean, 3976
+  pass, the 6 failing also fail on clean `main`; 3 tests fail when the fill is removed (mutation).
+  NOT seen in a browser.
+- **2026-10-05 - An operator the renter typed is no longer switched off. BUILT, NOT committed.**
+  Owner: *"when i write with operator to the agent the operator panel is not open"*. Detected, then
+  dropped by us: the live agent answered «crawler excavator 20 ton with operator» with
+  `operator_included: true` AND `field_notes: [{operator_included: "suggested"}]`, and the 2026-08-26
+  guard reads any note there as the agent guessing, so it set the operator to «no» and the rail never
+  opened. «2 forklifts with operator…» came back without the note and worked, which is why it looked
+  random. Now `processRfq` sends `?op=1` on the poll when the text asks for an operator
+  (`mentionsOperator`: an operator word and no refusal, EN + AR), and the guard stands down.
+  Files: `src/lib/agent/tier.ts`, `src/lib/api/client.ts`, `src/app/api/agent/jobs/[id]/route.ts`,
+  `src/lib/api/agent-adapters.ts`, `tests/unit/agent-adapters.test.ts`. ⚠️ Request-wide: the agent
+  does not say which words belong to which line, so a guessed operator on ANOTHER line of the same
+  message is kept too. ⚠️ Agent side not fixable here (Arabic «مع مشغل» returned `false`, an Arabic
+  generator matched as a 250 t crane): `docs/normalization-agent-operator-handoff.md`.
 - **2026-10-05 - What the renter WRITES goes through the cert table (agent parse only). BUILT on
   `main`, NOT committed.** Owner: treat the renter's words as project settings, app parity
   (`RfqParseService.withCertRule`). When a parse lands (`PROCESS_SUCCESS`: agent, quick parser and

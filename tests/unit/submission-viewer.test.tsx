@@ -202,7 +202,9 @@ describe("the terms step reads back as answered", () => {
     // The contract term comes from the request's form payload, so it arrives after the heading.
     expect(await within(terms).findByText("Applies to every item", {}, { timeout: 5000 })).toBeTruthy();
     const row = within(terms).getByText("Payment Terms").closest("div")!;
-    expect(row.textContent).toContain("net_30");
+    // The term in words, not the backend's code (staging report W4, 2026-10-05: «طلبتَ: net_0»).
+    expect(row.textContent).toContain("Net 30 days");
+    expect(row.textContent).not.toContain("net_30");
   });
 
   it("states what the renter asked beside every answer", async () => {

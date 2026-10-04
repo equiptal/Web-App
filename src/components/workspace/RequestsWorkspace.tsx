@@ -214,9 +214,17 @@ export function RequestsWorkspace() {
       if (!live) return;
       // One card per item of a submission — an off-platform supplier can answer several lines of the
       // same RFQ in one go, and each line is its own offer to compare.
-      const offline = link.submissions.flatMap((sub) =>
-        (sub.items.length ? sub.items : [undefined]).map((it) => ({ bid: { card: submissionToBidCard(sub, it), source: "offline" } as WorkspaceBid, sub })),
-      );
+      //
+      // ⚠️ Only the lines for THIS machine (staging report W3b, 2026-10-05). A submission answering
+      // the excavator and the forklift came back on both tabs with both lines, so the forklift's
+      // 9,000 sat in the excavator's comparison, and «lowest cost» starred its supplier over a
+      // cheaper excavator. A line with no `requestId` is kept: it cannot be placed, and dropping it
+      // would hide a bid. A submission with lines, none of them this machine's, is not shown here.
+      const offline = link.submissions.flatMap((sub) => {
+        const mine = sub.items.filter((it) => !it.requestId || it.requestId === itemId);
+        const lines = sub.items.length ? mine : [undefined];
+        return lines.map((it) => ({ bid: { card: submissionToBidCard(sub, it), source: "offline" } as WorkspaceBid, sub }));
+      });
       setBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
       // What the size filter is worth on this item, whichever way it is currently set.
       setLargerHeld(app.sizeCounts?.larger ?? 0);

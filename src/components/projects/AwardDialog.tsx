@@ -108,6 +108,7 @@ export function AwardDialog({
   defaultBasis = "monthly",
   onSave,
   saving,
+  error,
 }: {
   open: boolean;
   onClose: () => void;
@@ -115,6 +116,8 @@ export function AwardDialog({
   defaultBasis?: Award["rentalBasis"];
   onSave: (lines: AwardInput[]) => void;
   saving?: boolean;
+  /** Why the last save was refused, shown above the buttons. */
+  error?: string | null;
 }) {
   const t = useT();
   const a = t.projects.award;
@@ -326,6 +329,13 @@ export function AwardDialog({
           <span className="tabular-nums">{a.counter.replace("{used}", String(used)).replace("{qty}", String(item.quantity))}</span>
           {over && <span>· {a.overBy.replace("{n}", String(used - item.quantity))}</span>}
         </div>
+
+        {error && (
+          <p role="alert" className="flex items-start gap-1.5 rounded-sm border border-danger/40 bg-danger/[0.08] px-3 py-2 text-body font-semibold text-danger">
+            <Icon name="error" size={15} className="mt-px flex-none" />
+            {error}
+          </p>
+        )}
 
         <div className="flex justify-end gap-2 border-t border-border pt-3">
           <Button variant="secondary" onClick={onClose} disabled={saving}>

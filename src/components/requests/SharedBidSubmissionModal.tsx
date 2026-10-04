@@ -9,7 +9,8 @@ import { fetchBidFormData } from "@/lib/api/client";
 import { hasVatInclusiveNote, stripVatInclusiveNote, vatLines } from "@/lib/contract/vat-inclusive";
 import { computeRentalTotal, durationDaysBetween } from "@/lib/pricing/rental";
 import { qualityFromSubmission, qualityFromSubmissionItem } from "@/lib/contract/bid-quality";
-import { latinDigits } from "@/lib/contract/labels";
+import { latinDigits, paymentTermsLabel, termValueLabel } from "@/lib/contract/labels";
+import { certLabel } from "@/lib/contract/bids";
 import { Icon } from "@/components/ui";
 import { QualityRing } from "@/components/bid/QualityRing";
 import { CARD, cx } from "@/lib/ds";
@@ -86,7 +87,25 @@ const ATT_LABEL: Record<string, [string, string]> = {
 // Classify an item's documents back into the same groups the form uploads them under.
 const OWNERSHIP_TYPES = new Set(["istimara", "customs_card", "sales_contract", "saso_registration", "combined"]);
 // Party-responsibility values read clearer as "On renter" / "On supplier" (matches the supplier form).
-const PARTY_CHOICE: Record<string, [string, string]> = { RENTER: ["On renter", "على المستأجر"], RENTEE: ["On renter", "على المستأجر"], SUPPLIER: ["On supplier", "على المؤجّر"], ME: ["On supplier", "على المؤجّر"] };
+// YES / NO too: the operator term arrives as `YES`, and printed raw on an Arabic screen (staging report
+// W4, 2026-10-05).
+const PARTY_CHOICE: Record<string, [string, string]> = { RENTER: ["On renter", "على المستأجر"], RENTEE: ["On renter", "على المستأجر"], SUPPLIER: ["On supplier", "على المؤجّر"], ME: ["On supplier", "على المؤجّر"], YES: ["Yes", "نعم"], TRUE: ["Yes", "نعم"], NO: ["No", "لا"], FALSE: ["No", "لا"] };
+/**
+ * A contract term's value as words (staging report W4, 2026-10-05: «طلبتَ: net_0», «72 hours» on an
+ * Arabic screen). The backend's `valueAr` is preferred, but it can be missing or carry the code itself,
+ * so whatever arrives goes through the shared labels; an unknown value is kept as it came.
+ */
+function contractValue(key: string, raw: string, L: (en: string, ar: string) => string): string {
+  const v = latinDigits(raw);
+  const byKey = termValueLabel(key, v, L);
+  if (byKey && byKey !== v) return byKey;
+  const pay = paymentTermsLabel(v, L);
+  if (pay !== v) return pay;
+  const hours = v.trim().match(/^(\d+)\s*(h|hr|hrs|hour|hours|ساعة|ساعات)$/i);
+  if (hours) return L(`${hours[1]} hours`, `${hours[1]} ساعة`);
+  const yn = PARTY_CHOICE[v.trim().toUpperCase()];
+  return yn ? L(yn[0], yn[1]) : v;
+}
 const renterChoice = (v: string | null | undefined, ar: boolean): string => { const p = PARTY_CHOICE[String(v ?? "").trim().toUpperCase()]; return p ? (ar ? p[1] : p[0]) : String(v ?? ""); };
 
 export function SharedBidSubmissionModal({
@@ -96,6 +115,8 @@ export function SharedBidSubmissionModal({
   ar,
   L,
   onClose,
+  requestDurationDays,
+  requestStartDate,
   onDownloadQuotation,
 }: {
   bid: BidCard;
@@ -106,13 +127,19 @@ export function SharedBidSubmissionModal({
   ar: boolean;
   L: (en: string, arr: string) => string;
   onClose: () => void;
+  /** The request's own window, from the card that opened this: used only when the form carries no
+   *  dates of its own, so the viewer totals the same days as the card (staging report W3a). */
+  requestDurationDays?: number | null;
+  requestStartDate?: string | null;
   /** Export this submission as the app-parity quotation doc (same template as an on-platform bid). */
   onDownloadQuotation?: () => void;
   /** web-app/006 — deal-room-style negotiate relay. Accepted from callers but currently unused: the
    *  contact number is shown plainly for now, so there's no masked row to trigger it from. */
   onNegotiate?: () => void;
 }) {
-  const nf = (n: number) => new Intl.NumberFormat(ar ? "ar-EG" : "en-US").format(Math.round(n));
+  // Latin digits in both languages, as the card beside it (`formatSar`). ~~`ar-EG`~~ printed Eastern
+  // Arabic digits here only, so the same total read in two scripts (staging report W3a, 2026-10-05).
+  const nf = (n: number) => new Intl.NumberFormat("en-US").format(Math.round(n));
   /**
    * The three price rows as they are PRINTED.
    *
@@ -238,8 +265,13 @@ export function SharedBidSubmissionModal({
   // The request's rental window, straight off the bid-form payload this modal already fetches — the
   // same pair the supplier's own form prorates against. Nothing here comes from the backend's stored
   // total (see below), so an off-platform bid reads identically on the form, this viewer and the card.
-  const durationDays = durationDaysBetween(form?.projectTerms?.startDate, form?.projectTerms?.endDate);
-  const startDate = form?.projectTerms?.startDate ?? null;
+  //
+  // ⚠️ Falls back to the REQUEST's window when the form has none (staging report W3a, 2026-10-05): a
+  // form without dates prorated nothing, so the viewer printed one day's money (234,567 × 2) while
+  // the card beside it, reading the request, printed 13 days (7,013,553).
+  const formDays = durationDaysBetween(form?.projectTerms?.startDate, form?.projectTerms?.endDate);
+  const durationDays = formDays ?? requestDurationDays ?? null;
+  const startDate = (formDays != null ? form?.projectTerms?.startDate : requestStartDate) ?? null;
   /** Per-unit rental for one submitted line — prorated exactly as the supplier saw it when quoting. */
   const itemRental = (a?: LinkBidItem) =>
     computeRentalTotal({ rate: a?.rentalRate, priceUnit: a?.priceUnit, startDate, durationDays });
@@ -305,10 +337,10 @@ export function SharedBidSubmissionModal({
       if (codes.length > 1) {
         for (const code of codes) {
           const rk = certConfKey(k, code);
-          rows.push({ key: `${it.requestItemId}:${rk}`, label, asked: prettyCert(code), ok: conf[rk] ?? conf[k] });
+          rows.push({ key: `${it.requestItemId}:${rk}`, label, asked: certLabel(code, ar ? "ar" : "en") ?? prettyCert(code), ok: conf[rk] ?? conf[k] });
         }
       } else {
-        const val = k === "operatorCert" || k === "equipmentCert" ? prettyCert(asked) : renterChoice(asked, ar);
+        const val = k === "operatorCert" || k === "equipmentCert" ? (certLabel(asked, ar ? "ar" : "en") ?? prettyCert(asked)) : renterChoice(asked, ar);
         rows.push({ key: `${it.requestItemId}:${k}`, label, asked: val, ok: conf[k] });
       }
     }
@@ -322,7 +354,7 @@ export function SharedBidSubmissionModal({
     // The backend's own Arabic where it sends it (`c304828a`), with its digits normalised to Latin:
     // `valueAr` is seeded «٢٤ ساعة», and digits are Latin in both languages now.
     label: (ar && c.labelAr) || c.label,
-    asked: ar && c.valueAr ? latinDigits(c.valueAr) : c.value,
+    asked: contractValue(c.key, ar && c.valueAr ? c.valueAr : c.value, L),
     ok: contractAns[c.key as keyof typeof contractAns] as boolean | undefined,
   }));
   const itemTermGroups = shownItems.map((it) => ({ item: it, rows: termRowsFor(it) }));

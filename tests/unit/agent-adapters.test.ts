@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { extractAgentOutput, jobStatus, agentOutputToDraft, draftToRfqCorrection } from "@/lib/api/agent-adapters";
+import { mentionsOperator } from "@/lib/agent/tier";
 import type { Taxonomy } from "@/lib/contract";
 
 // A line item shaped like live Mansour output.
@@ -184,6 +185,30 @@ describe("agentOutputToDraft — an operator nobody asked for (owner, 2026-08-26
       extractAgentOutput(withNotes([{ field: "line_items[0].operator_included", note: "assumed for a forklift" }])),
     );
     expect(d.items[0].operatorNeeded).toBe("no");
+  });
+
+  /* Owner, 2026-10-05: *"when i write with operator to the agent the operator panel is not open"*. The
+     live agent answered «crawler excavator 20 ton with operator» with `operator_included: true` AND a
+     «suggested» note on it, and the guard above turned the renter's own operator off. */
+  it("keeps an operator the renter typed, whatever the agent's note says", () => {
+    const d = agentOutputToDraft(
+      extractAgentOutput(withNotes([{ field: "line_items[0].operator_included", note: "suggested" }])),
+      { renterSaidOperator: true },
+    );
+    expect(d.items[0].operatorNeeded).toBe("yes");
+  });
+
+  it("reads the renter's operator words in both languages", () => {
+    expect(mentionsOperator("crawler excavator 20 ton with operator")).toBe(true);
+    expect(mentionsOperator("Forklift WITH DRIVER")).toBe(true);
+    expect(mentionsOperator("حفار مع مشغل")).toBe(true);
+    expect(mentionsOperator("حفار مع مشغّل")).toBe(true);
+    expect(mentionsOperator("4 forklifts in Riyadh")).toBe(false);
+    // A refusal names the word too, and must not protect a guessed operator.
+    expect(mentionsOperator("crawler excavator without operator")).toBe(false);
+    expect(mentionsOperator("forklift, no driver, dry hire")).toBe(false);
+    expect(mentionsOperator("حفار بدون مشغل")).toBe(false);
+    expect(mentionsOperator("حفار مع مشغل بدون وقود")).toBe(true);
   });
 
   it("closes it when the agent raised it as a question, and clears the F.A.T it dragged along", () => {

@@ -128,7 +128,8 @@ describe("bidCardModel", () => {
       { label: "Demobilization", value: "Supplier" },
       { label: "Food", value: "Supplier" },
       { label: "Accommodation & transport", value: "Renter" },
-      { label: "Fuel", value: "Renter · diesel" },
+      // The fuel TYPE in words, not the form's code (staging report W4, 2026-10-05).
+      { label: "Fuel", value: "Renter · Diesel" },
     ]);
     expect(m.closing).toBe("Bidding closes 21 Aug 2026");
     expect(m.cta).toBe("Open the link to submit your bid →");
