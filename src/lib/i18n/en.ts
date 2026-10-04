@@ -2821,6 +2821,9 @@ export const en = {
       nudgeBoth: "Add dates for lower bids",
       nudgeEnd: "Add an end date for lower bids",
       nudgeStart: "Add a start date for lower bids",
+      /* The start picker greys out every day after the end date, and a renter read that as the field
+         being broken (owner, 2026-10-04: *"block it as now but with clear message"*). */
+      startCapped: "Start can't be after the end date. To start later, change the end date first",
     },
     /* ~~`carry` — the carry-forward modal's four strings («Equipment #{n}», what is locked, what is
        copied, and its two buttons).~~ Deleted with the modal (owner, 2026-09-09). What they said is

@@ -2184,6 +2184,7 @@ export const ar: Dictionary = {
       nudgeBoth: "أضف التاريخين لعروض أقل",
       nudgeEnd: "أضف تاريخ الانتهاء لعروض أقل",
       nudgeStart: "أضف تاريخ البداية لعروض أقل",
+      startCapped: "لا يمكن أن تبدأ بعد تاريخ النهاية. لتبدأ لاحقًا، غيّر تاريخ النهاية أولًا",
     },
     /* ~~`carry` — the carry-forward modal's four strings («Equipment #{n}», what is locked, what is
        copied, and its two buttons).~~ Deleted with the modal (owner, 2026-09-09). What they said is

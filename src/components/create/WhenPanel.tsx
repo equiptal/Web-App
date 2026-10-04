@@ -143,6 +143,15 @@ export function WhenPanel({
                   </label>
                 </div>
               </CanvasField>
+              {/* Why later start days are greyed out, said whenever an end date sets the cap. A renter
+                  read the blocked days as a broken field (owner, 2026-10-04: *"block it as now but
+                  with clear message"*). */}
+              {timing.endDate && (
+                <p className="mt-2 flex items-start gap-1.5 text-meta text-muted">
+                  <Icon name="info" size={13} className="mt-px flex-none" />
+                  {t.create.whenPanel.startCapped}
+                </p>
+              )}
 
               {/* MREQ-AC-10 — shown whenever EITHER end is missing. The prototype gated this on the end
                   date alone, so its own "add a start date" wording could never appear. */}

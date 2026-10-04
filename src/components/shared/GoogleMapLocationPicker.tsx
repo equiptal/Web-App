@@ -5,9 +5,11 @@
 // same props/contract — map render + click-to-pin + draggable marker + type-ahead search + reverse
 // geocode, all client-side with NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.
 //
-// Search uses the Geocoding API (forward geocode), NOT the Places Autocomplete widget: the app key
-// allows Maps JS + Geocoding but blocks the Places API (ApiTargetBlockedMapError). If "Places API"
-// is later enabled on the key, this can switch to google.maps.places.Autocomplete.
+// Search uses Places (New) autocomplete (`AutocompleteSuggestion`), with the Geocoding API as the
+// fallback when Places errors. ~~Geocoding only: the key blocked the Places API.~~ The key allows
+// Places now (checked 2026-10-04), and Geocoding is an address resolver, not a search: «qiddiyah»
+// came back as ONE fuzzy match, the whole country (owner: *"searching is weird, doesnt show all
+// results"*). The label resolve (`onResolveLabel`) still geocodes: it wants one point, not a list.
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Search, MapPin, Loader2, Navigation } from "lucide-react";
@@ -38,10 +40,13 @@ function loadMaps(): Promise<void> {
 }
 
 interface Suggestion {
-  lat: number;
-  lng: number;
   display: string;
   primary: string;
+  /** Geocoding results carry their point. */
+  lat?: number;
+  lng?: number;
+  /** Places predictions do not: the point is fetched only for the one the renter picks. */
+  prediction?: any;
 }
 
 interface MapLocationPickerProps {
@@ -84,6 +89,7 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const reqId = useRef(0); // guards out-of-order search responses
+  const placesSession = useRef<any>(null); // one Places billing session per pick
 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(false);
@@ -112,7 +118,7 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
         (results: any[], status: string) => {
           if (status !== "OK" || !results) return resolve([]);
           resolve(
-            results.slice(0, 6).map((r) => ({
+            results.slice(0, 6).map((r): Suggestion => ({
               lat: r.geometry.location.lat(),
               lng: r.geometry.location.lng(),
               display: r.formatted_address,
@@ -123,6 +129,32 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
       );
     });
   }, []);
+
+  // Type-ahead: Places (New) predictions, Saudi-scoped; the geocoder when Places is unavailable.
+  const placesSearch = useCallback(
+    async (query: string): Promise<Suggestion[]> => {
+      try {
+        const { AutocompleteSuggestion, AutocompleteSessionToken } = await (window as any).google.maps.importLibrary("places");
+        placesSession.current ??= new AutocompleteSessionToken();
+        const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: query,
+          sessionToken: placesSession.current,
+          includedRegionCodes: ["sa"],
+          language: "en",
+        });
+        return (suggestions as any[])
+          .filter((s) => s.placePrediction)
+          .slice(0, 6)
+          .map((s) => {
+            const p = s.placePrediction;
+            return { prediction: p, display: p.text.toString(), primary: p.mainText?.toString() ?? p.text.toString() };
+          });
+      } catch {
+        return geocodeSearch(query);
+      }
+    },
+    [geocodeSearch],
+  );
 
   const placeMarker = useCallback(
     (lat: number, lng: number) => {
@@ -207,7 +239,7 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
     void geocodeSearch(q).then((results) => {
       if (!alive) return;
       const hit = results[0];
-      if (!hit) {
+      if (hit?.lat == null || hit.lng == null) {
         // Nothing matched: hand the renter the query rather than an empty box.
         setSearchInput(q);
         return;
@@ -242,6 +274,22 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
     };
   }, [ready, value, reverseGeocode]);
 
+  // A picked suggestion: Places predictions fetch their point now, which also closes the session.
+  const pick = useCallback(
+    async (s: Suggestion) => {
+      if (s.lat != null && s.lng != null) return select(s.lat, s.lng, s.display);
+      try {
+        const place = s.prediction.toPlace();
+        await place.fetchFields({ fields: ["location", "formattedAddress"] });
+        placesSession.current = null;
+        if (place.location) select(place.location.lat(), place.location.lng(), place.formattedAddress ?? s.display);
+      } catch {
+        // Leave the list open; the renter can pick again or pin the map.
+      }
+    },
+    [select],
+  );
+
   // Debounced type-ahead. Coordinate/Maps-link pastes skip suggestions (resolved on Enter instead).
   useEffect(() => {
     const q = searchInput.trim();
@@ -253,14 +301,14 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
     const id = ++reqId.current;
     setSearching(true);
     const timer = setTimeout(async () => {
-      const results = await geocodeSearch(q);
+      const results = await placesSearch(q);
       if (id !== reqId.current) return;
       setSuggestions(results);
       setOpen(true);
       setSearching(false);
     }, 350);
     return () => clearTimeout(timer);
-  }, [searchInput, ready, geocodeSearch]);
+  }, [searchInput, ready, placesSearch]);
 
   // Enter: resolve a pasted coordinate/link, else take the first suggestion.
   const handleEnter = useCallback(async () => {
@@ -272,8 +320,8 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
       select(parsed.lat, parsed.lng, addr || q);
       return;
     }
-    if (suggestions[0]) select(suggestions[0].lat, suggestions[0].lng, suggestions[0].display);
-  }, [searchInput, suggestions, select, reverseGeocode]);
+    if (suggestions[0]) void pick(suggestions[0]);
+  }, [searchInput, suggestions, select, reverseGeocode, pick]);
 
   const handleMyLocation = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -316,10 +364,10 @@ export default function GoogleMapLocationPicker({ value, label, onChange, height
           {open && suggestions.length > 0 && (
             <ul className="absolute z-[1000] mt-1 max-h-64 w-full overflow-auto rounded-sm border border-border bg-surface py-1">
               {suggestions.map((s, i) => (
-                <li key={`${s.lat},${s.lng},${i}`}>
+                <li key={`${s.display},${i}`}>
                   <button
                     type="button"
-                    onClick={() => select(s.lat, s.lng, s.display)}
+                    onClick={() => void pick(s)}
                     className="flex w-full items-start gap-2 px-3 py-2 text-start text-body hover:bg-surface2"
                   >
                     <MapPin className="mt-0.5 h-3.5 w-3.5 flex-none text-brand" />

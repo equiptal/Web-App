@@ -7,6 +7,21 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-04 - Map search uses Places; start date says why later days are greyed. BUILT, NOT
+  committed.** (1) *"searching is weird, doesnt show all results"*: the type-ahead asked the
+  Geocoding API, which resolves an address and is not a search, so «qiddiyah» returned ONE
+  `partial_match`, the whole country. It looked deliberate because the comment said the key blocked
+  Places; that stopped being true (Places (New) answered on the live key, 2026-10-04). Now
+  `AutocompleteSuggestion` with a session token, Saudi-scoped, Geocoding as the fallback if Places
+  errors. Shared picker: create where panel, project form, edit-request location. (2) A renter could
+  not move the start date: `max = end date` greys out every later day. Owner kept the block
+  (*"block it as now but with clear message"*); a muted line now says so whenever an end date is set,
+  in the when panel and the edit-request modal. Files: `src/components/shared/GoogleMapLocationPicker.tsx`,
+  `src/components/create/WhenPanel.tsx`, `src/components/requests/RequestEditModals.tsx`,
+  `src/lib/i18n/en.ts`, `ar.ts`. ⚠️ Places is billed per session; the label resolve
+  (`onResolveLabel`) still geocodes on purpose, it wants one point. ⚠️ `cancel-confirmation.test.ts`
+  fails on a CRLF working tree (it searches for `
+`), before and after this change.
 - **2026-10-04 - Intercom: no made-up `<phone>@moedatech.app` email any more. BUILT, NOT
   committed.** `intercomEmail` now returns the real email or null. The invented address bounced
   every Intercom email (2,577 contacts carry one); it was kept "so one person is one contact", but

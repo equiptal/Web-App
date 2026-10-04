@@ -631,6 +631,15 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
                 themselves (owner, 2026-08-25). Save is blocked too — see `datesReversed`. */}
             <label><span className={lbl}>{L("Start date", "تاريخ البدء")}</span><input type="date" max={endDate || undefined} className={fld} value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
             <label><span className={lbl}>{L("End date", "تاريخ الانتهاء")}</span><input type="date" min={startDate || undefined} className={fld} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
+            {/* Why later start days are greyed out (owner, 2026-10-04), as in the create flow's `WhenPanel`. */}
+            {endDate && (
+              <p className="col-span-2 -mt-1 text-meta text-muted">
+                {L(
+                  "Start can't be after the end date. To start later, change the end date first",
+                  "لا يمكن أن تبدأ بعد تاريخ النهاية. لتبدأ لاحقًا، غيّر تاريخ النهاية أولًا",
+                )}
+              </p>
+            )}
             <Sel label={L("Rental basis", "أساس الإيجار")} value={rentalType} onChange={setRentalType} opts={RENTAL_OPTS} />
             <Num label={L("Working hours/day", "ساعات العمل/يوم")} value={hours} onChange={setHours} min={1} max={24} />
             {/* <Sel label={L("Overtime rate", "معدل العمل الإضافي")} value={overtime} onChange={setOvertime} opts={OVERTIME_OPTS} /> */}
