@@ -32,6 +32,13 @@ export const ar: Dictionary = {
     me: "أنا",
     supplier: "المورّد",
     sar: "ريال",
+    datePick: "اختر تاريخًا",
+    clear: "مسح",
+    today: "اليوم",
+    prevMonth: "الشهر السابق",
+    nextMonth: "الشهر التالي",
+    startAfterEnd: "لا يمكن أن يكون تاريخ البداية بعد تاريخ النهاية. غيّر أحدهما",
+    endBeforeStartPick: "لا يمكن أن يكون تاريخ النهاية قبل تاريخ البداية. غيّر أحدهما",
   },
   nav: {
     project: "المشروع",
@@ -795,7 +802,7 @@ export const ar: Dictionary = {
     rentalBasis: { daily: "يومي", weekly: "أسبوعي", monthly: "شهري" },
     overtime: { without: "بدون", "1.5x": "1.5×", "2x": "2×" },
     equipmentYear: { any: "أي", custom: "مخصص…", customPlaceholder: "اكتب سنة، مثال: 2008" },
-    safetyCert: { tuv: "TÜV", aramco: "معتمد من أرامكو", spsp: "SPSP", "saso-technical": "فحص ساسو الفني", other: "أخرى" },
+    safetyCert: { tuv: "TÜV", "tuv-saso": "TÜV (SASO)", aramco: "معتمد من أرامكو", spsp: "SPSP", "saso-technical": "فحص ساسو الفني", other: "أخرى" },
     otherCert: { "local-content": "المحتوى المحلي", "saso-registration": "تسجيل ساسو" },
     party: { me: "أنا", supplier: "المورّد" },
     fuelType: { diesel: "ديزل", petrol: "بنزين", electric: "كهربائي", hybrid: "هجين" },
@@ -2184,7 +2191,6 @@ export const ar: Dictionary = {
       nudgeBoth: "أضف التاريخين لعروض أقل",
       nudgeEnd: "أضف تاريخ الانتهاء لعروض أقل",
       nudgeStart: "أضف تاريخ البداية لعروض أقل",
-      startCapped: "لا يمكن أن تبدأ بعد تاريخ النهاية. لتبدأ لاحقًا، غيّر تاريخ النهاية أولًا",
     },
     /* ~~`carry` — the carry-forward modal's four strings («Equipment #{n}», what is locked, what is
        copied, and its two buttons).~~ Deleted with the modal (owner, 2026-09-09). What they said is

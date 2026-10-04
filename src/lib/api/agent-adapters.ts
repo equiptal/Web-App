@@ -559,7 +559,8 @@ const CERT_OUT: Record<string, AgentOperatorLicenseLevel> = { spsp: "SPSP", tuv:
 // Equipment safety certs ride the correction's loose `safety_certifications` string[] — include Aramco
 // (2026-07 cert rule) so a per-item Aramco pick survives the agent round-trip instead of being silently
 // dropped. Read-side normCert round-trips "ARAMCO" → "aramco" via SAFETY_CERTIFICATES.
-const SAFETY_CERT_OUT: Record<string, string> = { tuv: "TUV", aramco: "ARAMCO", spsp: "SPSP", "saso-technical": "SASO" };
+// TÜV (SASO) goes out as `TUV_SASO`; `pick` reads it back as `tuv-saso`.
+const SAFETY_CERT_OUT: Record<string, string> = { tuv: "TUV", "tuv-saso": "TUV_SASO", aramco: "ARAMCO", spsp: "SPSP", "saso-technical": "SASO" };
 
 /** Party → Mansour's `*_by_rentee` boolean: me ⇒ true (rentee covers), supplier ⇒ false; null passes through. */
 function renteeSide(p: Party | null | undefined): boolean | null {

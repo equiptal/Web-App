@@ -3,8 +3,8 @@
  *
  * ── Why this is not the model's job ──────────────────────────────────────────────────────────────
  *
- * `SAFETY_CERTIFICATES` is a closed list of two real marks — TÜV and Aramco — plus *other*. Two
- * words. Matching two words in a sentence is the same class of work the taxonomy matcher already
+ * `SAFETY_CERTIFICATES` is a closed list of three real marks — TÜV, TÜV (SASO) and Aramco — plus
+ * *other*. A few words. Matching a few words in a sentence is the same class of work the taxonomy matcher already
  * does for equipment names, which is why Tier 0 exists at all: **what the browser can answer for
  * certain, the browser answers.**
  *
@@ -51,6 +51,8 @@ import type { SafetyCertificate } from "@/lib/contract/options";
  */
 const SPELLINGS: Partial<Record<SafetyCertificate, string[]>> = {
   tuv: ["tuv", "tüv", "tuev", "t.u.v"],
+  // A TÜV from a SASO-listed provider (2026-10). Both word orders, with or without brackets/hyphen.
+  "tuv-saso": ["tuv saso", "tüv saso", "tuv-saso", "tuv (saso)", "tüv (saso)", "saso tuv", "saso tüv", "saso-tuv"],
   aramco: ["aramco", "أرامكو", "ارامكو"],
 };
 
@@ -76,5 +78,6 @@ export function certsInText(text: string): SafetyCertificate[] {
   for (const [cert, spellings] of Object.entries(SPELLINGS) as [SafetyCertificate, string[]][]) {
     if (names(text, spellings)) out.push(cert);
   }
-  return out;
+  // «tuv saso» also contains «tuv»; TÜV (SASO) covers plain TÜV, so only it is kept.
+  return out.includes("tuv-saso") ? out.filter((c) => c !== "tuv") : out;
 }

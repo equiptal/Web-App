@@ -167,6 +167,8 @@ const OFFER_DURATION_MAP: Record<string, string> = {
  */
 const CERT_TOKEN_MAP: Record<string, string> = {
   tuv: "tuv",
+  // A TÜV from a provider on SASO's list — the code the app stores (2026-10 cert rule).
+  "tuv-saso": "tuv_saso",
   aramco: "aramco", // 2026-07 cert rule — Aramco-certified equipment (canonical code the app stores)
   spsp: "spsp",
   "saso-technical": "saso_technical_inspection",

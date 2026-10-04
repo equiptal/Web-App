@@ -17,7 +17,7 @@
  * `yardId != null` supplier-side, so reading it turns every chip green). See `bid-map.ts:64`.
  */
 
-import { canonicalCertCode, computeUnitReadiness, readinessInputsFor, type UnitReadiness } from "@/lib/contract/bid-readiness";
+import { canonicalCertCode, computeUnitReadiness, docFamilyFor, readinessInputsFor, type UnitReadiness } from "@/lib/contract/bid-readiness";
 import type { OfferedUnitDoc } from "@/lib/contract/bids";
 import type { FleetMachine } from "@/lib/contract/fleet";
 
@@ -1316,6 +1316,7 @@ function docTypeLabel(type: string): Bilingual {
 /** An equipment certificate's row heading, keyed by `canonicalCertCode`. */
 const EQUIPMENT_CERT_ROW_LABEL: Record<string, Bilingual> = {
   tuv: { en: "TÜV certificate", ar: "شهادة TÜV" },
+  tuv_saso: { en: "TÜV (SASO) certificate", ar: "شهادة TÜV (SASO)" },
   spsp: { en: "SPSP certificate", ar: "شهادة SPSP" },
   saso: { en: "SASO certificate", ar: "شهادة ساسو" },
   aramco: { en: "Aramco certificate", ar: "شهادة أرامكو" },
@@ -1386,6 +1387,8 @@ function equipmentCertRowLabel(code: string): Bilingual {
  */
 const EQUIPMENT_ASK_TYPE: Record<string, string> = {
   tuv: "tuv",
+  // TÜV (SASO) is a TÜV from a SASO-listed issuer; the paper asked for is a TÜV (`docFamilyFor`).
+  tuv_saso: "tuv",
   spsp: "spsp",
   saso: "saso",
   insurance: "insurance",
@@ -1624,12 +1627,15 @@ export function equipmentDocGroups(machine: FleetMachine, request: MatchRequest)
   const equipHeld = heldByCode(machine.documentKeys.filter(isEquipmentCertDoc), canonicalCertCode);
   const equipRequested = readiness.equipmentCerts.map((c) => c.code);
   const equipRequiredSet = new Set(equipRequested);
-  for (const code of unionCodes(equipRequested, equipHeld)) {
+  // TÜV (SASO) is answered by a TÜV paper (`docFamilyFor`), so when it is asked its row takes over the
+  // TÜV row rather than listing one file twice (app parity, machine_panel_model.dart).
+  const sasoTuvAsked = equipRequiredSet.has("tuv_saso");
+  for (const code of unionCodes(equipRequested, equipHeld).filter((c) => !(sasoTuvAsked && c === "tuv"))) {
     certRows.push(
       certRow({
         key: `doc:equipment_cert:${code}`,
         label: equipmentCertRowLabel(code),
-        held: equipHeld.get(code) ?? [],
+        held: equipHeld.get(docFamilyFor(code)) ?? [],
         required: equipRequiredSet.has(code),
         askType: equipmentAskType(code),
       }),

@@ -121,6 +121,7 @@ export interface BidReadiness {
 
 const EQ_CERT_LABELS: Record<string, { en: string; ar: string }> = {
   tuv: { en: "TÜV", ar: "TÜV" },
+  tuv_saso: { en: "TÜV (SASO)", ar: "TÜV (SASO)" },
   aramco: { en: "Aramco Certified", ar: "معتمد من أرامكو" },
   spsp: { en: "SPSP", ar: "SPSP" },
   saso: { en: "SASO", ar: "شهادة SASO" },
@@ -205,6 +206,10 @@ export function requestedOperatorCertKinds(raw: string | null | undefined): stri
  * certificate files as `saso_technical_inspection`), but it is the spelling legacy SASO *requests*
  * carry, so it has to keep resolving to the family or those asks would silently stop being scored.
  */
+/** The equipment-cert family whose DOCUMENTS answer a requested one: `tuv_saso` → `tuv`, every other
+ *  code itself. App parity: `documentFamilyFor` (localized_labels.dart). */
+export const docFamilyFor = (code: string): string => (code === "tuv_saso" ? "tuv" : code);
+
 export function canonicalCertCode(x: string): string {
   const t = x.trim().toLowerCase().replace(/[\s-]+/g, "_").replace(/^operator_/, "");
   if (t.startsWith("aramco")) return "aramco";
@@ -312,8 +317,11 @@ export function computeUnitReadiness(
 
   const equipmentCerts: ReadinessCert[] = reqEquipCerts.map((c) => {
     const code = canonicalCertCode(c);
-    const present = eqDocByCert.has(code);
-    return { code, ...certLabel(code), present, url: present ? eqDocByCert.get(code) ?? null : null };
+    // TÜV (SASO) is answered by a TÜV paper: nothing checks the issuer against SASO's list yet
+    // (2026-10, app parity `documentFamilyFor`).
+    const docCode = docFamilyFor(code);
+    const present = eqDocByCert.has(docCode);
+    return { code, ...certLabel(code), present, url: present ? eqDocByCert.get(docCode) ?? null : null };
   });
   // `reqOperatorCertKinds` are already DOCUMENT KINDS (`readinessInputsFor` → `requestedOperatorCertKinds`),
   // so this is the app's `docTypes.contains(kind)` and nothing else. It used to run the ask through

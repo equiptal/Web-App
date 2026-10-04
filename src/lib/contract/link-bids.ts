@@ -43,7 +43,7 @@ export const certConfKey = (term: string, code: string) => `${term}::${code}`;
 // Known cert codes → clean display labels (2026-07 rule: TÜV + Aramco are the offered equipment certs;
 // legacy SPSP/SASO still render for old data). Unknown codes fall back to prettified uppercase.
 const CERT_LABEL: Record<string, string> = {
-  tuv: "TÜV", aramco: "Aramco Certified", aramco_certified: "Aramco Certified", aramco_certificate: "Aramco Certified",
+  tuv: "TÜV", tuv_saso: "TÜV (SASO)", aramco: "Aramco Certified", aramco_certified: "Aramco Certified", aramco_certificate: "Aramco Certified",
   spsp: "SPSP", saso: "SASO", saso_technical_inspection: "SASO technical inspection", saso_registration: "SASO registration",
 };
 export const prettyCert = (code: string) => {
@@ -470,7 +470,7 @@ export function submissionToBidCard(sub: LinkBidSubmission, item?: LinkBidItem):
   // Equipment-section enrichment for the comparison matrix. Off-platform bids have no equipment listing
   // or docs — only the supplier's Yes/No confirmations — so populate Year / Equipment certs / Operator
   // cert from those (showing the requested VALUE the supplier confirmed, e.g. TÜV), not blanks.
-  const toCertCode = (raw: string): CertCode | null => { const u = raw.toUpperCase(); return u.includes("TUV") || u.includes("TÜV") ? "TUV" : u.includes("SPSP") ? "SPSP" : u.includes("SASO") ? "SASO" : u.includes("LC") || u.includes("LOCAL") ? "LC" : null; };
+  const toCertCode = (raw: string): CertCode | null => { const u = raw.toUpperCase(); return (u.includes("TUV") || u.includes("TÜV")) && u.includes("SASO") ? "TUV_SASO" : u.includes("TUV") || u.includes("TÜV") ? "TUV" : u.includes("SPSP") ? "SPSP" : u.includes("SASO") ? "SASO" : u.includes("LC") || u.includes("LOCAL") ? "LC" : null; };
   const cc = c as Record<string, boolean | undefined>;
   const reqEqRaw = certCodesFromValue(rt.equipmentCert);
   const reqEqCertCodes = reqEqRaw.map((x) => toCertCode(x)).filter((x): x is CertCode => !!x);

@@ -162,8 +162,8 @@ describe("option lists come from the contract (MREQ-AC-17/18/19)", () => {
     const handle = await card();
     const labels = await optionsOf(handle, "Certificate");
     expect(labels[0]).toBe("No certificate");
-    expect(labels.slice(1)).toEqual(["TÜV", "Aramco Certified", "Other"]);
-    expect(SAFETY_CERTIFICATES).toEqual(["tuv", "aramco", "other"]);
+    expect(labels.slice(1)).toEqual(["TÜV", "TÜV (SASO)", "Aramco Certified", "Other"]);
+    expect(SAFETY_CERTIFICATES).toEqual(["tuv", "tuv-saso", "aramco", "other"]);
     // The prototype's inventions must not be reachable.
     for (const invented of ["CE", "ISO 9001", "SASO"]) expect(labels).not.toContain(invented);
   });

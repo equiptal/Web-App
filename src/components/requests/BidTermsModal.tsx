@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Dialog, DialogButton } from "@/components/Dialog";
 import { Icon } from "@/components/Icon";
-import { bucketBidTerms, termSides, CERT_LABEL, COUNTED_TERM_GROUP, type CertCode, type TermRow, type TermState } from "@/lib/contract/bids";
+import { bucketBidTerms, termSides, CERT_LABEL, certHeldFor, COUNTED_TERM_GROUP, type CertCode, type TermRow, type TermState } from "@/lib/contract/bids";
 
 /**
  * ── THE TERMS PAGE, READ OFF THE APP ────────────────────────────────────────────────────────────
@@ -428,7 +428,7 @@ function childRows(
 ): { label: string; value?: string; held?: boolean }[] {
   if (group === "certs") {
     const held = new Set(ask.certsHeld);
-    return ask.certsRequested.map((c) => ({ label: CERT_LABEL[c]?.en ?? c, held: held.has(c) }));
+    return ask.certsRequested.map((c) => ({ label: CERT_LABEL[c]?.en ?? c, held: certHeldFor(c, held) }));
   }
   if (group === "operator" && ask.operatorIncluded) {
     const fat = (v: "supplier" | "me" | null) =>

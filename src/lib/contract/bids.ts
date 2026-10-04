@@ -23,9 +23,12 @@ export type BidStatus =
 /** Safety/credential cert codes (app parity: CertType — LC/SASO/TÜV/SPSP). */
 // ARAMCO added per the 2026-07 cert rule (TÜV + Aramco are the offered equipment certs; SPSP/SASO stay
 // for legacy data). Labels per 013 acceptance (AC-01/02): LC → "محتوى محلي", SASO → "شهادة SASO".
-export type CertCode = "TUV" | "ARAMCO" | "SPSP" | "SASO" | "LC";
+// TUV_SASO (2026-10): a TÜV from a provider on SASO's list. Its own code so every chip NAMES the ask;
+// a held TÜV answers it (see `certHeldFor`).
+export type CertCode = "TUV" | "TUV_SASO" | "ARAMCO" | "SPSP" | "SASO" | "LC";
 export const CERT_LABEL: Record<CertCode, { en: string; ar: string }> = {
   TUV: { en: "TÜV", ar: "TÜV" },
+  TUV_SASO: { en: "TÜV (SASO)", ar: "TÜV (SASO)" },
   ARAMCO: { en: "Aramco Certified", ar: "معتمد من أرامكو" },
   SPSP: { en: "SPSP", ar: "SPSP" },
   SASO: { en: "SASO certificate", ar: "شهادة SASO" },
@@ -35,10 +38,21 @@ function toCert(raw: string): CertCode | null {
   const u = raw.trim().toUpperCase();
   if (u === "LC" || /LOCAL.?CONTENT/.test(u)) return "LC";
   if (/ARAMCO/.test(u)) return "ARAMCO";
+  // Before the SASO test, which would otherwise read `tuv_saso` as the SASO certificate.
+  if (/(TUV|TÜV)[\s_-]*\(?SASO/.test(u)) return "TUV_SASO";
   if (/SASO/.test(u)) return "SASO";
   if (/TUV|TÜV/.test(u)) return "TUV";
   if (/SPSP/.test(u)) return "SPSP";
   return null;
+}
+/**
+ * Whether a set of HELD cert codes answers a requested one. Every code answers itself; TÜV (SASO) is
+ * also answered by a plain TÜV, because nothing checks the issuer against SASO's list yet (2026-10,
+ * app parity `documentFamilyFor`).
+ */
+export function certHeldFor(requested: CertCode, held: ReadonlySet<CertCode> | readonly CertCode[]): boolean {
+  const has = (c: CertCode) => ("has" in held ? (held as ReadonlySet<CertCode>).has(c) : (held as readonly CertCode[]).includes(c));
+  return has(requested) || (requested === "TUV_SASO" && has("TUV"));
 }
 /** Normalise whatever the backend calls a certificate into the enum, dropping what it can't name.
  *  The request drawer needs this to render a request's required certificates as chips. */

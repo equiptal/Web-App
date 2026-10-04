@@ -205,6 +205,9 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**90.1** | Dialog — panel | `src/components/Dialog.tsx` |
 | &nbsp;&nbsp;**90.2** | Dialog — header row | `src/components/Dialog.tsx` |
 | **92** | Search select | `src/components/Dropdown.tsx` |
+| **93** | Date picker — trigger | `src/components/DatePicker.tsx` |
+| &nbsp;&nbsp;**93.1** | Date picker — calendar popup | `src/components/DatePicker.tsx` |
+| &nbsp;&nbsp;**93.2** | Date picker — red refusal note | `src/components/DatePicker.tsx` |
 <!-- pins:end -->
 
 ## Adding one

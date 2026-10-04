@@ -317,6 +317,9 @@ export const PIN_REGISTRY = {
   "dialog-panel": { n: "90.1", label: "Dialog — panel", file: "src/components/Dialog.tsx" },
   "dialog-header": { n: "90.2", label: "Dialog — header row", file: "src/components/Dialog.tsx" },
   "search-select": { n: "92", label: "Search select", file: "src/components/Dropdown.tsx" },
+  "date-picker": { n: "93", label: "Date picker — trigger", file: "src/components/DatePicker.tsx" },
+  "date-picker-panel": { n: "93.1", label: "Date picker — calendar popup", file: "src/components/DatePicker.tsx" },
+  "date-picker-conflict": { n: "93.2", label: "Date picker — red refusal note", file: "src/components/DatePicker.tsx" },
 } as const satisfies Record<string, PinEntry>;
 
 export type PinId = keyof typeof PIN_REGISTRY;

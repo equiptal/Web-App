@@ -27,7 +27,7 @@ import { useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Icon, Toggle } from "@/components/ui";
 import { Dropdown } from "@/components/Dropdown";
-import { SAFETY_CERTIFICATES, OPERATOR_CERTIFICATES, type Party } from "@/lib/contract/options";
+import { SAFETY_CERTIFICATES, OPERATOR_CERTIFICATES, toggleSafetyCert, type Party } from "@/lib/contract/options";
 import { blankTerms, type MachineTerms } from "@/lib/contract/work-order";
 
 const input =
@@ -153,7 +153,8 @@ function CertSet({
               <input
                 type="checkbox"
                 checked={on}
-                onChange={() => onChoose(on ? chosen.filter((x) => x !== c) : [...chosen, c])}
+                // TÜV and TÜV (SASO) are exclusive (`toggleSafetyCert`); other codes toggle alone.
+                onChange={() => onChoose(toggleSafetyCert(chosen, c))}
               />
               {labels[c] ?? c}
             </label>

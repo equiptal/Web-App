@@ -17,6 +17,7 @@ import { useState } from "react";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, Toggle } from "@/components/ui";
+import { DatePicker } from "@/components/DatePicker";
 import { CanvasField, CheckFromProject, ChoiceRow, PanelDot } from "@/components/create/Provenance";
 import { useProvenance } from "@/components/create/hooks";
 import { computeChargedDays, PAYMENT_TERMS, RENTAL_BASES, type PaymentTerm, type RentalBasis } from "@/lib/contract";
@@ -119,39 +120,34 @@ export function WhenPanel({
                 <div className="flex items-center gap-3">
                   <label className="flex-1 rounded-sm border border-border bg-surface px-3.5 py-2.5">
                     <span className="mb-1 block text-label font-semibold tracking-wide text-muted">{t.create.whenPanel.startDate}</span>
-                    {/* Each end bounds the other, so the PICKER cannot offer a backwards window
-                        (owner, 2026-08-25). A typed or pasted date still can, which is what the
-                        reversal message below and the `gate.datesReversed` gap are for. */}
-                    <input
-                      type="date"
-                      max={timing.endDate ?? undefined}
-                      value={timing.startDate ?? ""}
-                      onChange={(e) => setTiming({ startDate: e.target.value || null }, "timing.start_date")}
-                      className="w-full bg-transparent text-subhead font-extrabold text-navy outline-none"
+                    {/* Each end bounds the other (owner, 2026-08-25), now by REFUSING the pick with a red
+                        note in the calendar rather than greying days out (owner, 2026-10-04): a renter
+                        read the greyed days as a broken field. See `DatePicker`. A draft can still
+                        arrive backwards from the agent, which is what the reversal message below and
+                        the `gate.datesReversed` gap are for. */}
+                    <DatePicker
+                      value={timing.startDate}
+                      notAfter={timing.endDate}
+                      conflict={t.common.startAfterEnd}
+                      label={t.create.whenPanel.startDate}
+                      onChange={(v) => setTiming({ startDate: v }, "timing.start_date")}
+                      triggerClass="w-full bg-transparent text-subhead font-extrabold text-navy outline-none"
                     />
                   </label>
                   <Icon name="arrow_forward" size={16} className="flex-none text-muted rtl:rotate-180" />
                   <label className="flex-1 rounded-sm border border-border bg-surface px-3.5 py-2.5">
                     <span className="mb-1 block text-label font-semibold tracking-wide text-muted">{t.create.whenPanel.endDate}</span>
-                    <input
-                      type="date"
-                      min={timing.startDate ?? undefined}
-                      value={timing.endDate ?? ""}
-                      onChange={(e) => setTiming({ endDate: e.target.value || null }, "timing.end_date")}
-                      className="w-full bg-transparent text-subhead font-extrabold text-navy outline-none"
+                    <DatePicker
+                      value={timing.endDate}
+                      notBefore={timing.startDate}
+                      conflict={t.common.endBeforeStartPick}
+                      label={t.create.whenPanel.endDate}
+                      onChange={(v) => setTiming({ endDate: v }, "timing.end_date")}
+                      triggerClass="w-full bg-transparent text-subhead font-extrabold text-navy outline-none"
                     />
                   </label>
                 </div>
               </CanvasField>
-              {/* Why later start days are greyed out, said whenever an end date sets the cap. A renter
-                  read the blocked days as a broken field (owner, 2026-10-04: *"block it as now but
-                  with clear message"*). */}
-              {timing.endDate && (
-                <p className="mt-2 flex items-start gap-1.5 text-meta text-muted">
-                  <Icon name="info" size={13} className="mt-px flex-none" />
-                  {t.create.whenPanel.startCapped}
-                </p>
-              )}
 
               {/* MREQ-AC-10 — shown whenever EITHER end is missing. The prototype gated this on the end
                   date alone, so its own "add a start date" wording could never appear. */}

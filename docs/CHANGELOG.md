@@ -7,21 +7,50 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
-- **2026-10-04 - Map search uses Places; start date says why later days are greyed. BUILT, NOT
-  committed.** (1) *"searching is weird, doesnt show all results"*: the type-ahead asked the
+- **2026-10-04 - Certificates: new «TÜV (SASO)» option. BUILT on `main`, NOT committed.** A TÜV
+  from a provider on SASO's list (owner, via Awab). Offered beside TÜV / Aramco / Other on every
+  equipment-cert picker (machine card, project pills, project templates, edit request) and exclusive
+  with plain TÜV (`toggleSafetyCert`). Wire code `tuv_saso`, the same as the app; the edit-request
+  modal maps it both ways (`normalizeSafetyCert`). The browser quick parser reads «tuv saso» / «saso
+  tüv» from the renter's text (`quick-certs.ts`). Readiness: its own code (`TUV_SASO` in `CertCode`,
+  `tuv_saso` in `bid-readiness`) so every chip names it, but a held TÜV answers it (`certHeldFor`,
+  `docFamilyFor`) because nothing checks the issuer yet; on the map panel its row replaces the TÜV
+  row. ⚠️ The app's 2026-10 per-machine-type cert table was built here first and then WITHDRAWN the
+  same day (owner: the web has no step 1, every machine and operator takes its own values), so no
+  cert is derived from the machine type. ⚠️ `toCert` must test TÜV-SASO BEFORE the bare SASO test,
+  or `tuv_saso` reads as the SASO certificate. ⚠️ The external RFQ agent (Mansour) does not know the
+  code; it is not in this repo. Files: `src/lib/contract/{options,bids,bid-readiness,link-bids,
+  request-card}.ts`, `src/lib/api/{app,agent}-adapters.ts`, `src/lib/agent/quick-certs.ts`,
+  `src/components/create/CertSelect.tsx`, `src/components/projects/TermsFields.tsx`,
+  `src/components/requests/{BidTermsModal,RequestEditModals}.tsx`,
+  `src/components/map/panel/machine-panel-model.ts`, `src/lib/i18n/{en,ar}.ts`, tests
+  `tuv-saso-cert` (new), `machine-card`. Verified: tsc 0, lint clean, 3954 pass; the 6 failing also
+  fail on clean `main`. NOT seen in a browser.
+- **2026-10-04 - Date fields: our own calendar; a backwards pick is refused with a red note. BUILT,
+  NOT committed.** The native `<input type="date">` bounded start by `max = end` and end by
+  `min = start`, so later days were greyed out and a renter read the start field as broken. The
+  first fix (entry below, an always-on muted line) was withdrawn the same day: *"the start 6-10 and
+  end is 8-10 why this message appear?"*. Owner's ruling: *"keep the days showing but when someone
+  selects start after the end date show a red note at the bottom of the calender window ... and dont
+  allow the selection"*, both ends. The browser's popup cannot carry our text, so `DatePicker` is a
+  new in-app calendar (portal, pins 93/93.1/93.2): every day pickable, a backwards pick keeps the old
+  value, stays open and shows the note. Used in the create when panel and the edit-request modal.
+  Files: `src/components/DatePicker.tsx`, `src/components/create/WhenPanel.tsx`,
+  `src/components/requests/RequestEditModals.tsx`, `src/lib/i18n/en.ts`, `ar.ts`, `src/lib/uiPins.ts`,
+  `tests/unit/when-panel.test.tsx`. ⚠️ Values stay `YYYY-MM-DD` strings, so stores and payloads are
+  untouched. ⚠️ The project form, work order and share-step date inputs are still native.
+- **2026-10-04 - Map search uses Places; start date says why later days are greyed. Committed in
+  `998c1b14`.** (1) *"searching is weird, doesnt show all results"*: the type-ahead asked the
   Geocoding API, which resolves an address and is not a search, so «qiddiyah» returned ONE
   `partial_match`, the whole country. It looked deliberate because the comment said the key blocked
   Places; that stopped being true (Places (New) answered on the live key, 2026-10-04). Now
   `AutocompleteSuggestion` with a session token, Saudi-scoped, Geocoding as the fallback if Places
-  errors. Shared picker: create where panel, project form, edit-request location. (2) A renter could
-  not move the start date: `max = end date` greys out every later day. Owner kept the block
-  (*"block it as now but with clear message"*); a muted line now says so whenever an end date is set,
-  in the when panel and the edit-request modal. Files: `src/components/shared/GoogleMapLocationPicker.tsx`,
-  `src/components/create/WhenPanel.tsx`, `src/components/requests/RequestEditModals.tsx`,
-  `src/lib/i18n/en.ts`, `ar.ts`. ⚠️ Places is billed per session; the label resolve
-  (`onResolveLabel`) still geocodes on purpose, it wants one point. ⚠️ `cancel-confirmation.test.ts`
-  fails on a CRLF working tree (it searches for `
-`), before and after this change.
+  errors. Shared picker: create where panel, project form, edit-request location. (2) ~~A muted
+  line saying the start is capped by the end date, whenever an end date is set.~~ Withdrawn the same
+  day, see the entry above. Files: `src/components/shared/GoogleMapLocationPicker.tsx`. ⚠️ Places is
+  billed per session; the label resolve (`onResolveLabel`) still geocodes on purpose, it wants one
+  point. ⚠️ `cancel-confirmation.test.ts` fails on a CRLF working tree (it searches for a bare LF),
+  before and after this change.
 - **2026-10-04 - Intercom: no made-up `<phone>@moedatech.app` email any more. BUILT, NOT
   committed.** `intercomEmail` now returns the real email or null. The invented address bounced
   every Intercom email (2,577 contacts carry one); it was kept "so one person is one contact", but

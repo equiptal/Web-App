@@ -4,10 +4,11 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { Dialog } from "@/components/Dialog";
 import { Dropdown } from "@/components/Dropdown";
+import { DatePicker } from "@/components/DatePicker";
 import { CertSelect } from "@/components/create/CertSelect";
 import type { SubtypeAttachmentOption } from "@/lib/contract/app";
 import { requestedMinYear } from "@/lib/contract/bids";
-import { SAFETY_CERTIFICATES, type SafetyCertificate } from "@/lib/contract/options";
+import { SAFETY_CERTIFICATES, normalizeSafetyCert, type SafetyCertificate } from "@/lib/contract/options";
 import { taxName, type Taxonomy } from "@/lib/contract/taxonomy";
 import { fetchTaxonomy, updateRequest } from "@/lib/api/client";
 import { type RequestRecord } from "@/lib/contract/requests";
@@ -283,9 +284,10 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
     };
   }, [subtypeId]);
   const [certs, setCerts] = useState<SafetyCertificate[]>(
-    (it?.safetyCertifications ?? []).filter((c): c is SafetyCertificate =>
-      (SAFETY_CERTIFICATES as readonly string[]).includes(c),
-    ),
+    // Normalised first: the record stores TÜV (SASO) as `tuv_saso`, the chip is `tuv-saso`.
+    (it?.safetyCertifications ?? [])
+      .map((c) => normalizeSafetyCert(c))
+      .filter((c): c is SafetyCertificate => (SAFETY_CERTIFICATES as readonly string[]).includes(c)),
   );
   const [itemNotes, setItemNotes] = useState(s(it?.additionalNotes));
 
@@ -419,7 +421,8 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
         demobilizationByRentee: demob === "rentee",
         // Only meaningful for a burnt fuel, exactly as `toDieselIncluded` decides it on create.
         ...(fuel === "DIESEL" || fuel === "PETROL" ? { dieselIncluded: fuelBy === "supplier" } : {}),
-        safetyCertifications: certs,
+        // Back to the stored spelling (`tuv-saso` → `tuv_saso`, what the app and create send).
+        safetyCertifications: certs.map((c) => (c === "tuv-saso" ? "tuv_saso" : c)),
         ...(isCrane && workType.trim() ? { workType: workType.trim().slice(0, 255) } : {}),
         attachmentIds: attachments,
         /* Passed through, not edited: nothing in the product asks for these, and the item is
@@ -628,18 +631,19 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
           <SecH icon="event">{L("When", "التوقيت")}</SecH>
           <div className="grid grid-cols-2 gap-3">
             {/* Each end bounds the other, as the numeric fields on this same row already bound
-                themselves (owner, 2026-08-25). Save is blocked too — see `datesReversed`. */}
-            <label><span className={lbl}>{L("Start date", "تاريخ البدء")}</span><input type="date" max={endDate || undefined} className={fld} value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-            <label><span className={lbl}>{L("End date", "تاريخ الانتهاء")}</span><input type="date" min={startDate || undefined} className={fld} value={endDate} onChange={(e) => setEndDate(e.target.value)} /></label>
-            {/* Why later start days are greyed out (owner, 2026-10-04), as in the create flow's `WhenPanel`. */}
-            {endDate && (
-              <p className="col-span-2 -mt-1 text-meta text-muted">
-                {L(
-                  "Start can't be after the end date. To start later, change the end date first",
-                  "لا يمكن أن تبدأ بعد تاريخ النهاية. لتبدأ لاحقًا، غيّر تاريخ النهاية أولًا",
-                )}
-              </p>
-            )}
+                themselves (owner, 2026-08-25). Save is blocked too — see `datesReversed`.
+                Since 2026-10-04 by refusing the pick with a red note in the calendar, not by greying
+                days out, which a renter read as a broken field. See `DatePicker`. */}
+            <label><span className={lbl}>{L("Start date", "تاريخ البدء")}</span>
+              <DatePicker value={startDate || null} notAfter={endDate || null} label={L("Start date", "تاريخ البدء")} triggerClass={fld}
+                conflict={L("Start can't be after the end date. Change one of them", "لا يمكن أن يكون تاريخ البداية بعد تاريخ النهاية. غيّر أحدهما")}
+                onChange={(v) => setStartDate(v ?? "")} />
+            </label>
+            <label><span className={lbl}>{L("End date", "تاريخ الانتهاء")}</span>
+              <DatePicker value={endDate || null} notBefore={startDate || null} label={L("End date", "تاريخ الانتهاء")} triggerClass={fld}
+                conflict={L("End can't be before the start date. Change one of them", "لا يمكن أن يكون تاريخ النهاية قبل تاريخ البداية. غيّر أحدهما")}
+                onChange={(v) => setEndDate(v ?? "")} />
+            </label>
             <Sel label={L("Rental basis", "أساس الإيجار")} value={rentalType} onChange={setRentalType} opts={RENTAL_OPTS} />
             <Num label={L("Working hours/day", "ساعات العمل/يوم")} value={hours} onChange={setHours} min={1} max={24} />
             {/* <Sel label={L("Overtime rate", "معدل العمل الإضافي")} value={overtime} onChange={setOvertime} opts={OVERTIME_OPTS} /> */}

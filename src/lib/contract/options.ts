@@ -37,10 +37,33 @@ export function equipmentYears(now: Date = new Date()): string[] {
  */
 export const LEGACY_EQUIPMENT_YEAR_BANDS = ["2015+", "2018+", "2020+", "2022+"] as const;
 
-// 2026-07 cert rule: equipment certs offered are TÜV + Aramco (SPSP/SASO dropped from selection but
-// legacy values still RENDER for old data, so they stay in the union). Aramco is equipment-only.
-export type SafetyCertificate = "tuv" | "aramco" | "spsp" | "saso-technical" | "other"; // AC-50 (+ web-app/002 free-text "other")
-export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "aramco", "other"];
+// Equipment certs offered are TÜV, TÜV (SASO) (added 2026-10) and Aramco (SPSP/SASO dropped from
+// selection but legacy values still RENDER for old data, so they stay in the union). Aramco is
+// equipment-only. `tuv-saso` is a TÜV certificate from a provider on SASO's list; it replaces plain
+// TÜV rather than sitting beside it (see {@link toggleSafetyCert}).
+export type SafetyCertificate = "tuv" | "tuv-saso" | "aramco" | "spsp" | "saso-technical" | "other"; // AC-50 (+ web-app/002 free-text "other")
+export const SAFETY_CERTIFICATES: SafetyCertificate[] = ["tuv", "tuv-saso", "aramco", "other"];
+
+/** The two TÜV codes. Exclusive on every picker: TÜV (SASO) already covers plain TÜV. */
+export const TUV_CERTIFICATES: readonly SafetyCertificate[] = ["tuv", "tuv-saso"];
+
+/**
+ * Toggle `code` in a cert selection, keeping the TÜV pair exclusive: turning one TÜV code on turns
+ * the other off. Returns a new list in {@link SAFETY_CERTIFICATES} order (then anything legacy).
+ * App parity: `toggleEquipmentCert` (localized_labels.dart).
+ */
+export function toggleSafetyCert<T extends string>(selected: readonly T[], code: T): T[] {
+  let next: T[];
+  if (selected.includes(code)) {
+    next = selected.filter((c) => c !== code);
+  } else {
+    const tuv = TUV_CERTIFICATES as readonly string[];
+    next = [...selected.filter((c) => !(tuv.includes(code) && tuv.includes(c))), code];
+  }
+  const order = SAFETY_CERTIFICATES as readonly string[];
+  const rank = (c: string) => (order.includes(c) ? order.indexOf(c) : order.length);
+  return next.sort((a, b) => rank(a) - rank(b));
+}
 /**
  * Operator per-item certificate options — Aramco is NOT an operator cert (equipment-only, app parity).
  *
@@ -70,6 +93,9 @@ export function normalizeSafetyCert(raw: string): string {
     case "tuv_certificate":
     case "tuv_inspection":
       return "tuv";
+    case "tuv_saso":
+    case "tuv_(saso)":
+      return "tuv-saso";
     case "aramco":
     case "aramco_certified":
     case "aramco_certificate":

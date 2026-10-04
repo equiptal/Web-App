@@ -433,6 +433,7 @@ const DOC_TYPE_LABELS: Record<string, [string, string]> = {
   sales_contract: ["Sale contract", "عقد البيع"],
   saso_registration: ["SASO registration", "تسجيل ساسو"],
   tuv: ["TÜV certificate", "شهادة TÜV"],
+  tuv_saso: ["TÜV (SASO) certificate", "شهادة TÜV (SASO)"],
   spsp: ["SPSP certificate", "شهادة SPSP"],
   saso: ["SASO certificate", "شهادة ساسو"],
   aramco: ["Aramco certificate", "شهادة أرامكو"],

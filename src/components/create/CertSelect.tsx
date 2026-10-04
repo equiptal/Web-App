@@ -24,7 +24,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui";
 import { cx } from "@/lib/ds";
 import { useT } from "@/lib/i18n";
-import { SAFETY_CERTIFICATES, type SafetyCertificate } from "@/lib/contract";
+import { SAFETY_CERTIFICATES, toggleSafetyCert, type SafetyCertificate } from "@/lib/contract";
 
 export function CertSelect({
   values,
@@ -81,8 +81,8 @@ export function CertSelect({
       ? c.noCert
       : c.cert;
 
-  const toggle = (k: SafetyCertificate) =>
-    onChange(values.includes(k) ? values.filter((x) => x !== k) : [...values, k]);
+  // TÜV and TÜV (SASO) are exclusive: one switches the other off (`toggleSafetyCert`).
+  const toggle = (k: SafetyCertificate) => onChange(toggleSafetyCert(values, k));
 
   /* ── Which orange, and why not the pressed one (owner, 2026-09-08) ───────────────────
      *"Show them orange … in warning orange … and make its tone the same as the one in prod now."*

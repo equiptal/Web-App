@@ -88,12 +88,31 @@ describe("with the end date before the start date", () => {
     expect(gate.reasons).toContain("gate.datesReversed");
   });
 
-  it("bounds each date input by the other, so the picker cannot offer one", async () => {
-    await panel({ draft: withTiming({ startDate: "2026-09-10", endDate: null }) });
-    const dates = screen.getAllByDisplayValue("2026-09-10")[0] as HTMLInputElement;
-    expect(dates.max).toBe("");
-    const ends = document.querySelectorAll<HTMLInputElement>('input[type="date"]');
-    expect(ends[1].min).toBe("2026-09-10");
+  /**
+   * ~~«bounds each date input by the other, so the picker cannot offer one»~~ (`max`/`min` on native
+   * inputs). Reversed by the owner on 2026-10-04: greyed-out days read as a broken field. Every day
+   * shows; a backwards pick is REFUSED, with the reason in red at the bottom of the calendar.
+   */
+  it("refuses a start after the end with a red note, and takes one before it", async () => {
+    const handle = await panel({ draft: withTiming({ startDate: "2026-09-10", endDate: "2026-09-12" }) });
+    await handle.run(() => screen.getByRole("button", { name: "START DATE" }).click());
+    const day = (n: number) => screen.getAllByRole("button", { pressed: false }).find((b) => b.textContent === String(n))!;
+
+    await handle.run(() => day(20).click());
+    expect(screen.getByRole("alert").textContent).toContain("Start can't be after the end date. Change one of them");
+    expect(handle.store().state.draft!.project.timing.startDate).toBe("2026-09-10");
+
+    await handle.run(() => day(11).click());
+    expect(handle.store().state.draft!.project.timing.startDate).toBe("2026-09-11");
+  });
+
+  it("refuses an end before the start", async () => {
+    const handle = await panel({ draft: withTiming({ startDate: "2026-09-10", endDate: "2026-09-12" }) });
+    await handle.run(() => screen.getByRole("button", { name: "END DATE" }).click());
+    const day = screen.getAllByRole("button", { pressed: false }).find((b) => b.textContent === "5")!;
+    await handle.run(() => day.click());
+    expect(screen.getByRole("alert").textContent).toContain("End can't be before the start date. Change one of them");
+    expect(handle.store().state.draft!.project.timing.endDate).toBe("2026-09-12");
   });
 });
 
