@@ -12,7 +12,7 @@
  * | App sends | Web sends |
  * |---|---|
  * | `user_id` — the DB user id | the same, from the session |
- * | name, email, phone | phone; name and email only as the app's own fallbacks (see below) |
+ * | name, email, phone | phone; name with the app's own fallback; email only when real, as the app does (see below) |
  * | `user_type` — from `active_role` | always `rentee`: this whole surface is the renter's |
  * | `app_version` / `app_build` / `device_os` | `device_os: "web"` and the app version |
  * | (no `platform` yet) | `platform: "web-rentee"`, the `X-Client-Platform` value |
@@ -123,18 +123,15 @@ export function recentSupportError(now = Date.now()): string | null {
 }
 
 /**
- * The address a support agent sees.
+ * The address a support agent sees: the user's real email, or null.
  *
- * A real email wins, because it is the one the user actually owns. Failing that the app derives one
- * from the phone number — digits only, `@moedatech.app` — and this does the same, so one person does
- * not arrive in the inbox as two contacts depending on which client they wrote from. Null when there
- * is neither, rather than an empty string: Intercom treats `""` as a value and would store it.
+ * Never a made-up one. The phone-derived `<digits>@moedatech.app` address this used to invent (as the
+ * app did) bounced every Intercom email sent to it (Intercom handoff item 9). One person is still one
+ * contact without it, because Intercom keys the contact on `user_id`. Null rather than an empty
+ * string: Intercom treats `""` as a value and would store it.
  */
-export function intercomEmail(phone: string | null | undefined, email?: string | null): string | null {
-  const real = email?.trim();
-  if (real) return real;
-  const digits = (phone ?? "").replace(/[+\s]/g, "");
-  return digits ? `${digits}@moedatech.app` : null;
+export function intercomEmail(email?: string | null): string | null {
+  return email?.trim() || null;
 }
 
 /** The display name, with the app's own fallback for a user who has not given one. */
@@ -173,7 +170,7 @@ export function buildIntercomPayload(args: {
      */
     user_id: server?.userId ?? String(user.id),
     name: intercomName(user.id, name),
-    email: intercomEmail(phone, email),
+    email: intercomEmail(email),
     phone,
     // `active_role` 1 on the app. There is no supplier surface on the web to be anything else.
     user_type: "rentee",

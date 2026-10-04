@@ -19,19 +19,15 @@ import { chatContext } from "@/components/support/IntercomWidget";
  */
 
 describe("intercomEmail", () => {
-  it("prefers the real address — the one the user actually owns", () => {
-    expect(intercomEmail("+966 50 123 4567", "yara@moedatech.net")).toBe("yara@moedatech.net");
+  it("sends the real address, the one the user actually owns", () => {
+    expect(intercomEmail("yara@moedatech.net")).toBe("yara@moedatech.net");
+    expect(intercomEmail("  yara@moedatech.net ")).toBe("yara@moedatech.net");
   });
 
-  it("derives one from the phone when there is none, digits only, as the app does", () => {
-    expect(intercomEmail("+966 50 123 4567")).toBe("966501234567@moedatech.app");
-    expect(intercomEmail("+966501234567", "   ")).toBe("966501234567@moedatech.app");
-  });
-
-  it("answers null rather than an empty string, which Intercom would store as a value", () => {
-    expect(intercomEmail("")).toBeNull();
+  it("never makes one up from the phone, and answers null rather than an empty string", () => {
+    expect(intercomEmail()).toBeNull();
+    expect(intercomEmail("   ")).toBeNull();
     expect(intercomEmail(null)).toBeNull();
-    expect(intercomEmail(undefined, null)).toBeNull();
   });
 });
 
@@ -59,7 +55,7 @@ describe("buildIntercomPayload", () => {
     // Nested under `customAttributes` (the mobile SDK's shape) they would file under one unusable key.
     expect(payload).toMatchObject({
       name: "User 42",
-      email: "966501234567@moedatech.app",
+      email: null,
       phone: "+966501234567",
       user_type: "rentee",
       tier: "verified",
@@ -239,7 +235,7 @@ describe("buildIntercomPayload with the server's identity", () => {
     const p = buildIntercomPayload({ user, locale: "en", appVersion: "1.0.0", server: null });
     expect(p.user_id).toBe("42");
     expect(p.name).toBe("User 42");
-    expect(p.email).toBe("966501234567@moedatech.app");
+    expect(p.email).toBeNull();
     expect("user_hash" in p).toBe(false);
   });
 });

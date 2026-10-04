@@ -7,6 +7,13 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-04 - Intercom: no made-up `<phone>@moedatech.app` email any more. BUILT, NOT
+  committed.** `intercomEmail` now returns the real email or null. The invented address bounced
+  every Intercom email (2,577 contacts carry one); it was kept "so one person is one contact", but
+  Intercom keys the contact on `user_id`, so it never did that job. The mobile app dropped it the
+  same day. ⚠️ The existing fake emails stay on the contacts until cleared by API (Awab).
+  Files: `src/lib/support/intercom.ts`, `tests/unit/intercom.test.ts`. Verified: 22/22, `tsc` clean.
+
 - **2026-10-01 - Chat dock: «awaiting confirmation», «withdrew», «Deal confirmed» and «Request Summary» are grey pills now.**
   Owner: *"why these not in the middle same style the grey pills"* and *"this message is for supplier wording"*.
   The backend tags them `awaiting_confirmation` / `acceptance_withdrawn` / `deal_closed`, which `parseChatCard`
