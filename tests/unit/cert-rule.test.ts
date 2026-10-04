@@ -6,6 +6,9 @@ import {
   newManualItem,
   normalizeSafetyCert,
   splitSafetyCerts,
+  certsForLine,
+  operatorCertsFor,
+  isLiftingCategory,
 } from "@/lib/contract";
 import { agentOutputToDraft } from "@/lib/api/agent-adapters";
 import { draftToCreateRequest } from "@/lib/api/app-adapters";
@@ -14,6 +17,12 @@ import { nodesToTree } from "@/lib/api/app-adapters";
 
 /**
  * Certificates are the RENTER's choice, never the wizard's guess — for BOTH kinds.
+ *
+ * ── 2026-10-05: the AGENT's reading goes through the cert table ──────────────────────────────────
+ * What the renter WROTE is treated as project settings (owner): when a parse lands, the certs the
+ * text named are filtered by each line's machine type (`withAgentCertRule`): Aramco only on lifting,
+ * else TÜV; the operator follows unless the text named one. Nothing else below changed: a machine
+ * the renter edits by hand is never re-derived, and a renter who named no cert gets none.
  *
  * The 2026-07 cert rule used to seed each line automatically: the equipment cert by category (lifting /
  * cranes / aerial → ARAMCO, every other group → TÜV) and the operator cert as SPSP on every operator-on
@@ -65,12 +74,103 @@ describe("cert defaults", () => {
     expect("DEFAULT_OPERATOR_CERT" in contract).toBe(false);
   });
 
-  it("keeps no lifting classifier either — the app deleted its counterpart outright", async () => {
-    // `isLiftingEquipment` / `equipmentCertForLifting` / `kLiftingTagValues` are gone from
-    // `localized_labels.dart` on main. A dead predicate here would read as a live rule.
-    const contract = await import("@/lib/contract");
-    expect("isLiftingCategory" in contract).toBe(false);
-    expect("LIFTING_TAG_VALUES" in contract).toBe(false);
+  it("classifies lifting by the category TAG, falling back to names only without one", () => {
+    // Back for the agent cert rule (2026-10-05). It decides nothing on a renter's own clicks.
+    expect(isLiftingCategory({ categoryId: "cat-lift" }, TAXONOMY)).toBe(true);
+    expect(isLiftingCategory({ categoryId: "cat-earth" }, TAXONOMY)).toBe(false);
+    expect(isLiftingCategory({ categoryId: "material-handling", subcategoryId: "forklifts" }, TAXONOMY)).toBe(true);
+    // Cold catalogue: the agent's own label for the line decides.
+    expect(isLiftingCategory({ categoryId: "uuid-1" }, [], { en: "Mobile Crane" })).toBe(true);
+    expect(isLiftingCategory({ categoryId: "uuid-1" }, [], { en: "Crawler Excavator" })).toBe(false);
+  });
+});
+
+describe("certsForLine — the owner's 2026-10 table, row by row", () => {
+  // [read from the text, lifting machine, other machine]
+  const rows: [string[], string[], string[]][] = [
+    [[], [], []],
+    [["tuv"], ["tuv"], ["tuv"]],
+    [["tuv-saso"], ["tuv-saso"], ["tuv-saso"]],
+    [["aramco"], ["aramco"], ["tuv"]],
+    [["tuv", "aramco"], ["tuv", "aramco"], ["tuv"]],
+    [["tuv-saso", "aramco"], ["tuv-saso", "aramco"], ["tuv-saso"]],
+    [["other"], ["other"], ["other"]],
+  ];
+  for (const [read, lifting, other] of rows) {
+    it(`reads ${JSON.stringify(read)}`, () => {
+      expect(certsForLine(read, true)).toEqual(lifting);
+      expect(certsForLine(read, false)).toEqual(other);
+    });
+  }
+
+  it("the operator follows: TÜV / TÜV (SASO) ⇒ TÜV, Aramco ⇒ SPSP, Other ⇒ nothing", () => {
+    expect(operatorCertsFor(["tuv-saso"])).toEqual(["tuv"]);
+    expect(operatorCertsFor(["aramco"])).toEqual(["spsp"]);
+    expect(operatorCertsFor(["tuv", "aramco"])).toEqual(["tuv", "spsp"]);
+    expect(operatorCertsFor(["other"])).toEqual([]);
+  });
+});
+
+describe("PROCESS_SUCCESS — the renter's words treated as project settings", () => {
+  const parsed = (items: EquipmentItem[], shared: string[] = []) => ({
+    project: { ...defaultProjectDetails(), certificates: { ...defaultProjectDetails().certificates, safety: shared as never } },
+    items,
+    detectedLocations: [],
+    summary: { totalItems: items.length, needsValidation: 0, notAvailable: 0 },
+  });
+  const crane = { categoryId: "cat-lift", subcategoryId: null, measurementId: null };
+  const excavator = { categoryId: "cat-earth", subcategoryId: null, measurementId: null };
+
+  it("'excavator and crane with Aramco': TÜV + operator TÜV, and Aramco + operator SPSP", () => {
+    const s = reducer({ ...initialState, taxonomy: TAXONOMY }, {
+      t: "PROCESS_SUCCESS",
+      draft: parsed([
+        item("a1", { ref: excavator, operatorNeeded: "yes", safetyCertsOverride: ["aramco"] }),
+        item("a2", { ref: crane, operatorNeeded: "yes", safetyCertsOverride: ["aramco"] }),
+      ]),
+    });
+    const [exc, crn] = s.draft!.items;
+    expect(exc.safetyCertsOverride).toEqual(["tuv"]);
+    expect(exc.operator.certificate).toEqual(["tuv"]);
+    expect(crn.safetyCertsOverride).toEqual(["aramco"]);
+    expect(crn.operator.certificate).toEqual(["spsp"]);
+  });
+
+  it("a request-wide pick the agent globalised is filtered per machine", () => {
+    const s = reducer({ ...initialState, taxonomy: TAXONOMY }, {
+      t: "PROCESS_SUCCESS",
+      draft: parsed([item("a1", { ref: excavator }), item("a2", { ref: crane })], ["tuv-saso", "aramco"]),
+    });
+    expect(s.draft!.items[0].safetyCertsOverride).toEqual(["tuv-saso"]);
+    expect(s.draft!.items[1].safetyCertsOverride).toEqual(["tuv-saso", "aramco"]);
+  });
+
+  it("an operator cert the TEXT named is kept as the renter wrote it", () => {
+    const named = item("a1", {
+      ref: crane,
+      operatorNeeded: "yes",
+      safetyCertsOverride: ["aramco"],
+      operator: { ...newManualItem("a1").operator, certificate: ["tuv"] },
+    });
+    const s = reducer({ ...initialState, taxonomy: TAXONOMY }, { t: "PROCESS_SUCCESS", draft: parsed([named]) });
+    expect(s.draft!.items[0].operator.certificate).toEqual(["tuv"]);
+  });
+
+  it("the agent snapshot equals the filtered draft, so our rule is never reported as a correction", () => {
+    const s = reducer({ ...initialState, taxonomy: TAXONOMY }, {
+      t: "PROCESS_SUCCESS",
+      draft: parsed([item("a1", { ref: excavator, safetyCertsOverride: ["aramco"] })]),
+    });
+    expect(JSON.stringify(s.agentOrigin!.items)).toBe(JSON.stringify(s.draft!.items));
+  });
+
+  it("a cert the renter then picks by hand is never re-derived", () => {
+    const landed = reducer({ ...initialState, taxonomy: TAXONOMY }, {
+      t: "PROCESS_SUCCESS",
+      draft: parsed([item("a1", { ref: excavator, safetyCertsOverride: ["aramco"] })]),
+    });
+    const s = reducer(landed, { t: "PATCH_ITEM", id: "a1", patch: { safetyCertsOverride: ["aramco"] } });
+    expect(s.draft!.items[0].safetyCertsOverride).toEqual(["aramco"]);
   });
 });
 

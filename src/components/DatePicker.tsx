@@ -10,9 +10,10 @@
  *
  * The owner's ruling: *"keep the days showing but when someone selects start after the end date show
  * a red note at the bottom of the calender window saying start cant be after end date, change one of
- * them and dont allow the selection"*. So every day is pickable-looking, a pick that would run the
- * window backwards is REFUSED (the value does not change, the calendar stays open) and the reason is
- * said in red at the bottom of this popup, where the renter is looking.
+ * them and dont allow the selection"*. Then (2026-10-05): «Change one of them» dropped from the note,
+ * and a start and end on the same day refused as well. So every day is pickable-looking, a pick that
+ * would run the window backwards or collapse it to one day is REFUSED (the value does not change, the
+ * calendar stays open) and the reason is said in red at the bottom of this popup.
  *
  * ~~A muted «Start can't be after the end date» line under the fields, always on.~~ Shipped and
  * withdrawn the same day (owner: *"the start 6-10 and end is 8-10 why this message appear?"*): it
@@ -56,9 +57,9 @@ export function DatePicker({
 }: {
   value: string | null;
   onChange: (value: string | null) => void;
-  /** A pick later than this is refused: the START field, bounded by the end date. */
+  /** A pick on or after this is refused: the START field, bounded by the end date. */
   notAfter?: string | null;
-  /** A pick earlier than this is refused: the END field, bounded by the start date. */
+  /** A pick on or before this is refused: the END field, bounded by the start date. */
   notBefore?: string | null;
   /** The red note shown when a pick is refused. */
   conflict: string;
@@ -131,7 +132,8 @@ export function DatePicker({
 
   /** Every pick goes through here, so «Today» obeys the same rule as a day in the grid. */
   const pick = (k: string) => {
-    if ((notAfter && k > notAfter) || (notBefore && k < notBefore)) {
+    // The SAME day is refused too (owner, 2026-10-05: *"apply this rule if start and end is the same"*).
+    if ((notAfter && k >= notAfter) || (notBefore && k <= notBefore)) {
       setRefused(true);
       return;
     }

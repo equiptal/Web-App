@@ -30,7 +30,7 @@ export interface Category {
   name: string;
   nameAr?: string | null;
   /** Canonical taxonomy group (`equipment_taxonomy.tag`), e.g. "Lifting, Cranes & Aerial". Tags live on
-   *  CATEGORY rows, so a subcategory inherits its parent's. Display/grouping only — no cert rule reads it. */
+   *  CATEGORY rows, so a subcategory inherits its parent's. Also decides lifting for the agent cert rule ({@link isLiftingCategory}). */
   tag?: string | null;
   subcategories: Subcategory[];
   /** A photograph of real equipment for this node, when the admin panel has one.
@@ -89,17 +89,57 @@ export function taxName(node: { name: string; nameAr?: string | null } | undefin
   return locale === "ar" && node.nameAr ? node.nameAr : node.name;
 }
 
-/*
- * `isLiftingCategory` used to live here — the tag lookup plus English/Arabic name hints that decided
- * whether a line was lifting equipment, which was the branch of the 2026-07 cert rule that seeded
- * Aramco. The rule is withdrawn (certificates are the renter's pick, never the wizard's), and the app
- * deleted its counterpart outright in the same change — `isLiftingEquipment`, `equipmentCertForLifting`
- * and `kLiftingTagValues` are all gone from `localized_labels.dart` on `main`. Kept dead here it would
- * read as a live classification anyone might wire back up, so it is gone from the web too.
- *
- * The `tag` field on {@link TaxonomyCategory} stays — it is what the taxonomy endpoint returns, not a
- * cert signal.
+/**
+ * `tag` values that identify the lifting / cranes / aerial group. The taxonomy endpoint returns the
+ * column verbatim (the DB display name); the slug form is accepted too so either source resolves.
+ * App parity: `kLiftingTagValues` (localized_labels.dart).
  */
+export const LIFTING_TAG_VALUES = ["lifting, cranes & aerial", "lifting_cranes_aerial"];
+
+/** English name fragments that mean "lifting" — consulted only when no tag is available (cold/fixture
+ *  taxonomy, pre-reorg rows). App parity: `_liftingNameHintsEn`. */
+const LIFTING_NAME_HINTS_EN = [
+  "lifting",
+  "crane",
+  "forklift",
+  "telehandler",
+  "aerial work platform",
+  "mewp",
+  "scissor lift",
+  "man lift",
+  "spider lift",
+  "boom lift",
+];
+
+/** Arabic counterparts of {@link LIFTING_NAME_HINTS_EN}. App parity: `_liftingNameHintsAr`. */
+const LIFTING_NAME_HINTS_AR = ["رفع", "رافع", "كرين"];
+
+/**
+ * Whether a ref belongs to the "Lifting, Cranes & Aerial" taxonomy group (cranes, forklifts,
+ * telehandlers, MEWPs …). Drives the 2026-10 cert table applied to what the AGENT fills in
+ * (`withAgentCertRule`): Aramco only on lifting machines, else TÜV.
+ *
+ * App parity with `isLiftingEquipment` (localized_labels.dart): the taxonomy `tag` wins outright when
+ * present, so a BMU row like "Basket Crane" is never mis-classified by its name. Only when no tag is
+ * available (fixture taxonomy, cold cache) do we fall back to the category/subcategory names — plus the
+ * category id, which is a slug of the name in the fixture data, and any `names` the caller has (the
+ * agent's own labels for the line).
+ */
+export function isLiftingCategory(
+  ref: { categoryId: string | null; subcategoryId?: string | null },
+  taxonomy: Taxonomy,
+  names?: { en?: string | null; ar?: string | null },
+): boolean {
+  const cat = taxonomy.find((c) => c.id === ref.categoryId);
+  const sub = cat?.subcategories.find((s) => s.id === ref.subcategoryId);
+  const tag = (cat?.tag ?? sub?.tag ?? "").trim().toLowerCase();
+  if (tag) return LIFTING_TAG_VALUES.includes(tag);
+
+  const en = `${ref.categoryId ?? ""} ${cat?.name ?? ""} ${sub?.name ?? ""} ${names?.en ?? ""}`.toLowerCase();
+  if (LIFTING_NAME_HINTS_EN.some((h) => en.includes(h))) return true;
+  const ar = `${cat?.nameAr ?? ""} ${sub?.nameAr ?? ""} ${names?.ar ?? ""}`;
+  return LIFTING_NAME_HINTS_AR.some((h) => ar.includes(h));
+}
 
 /** A point in the taxonomy. A complete match has all three; partial selections leave lower levels null. */
 export interface TaxonomyRef {

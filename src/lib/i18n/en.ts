@@ -36,8 +36,8 @@ export const en = {
     today: "Today",
     prevMonth: "Previous month",
     nextMonth: "Next month",
-    startAfterEnd: "Start can't be after the end date. Change one of them",
-    endBeforeStartPick: "End can't be before the start date. Change one of them",
+    startAfterEnd: "Start can't be on or after the end date",
+    endBeforeStartPick: "End can't be on or before the start date",
   },
   nav: {
     project: "Project",

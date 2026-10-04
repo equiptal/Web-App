@@ -636,12 +636,12 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
                 days out, which a renter read as a broken field. See `DatePicker`. */}
             <label><span className={lbl}>{L("Start date", "تاريخ البدء")}</span>
               <DatePicker value={startDate || null} notAfter={endDate || null} label={L("Start date", "تاريخ البدء")} triggerClass={fld}
-                conflict={L("Start can't be after the end date. Change one of them", "لا يمكن أن يكون تاريخ البداية بعد تاريخ النهاية. غيّر أحدهما")}
+                conflict={L("Start can't be on or after the end date", "لا يمكن أن يكون تاريخ البداية في يوم النهاية أو بعده")}
                 onChange={(v) => setStartDate(v ?? "")} />
             </label>
             <label><span className={lbl}>{L("End date", "تاريخ الانتهاء")}</span>
               <DatePicker value={endDate || null} notBefore={startDate || null} label={L("End date", "تاريخ الانتهاء")} triggerClass={fld}
-                conflict={L("End can't be before the start date. Change one of them", "لا يمكن أن يكون تاريخ النهاية قبل تاريخ البداية. غيّر أحدهما")}
+                conflict={L("End can't be on or before the start date", "لا يمكن أن يكون تاريخ النهاية في يوم البداية أو قبله")}
                 onChange={(v) => setEndDate(v ?? "")} />
             </label>
             <Sel label={L("Rental basis", "أساس الإيجار")} value={rentalType} onChange={setRentalType} opts={RENTAL_OPTS} />

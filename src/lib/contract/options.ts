@@ -64,6 +64,51 @@ export function toggleSafetyCert<T extends string>(selected: readonly T[], code:
   const rank = (c: string) => (order.includes(c) ? order.indexOf(c) : order.length);
   return next.sort((a, b) => rank(a) - rank(b));
 }
+
+/**
+ * One machine's equipment certs from the certs the AGENT read for it, per the owner's 2026-10 table
+ * (app parity `certsForRequestLine`, localized_labels.dart):
+ *
+ *   read                 lifting machine        other machine
+ *   TÜV                  TÜV                    TÜV
+ *   TÜV (SASO)           TÜV (SASO)             TÜV (SASO)
+ *   Aramco               Aramco                 TÜV
+ *   TÜV + Aramco         TÜV, Aramco            TÜV
+ *   TÜV (SASO) + Aramco  TÜV (SASO), Aramco     TÜV (SASO)
+ *   Other                Other                  Other
+ *
+ * Applied ONLY to what the agent fills in (`withAgentCertRule`); a cert the renter picks on a
+ * machine card is never touched. Nothing read ⇒ nothing.
+ */
+export function certsForLine(picks: readonly string[], isLifting: boolean): SafetyCertificate[] {
+  const codes = picks.map((c) => normalizeSafetyCert(c));
+  const tuv: SafetyCertificate | null = codes.includes("tuv-saso") ? "tuv-saso" : codes.includes("tuv") ? "tuv" : null;
+  const aramco = codes.includes("aramco");
+  const out: SafetyCertificate[] = [];
+  if (tuv) out.push(tuv);
+  if (aramco && isLifting) out.push("aramco");
+  if (aramco && !isLifting && !tuv) out.push("tuv");
+  // Legacy codes and the free-text "other" chip ride along unchanged.
+  for (const c of codes) {
+    if (c === "tuv" || c === "tuv-saso" || c === "aramco") continue;
+    if (!(out as string[]).includes(c)) out.push(c as SafetyCertificate);
+  }
+  return out;
+}
+
+/**
+ * The operator certs that go with a machine's equipment certs: TÜV or TÜV (SASO) ⇒ TÜV, Aramco ⇒ SPSP
+ * (Aramco approves a machine and has no operator document), both when both. A free-text "other" is
+ * NOT copied. App parity: `operatorLicenseForEquipmentCerts`.
+ */
+export function operatorCertsFor(equipment: readonly string[]): SafetyCertificate[] {
+  const codes = equipment.map((c) => normalizeSafetyCert(c));
+  const out: SafetyCertificate[] = [];
+  if (codes.includes("tuv") || codes.includes("tuv-saso")) out.push("tuv");
+  if (codes.includes("aramco") || codes.includes("spsp")) out.push("spsp");
+  return out;
+}
+
 /**
  * Operator per-item certificate options — Aramco is NOT an operator cert (equipment-only, app parity).
  *

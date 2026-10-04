@@ -7,6 +7,22 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-05 - What the renter WRITES goes through the cert table (agent parse only). BUILT on
+  `main`, NOT committed.** Owner: treat the renter's words as project settings, app parity
+  (`RfqParseService.withCertRule`). When a parse lands (`PROCESS_SUCCESS`: agent, quick parser and
+  store-direct seeds), `withAgentCertRule` filters each line's certs by its machine type: Aramco
+  only on lifting machines, else the TÜV the text named or plain TÜV; the operator follows (TÜV /
+  TÜV (SASO) ⇒ TÜV, Aramco ⇒ SPSP) unless the text named one. So "excavator with Aramco" now posts
+  TÜV, the same as the app. A request-wide pick the agent globalised gets a filtered copy per line.
+  ⚠️ Renter clicks are NEVER re-derived: the 2026-10-04 decision (every machine and operator keeps
+  its own values) still holds for everything done by hand. ⚠️ The agent snapshot (`agentOrigin`)
+  is taken AFTER the rule, so our Aramco ⇒ TÜV is not sent back to Mansour as a renter correction.
+  ⚠️ Lifting uses the taxonomy tag; with a cold catalogue it falls back to the agent's own labels
+  (`isLiftingCategory(…, names)`, restored from `f275232f^`). The agent is unchanged: it reports
+  the renter's words (Moedatech-App `docs/handoffs/rfq-agent-tuv-saso.md`). Files:
+  `src/lib/contract/{agent-cert-rule (new),options,taxonomy,index}.ts`, `src/lib/store/rfq-store.tsx`,
+  tests `cert-rule`, `project-intake`. Verified: tsc 0, lint clean, 3968 pass, the 6 failing also fail
+  on clean `main`; the parse tests fail when the rule is removed (mutation). NOT seen in a browser.
 - **2026-10-04 - Certificates: new «TÜV (SASO)» option. BUILT on `main`, NOT committed.** A TÜV
   from a provider on SASO's list (owner, via Awab). Offered beside TÜV / Aramco / Other on every
   equipment-cert picker (machine card, project pills, project templates, edit request) and exclusive
@@ -26,6 +42,15 @@ reversal, or the reason an odd-looking line is load-bearing.
   `src/components/map/panel/machine-panel-model.ts`, `src/lib/i18n/{en,ar}.ts`, tests
   `tuv-saso-cert` (new), `machine-card`. Verified: tsc 0, lint clean, 3954 pass; the 6 failing also
   fail on clean `main`. NOT seen in a browser.
+- **2026-10-05 - Date picker: same-day start and end refused; «Change one of them» dropped. BUILT,
+  NOT committed.** Owner: *"Change one of them remove this, and also apply this rule if start and end
+  is the same"*. `DatePicker` now refuses `k >= notAfter` / `k <= notBefore`; the notes read «Start
+  can't be on or after the end date» / «End can't be on or before the start date» (EN + AR), since
+  «after» alone was untrue for the same day. Files: `src/components/DatePicker.tsx`, `en.ts`, `ar.ts`,
+  `src/components/requests/RequestEditModals.tsx`, `tests/unit/when-panel.test.tsx`. ⚠️ Picker only:
+  a same-day window that arrives another way (agent extraction, an older draft or request) is NOT
+  blocked, because `computeChargedDays().reversed`, the modal's `datesReversed` and
+  `gate.datesReversed` still allow start == end. A one-day rental can no longer be picked at all.
 - **2026-10-05 - Fonts are files in the repo; the build no longer fetches Google Fonts. BUILT, NOT
   committed.** Amplify main jobs 80 (`999ebe0d`) and 82 (`c487d706`) failed in `src/app/layout.tsx`:
   `next/font ... Cannot read properties of null (reading '1')`. `next/font/google` downloads every

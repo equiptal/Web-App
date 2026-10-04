@@ -262,6 +262,8 @@ describe("adding a machine", () => {
 
   it("copies the first machine's terms onto the new one", () => {
     let s = withFirst({
+      // A crane: Aramco read from the text survives the agent cert rule only on a lifting machine.
+      ref: { categoryId: "cranes", subcategoryId: null, measurementId: null },
       deliveryOverride: "supplier",
       returnOverride: "supplier",
       fuelResponsibilityOverride: "supplier",

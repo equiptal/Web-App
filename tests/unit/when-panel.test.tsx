@@ -91,7 +91,7 @@ describe("with the end date before the start date", () => {
   /**
    * ~~«bounds each date input by the other, so the picker cannot offer one»~~ (`max`/`min` on native
    * inputs). Reversed by the owner on 2026-10-04: greyed-out days read as a broken field. Every day
-   * shows; a backwards pick is REFUSED, with the reason in red at the bottom of the calendar.
+   * shows; a backwards or same-day pick is REFUSED, with the reason in red at the bottom of the calendar.
    */
   it("refuses a start after the end with a red note, and takes one before it", async () => {
     const handle = await panel({ draft: withTiming({ startDate: "2026-09-10", endDate: "2026-09-12" }) });
@@ -99,7 +99,7 @@ describe("with the end date before the start date", () => {
     const day = (n: number) => screen.getAllByRole("button", { pressed: false }).find((b) => b.textContent === String(n))!;
 
     await handle.run(() => day(20).click());
-    expect(screen.getByRole("alert").textContent).toContain("Start can't be after the end date. Change one of them");
+    expect(screen.getByRole("alert").textContent).toContain("Start can't be on or after the end date");
     expect(handle.store().state.draft!.project.timing.startDate).toBe("2026-09-10");
 
     await handle.run(() => day(11).click());
@@ -111,8 +111,18 @@ describe("with the end date before the start date", () => {
     await handle.run(() => screen.getByRole("button", { name: "END DATE" }).click());
     const day = screen.getAllByRole("button", { pressed: false }).find((b) => b.textContent === "5")!;
     await handle.run(() => day.click());
-    expect(screen.getByRole("alert").textContent).toContain("End can't be before the start date. Change one of them");
+    expect(screen.getByRole("alert").textContent).toContain("End can't be on or before the start date");
     expect(handle.store().state.draft!.project.timing.endDate).toBe("2026-09-12");
+  });
+
+  // Owner, 2026-10-05: *"apply this rule if start and end is the same"*.
+  it("refuses a start on the end's own day", async () => {
+    const handle = await panel({ draft: withTiming({ startDate: "2026-09-10", endDate: "2026-09-12" }) });
+    await handle.run(() => screen.getByRole("button", { name: "START DATE" }).click());
+    const day = screen.getAllByRole("button", { pressed: false }).find((b) => b.textContent === "12")!;
+    await handle.run(() => day.click());
+    expect(screen.getByRole("alert").textContent).toContain("Start can't be on or after the end date");
+    expect(handle.store().state.draft!.project.timing.startDate).toBe("2026-09-10");
   });
 });
 

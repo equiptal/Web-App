@@ -19,6 +19,7 @@ import {
   defaultOperatorNeeded,
   newManualItem,
   postableItems,
+  withAgentCertRule,
 } from "@/lib/contract";
 import {
   ApiError,
@@ -410,14 +411,15 @@ export function reducer(state: RfqState, a: Action): RfqState {
       // account modal (same UX as the client-side localStorage nudge), never an error screen.
       return { ...state, busy: false, phase: "intake", error: null, errorDetail: null, guestLimit: true };
     case "PROCESS_SUCCESS": {
-      // No cert seeding. An agent-parsed item keeps whatever `safety_certifications` the RFQ text
-      // actually named and nothing more — an item the text said nothing about reaches Step 2 blank,
-      // which is now also true of one created by hand.
-      const seededItems = a.draft.items;
+      // The renter's words count as project settings (owner, 2026-10-05): the certs the text named go
+      // through the cert table with each line's machine type, so "excavator with Aramco" lands as
+      // TÜV and the operator follows (`withAgentCertRule`). An item the text said nothing about still
+      // reaches Step 2 blank, and nothing re-derives a cert the renter picks afterwards.
+      const seededItems = withAgentCertRule(a.draft, state.taxonomy).items;
       // Snapshot the agent's values (refs are safe — all edits are immutable copies). The SEEDED
-      // items are snapshotted, not the raw ones: the cert seed is our default, not a renter edit, so
+      // items are snapshotted, not the raw ones: the cert rule is ours, not a renter edit, so
       // comparing against the raw items would mark every draft "edited" and fire a spurious
-      // web_review correction on every submit.
+      // web_review correction on every submit (and teach the agent our rule as a correction).
       const origin = { project: a.draft.project, items: seededItems };
 
       const parsed: RfqDraft = {
