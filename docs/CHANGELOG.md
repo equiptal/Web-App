@@ -8,8 +8,9 @@ Read the entries that touch the surface you are changing. Nearly every one recor
 reversal, or the reason an odd-looking line is load-bearing.
 
 - **2026-10-05 - Staging issues report (W1-W4), fixed on main. BUILT, NOT committed.** From
-  `moedatech-web-staging-issues.html`. (W1) Year and certificate get the fuel chip's star strip while
-  unanswered, no red word; owner: *"star only and keep it with the shake on refusal too"*, softening
+  `moedatech-web-staging-issues.html`. (W1) Year and certificate, while unanswered, get a red border and a
+  star on the pick box itself, no red word (~~the fuel chip's white title strip~~, withdrawn the same
+  day: *"only show the pick box itself with red borders and star dont add this white box"*); owner: *"star only and keep it with the shake on refusal too"*, softening
   the 2026-09-03 «don't say required» ruling. (W2) The private award sent the request row's
   `MONTHLY` and the awards endpoint 422'd on anything but `monthly`; now `basisFromWire`, which also
   fixes a weekly row labelled «per month». Its refusal is shown inside the dialog, not behind the

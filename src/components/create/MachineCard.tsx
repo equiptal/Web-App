@@ -172,6 +172,10 @@ export function MachineCard({
   const attachments = useItemAttachments(item);
   const prov = useProvenance(item.id);
   const years = equipmentYears();
+  /** Unanswered: no value and never touched («No certificate» / «Any year» are answers). See the
+   *  W1 note above the certificate. */
+  const owedCert = overrides.safetyCerts.length === 0 && !isTouched(state.draft!, prov.key("safety_certificates"));
+  const owedYear = !overrides.equipmentYear && !isTouched(state.draft!, prov.key("equipment_year"));
 
   const gapFor = (field: string) => gaps.some((g) => g.field === field);
   const shake = (field: string) => shaking && gapFor(field);
@@ -419,21 +423,20 @@ export function MachineCard({
               ── A star, still no word (owner, 2026-10-05) ───────────────────────────────────────
               Staging report W1: *"Required fields are not starred, and pressing the button shows no
               error"*, the button only scrolled back to an unmarked card. The owner's ruling: *"star
-              only and keep it with the shake on refusal too"*. So each gets the fuel chip's star
-              strip while it is UNANSWERED (no value and never touched: «No certificate» / «Any year»
-              store as absent and count as answers, as `gates.ts` reads them), and `word` stays off
-              so the strip never says «Required». */}
+              only and keep it with the shake on refusal too"*. So each is marked while it is
+              UNANSWERED (no value and never touched: «No certificate» / «Any year» store as absent and
+              count as answers, as `gates.ts` reads them), and never says «Required».
+              ~~The fuel chip's white title strip over each.~~ Same day: *"only show the pick box
+              itself with red borders and star dont add this white box"*. The mark is on the box. */}
           <div className="absolute inset-x-2.5 top-2.5 flex items-start justify-between gap-2">
             <div className="min-w-0 max-w-[58%]">
               <div className={shake("safety_certificates") ? "shake-error" : undefined}>
-                {overrides.safetyCerts.length === 0 && !isTouched(state.draft!, prov.key("safety_certificates")) && (
-                  <OverlayRequired title={t.create.machineCard.certName} />
-                )}
                 {/* More than one, because the field has always been an array everywhere else — on the
                     draft, on the wire, and on the bid form where a supplier confirms each cert on its
                     own row. Only this control disagreed, so a renter needing TÜV AND Aramco could ask
                     for one of them and find out at the bids which half he had lost. */}
                 <CertSelect
+                  required={owedCert}
                   values={overrides.safetyCerts}
                   touched={isTouched(state.draft!, prov.key("safety_certificates"))}
                   tone={gapFor("safety_certificates") ? "brand" : "overlay"}
@@ -531,32 +534,32 @@ export function MachineCard({
               />
             </div>
             <div className={`min-w-0 max-w-[48%] ${shake("equipment_year") ? "shake-error" : ""}`}>
-              {/* Star only, as the certificate (owner, 2026-10-05). */}
-              {!overrides.equipmentYear && !isTouched(state.draft!, prov.key("equipment_year")) && (
-                <OverlayRequired title={t.create.machineCard.minYearName} />
-              )}
-              <SearchSelect
-                value={overrides.equipmentYear}
-                placeholder={t.create.machineCard.minYear}
-                searchPlaceholder={t.create.machineCard.minYear}
-                label={t.create.machineCard.minYearName}
-                tone={gapFor("equipment_year") ? "brand" : "overlay"}
-                /* The same three states as the certificate beside it — see the note there. */
-                preselected={isSystemChosen(
-                  prov.itemSource("equipment_year", overrides.equipmentYear, "equipmentYear", true),
-                )}
-                /* Every year from 2010 to now, newest first — the app's own list (`year_stepper.dart`),
-                   and `SearchSelect` gives it the same search box the app's sheet has. A draft saved
-                   with one of the old bands keeps rendering: the value is carried in so the field
-                   shows what the renter chose rather than emptying itself. */
-                options={[
-                  ...(overrides.equipmentYear && !years.includes(overrides.equipmentYear)
-                    ? [{ value: overrides.equipmentYear, label: overrides.equipmentYear }]
-                    : []),
-                  ...years.map((y) => ({ value: y, label: y === "any" ? t.create.machineCard.anyYear : y })),
-                ]}
-                onChange={(v) => set("equipment_year", { equipmentYear: v })}
-              />
+              {/* Red border and star on the box, as the certificate (owner, 2026-10-05). The star rides
+                  in the placeholder, which only shows while there is no value. */}
+              <div className={owedYear ? "rounded-sm ring-2 ring-danger" : undefined}>
+                <SearchSelect
+                  value={overrides.equipmentYear}
+                  placeholder={owedYear ? `${t.create.machineCard.minYear} *` : t.create.machineCard.minYear}
+                  searchPlaceholder={t.create.machineCard.minYear}
+                  label={t.create.machineCard.minYearName}
+                  tone={gapFor("equipment_year") ? "brand" : "overlay"}
+                  /* The same three states as the certificate beside it — see the note there. */
+                  preselected={isSystemChosen(
+                    prov.itemSource("equipment_year", overrides.equipmentYear, "equipmentYear", true),
+                  )}
+                  /* Every year from 2010 to now, newest first — the app's own list (`year_stepper.dart`),
+                     and `SearchSelect` gives it the same search box the app's sheet has. A draft saved
+                     with one of the old bands keeps rendering: the value is carried in so the field
+                     shows what the renter chose rather than emptying itself. */
+                  options={[
+                    ...(overrides.equipmentYear && !years.includes(overrides.equipmentYear)
+                      ? [{ value: overrides.equipmentYear, label: overrides.equipmentYear }]
+                      : []),
+                    ...years.map((y) => ({ value: y, label: y === "any" ? t.create.machineCard.anyYear : y })),
+                  ]}
+                  onChange={(v) => set("equipment_year", { equipmentYear: v })}
+                />
+              </div>
             </div>
           </div>
         </div>

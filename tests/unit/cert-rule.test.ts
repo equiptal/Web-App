@@ -174,6 +174,46 @@ describe("PROCESS_SUCCESS — the renter's words treated as project settings", (
   });
 });
 
+describe("turning the operator ON fills an EMPTY operator cert from the machine (2026-10-05)", () => {
+  const off = (patch: Partial<EquipmentItem> = {}) =>
+    item("m1", { operatorNeeded: "no", operator: { ...newManualItem("m1").operator, certificate: [] }, ...patch });
+  const turnOn = (s: ReturnType<typeof stateWith>) =>
+    reducer(s, { t: "PATCH_ITEM", id: "m1", patch: { operatorNeeded: "yes" } });
+
+  it("'crane with Aramco', operator switched on by hand: operator SPSP", () => {
+    const s = turnOn(stateWith([off({ safetyCertsOverride: ["aramco"] })]));
+    expect(s.draft!.items[0].operator.certificate).toEqual(["spsp"]);
+  });
+
+  it("TÜV (SASO) + Aramco on the machine: operator TÜV + SPSP", () => {
+    const s = turnOn(stateWith([off({ safetyCertsOverride: ["tuv-saso", "aramco"] })]));
+    expect(s.draft!.items[0].operator.certificate).toEqual(["tuv", "spsp"]);
+  });
+
+  it("follows the request-wide pick when the machine has none of its own", () => {
+    const s0 = stateWith([off()]);
+    const shared = { ...s0, draft: { ...s0.draft!, project: { ...s0.draft!.project, certificates: { ...s0.draft!.project.certificates, safety: ["tuv" as const] } } } };
+    expect(turnOn(shared).draft!.items[0].operator.certificate).toEqual(["tuv"]);
+  });
+
+  it("a machine with no cert gives none — «I need an operator» alone asks for nothing", () => {
+    expect(turnOn(stateWith([off()])).draft!.items[0].operator.certificate).toEqual([]);
+  });
+
+  it("never overwrites an operator cert the renter already chose", () => {
+    const chosen = off({ safetyCertsOverride: ["aramco"], operator: { ...newManualItem("m1").operator, certificate: ["tuv"] } });
+    expect(turnOn(stateWith([chosen])).draft!.items[0].operator.certificate).toEqual(["tuv"]);
+  });
+
+  it("does nothing when the operator was already on, or is switched off", () => {
+    const already = item("m1", { operatorNeeded: "yes", safetyCertsOverride: ["aramco"] });
+    const s = reducer(stateWith([already]), { t: "PATCH_ITEM", id: "m1", patch: { operatorNeeded: "yes" } });
+    expect(s.draft!.items[0].operator.certificate).toEqual([]);
+    const offAgain = reducer(stateWith([already]), { t: "PATCH_ITEM", id: "m1", patch: { operatorNeeded: "no" } });
+    expect(offAgain.draft!.items[0].operator.certificate).toEqual([]);
+  });
+});
+
 describe("nodesToTree", () => {
   it("carries the category tag through to the UI taxonomy (and down to subcategories)", () => {
     const tree = nodesToTree([

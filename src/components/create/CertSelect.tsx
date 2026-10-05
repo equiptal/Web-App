@@ -31,6 +31,7 @@ export function CertSelect({
   touched,
   tone = "overlay",
   preselected = false,
+  required = false,
   onChange,
 }: {
   values: SafetyCertificate[];
@@ -46,6 +47,12 @@ export function CertSelect({
    * fields"*). Informational, never blocking: the ring says «check this», not «answer this».
    */
   preselected?: boolean;
+  /**
+   * Unanswered and owed: a red border on the box itself and a star after its words (owner,
+   * 2026-10-05: *"only show the pick box itself with red borders and star dont add this white box"*).
+   * Off by default, so the edit-request modal is unchanged.
+   */
+  required?: boolean;
   onChange: (next: SafetyCertificate[]) => void;
 }) {
   const t = useT();
@@ -106,6 +113,7 @@ export function CertSelect({
            across the whole canvas. `ring-offset` is the navy photo here rather than `surface2`, so
            the offset is transparent and the ring reads against whatever is behind the pill. */
         preselected && "rounded-sm ring-1 ring-brand",
+        required && "rounded-sm ring-2 ring-danger",
       )}
     >
       <button
@@ -122,7 +130,10 @@ export function CertSelect({
           !values.length && !touched && "opacity-90",
         )}
       >
-        <span className="min-w-0 flex-1 truncate text-start">{summary}</span>
+        <span className="min-w-0 flex-1 truncate text-start">
+          {summary}
+          {required && <span className="ms-1">*</span>}
+        </span>
         <Icon name="expand_more" size={14} className="flex-none" />
       </button>
 

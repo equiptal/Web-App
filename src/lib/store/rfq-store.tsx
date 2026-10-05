@@ -20,6 +20,7 @@ import {
   newManualItem,
   postableItems,
   withAgentCertRule,
+  operatorCertsFor,
 } from "@/lib/contract";
 import {
   ApiError,
@@ -747,9 +748,21 @@ export function reducer(state: RfqState, a: Action): RfqState {
         })),
       }));
     case "PATCH_ITEM":
-      // Turning the operator ON no longer seeds an operator cert — "I need an operator" is not
-      // "I require an SPSP-certified operator". The chip row starts empty for the renter to fill.
-      return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, ...a.patch })));
+      // Turning the operator ON fills an EMPTY operator cert from the machine's own cert chips (owner,
+      // 2026-10-05; app parity `_seedOperatorCertsFromEquipment`): TÜV / TÜV (SASO) ⇒ TÜV, Aramco ⇒
+      // SPSP. The one exception to "renter clicks are never derived from": it only fills an empty
+      // field, never overwrites an operator cert already chosen, and a machine with no cert gives
+      // none — so "I need an operator" alone still asks for nothing.
+      return withDraft(state, (d) =>
+        mapItem(d, a.id, (i) => {
+          const next = { ...i, ...a.patch };
+          const switchedOn = a.patch.operatorNeeded === "yes" && i.operatorNeeded !== "yes";
+          const empty = next.operator.certificate.length === 0 && !next.operator.certificateOther?.trim();
+          if (!switchedOn || !empty) return next;
+          const certificate = operatorCertsFor(next.safetyCertsOverride ?? d.project.certificates.safety);
+          return certificate.length ? { ...next, operator: { ...next.operator, certificate } } : next;
+        }),
+      );
     case "PATCH_ITEM_OPERATOR":
       return withDraft(state, (d) => mapItem(d, a.id, (i) => ({ ...i, operator: { ...i.operator, ...a.patch } })));
     case "SET_ITEM_CATEGORY":
