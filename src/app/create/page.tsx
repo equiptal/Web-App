@@ -13,6 +13,7 @@ import { consumeDirectStash } from "@/lib/agent/direct-stash";
 import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
 import { useT } from "@/lib/i18n";
+import { safeStoreUrl } from "@/lib/app-handoff";
 
 /**
  * /create — the RFQ creation flow (web-app/002), reached from the home's Create-request entry and
@@ -73,6 +74,7 @@ function DirectRequestGate() {
   const supplierId = params.get("supplierId");
   const supplierName = params.get("supplierName");
   const storeId = params.get("storeId");
+  const storeUrl = safeStoreUrl(params.get("storeUrl"));
   const prefill = params.get("prefill");
   const equipment: DirectPrefill = {
     categoryId: params.get("catId"),
@@ -122,8 +124,11 @@ function DirectRequestGate() {
   useEffect(() => {
     // The recipient, whenever the URL names a different one. Kept separate from the seed below: a
     // renter can arrive for a new machine at a supplier the store already names.
-    if ((direct?.supplierId ?? null) !== (supplierId ?? null)) {
-      actions.setDirect(supplierId ? { supplierId, supplierName, storeId } : null);
+    // `storeUrl` follows THIS link, present or absent (owner, 2026-10-06: *"only if he came from it,
+    // if he was on web then back to store will be the web store"*). A press on the web store carries
+    // none, so it must clear one an earlier Supplier OS visit left for the same supplier.
+    if ((direct?.supplierId ?? null) !== (supplierId ?? null) || (direct?.storeUrl ?? null) !== storeUrl) {
+      actions.setDirect(supplierId ? { supplierId, supplierName, storeId, storeUrl } : null);
     }
     if (!supplierId) return;
 
@@ -178,7 +183,7 @@ function DirectRequestGate() {
     }
     // `actions` is rebuilt each render but only wraps dispatch; depending on it would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supplierId, supplierName, storeId, prefill, wanted, inDraft, direct, text]);
+  }, [supplierId, supplierName, storeId, storeUrl, prefill, wanted, inDraft, direct, text]);
 
   return null;
 }

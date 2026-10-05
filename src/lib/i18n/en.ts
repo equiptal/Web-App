@@ -290,7 +290,7 @@ export const en = {
     approxLocation: "Approximate: city only",
     noLocation: "No location on this listing",
     // The recipient ribbon on the create flow, when the request was started from a store.
-    directBanner: "This request goes to {name} only. No other supplier sees it.",
+    directBanner: "This request goes only to {name} store",
     directBannerBack: "Back to the store",
     directSupplierFallback: "this supplier",
   },

@@ -1,4 +1,5 @@
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/config/store-links";
+import { OS_BASE } from "@/lib/api/client";
 
 /**
  * «Request now» from a supplier's public store, arriving on `/create` (Supplier OS
@@ -88,5 +89,23 @@ export function rememberQrDismissed(appLink: string): void {
     sessionStorage.setItem(DISMISS_KEY, appLink);
   } catch {
     // Private mode or blocked storage: the popup simply shows again on a refresh.
+  }
+}
+
+/**
+ * `?storeUrl=` as a link «Back to the store» may follow, or null.
+ *
+ * 🔴 **Only a page on the Supplier OS origin.** The value arrives in the address, so anyone can put
+ * any URL there; following it unchecked would make the request page an open redirect wearing our
+ * name. So the exact origin of `NEXT_PUBLIC_OS_APP_URL`, scheme included, which is where the public
+ * store pages live (`os.moedatech.net/s/…`). Anything else falls back to the web's `/stores/<id>`.
+ */
+export function safeStoreUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return url.origin === new URL(OS_BASE).origin ? url.href : null;
+  } catch {
+    return null;
   }
 }

@@ -839,7 +839,7 @@ export async function setShareLinkLogo(requestId: string, logoUrl: string | null
  * link. Staging is the environment that opts in, by setting `NEXT_PUBLIC_OS_APP_URL`. c-hub's
  * `lib/bidShareLink.ts` carries the same inversion for the same reason; do not "fix" it.
  */
-const OS_BASE = (process.env.NEXT_PUBLIC_OS_APP_URL || "https://os.moedatech.net").replace(/\/$/, "");
+export const OS_BASE = (process.env.NEXT_PUBLIC_OS_APP_URL || "https://os.moedatech.net").replace(/\/$/, "");
 
 /**
  * Build a request's public share link. The token IS the request's UUID / group id.

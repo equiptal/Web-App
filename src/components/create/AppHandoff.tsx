@@ -24,6 +24,7 @@ import {
  *
  * ⚠️ The design draws a spinner beside «Continue on web» and on 1b. Neither is drawn here: nothing
  * on this page is loading or redirecting, and a spinner that never finishes reads as a stuck page.
+ * 1a carried the prototype's for a day; the owner had it removed (2026-10-06).
  */
 export function AppHandoff() {
   const params = useSearchParams();
@@ -129,8 +130,6 @@ function StoreLine({ name, logoUrl, onDark = false }: { name: string | null; log
  * ⚠️ **«Continue on web» is the ONLY way out**: no corner close, no backdrop click, no Escape. That is
  * why this is its own overlay and not the house `Dialog`, whose three exits are the point of it, and
  * whose five widths do not include the prototype's 720.
- *
- * ⚠️ The small spinner beside the button is the prototype's. Nothing is loading behind it.
  */
 function QrPopup({
   appLink,
@@ -160,7 +159,7 @@ function QrPopup({
           <StoreLine name={storeName} logoUrl={logoUrl} />
           <h2 className="text-hero font-extrabold leading-tight">{c.title}</h2>
           <p className="text-subhead leading-relaxed text-muted">{c.body}</p>
-          <div className="mt-auto flex items-center gap-3 pt-3">
+          <div className="mt-auto pt-3">
             <button
               ref={button}
               type="button"
@@ -169,7 +168,6 @@ function QrPopup({
             >
               {c.continueWeb}
             </button>
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-brand" aria-hidden="true" />
           </div>
         </div>
         <div className="flex flex-col items-center justify-center gap-4 bg-navy px-5 py-[30px]">

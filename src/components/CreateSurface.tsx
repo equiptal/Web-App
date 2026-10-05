@@ -134,7 +134,16 @@ export function CreateSurface() {
           <span className="min-w-0 flex-1 text-body font-semibold text-navy">
             {t.store.directBanner.replace("{name}", state.direct.supplierName ?? t.store.directSupplierFallback)}
           </span>
-          {state.direct.storeId && state.phase !== "confirmation" && (
+          {/* Back to where he came from: the Supplier OS store page when the link named one, else the
+              web's own store page (owner, 2026-10-06). A full navigation, since it leaves this app. */}
+          {state.direct.storeUrl && state.phase !== "confirmation" ? (
+            <a
+              href={state.direct.storeUrl}
+              className="text-meta font-semibold text-brand underline decoration-brand/40 underline-offset-2 transition hover:decoration-brand"
+            >
+              {t.store.directBannerBack}
+            </a>
+          ) : state.direct.storeId && state.phase !== "confirmation" && (
             <Link
               href={`/stores/${state.direct.storeId}`}
               className="text-meta font-semibold text-brand underline decoration-brand/40 underline-offset-2 transition hover:decoration-brand"

@@ -240,7 +240,7 @@ export const ar: Dictionary = {
     nextPhoto: "التالي",
     approxLocation: "تقريبي: المدينة فقط",
     noLocation: "لا يوجد موقع لهذه المعدة",
-    directBanner: "هذا الطلب يصل إلى {name} وحده. لا يراه أي مورّد آخر.",
+    directBanner: "هذا الطلب يصل فقط إلى متجر {name}",
     directBannerBack: "العودة إلى المتجر",
     directSupplierFallback: "هذا المورّد",
   },

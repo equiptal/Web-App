@@ -7,6 +7,17 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-06 - «Back to the store» on a direct request returns to the Supplier OS store page he
+  came from. BUILT, NOT committed.** Owner: *"from where he came from"*. It always opened the web's
+  `/stores/<id>`. Now `?storeUrl=` on `/create` is kept on `DirectTarget.storeUrl` and the banner link
+  follows it; without one, `/stores/<id>` as before. The banner also reads «This request goes only to
+  {name} store» (owner's words). Files: `src/lib/app-handoff.ts` (`safeStoreUrl`),
+  `src/app/create/page.tsx`, `src/components/CreateSurface.tsx`, `src/lib/contract/draft.ts`,
+  `src/lib/api/client.ts` (`OS_BASE` exported), `src/lib/i18n/{en,ar}.ts`, tests. 🔴 `storeUrl` is
+  followed ONLY when its origin is exactly `NEXT_PUBLIC_OS_APP_URL`'s, or the page is an open
+  redirect. ⚠️ Inert until Supplier OS sends `storeUrl` in the Request link. ⚠️ The equipment tab's
+  ×/+ errand still goes to the web store: it stashes the draft in this app, and a Supplier OS
+  «Request now» on a phone may open the app instead and lose it.
 - **2026-10-05 - A direct request no longer names the machine with the listing's make and model. BUILT, NOT
   committed.** Owner, on a staging phone shot: «EQUIPMENT NAME IN MY OWN WORDS» read «Tadano GR-250N».
   Supplier OS sends `prefill` (make and model); `directRequestItem` seeded it into `rawLabel`, which the
@@ -27,8 +38,8 @@ reversal, or the reason an odd-looking line is load-bearing.
   `src/lib/i18n/{en,ar}.ts`, `tests/unit/app-handoff.test.tsx`, `package.json` (`qrcode`). ⚠️ 1b
   needs `appLink` on PHONE clicks, which Supplier OS does not send yet, so phones get 1c only. 1b cannot
   be the design's «loading» screen: the app opens before this page loads, or this page loads because it
-  did not. ⚠️ The design's spinner and «جارٍ تحويلك» title are kept at the owner's request although
-  nothing redirects. ⚠️ Design S7/UAT-13 say no logo means an empty centre; the owner chose the initial.
+  did not. ⚠️ The design's «جارٍ تحويلك» title is kept at the owner's request although nothing
+  redirects; its spinner was added, then removed (owner, 2026-10-06). ⚠️ Design S7/UAT-13 say no logo means an empty centre; the owner chose the initial.
 - **2026-10-05 - Staging issues report (W1-W4), fixed on main. BUILT, NOT committed.** From
   `moedatech-web-staging-issues.html`. (W1) Year and certificate, while unanswered, get a red border and a
   star on the pick box itself, no red word (~~the fuel chip's white title strip~~, withdrawn the same

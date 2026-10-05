@@ -4,7 +4,7 @@ import { AppHandoff } from "@/components/create/AppHandoff";
 import { LocaleProvider } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
 import { ar } from "@/lib/i18n/ar";
-import { handoffSurface, isInAppBrowser, storeUrlFor } from "@/lib/app-handoff";
+import { handoffSurface, isInAppBrowser, safeStoreUrl, storeUrlFor } from "@/lib/app-handoff";
 import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/config/store-links";
 
 /**
@@ -57,6 +57,20 @@ describe("device helpers", () => {
     expect(storeUrlFor(IPHONE, true)).toBe(APP_STORE_URL);
     expect(storeUrlFor("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", true)).toBe(APP_STORE_URL);
     expect(storeUrlFor(ANDROID, true)).toBe(PLAY_STORE_URL);
+  });
+});
+
+describe("safeStoreUrl («Back to the store»)", () => {
+  it("accepts a Supplier OS store page", () => {
+    expect(safeStoreUrl("https://os.moedatech.net/s/kR7x")).toBe("https://os.moedatech.net/s/kR7x");
+  });
+  it("refuses anything else, so the page is no open redirect", () => {
+    expect(safeStoreUrl("https://evil.example/s/kR7x")).toBeNull();
+    expect(safeStoreUrl("https://os.moedatech.net.evil.example/s/1")).toBeNull();
+    expect(safeStoreUrl("http://os.moedatech.net/s/kR7x")).toBeNull();
+    expect(safeStoreUrl("javascript:alert(1)")).toBeNull();
+    expect(safeStoreUrl("/stores/1")).toBeNull();
+    expect(safeStoreUrl(null)).toBeNull();
   });
 });
 
