@@ -134,7 +134,7 @@ function QrPopup({
   const c = t.appHandoff;
   return (
     <Dialog open onClose={onContinue} size="lg" tone="dark" padded={false}>
-      <div className="grid sm:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="grid sm:grid-cols-[minmax(0,1fr)_280px]">
         <div className="flex flex-col gap-4 bg-surface p-8 text-navy">
           <StoreLine name={storeName} />
           <h2 className="text-display font-extrabold leading-tight">{c.title}</h2>
