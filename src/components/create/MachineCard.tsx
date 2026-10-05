@@ -534,12 +534,13 @@ export function MachineCard({
               />
             </div>
             <div className={`min-w-0 max-w-[48%] ${shake("equipment_year") ? "shake-error" : ""}`}>
-              {/* Red border and star on the box, as the certificate (owner, 2026-10-05). The star rides
-                  in the placeholder, which only shows while there is no value. */}
+              {/* Red border and red star on the box, as the certificate (owner, 2026-10-05). The star
+                  is `placeholderMark`, which only shows while there is no value. */}
               <div className={owedYear ? "rounded-sm ring-2 ring-danger" : undefined}>
                 <SearchSelect
                   value={overrides.equipmentYear}
-                  placeholder={owedYear ? `${t.create.machineCard.minYear} *` : t.create.machineCard.minYear}
+                  placeholder={t.create.machineCard.minYear}
+                  placeholderMark={owedYear ? <span className="ms-1 text-danger">*</span> : undefined}
                   searchPlaceholder={t.create.machineCard.minYear}
                   label={t.create.machineCard.minYearName}
                   tone={gapFor("equipment_year") ? "brand" : "overlay"}

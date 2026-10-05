@@ -26,8 +26,9 @@ reversal, or the reason an odd-looking line is load-bearing.
   `RequestsWorkspace.tsx`, `RequestDetailsModal.tsx`, `bidCardModel.ts`, `contract/bids.ts`,
   `contract/request-fields.ts`, tests. ⚠️ Not on main, nothing to do: the Railway share link is
   staging's `NEXT_PUBLIC_OS_APP_URL`. ⚠️ Backend, not fixable here: notifications in English (the web
-  sends `language=ar`), «حفار» without «جنزير» (the form's `labelAr`), the share image's Arabic word
-  order (the backend's own image), the English recommendation reason (agent), W5's 15-20 min delay.
+  sends `language=ar`), «حفار» without «جنزير» (the form's `labelAr`), ~~the share image's Arabic word
+  order (the backend's own image)~~ CORRECTED: it is OURS (`/bid/[token]/og`), which lays Arabic words
+  out left to right; reproduced by rendering «حفار 20 طن · مع مشغّل» with the same renderer and font. The English recommendation reason (agent), W5's 15-20 min delay.
   ⚠️ W3a's cause is inferred from the code; CEX-010956 itself was not opened.
 - **2026-10-05 - Switching the operator ON fills an EMPTY operator cert from the machine's certs.
   BUILT on `main`, NOT committed.** Owner: a renter who wrote "with Aramco" without an operator,

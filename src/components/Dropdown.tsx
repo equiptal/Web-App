@@ -85,6 +85,7 @@ export function Dropdown({
   tone = "field",
   preselected = false,
   prefix,
+  placeholderMark,
   triggerClass,
   disabled = false,
   defaultOpen = false,
@@ -144,6 +145,12 @@ export function Dropdown({
    * before it says what is chosen.
    */
   prefix?: ReactNode;
+  /**
+   * A mark drawn after the PLACEHOLDER only, never after a chosen value: the machine card's red star
+   * on an unanswered year (owner, 2026-10-05: *"make the star red not white"*). A string placeholder
+   * cannot carry its own colour, so the mark is a node of its own.
+   */
+  placeholderMark?: ReactNode;
   /**
    * The trigger's own skin, replacing the tone's.
    *
@@ -328,6 +335,7 @@ export function Dropdown({
         {tone !== "bare" && (
           <span className={`truncate ${tone === "pill" ? "font-semibold" : ""} ${selected || tone !== "field" ? "" : "text-muted"}`}>
             {selected?.label ?? placeholder}
+            {!selected && placeholderMark}
           </span>
         )}
         <Icon name="expand_more" size={tone === "field" ? 16 : 14} className={`flex-none ${tone === "brand" || tone === "overlay" ? "" : "opacity-50"}`} />

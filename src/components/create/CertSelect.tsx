@@ -132,7 +132,7 @@ export function CertSelect({
       >
         <span className="min-w-0 flex-1 truncate text-start">
           {summary}
-          {required && <span className="ms-1">*</span>}
+          {required && <span className="ms-1 text-danger">*</span>}
         </span>
         <Icon name="expand_more" size={14} className="flex-none" />
       </button>
