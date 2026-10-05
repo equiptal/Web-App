@@ -26,9 +26,12 @@ const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
 const HUB = read("src/components/home/HomeHub.tsx");
 
 describe("the dashboard's tabs", () => {
-  it("names the three views, in the owner's order", () => {
-    expect(HUB).toContain('type View = "requests" | "suppliers" | "projects"');
-    expect(HUB).toContain('const VIEWS: View[] = ["requests", "suppliers", "projects"]');
+  it("names the four views, in the owner's order", () => {
+    /* Governance joined them on 2026-10-03, after suppliers and before projects, and it is
+       GATED: `views` drops it for an account that cannot open it, so the list below is the
+       authored order rather than the rendered one. */
+    expect(HUB).toContain('type View = "requests" | "suppliers" | "governance" | "projects"');
+    expect(HUB).toContain('const VIEWS: View[] = ["requests", "suppliers", "governance", "projects"]');
   });
 
   it("keeps all three blocks MOUNTED and hides the two that are closed", () => {

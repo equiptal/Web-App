@@ -12,14 +12,24 @@ import { CtaBanner } from "@/components/home/CtaBanner";
 import { HomeRequests } from "@/components/home/HomeRequests";
 import { ProjectsSurface } from "@/components/projects/ProjectsSurface";
 import { SuppliersPage } from "@/components/suppliers/SuppliersPage";
+import { canSeeGovernanceDashboard } from "@/lib/access/dashboard";
+import { GovernanceBoard } from "@/components/home/GovernanceBoard";
 import { pin } from "@/lib/uiPins";
 import { Icon } from "@/components/Icon";
 
-/** The three things the dashboard holds, one at a time (owner, 2026-09-16). */
-type View = "requests" | "suppliers" | "projects";
-const VIEWS: View[] = ["requests", "suppliers", "projects"];
+/** The things the dashboard holds, one at a time (owner, 2026-09-16). */
+type View = "requests" | "suppliers" | "governance" | "projects";
+/**
+ * GOVERNANCE sits after My Suppliers (owner, 2026-10-03). It is gated to one account, so the row
+ * is built per reader rather than being this constant — a tab everyone can see and nobody can open
+ * is worse than no tab. `VIEWS` stays the canonical ORDER; `HomeHub` filters it.
+ */
+const VIEWS: View[] = ["requests", "suppliers", "governance", "projects"];
 
-const VIEW_ICON = { requests: "assignment", suppliers: "groups", projects: "place" } as const;
+const VIEW_ICON = { requests: "assignment", suppliers: "groups", governance: "gavel", projects: "place" } as const;
+
+/** The three blocks that report a row count. Governance is a board, not a list, so it has none. */
+type Counted = Exclude<View, "governance">;
 
 /**
  * The tab row.
@@ -58,19 +68,21 @@ const VIEW_ICON = { requests: "assignment", suppliers: "groups", projects: "plac
  */
 export function DashboardTabs({
   view,
+  views,
   counts,
   onPick,
 }: {
   view: View;
-  counts: Record<View, number | null>;
+  views: View[];
+  counts: Record<Counted, number | null>;
   onPick: (v: View) => void;
 }) {
   const t = useT();
   return (
     <div {...pin("home-tabs")} className="flex flex-wrap items-center gap-2">
-      {VIEWS.map((k) => {
+      {views.map((k) => {
         const on = view === k;
-        const n = counts[k];
+        const n = k === "governance" ? null : counts[k];
         return (
           <button
             key={k}
@@ -85,17 +97,26 @@ export function DashboardTabs({
             )}
           >
             <Icon name={VIEW_ICON[k]} size={18} className={on ? "text-surface" : "text-muted-dark"} />
-            {k === "requests" ? t.home.yourRequests : k === "suppliers" ? t.suppliers.title : t.projects.surface.heading}
+            {k === "requests"
+              ? t.home.yourRequests
+              : k === "suppliers"
+                ? t.suppliers.title
+                : k === "governance"
+                  ? "Governance"
+                  : t.projects.surface.heading}
             {/* A dash while the block has not answered yet: «0 suppliers» on a list still loading is
-                a wrong statement, not a pending one. */}
-            <span
-              className={cx(
-                "rounded-full px-1.5 py-0.5 text-label font-extrabold tabular-nums",
-                on ? "bg-surface/20 text-surface" : "bg-surface2 text-navy-mid",
-              )}
-            >
-              {n ?? "–"}
-            </span>
+                a wrong statement, not a pending one. Governance carries NO pill at all: it is a
+                board rather than a list, and a dash beside it would read as a count still loading. */}
+            {k !== "governance" && (
+              <span
+                className={cx(
+                  "rounded-full px-1.5 py-0.5 text-label font-extrabold tabular-nums",
+                  on ? "bg-surface/20 text-surface" : "bg-surface2 text-navy-mid",
+                )}
+              >
+                {n ?? "–"}
+              </span>
+            )}
           </button>
         );
       })}
@@ -117,7 +138,7 @@ export function DashboardTabs({
  */
 export function HomeHub() {
   const router = useRouter();
-  const { status } = useSession();
+  const { status, user } = useSession();
   const t = useT();
 
   /* ── A guest LANDS on Browse, but is not held off the dashboard (owner, 2026-08-30 · 2026-09-04)
@@ -155,7 +176,15 @@ export function HomeHub() {
      call over the alternative on the table (the two reference blocks side by side, each capped at a
      few rows with a «See all» door), and its cost is stated: two of the three states are behind a
      press, which is the thing a dashboard exists not to do. */
+  /* Gated to one account, so the tab row is built per reader: a tab everyone can see and nobody
+     can open is worse than no tab at all. */
+  const canGovernance = canSeeGovernanceDashboard(user);
+  const views = VIEWS.filter((v) => v !== "governance" || canGovernance);
+
   const [view, setView] = useState<View>("requests");
+  /* The board is mounted the first time its tab is chosen and stays mounted after, so a trip to
+     another tab does not re-run its fan-out or lose the cards the reader arranged. */
+  const [seenGovernance, setSeenGovernance] = useState(false);
   /* Which block is open is IN THE URL, so a reload, a Back from a supplier profile and a link a
      renter pastes all land on the same tab — the workspace's own ruling (2026-09-06).
      `replaceState`, never push: switching tabs is not a navigation, and pushing would make the
@@ -163,7 +192,7 @@ export function HomeHub() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const want = new URL(window.location.href).searchParams.get("view");
-    if (want === "suppliers" || want === "projects" || want === "requests") setView(want);
+    if (want === "suppliers" || want === "projects" || want === "requests" || want === "governance") setView(want);
   }, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -173,11 +202,12 @@ export function HomeHub() {
     else url.searchParams.delete("view");
     if (url.search !== before) window.history.replaceState(window.history.state, "", url.toString());
   }, [view]);
+  useEffect(() => { if (view === "governance") setSeenGovernance(true); }, [view]);
 
   /* The counts on the tabs. Each block owns its own read, so it REPORTS what it found rather than
      this page fetching the same three lists a second time. `null` is "not answered yet" and draws a
      dash — a 0 while a list is still loading is a wrong statement, not a pending one. */
-  const [counts, setCounts] = useState<Record<View, number | null>>({ requests: null, suppliers: null, projects: null });
+  const [counts, setCounts] = useState<Record<Counted, number | null>>({ requests: null, suppliers: null, projects: null });
   const countRequests = useCallback((n: number) => setCounts((c) => (c.requests === n ? c : { ...c, requests: n })), []);
   const countSuppliers = useCallback((n: number) => setCounts((c) => (c.suppliers === n ? c : { ...c, suppliers: n })), []);
   const countProjects = useCallback((n: number) => setCounts((c) => (c.projects === n ? c : { ...c, projects: n })), []);
@@ -209,13 +239,20 @@ export function HomeHub() {
           a renter deep in the create flow must not be tapped on the shoulder. */}
       <HomeNotificationBubble />
 
+      {/* ~~The hero steps aside for the governance board.~~ It was taken away on the reasoning that
+          a banner above the board costs the rail the height it needs to reach the top of the
+          window, and that reasoning was wrong twice over: the rail could not reach the top of the
+          window anyway while it lived inside a frame that started below the header, and the fix
+          for that (the frame grows over the host's chrome while the rail is open) covers a banner
+          just as happily as it covers the header. Owner, 2026-10-03: *"the create request by agent
+          cta is no more exist so i want it back"*. It is on every tab again. */}
       <CtaBanner />
 
       {/* ── The three tabs (owner, 2026-09-16) ────────────────────────────────────────────────────
           They ARE the section headings: each carries the plate glyph, the name and the count that
           the block's own header used to draw, and the blocks drop that header (`hideHeading`) so the
           dashboard does not say «My Suppliers · 42» twice, a tab apart. */}
-      <DashboardTabs view={view} counts={counts} onPick={setView} />
+      <DashboardTabs view={view} views={views} counts={counts} onPick={setView} />
 
       {/* Every block stays MOUNTED and the two that are closed are hidden (`display:none`), which is
           three deliberate consequences: the counts on the tabs are real for all three rather than
@@ -242,6 +279,20 @@ export function HomeHub() {
       <div className={cx(view !== "suppliers" && "hidden")}>
         <SuppliersPage embedded hideHeading onCount={countSuppliers} />
       </div>
+
+      {/* ── Governance and compliance (owner, 2026-10-03) ────────────────────────────────────────
+          The board is an iframe rather than a component because it IS the prototype, running on
+          live data: one page whose cards, figures and drill-downs all derive from one fetch. It is
+          mounted only for the accounts that can open it, and only once the tab has been chosen —
+          it fans out across every request to build itself, which is not a cost to pay for a reader
+          who never presses it. */}
+      {/* Full-bleed: the board breaks out of this column's padding so the rail meets the right
+          edge of the window rather than stopping at a gutter. */}
+      {canGovernance && seenGovernance && (
+        <div className={cx("-mx-4 sm:-mx-6 lg:-mx-8", view !== "governance" && "hidden")}>
+          <GovernanceBoard />
+        </div>
+      )}
 
       {/* ── The sites (owner, 2026-08-30 · reordered 2026-09-04) ──────────────────────────────────
           A renter's sites are part of the picture the dashboard draws — what is out to the market,

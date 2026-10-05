@@ -31,7 +31,27 @@ if (!url) {
   console.error('no DATABASE_URL in ' + ENV_FILE);
   process.exit(1);
 }
-process.env.DATABASE_URL = url;
+/**
+ * Staging runs with `--require_secure_transport=ON`, so a plain connection is refused outright:
+ * `ERROR HY000 (3159): Connections using insecure transport are prohibited`. The env file carries
+ * no TLS parameter, which is why this script could never reach staging — prod let it through.
+ *
+ * ⚠️ The test below is for `sslaccept` and NOT for "ssl": the staging URL already carries
+ * `ssl-mode`, a MySQL CLI flag Prisma ignores entirely. A looser check matches it, skips the
+ * append, and leaves the connection plaintext while looking like it did the right thing.
+ *
+ * ⚠️ On WINDOWS the chain then fails anyway: Prisma's engine verifies against the Windows
+ * certificate store, which has no Amazon RDS root, and `sslcert` cannot supply one to it — that
+ * option reaches the Rust TLS backend only on platforms using rustls, not schannel. Node's own
+ * bundle does carry Amazon Root CA 1, but Prisma never consults it.
+ *
+ * There is no switch in this file to get past that, deliberately. Run it from WSL or any Linux
+ * shell, where `strict` verifies unaided, or trust the Amazon RDS root on the machine once, which
+ * fixes every tool rather than this one. Both leave verification on, which is the point.
+ */
+let dsn = url;
+if (!/[?&]sslaccept=/.test(dsn)) dsn += (dsn.includes('?') ? '&' : '?') + 'sslaccept=strict';
+process.env.DATABASE_URL = dsn;
 
 const { PrismaClient } = require(path.join(BACKEND, 'node_modules', '@prisma', 'client'));
 const prisma = new PrismaClient();

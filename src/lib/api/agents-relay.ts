@@ -110,6 +110,43 @@ export async function relayAsRenter(path: string, init: RelayInit = {}): Promise
   }
 }
 
+/**
+ * Read one `/agents{path}` GET as the signed-in renter and return its DATA, not a response.
+ *
+ * {@link relayAsRenter} is for a route that hands the answer straight back to the browser. This is
+ * for a route that has to COMBINE several of them — the governance board reads the renter's
+ * projects and supplier list alongside his requests and folds all three into one payload, and it
+ * cannot do that with a `NextResponse` in its hand.
+ *
+ * ⚠️ The projects and supplier registry live on the AGENTS backend, not on app-backend. The
+ * governance route originally asked app-backend for `/projects` and `/renter-suppliers`, caught the
+ * 404 and carried on with an empty set, so every project column read "Unnamed project" and every
+ * supplier read "not registered" — wrong answers that looked exactly like a renter who had simply
+ * filled nothing in. Use this for anything under `/agents`.
+ *
+ * Returns `null` on any failure. The caller decides what an absence means, and on this page it
+ * means a column says what is not stored rather than the route failing as a whole.
+ */
+export async function agentsGet<T>(path: string): Promise<T | null> {
+  if (!serverEnv.agentsApiUrl || !serverEnv.agentsApiToken) return null;
+  const userId = await sessionUserId();
+  if (userId == null) return null;
+  const url = `${serverEnv.agentsApiUrl}/agents${path}${path.includes("?") ? "&" : "?"}userId=${userId}`;
+  try {
+    const res = await fetch(url, {
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serverEnv.agentsApiToken}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json: unknown = await res.json().catch(() => null);
+    /* Same `{ data }` unwrap as the relay. Some handlers envelope and some do not, and a caller
+       that guessed wrong got `undefined` rather than an error. */
+    return (json && typeof json === "object" && "data" in json ? (json as { data: T }).data : (json as T)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Read a request's body as raw text, or `undefined` when it has none. */
 export async function rawBody(req: Request): Promise<string | undefined> {
   const text = await req.text().catch(() => "");

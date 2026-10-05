@@ -592,7 +592,14 @@ export const SPECIMENS: Specimen[] = [
     label: "Dashboard - requests / suppliers / projects tabs",
     render: () => (
       <div style={{ width: "100%", minWidth: 0 }}>
-        <DashboardTabs view="requests" counts={{ requests: 4, suppliers: 42, projects: null }} onPick={() => {}} />
+        {/* Governance included, so the specimen shows the row a gated reader actually gets: it
+            carries no count pill, which is the one thing about it worth looking at here. */}
+        <DashboardTabs
+          view="requests"
+          views={["requests", "suppliers", "governance", "projects"]}
+          counts={{ requests: 4, suppliers: 42, projects: null }}
+          onPick={() => {}}
+        />
       </div>
     ),
   },

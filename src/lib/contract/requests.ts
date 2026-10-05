@@ -397,6 +397,8 @@ export interface RequestRecord {
   createdAt?: string | null;
   dealRoomId?: string | null;
   bidCount?: number | null;
+  /** How many suppliers dispatch actually notified. Absent on a backend older than 2026-09-24. */
+  suppliersNotified?: number | null;
   unreadBidCount?: number | null;
   equipmentItems: RequestItem[];
   /** Every other field the backend returns, so the detail screen can render them all. */
@@ -455,6 +457,17 @@ export interface RequestListItem {
    * only refused at save. Defaults false when the payload predates the field.
    */
   renteeEditUsed: boolean;
+  /**
+   * How many suppliers the dispatch actually notified, for a BROADCAST request.
+   *
+   * ⚠️ **Null is "not recorded", never zero.** It is absent on a backend older than 2026-09-24 and
+   * on any request that was never dispatched, and a reader that collapses the two reports a
+   * request nobody saw and a request everybody ignored as the same thing. The governance board
+   * printed "suppliers reached not stored" on every marketplace row for exactly as long as this
+   * field went unmapped — `my-requests` has been returning it the whole time, and the support
+   * context route was already reading it straight off the raw record.
+   */
+  suppliersNotified: number | null;
   /** Certificates the request demands, normalised to the enum — the drawer's chips. */
   requiredCerts: CertCode[];
   /** Who the request assigned mobilization / demobilization to (true = renter bears it, false = supplier). */
@@ -629,6 +642,7 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
     // `my-requests` spreads the whole request row, so this arrives already — it was simply never
     // read here, which is why the web had no idea the one post-bid edit had been spent.
     renteeEditUsed: r.renteeEditUsed === true,
+    suppliersNotified: num(r.suppliersNotified),
     requiredCerts: toCertCodes(r.requiredCerts),
     mobByRentee: it?.mobilizationByRentee ?? null,
     demobByRentee: it?.demobilizationByRentee ?? null,
