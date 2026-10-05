@@ -7,6 +7,28 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-05 - A direct request no longer names the machine with the listing's make and model. BUILT, NOT
+  committed.** Owner, on a staging phone shot: «EQUIPMENT NAME IN MY OWN WORDS» read «Tadano GR-250N».
+  Supplier OS sends `prefill` (make and model); `directRequestItem` seeded it into `rawLabel`, which the
+  name box shows as the renter's words (`customEquipment ?? rawLabel ?? pickedName`) and `app-adapters`
+  posts as his `customEquipmentName`. It looked right because `rawLabel` was documented as the «YOU WROTE»
+  text, but that card reads `state.text`, not `rawLabel`. Now `rawLabel: null` whenever the triple is
+  seeded, so the box shows the picked type and size; `prefill` still seeds the text box when the triple
+  is incomplete. Files: `src/lib/agent/direct-draft.ts`, `src/app/create/page.tsx`,
+  `tests/unit/direct-from-store.test.ts`. ⚠️ Drafts already saved with the old seed keep their name.
+- **2026-10-05 - «Request now» app handoff on `/create` (Supplier OS `request-now-tickets-web.md`,
+  design «Order Blocker Flow»). First cut in `365a9c2e` / `79a36aa2`; the prototype-exact 1a, the
+  logo on the store line and the brand spelling are NOT committed.** Desktop popup 1a (QR drawn from `appLink`
+  exactly, store logo else initial in its centre and on the store line), phone banner 1c, in-app
+  browser screen 1b, and WEB-4: «Continue on web» keeps 1a closed for the browser session, keyed by
+  `appLink`. Owner: «Continue on web» is 1a's ONLY exit (no ×, scrim or Escape), so 1a is its own
+  overlay rather than `Dialog`. Desktop is `(pointer: coarse)` false, never width. Files:
+  `src/lib/app-handoff.ts`, `src/components/create/AppHandoff.tsx`, `src/app/create/page.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/app-handoff.test.tsx`, `package.json` (`qrcode`). ⚠️ 1b
+  needs `appLink` on PHONE clicks, which Supplier OS does not send yet, so phones get 1c only. 1b cannot
+  be the design's «loading» screen: the app opens before this page loads, or this page loads because it
+  did not. ⚠️ The design's spinner and «جارٍ تحويلك» title are kept at the owner's request although
+  nothing redirects. ⚠️ Design S7/UAT-13 say no logo means an empty centre; the owner chose the initial.
 - **2026-10-05 - Staging issues report (W1-W4), fixed on main. BUILT, NOT committed.** From
   `moedatech-web-staging-issues.html`. (W1) Year and certificate, while unanswered, get a red border and a
   star on the pick box itself, no red word (~~the fuel chip's white title strip~~, withdrawn the same

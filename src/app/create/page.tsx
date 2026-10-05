@@ -62,8 +62,9 @@ export default function CreatePage() {
  * write down the machine he just pressed, and then guessing which catalogue row he meant, was the
  * web inventing a step the app never had — and the guess can miss.
  *
- * `?prefill=` stays: it is the label the canvas shows under «YOU WROTE», and the FALLBACK for a
- * listing whose triple is incomplete (an older payload, a half-filled row). Without the ids the flow
+ * `?prefill=` stays only as the FALLBACK for a listing whose triple is incomplete (an older payload,
+ * a half-filled row). With the triple it is ignored: it is the listing's make and model, not the
+ * renter's words, and seeding it named his machine for him (owner, 2026-10-05). Without the ids the flow
  * is exactly what it was — the words in the box, the renter's to edit, the agent's to read.
  */
 function DirectRequestGate() {
@@ -77,7 +78,6 @@ function DirectRequestGate() {
     categoryId: params.get("catId"),
     subtypeId: params.get("subId"),
     capacityId: params.get("capId"),
-    label: prefill,
     fuel: params.get("fuel"),
     year: Number(params.get("year")) || null,
   };

@@ -37,7 +37,8 @@ describe("the listing as a draft", () => {
     // Nothing to validate: these ids came off the row the renter chose, not out of a model.
     expect(item.verdict).toBe("confident");
     expect(item.resolved).toBe(true);
-    expect(item.rawLabel).toBe("Crawler excavator 30 ton Caterpillar 320");
+    // Not the listing's make and model: `rawLabel` reads as the renter's own words and is posted as them.
+    expect(item.rawLabel).toBeNull();
   });
 
   it("takes the listing's fuel, and its year as the MINIMUM the request accepts", () => {
@@ -58,7 +59,7 @@ describe("the listing as a draft", () => {
   it("states no price, make or model — a request says what the renter needs", () => {
     const draft = directRequestDraft(LISTING);
     const json = JSON.stringify(draft.items[0]);
-    // The label is the only place the make appears, and it is display text under «YOU WROTE».
+    expect(json).not.toContain("Caterpillar");
     expect(draft.items[0].additionalNotes).toBe("");
     expect(json).not.toContain("priceUnit");
   });
@@ -106,7 +107,6 @@ describe("a second machine from the same store", () => {
     // shown the 30 ton one he looked at a minute ago.
     expect(second.draft?.items).toHaveLength(1);
     expect(second.draft?.items[0].ref.measurementId).toBe("cap-50");
-    expect(second.draft?.items[0].rawLabel).toBe("Crawler excavator 50 ton");
   });
 
   it("keeps the recipient across the swap — both presses are that store's", () => {

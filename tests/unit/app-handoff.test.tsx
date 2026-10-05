@@ -108,6 +108,29 @@ describe("<AppHandoff>", () => {
     expect(screen.queryByText(en.appHandoff.title)).toBeNull();
   });
 
+  it("desktop: a store with a logo shows it in the store line and the QR centre, no initial", async () => {
+    vi.stubGlobal("fetch", async () =>
+      new Response(JSON.stringify({ name: "Al Noor Rentals", logoUrl: "https://cdn.example/logo.png" }), { status: 200 }),
+    );
+    url.search = `?storeId=s1&src=share&appLink=${encodeURIComponent(LINK)}`;
+    device(false, DESKTOP);
+    const { container } = draw();
+    await screen.findByText("Al Noor Rentals store");
+    const logos = Array.from(container.ownerDocument.querySelectorAll("img")).filter((i) => i.src === "https://cdn.example/logo.png");
+    expect(logos).toHaveLength(2);
+    expect(screen.queryByText("A")).toBeNull();
+  });
+
+  it("desktop: «Continue on web» is the only way out (no close, Escape does nothing)", async () => {
+    url.search = `?src=share&appLink=${encodeURIComponent(LINK)}`;
+    device(false, DESKTOP);
+    draw();
+    await screen.findByText(en.appHandoff.title);
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByText(en.appHandoff.title)).toBeTruthy();
+  });
+
   it("desktop: a refresh after «Continue on web» keeps the popup closed (WEB-4)", async () => {
     url.search = `?src=share&appLink=${encodeURIComponent(LINK)}`;
     device(false, DESKTOP);

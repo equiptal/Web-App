@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
-import { Dialog } from "@/components/Dialog";
 import { CloseIcon } from "@/components/HeaderIcons";
 import { btn } from "@/lib/ds";
 import { useT } from "@/lib/i18n";
@@ -64,7 +63,7 @@ export function AppHandoff() {
     );
   }
   if (surface === "inApp" && appLink) {
-    return <InAppScreen appLink={appLink} storeName={name} onContinue={() => setSurface("banner")} />;
+    return <InAppScreen appLink={appLink} storeName={name} logoUrl={store.logoUrl} onContinue={() => setSurface("banner")} />;
   }
   if (surface === "banner") {
     return <AppBanner storeUrl={storeUrlFor(ua, coarse)} onClose={() => setSurface(null)} />;
@@ -98,14 +97,24 @@ function useStoreFace(storeId: string | null): { name: string | null; logoUrl: s
 
 const initialOf = (name: string | null) => name?.trim().charAt(0).toUpperCase() ?? "";
 
-/** «متجر fadwa ali» with the store's initial in a small tile, above the title on 1a and 1b. */
-function StoreLine({ name, onDark = false }: { name: string | null; onDark?: boolean }) {
+/**
+ * «متجر fadwa ali» with the store's mark in a small tile, above the title on 1a and 1b: the logo
+ * when the store has one (owner, 2026-10-05), the name's initial otherwise.
+ */
+function StoreLine({ name, logoUrl, onDark = false }: { name: string | null; logoUrl: string | null; onDark?: boolean }) {
   const t = useT();
+  const [logoFailed, setLogoFailed] = useState(false);
   if (!name) return null;
+  const showLogo = !!logoUrl && !logoFailed;
   return (
     <div className={`flex items-center gap-2 text-meta ${onDark ? "justify-center text-white/70" : "text-muted"}`}>
-      <span className="grid h-7 w-7 flex-none place-items-center rounded-sm bg-brand-soft text-meta font-extrabold text-brand-deep">
-        {initialOf(name)}
+      <span className="grid h-7 w-7 flex-none place-items-center overflow-hidden rounded-sm bg-brand-soft text-meta font-extrabold text-brand-deep">
+        {showLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} alt="" className="h-full w-full bg-white object-contain" onError={() => setLogoFailed(true)} />
+        ) : (
+          initialOf(name)
+        )}
       </span>
       {t.appHandoff.storeLabel.replace("{name}", name)}
     </div>
@@ -113,11 +122,15 @@ function StoreLine({ name, onDark = false }: { name: string | null; onDark?: boo
 }
 
 /**
- * Frame 1a: the copy on the surface side, the QR on a navy side. Every way out (the button, the X,
- * the scrim, Escape) is «Continue on web».
+ * Frame 1a, drawn as the prototype draws it (owner, 2026-10-05: *"i want continue on web not x,
+ * follow the prototype exactly in ui"*): the copy on the surface side, the QR on a navy side, over
+ * the dimmed and blurred form.
  *
- * `tone="dark"` so the panel's own ground is the QR side's navy and the corner close is drawn for it:
- * in both directions the close sits at the inline END, which is the QR column.
+ * ⚠️ **«Continue on web» is the ONLY way out**: no corner close, no backdrop click, no Escape. That is
+ * why this is its own overlay and not the house `Dialog`, whose three exits are the point of it, and
+ * whose five widths do not include the prototype's 720.
+ *
+ * ⚠️ The small spinner beside the button is the prototype's. Nothing is loading behind it.
  */
 function QrPopup({
   appLink,
@@ -132,26 +145,40 @@ function QrPopup({
 }) {
   const t = useT();
   const c = t.appHandoff;
+  const button = useRef<HTMLButtonElement>(null);
+  // Focus lands on the one control a keyboard can use to leave.
+  useEffect(() => button.current?.focus(), []);
   return (
-    <Dialog open onClose={onContinue} size="lg" tone="dark" padded={false}>
-      <div className="grid sm:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="flex flex-col gap-4 bg-surface p-8 text-navy">
-          <StoreLine name={storeName} />
-          <h2 className="text-display font-extrabold leading-tight">{c.title}</h2>
-          <p className="text-body leading-relaxed text-muted">{c.body}</p>
-          <div className="mt-auto pt-3">
-            <button type="button" onClick={onContinue} className={btn("secondary", "lg")}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-navy-deep/55 p-4 backdrop-blur-[3px]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={c.title}
+        className="grid w-[720px] max-w-full overflow-hidden rounded-lg bg-surface sm:grid-cols-[minmax(0,1fr)_280px]"
+      >
+        <div className="flex flex-col gap-4 px-9 pb-[30px] pt-9 text-navy">
+          <StoreLine name={storeName} logoUrl={logoUrl} />
+          <h2 className="text-hero font-extrabold leading-tight">{c.title}</h2>
+          <p className="text-subhead leading-relaxed text-muted">{c.body}</p>
+          <div className="mt-auto flex items-center gap-3 pt-3">
+            <button
+              ref={button}
+              type="button"
+              onClick={onContinue}
+              className="h-[46px] rounded-md border border-border-strong bg-surface px-[22px] text-subhead font-extrabold text-navy transition hover:bg-surface2"
+            >
               {c.continueWeb}
             </button>
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-brand" aria-hidden="true" />
           </div>
         </div>
-        <div className="flex flex-col items-center justify-center gap-4 bg-navy px-5 py-8">
+        <div className="flex flex-col items-center justify-center gap-4 bg-navy px-5 py-[30px]">
           <QrCode value={appLink} label={storeName} logoUrl={logoUrl} />
-          <p className="text-center text-body font-extrabold text-white">{c.scanHint}</p>
+          <p className="text-center text-subhead font-extrabold text-white">{c.scanHint}</p>
           <StoreBadges />
         </div>
       </div>
-    </Dialog>
+    </div>
   );
 }
 
@@ -177,7 +204,7 @@ function QrCode({ value, label, logoUrl }: { value: string; label: string | null
   const showLogo = !!logoUrl && !logoFailed;
 
   return (
-    <div className="relative grid h-[196px] w-[196px] place-items-center rounded-md bg-white p-3.5" data-testid="handoff-qr">
+    <div className="relative grid h-[203px] w-[203px] place-items-center rounded-md bg-white p-3.5" data-testid="handoff-qr">
       <svg viewBox={`0 0 ${path.size} ${path.size}`} className="h-full w-full" shapeRendering="crispEdges" role="img" aria-label={value}>
         <path d={path.d} fill="#000" />
       </svg>
@@ -203,7 +230,7 @@ function QrCode({ value, label, logoUrl }: { value: string; label: string | null
  */
 function StoreBadges() {
   const badge =
-    "flex flex-none items-center gap-2 rounded-md border border-white/25 bg-black px-2.5 py-1.5 text-white transition hover:border-white/50";
+    "flex flex-none items-center gap-[7px] rounded-md border border-white/25 bg-black px-2 py-1.5 text-white transition hover:border-white/50";
   return (
     <div className="flex gap-1.5" dir="ltr">
       <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className={badge} aria-label="Download on the App Store">
@@ -235,7 +262,17 @@ function StoreBadges() {
  * pictures an automatic redirect, but a script that sends the page there by itself does not open the
  * app on iPhone: iOS only hands a universal link to the app on a user's tap.
  */
-function InAppScreen({ appLink, storeName, onContinue }: { appLink: string; storeName: string | null; onContinue: () => void }) {
+function InAppScreen({
+  appLink,
+  storeName,
+  logoUrl,
+  onContinue,
+}: {
+  appLink: string;
+  storeName: string | null;
+  logoUrl: string | null;
+  onContinue: () => void;
+}) {
   const t = useT();
   const c = t.appHandoff;
   return (
@@ -246,7 +283,7 @@ function InAppScreen({ appLink, storeName, onContinue }: { appLink: string; stor
       className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-5 overflow-y-auto bg-navy px-8 py-10 text-center"
     >
       <div className="text-display font-extrabold text-white">{c.brand}</div>
-      <StoreLine name={storeName} onDark />
+      <StoreLine name={storeName} logoUrl={logoUrl} onDark />
       <h2 className="text-title font-extrabold text-white">{c.title}</h2>
       <p className="max-w-[320px] text-body leading-relaxed text-white/70">{c.body}</p>
       <a href={appLink} className={btn("primary", "lg", { full: true, className: "mt-4 max-w-[320px]" })}>

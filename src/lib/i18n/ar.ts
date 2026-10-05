@@ -681,7 +681,7 @@ export const ar: Dictionary = {
     disappearsSoon: "تجريبي - يختفي قريباً",
   },
   appHandoff: {
-    brand: "معدّاتك",
+    brand: "معداتك",
     storeLabel: "متجر {name}",
     title: "جارٍ تحويلك إلى طلب معدّتك",
     body: "قدّم طلبك مباشرة وتفاوض مع المورّد دون وسيط",

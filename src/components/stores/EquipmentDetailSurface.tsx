@@ -182,8 +182,8 @@ export function EquipmentDetailSurface({
            The renter tapped a row in a catalogue; sending its words for the agent to parse asked
            him to describe what he had just pointed at, and let the parse miss. The app builds an
            `EquipmentPrefill` off the listing — the taxonomy triple, its fuel, its year — and opens
-           the form with the machine already chosen. `prefill` above stays as the label the canvas
-           shows under «YOU WROTE», and as the fallback for a listing whose triple is incomplete. */
+           the form with the machine already chosen. `prefill` above stays only as the fallback for
+           a listing whose triple is incomplete; with the triple, `/create` ignores it. */
         if (eq?.categoryId && eq.subcategoryId && eq.measurementId) {
           qs.set("catId", eq.categoryId);
           qs.set("subId", eq.subcategoryId);
