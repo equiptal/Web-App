@@ -680,6 +680,18 @@ export const ar: Dictionary = {
     trialBadge: "تجريبي",
     disappearsSoon: "تجريبي - يختفي قريباً",
   },
+  appHandoff: {
+    brand: "معدّاتك",
+    storeLabel: "متجر {name}",
+    title: "جارٍ تحويلك إلى طلب معدّتك",
+    body: "قدّم طلبك مباشرة وتفاوض مع المورّد دون وسيط",
+    scanHint: "امسح الرمز للمتابعة على التطبيق",
+    continueWeb: "متابعة على الويب",
+    openInApp: "فتح في التطبيق",
+    continueBrowser: "المتابعة على المتصفح",
+    bannerText: "مصمّمة لسطح المكتب",
+    download: "حمّل التطبيق",
+  },
   /** العضوية في شركة — نفس نصوص التطبيق (مفاتيح company* في app_ar.arb). */
   company: {
     myCompany: "شركتي",

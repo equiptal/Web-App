@@ -831,6 +831,19 @@ export const en = {
     trialBadge: "TRIAL",
     disappearsSoon: "TRIAL - DISAPPEARS SOON",
   },
+  /** «Request now» from a supplier's store, handed to the app (design «Order Blocker Flow», 1a / 1b / 1c). */
+  appHandoff: {
+    brand: "Moedatech",
+    storeLabel: "{name} store",
+    title: "Taking you to your equipment request",
+    body: "Place your request directly and negotiate with the supplier, no middleman",
+    scanHint: "Scan the code to continue in the app",
+    continueWeb: "Continue on web",
+    openInApp: "Open in app",
+    continueBrowser: "Continue in browser",
+    bannerText: "Designed for desktop",
+    download: "Download the app",
+  },
   /**
    * Multi-company membership (docs/plans/company-shared-visibility.md). Copy is character-identical
    * to the app's `company*` arb keys so the two surfaces read the same — the consent and close-down

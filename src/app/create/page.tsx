@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { RfqProvider, useRfq } from "@/lib/store/rfq-store";
 import { CreateSurface } from "@/components/CreateSurface";
 import { CreateBack } from "@/components/create/CreateBack";
+import { AppHandoff } from "@/components/create/AppHandoff";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
 import { canSeedDirect, directRequestDraft, directRequestItem, type DirectPrefill } from "@/lib/agent/direct-draft";
 import { consumeDirectStash } from "@/lib/agent/direct-stash";
@@ -31,6 +32,10 @@ export default function CreatePage() {
         <FirstRequestGate />
       </Suspense>
       <AppShell title={t.shell.request}>
+        {/* Store «Request now» handoff to the app: QR popup, in-app screen or phone banner. */}
+        <Suspense fallback={null}>
+          <AppHandoff />
+        </Suspense>
         <CreateBack />
         <CreateSurface />
       </AppShell>
