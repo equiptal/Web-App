@@ -26,6 +26,21 @@ reversal, or the reason an odd-looking line is load-bearing.
   Profile switcher did, so switching from the header left pushes in the old language. Signed-in only
   (the toggle shows to visitors) and not awaited, like Profile. Verified: tsc and eslint as above,
   AppShell tests unchanged (14 pre-existing failures with and without).
+- **2026-10-07 - Review pens open the section they name; a past start date is refused. BUILT, NOT
+  committed.** (1) Owner: *"edit path from the pen icon in the summary and review screen is not
+  working"*, prod and staging. Reproduced on staging: «Edit» on «Where it goes» / «When it runs» DID
+  leave the review, but through `backToItem(0)`, and `SET_READY_TO_SEND false` / `GO_ITEM` both open
+  the EQUIPMENT panel, while the site and schedule sat closed under the green «locked» strip lower
+  down. So the press looked like nothing. Now `backToSection` opens that panel, and the canvas starts
+  unlocked and scrolls to it when it mounts on «where»/«when». The strip pen and the Equipment pen
+  still land on the equipment, which is what they name. (2) Owner: start date may not be in the past.
+  `DatePicker` gained `notPast`, used on the create flow's start field only: a day before today is
+  refused with «Start can't be in the past», today allowed, days stay visible (the 2026-10-04 ruling).
+  Files: `ReadyToSend.tsx`, `Canvas.tsx`, `DatePicker.tsx`, `WhenPanel.tsx`, `en.ts`, `ar.ts`,
+  `tests/unit/{ready-to-send,when-panel}.test.tsx`. ⚠️ Picker only: a past start from the agent or an
+  older draft is not blocked by the gate. ⚠️ The edit-request modal's start field is unchanged, since a
+  live request's start is legitimately past. ⚠️ `when-panel` tests now pin today to 2026-09-01; they
+  pick September days.
 - **2026-10-06 - «Back to the store» on a direct request returns to the Supplier OS store page he
   came from. BUILT, NOT committed.** Owner: *"from where he came from"*. It always opened the web's
   `/stores/<id>`. Now `?storeUrl=` on `/create` is kept on `DirectTarget.storeUrl` and the banner link

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { WhenPanel } from "@/components/create/WhenPanel";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
@@ -73,6 +73,15 @@ describe("the charged-day figure (MREQ-AC-32/33)", () => {
  */
 describe("with the end date before the start date", () => {
   const backwards = { startDate: "2026-09-10", endDate: "2026-09-03" };
+  /* The picks below are September 2026 days, and the start field refuses a day before TODAY since
+     2026-10-07. Today is pinned to 1 September so these cases keep testing the order of the dates. */
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 1, 12));
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
 
   it("withholds the figure instead of reporting one day", async () => {
     await panel({ draft: withTiming(backwards) });
@@ -113,6 +122,25 @@ describe("with the end date before the start date", () => {
     await handle.run(() => day.click());
     expect(screen.getByRole("alert").textContent).toContain("End can't be on or before the start date");
     expect(handle.store().state.draft!.project.timing.endDate).toBe("2026-09-12");
+  });
+
+  // Owner, 2026-10-07: the start date cannot be in the past. Today itself is allowed.
+  it("refuses a start before today with its own note, and takes today", async () => {
+    vi.setSystemTime(new Date(2026, 8, 8, 12));
+    try {
+      const handle = await panel({ draft: withTiming({ startDate: "2026-09-10", endDate: "2026-09-20" }) });
+      await handle.run(() => screen.getByRole("button", { name: "START DATE" }).click());
+      const day = (n: number) => screen.getAllByRole("button", { pressed: false }).find((b) => b.textContent === String(n))!;
+
+      await handle.run(() => day(5).click());
+      expect(screen.getByRole("alert").textContent).toContain("Start can't be in the past");
+      expect(handle.store().state.draft!.project.timing.startDate).toBe("2026-09-10");
+
+      await handle.run(() => day(8).click());
+      expect(handle.store().state.draft!.project.timing.startDate).toBe("2026-09-08");
+    } finally {
+      vi.setSystemTime(new Date(2026, 8, 1, 12));
+    }
   });
 
   // Owner, 2026-10-05: *"apply this rule if start and end is the same"*.

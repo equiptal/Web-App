@@ -37,6 +37,7 @@ export const en = {
     prevMonth: "Previous month",
     nextMonth: "Next month",
     startAfterEnd: "Start can't be on or after the end date",
+    startInPast: "Start can't be in the past",
     endBeforeStartPick: "End can't be on or before the start date",
   },
   nav: {

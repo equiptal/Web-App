@@ -38,6 +38,7 @@ export const ar: Dictionary = {
     prevMonth: "الشهر السابق",
     nextMonth: "الشهر التالي",
     startAfterEnd: "لا يمكن أن يكون تاريخ البداية في يوم النهاية أو بعده",
+    startInPast: "لا يمكن أن يكون تاريخ البداية في الماضي",
     endBeforeStartPick: "لا يمكن أن يكون تاريخ النهاية في يوم البداية أو قبله",
   },
   nav: {

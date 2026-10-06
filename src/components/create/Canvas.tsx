@@ -123,7 +123,9 @@ export function Canvas() {
    * renter thinks he is answering one equipment, and a renter who has just pressed «Change» is not
    * doing that. Leaving the canvas and coming back locks them again, answered.
    */
-  const [unlocked, setUnlocked] = useState(false);
+  /* Arriving from a review pen for the site or the schedule IS the «Change» (owner, 2026-10-07):
+     without it the panel the pen opened sat behind the green strip, and the press read as nothing. */
+  const [unlocked, setUnlocked] = useState(() => state.activeSection === "where" || state.activeSection === "when");
   /**
    * ── The equipment a tab's ✕ is about to remove (owner, 2026-09-09) ────────────────────────────
    * *"In the equipment tabs must have x button to remove it."*
@@ -206,6 +208,14 @@ export function Canvas() {
   /** The other two panels, for the same reason: a shake off screen is a click that did nothing. */
   const whereRef = useRef<HTMLDivElement | null>(null);
   const whenRef = useRef<HTMLDivElement | null>(null);
+
+  /* A review pen lands on the panel it named, which sits BELOW the equipment card, so bring it into
+     view on arrival. Mount only: later opens are the renter's own presses. */
+  useEffect(() => {
+    const s = state.activeSection;
+    if (s === "where" || s === "when") (s === "where" ? whereRef : whenRef).current?.scrollIntoView?.({ block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const t0 = timers.current;
