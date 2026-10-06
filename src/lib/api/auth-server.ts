@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AuthError, type AuthErrorKind } from "@/lib/api/app-backend";
 import type { RenterUser } from "@/lib/contract/auth";
+import { LOCALE_COOKIE } from "@/lib/i18n/config";
 
 /**
  * SERVER-ONLY helpers for the auth route handlers (web-app/001): httpOnly token cookies, request
@@ -69,8 +70,14 @@ export function clearAuthCookies(res: NextResponse): void {
   }
 }
 
-/** Forward the renter's language to the backend `Accept-Language` (en/ar). */
+/**
+ * The renter's language for the backend (en/ar): the in-app choice (`LOCALE_COOKIE`) first, then the
+ * browser's `Accept-Language`. ⚠️ Reading only the header gave an English browser English backend
+ * copy (notification titles) even with the app switched to Arabic.
+ */
 export function localeFromRequest(req: Request): string {
+  const chosen = new RegExp(`(?:^|;\\s*)${LOCALE_COOKIE}=(en|ar)(?:;|$)`).exec(req.headers.get("cookie") ?? "")?.[1];
+  if (chosen) return chosen;
   const header = req.headers.get("accept-language") ?? "";
   return header.toLowerCase().startsWith("ar") ? "ar" : "en";
 }

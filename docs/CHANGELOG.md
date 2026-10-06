@@ -7,6 +7,20 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-06 - Backend copy (notification titles and bodies) follows the in-app language, not the
+  browser's. BUILT, NOT committed.** An Arabic UI showed «New off-platform bid» in the home bubble:
+  `localeFromRequest` read only `Accept-Language`, while the language choice lives in `localStorage`,
+  which no route can see, so an English browser with the app switched to Arabic asked the backend for
+  `language=en`. The backend already stores and serves `titleAr`; nothing was missing there. Now the
+  provider mirrors every choice (`?lang=`, stored, detected, switcher) into the `mt_locale` cookie
+  (`LOCALE_COOKIE`) and `localeFromRequest` prefers it, falling back to the header. It reaches all
+  ~26 routes using `localeFromRequest`, including `Accept-Language` on every `withAuthedBackend` call.
+  Files: `src/lib/i18n/{config.ts,index.tsx}`, `src/lib/api/auth-server.ts`. ⚠️ The cookie is set in
+  the provider's mount effect, which runs AFTER children's effects, so on the very first load after
+  this ships, a request fired on mount still uses the header; every later request uses the choice.
+  ⚠️ The home bubble fetches once per mount (`[userId]`), so switching language does not re-title it
+  until the next mount. Verified: tsc shows only the pre-existing `qrcode` error, eslint clean, unit
+  tests unchanged (same 623 pre-existing failures with and without the change). NOT seen in a browser.
 - **2026-10-06 - «Back to the store» on a direct request returns to the Supplier OS store page he
   came from. BUILT, NOT committed.** Owner: *"from where he came from"*. It always opened the web's
   `/stores/<id>`. Now `?storeUrl=` on `/create` is kept on `DirectTarget.storeUrl` and the banner link
