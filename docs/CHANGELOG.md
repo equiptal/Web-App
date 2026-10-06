@@ -8,7 +8,7 @@ Read the entries that touch the surface you are changing. Nearly every one recor
 reversal, or the reason an odd-looking line is load-bearing.
 
 - **2026-10-06 - Backend copy (notification titles and bodies) follows the in-app language, not the
-  browser's. BUILT, NOT committed.** An Arabic UI showed «New off-platform bid» in the home bubble:
+  browser's. On `staging` (`d4d9d3a5`); header toggle part BUILT, NOT committed.** An Arabic UI showed «New off-platform bid» in the home bubble:
   `localeFromRequest` read only `Accept-Language`, while the language choice lives in `localStorage`,
   which no route can see, so an English browser with the app switched to Arabic asked the backend for
   `language=en`. The backend already stores and serves `titleAr`; nothing was missing there. Now the
@@ -21,6 +21,11 @@ reversal, or the reason an odd-looking line is load-bearing.
   ⚠️ The home bubble fetches once per mount (`[userId]`), so switching language does not re-title it
   until the next mount. Verified: tsc shows only the pre-existing `qrcode` error, eslint clean, unit
   tests unchanged (same 623 pre-existing failures with and without the change). NOT seen in a browser.
+  Same day: the header language toggle (`AppShell.tsx` `switchLocale`) now also saves the choice to
+  the account (`updateLanguage`, `PATCH /users/me/language`), which picks the PUSH language. Only the
+  Profile switcher did, so switching from the header left pushes in the old language. Signed-in only
+  (the toggle shows to visitors) and not awaited, like Profile. Verified: tsc and eslint as above,
+  AppShell tests unchanged (14 pre-existing failures with and without).
 - **2026-10-06 - «Back to the store» on a direct request returns to the Supplier OS store page he
   came from. BUILT, NOT committed.** Owner: *"from where he came from"*. It always opened the web's
   `/stores/<id>`. Now `?storeUrl=` on `/create` is kept on `DirectTarget.storeUrl` and the banner link

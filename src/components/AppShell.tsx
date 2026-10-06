@@ -13,6 +13,7 @@ import type { Locale } from "@/lib/i18n/config";
 // import { SurveyProvider } from "@/components/surveys/SurveyProvider";
 import { AuthGateProvider, useAuthGate } from "@/components/auth/AuthGate";
 import { fetchDealRoomUnread } from "@/lib/api/client";
+import { updateLanguage } from "@/lib/api/profile-client";
 import { btn, cx, OVERLAY, PAGE_BACK, PAGE_MAX, PAGE_X, PAGE_Y, POPOVER, SCRIM } from "@/lib/ds";
 import { backTarget } from "@/lib/contract/back-nav";
 import { previousPath, recordTrail } from "@/lib/nav-trail";
@@ -177,6 +178,12 @@ function AppShellInner({ children, title, fullBleed, pageScroll }: AppShellProps
   const { locale, setLocale } = useLocale();
   const t = useT();
   const { tier, status, signOut, refresh: refreshSession } = useSession();
+  /** The header toggle saves the choice to the account too, like the Profile switcher, so push
+   *  notifications follow it. Signed-in only (the toggle shows to visitors); best-effort, as there. */
+  const switchLocale = (l: Locale) => {
+    setLocale(l);
+    if (status === "authed") void updateLanguage(l);
+  };
   /** The account menu: Profile, and the only door out of the app. */
   const [accountOpen, setAccountOpen] = useState(false);
   /** The verification form, opened by the header nudge — see the note on that button. */
@@ -472,7 +479,7 @@ function AppShellInner({ children, title, fullBleed, pageScroll }: AppShellProps
                 once. Below `sm` it moves into the nav sheet, under the three places, which is room
                 the bar does not have to find. It is not removed anywhere. */}
             <span {...pin("header-locale")} className="hidden sm:inline-flex">
-              <LocaleToggle locale={locale} setLocale={setLocale} />
+              <LocaleToggle locale={locale} setLocale={switchLocale} />
             </span>
 
             {/* Signed-out visitors browse freely; this opens the auth modal (no /login page). */}
@@ -692,7 +699,7 @@ function AppShellInner({ children, title, fullBleed, pageScroll }: AppShellProps
 
                 It carries the language toggle down with it — see the note on that control above. */}
             <AppNavMobile items={navItems}>
-              <LocaleToggle locale={locale} setLocale={setLocale} tone="sheet" />
+              <LocaleToggle locale={locale} setLocale={switchLocale} tone="sheet" />
             </AppNavMobile>
           </div>
         </header>
