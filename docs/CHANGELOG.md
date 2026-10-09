@@ -7,6 +7,73 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-06 - Backend copy (notification titles and bodies) follows the in-app language, not the
+  browser's. On `staging` (`d4d9d3a5`); header toggle part BUILT, NOT committed.** An Arabic UI showed «New off-platform bid» in the home bubble:
+  `localeFromRequest` read only `Accept-Language`, while the language choice lives in `localStorage`,
+  which no route can see, so an English browser with the app switched to Arabic asked the backend for
+  `language=en`. The backend already stores and serves `titleAr`; nothing was missing there. Now the
+  provider mirrors every choice (`?lang=`, stored, detected, switcher) into the `mt_locale` cookie
+  (`LOCALE_COOKIE`) and `localeFromRequest` prefers it, falling back to the header. It reaches all
+  ~26 routes using `localeFromRequest`, including `Accept-Language` on every `withAuthedBackend` call.
+  Files: `src/lib/i18n/{config.ts,index.tsx}`, `src/lib/api/auth-server.ts`. ⚠️ The cookie is set in
+  the provider's mount effect, which runs AFTER children's effects, so on the very first load after
+  this ships, a request fired on mount still uses the header; every later request uses the choice.
+  ⚠️ The home bubble fetches once per mount (`[userId]`), so switching language does not re-title it
+  until the next mount. Verified: tsc shows only the pre-existing `qrcode` error, eslint clean, unit
+  tests unchanged (same 623 pre-existing failures with and without the change). NOT seen in a browser.
+  Same day: the header language toggle (`AppShell.tsx` `switchLocale`) now also saves the choice to
+  the account (`updateLanguage`, `PATCH /users/me/language`), which picks the PUSH language. Only the
+  Profile switcher did, so switching from the header left pushes in the old language. Signed-in only
+  (the toggle shows to visitors) and not awaited, like Profile. Verified: tsc and eslint as above,
+  AppShell tests unchanged (14 pre-existing failures with and without).
+- **2026-10-07 - Review pens open the section they name; a past start date is refused. BUILT, NOT
+  committed.** (1) Owner: *"edit path from the pen icon in the summary and review screen is not
+  working"*, prod and staging. Reproduced on staging: «Edit» on «Where it goes» / «When it runs» DID
+  leave the review, but through `backToItem(0)`, and `SET_READY_TO_SEND false` / `GO_ITEM` both open
+  the EQUIPMENT panel, while the site and schedule sat closed under the green «locked» strip lower
+  down. So the press looked like nothing. Now `backToSection` opens that panel, and the canvas starts
+  unlocked and scrolls to it when it mounts on «where»/«when». The strip pen and the Equipment pen
+  still land on the equipment, which is what they name. (2) Owner: start date may not be in the past.
+  `DatePicker` gained `notPast`, used on the create flow's start field only: a day before today is
+  refused with «Start can't be in the past», today allowed, days stay visible (the 2026-10-04 ruling).
+  Files: `ReadyToSend.tsx`, `Canvas.tsx`, `DatePicker.tsx`, `WhenPanel.tsx`, `en.ts`, `ar.ts`,
+  `tests/unit/{ready-to-send,when-panel}.test.tsx`. ⚠️ Picker only: a past start from the agent or an
+  older draft is not blocked by the gate. ⚠️ The edit-request modal's start field is unchanged, since a
+  live request's start is legitimately past. ⚠️ `when-panel` tests now pin today to 2026-09-01; they
+  pick September days.
+- **2026-10-06 - «Back to the store» on a direct request returns to the Supplier OS store page he
+  came from. BUILT, NOT committed.** Owner: *"from where he came from"*. It always opened the web's
+  `/stores/<id>`. Now `?storeUrl=` on `/create` is kept on `DirectTarget.storeUrl` and the banner link
+  follows it; without one, `/stores/<id>` as before. The banner also reads «This request goes only to
+  {name} store» (owner's words). Files: `src/lib/app-handoff.ts` (`safeStoreUrl`),
+  `src/app/create/page.tsx`, `src/components/CreateSurface.tsx`, `src/lib/contract/draft.ts`,
+  `src/lib/api/client.ts` (`OS_BASE` exported), `src/lib/i18n/{en,ar}.ts`, tests. 🔴 `storeUrl` is
+  followed ONLY when its origin is exactly `NEXT_PUBLIC_OS_APP_URL`'s, or the page is an open
+  redirect. ⚠️ Inert until Supplier OS sends `storeUrl` in the Request link. ⚠️ The equipment tab's
+  ×/+ errand still goes to the web store: it stashes the draft in this app, and a Supplier OS
+  «Request now» on a phone may open the app instead and lose it.
+- **2026-10-05 - A direct request no longer names the machine with the listing's make and model. BUILT, NOT
+  committed.** Owner, on a staging phone shot: «EQUIPMENT NAME IN MY OWN WORDS» read «Tadano GR-250N».
+  Supplier OS sends `prefill` (make and model); `directRequestItem` seeded it into `rawLabel`, which the
+  name box shows as the renter's words (`customEquipment ?? rawLabel ?? pickedName`) and `app-adapters`
+  posts as his `customEquipmentName`. It looked right because `rawLabel` was documented as the «YOU WROTE»
+  text, but that card reads `state.text`, not `rawLabel`. Now `rawLabel: null` whenever the triple is
+  seeded, so the box shows the picked type and size; `prefill` still seeds the text box when the triple
+  is incomplete. Files: `src/lib/agent/direct-draft.ts`, `src/app/create/page.tsx`,
+  `tests/unit/direct-from-store.test.ts`. ⚠️ Drafts already saved with the old seed keep their name.
+- **2026-10-05 - «Request now» app handoff on `/create` (Supplier OS `request-now-tickets-web.md`,
+  design «Order Blocker Flow»). First cut in `365a9c2e` / `79a36aa2`; the prototype-exact 1a, the
+  logo on the store line and the brand spelling are NOT committed.** Desktop popup 1a (QR drawn from `appLink`
+  exactly, store logo else initial in its centre and on the store line), phone banner 1c, in-app
+  browser screen 1b, and WEB-4: «Continue on web» keeps 1a closed for the browser session, keyed by
+  `appLink`. Owner: «Continue on web» is 1a's ONLY exit (no ×, scrim or Escape), so 1a is its own
+  overlay rather than `Dialog`. Desktop is `(pointer: coarse)` false, never width. Files:
+  `src/lib/app-handoff.ts`, `src/components/create/AppHandoff.tsx`, `src/app/create/page.tsx`,
+  `src/lib/i18n/{en,ar}.ts`, `tests/unit/app-handoff.test.tsx`, `package.json` (`qrcode`). ⚠️ 1b
+  needs `appLink` on PHONE clicks, which Supplier OS does not send yet, so phones get 1c only. 1b cannot
+  be the design's «loading» screen: the app opens before this page loads, or this page loads because it
+  did not. ⚠️ The design's «جارٍ تحويلك» title is kept at the owner's request although nothing
+  redirects; its spinner was added, then removed (owner, 2026-10-06). ⚠️ Design S7/UAT-13 say no logo means an empty centre; the owner chose the initial.
 - **2026-10-05 - Staging issues report (W1-W4), fixed on main. BUILT, NOT committed.** From
   `moedatech-web-staging-issues.html`. (W1) Year and certificate, while unanswered, get a red border and a
   star on the pick box itself, no red word (~~the fuel chip's white title strip~~, withdrawn the same

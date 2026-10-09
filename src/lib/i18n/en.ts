@@ -37,6 +37,7 @@ export const en = {
     prevMonth: "Previous month",
     nextMonth: "Next month",
     startAfterEnd: "Start can't be on or after the end date",
+    startInPast: "Start can't be in the past",
     endBeforeStartPick: "End can't be on or before the start date",
   },
   nav: {
@@ -290,7 +291,7 @@ export const en = {
     approxLocation: "Approximate: city only",
     noLocation: "No location on this listing",
     // The recipient ribbon on the create flow, when the request was started from a store.
-    directBanner: "This request goes to {name} only. No other supplier sees it.",
+    directBanner: "This request goes only to {name} store",
     directBannerBack: "Back to the store",
     directSupplierFallback: "this supplier",
   },
@@ -830,6 +831,19 @@ export const en = {
     bidsBanner: "These are sample bids for your trial. No real suppliers were contacted.",
     trialBadge: "TRIAL",
     disappearsSoon: "TRIAL - DISAPPEARS SOON",
+  },
+  /** «Request now» from a supplier's store, handed to the app (design «Order Blocker Flow», 1a / 1b / 1c). */
+  appHandoff: {
+    brand: "Moedatech",
+    storeLabel: "{name} store",
+    title: "Taking you to your equipment request",
+    body: "Place your request directly and negotiate with the supplier, no middleman",
+    scanHint: "Scan the code to continue in the app",
+    continueWeb: "Continue on web",
+    openInApp: "Open in app",
+    continueBrowser: "Continue in browser",
+    bannerText: "Designed for desktop",
+    download: "Download the app",
   },
   /**
    * Multi-company membership (docs/plans/company-shared-visibility.md). Copy is character-identical

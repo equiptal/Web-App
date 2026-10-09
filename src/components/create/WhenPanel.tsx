@@ -128,6 +128,8 @@ export function WhenPanel({
                     <DatePicker
                       value={timing.startDate}
                       notAfter={timing.endDate}
+                      notPast
+                      pastConflict={t.common.startInPast}
                       conflict={t.common.startAfterEnd}
                       label={t.create.whenPanel.startDate}
                       onChange={(v) => setTiming({ startDate: v }, "timing.start_date")}

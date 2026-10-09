@@ -126,6 +126,16 @@ export function ReadyToSend() {
     actions.setReadyToSend(false);
     actions.goItem(index);
   };
+  /**
+   * A section pen lands on THAT section (owner, 2026-10-07: *"edit path from the pen icon … is not
+   * working"*). ~~`backToItem(0)` for the site and the schedule too~~: leaving the review always opens
+   * the equipment panel, so «Edit» on «When it runs» returned to the canvas with the dates closed
+   * under the green strip, and read as a press that did nothing. The canvas unlocks and scrolls to it.
+   */
+  const backToSection = (section: "where" | "when") => {
+    actions.setReadyToSend(false);
+    actions.openSection(section);
+  };
 
   /* ── The whole request, on one line, beside the title (owner, 2026-09-02) ────────────────────
    *
@@ -306,7 +316,7 @@ export function ReadyToSend() {
         <div className="flex flex-col">
 
       {/* ---------------- Site ---------------- */}
-      <SummaryCard title={t.create.ready.where} onEdit={() => backToItem(0)}>
+      <SummaryCard title={t.create.ready.where} onEdit={() => backToSection("where")}>
         <p className="text-body text-navy-mid">
           {project.location.label ?? "—"}
           {project.location.lat != null && (
@@ -316,7 +326,7 @@ export function ReadyToSend() {
       </SummaryCard>
 
       {/* ---------------- Schedule ---------------- */}
-      <SummaryCard title={t.create.ready.when} onEdit={() => backToItem(0)}>
+      <SummaryCard title={t.create.ready.when} onEdit={() => backToSection("when")}>
         <div className="grid gap-2.5 sm:grid-cols-3">
           <Tile label={t.create.ready.billingDuration}>
             {[

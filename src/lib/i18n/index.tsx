@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { en, type Dictionary } from "./en";
 import { ar } from "./ar";
-import { DEFAULT_LOCALE, detectLocale, dirFor, isLocale, type Dir, type Locale } from "./config";
+import { DEFAULT_LOCALE, LOCALE_COOKIE, detectLocale, dirFor, isLocale, type Dir, type Locale } from "./config";
 
 const DICTS: Record<Locale, Dictionary> = { en, ar };
 const STORAGE_KEY = "moedatech.locale";
@@ -14,6 +14,15 @@ interface LocaleContextValue {
   dir: Dir;
   setLocale: (l: Locale) => void;
   t: Dictionary;
+}
+
+/** Mirror the choice for the server (see `LOCALE_COOKIE`). A year, like the `localStorage` copy it shadows. */
+function writeLocaleCookie(l: Locale) {
+  try {
+    document.cookie = `${LOCALE_COOKIE}=${l}; path=/; max-age=31536000; samesite=lax`;
+  } catch {
+    /* ignore */
+  }
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null);
@@ -47,6 +56,7 @@ export function LocaleProvider({
       const asked = new URLSearchParams(window.location.search).get("lang");
       if (asked && isLocale(asked)) {
         setLocaleState(asked);
+        writeLocaleCookie(asked);
         try {
           window.localStorage.setItem(STORAGE_KEY, asked);
         } catch {
@@ -61,9 +71,14 @@ export function LocaleProvider({
     const stored = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
     if (stored && isLocale(stored)) {
       setLocaleState(stored);
+      writeLocaleCookie(stored);
       return;
     }
-    if (typeof navigator !== "undefined") setLocaleState(detectLocale(navigator.language));
+    if (typeof navigator !== "undefined") {
+      const detected = detectLocale(navigator.language);
+      setLocaleState(detected);
+      writeLocaleCookie(detected);
+    }
   }, []);
 
   // Keep <html lang/dir> in sync.
@@ -74,6 +89,7 @@ export function LocaleProvider({
 
   const setLocale = (l: Locale) => {
     setLocaleState(l);
+    writeLocaleCookie(l);
     try {
       window.localStorage.setItem(STORAGE_KEY, l);
     } catch {

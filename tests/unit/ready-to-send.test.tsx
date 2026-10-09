@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { ReadyToSend } from "@/components/create/ReadyToSend";
 import { BID_WINDOWS, MAINTENANCE_SLAS, PAYMENT_TERMS } from "@/lib/contract";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
@@ -82,6 +82,19 @@ describe("what suppliers will see (MREQ-AC-42)", () => {
     await openDetails(handle);
     await handle.run(() => screen.getAllByRole("button", { name: /Edit/ })[0].click());
     expect(handle.store().state.readyToSend).toBe(false);
+  });
+
+  it("lands on the section whose pen was pressed, not on the equipment (owner, 2026-10-07)", async () => {
+    /* Every pen used to leave through `backToItem(0)`, which opens the equipment panel: «Edit» on the
+       site or the schedule came back to the canvas with that panel closed, and read as nothing. */
+    for (const [i, section] of [[0, "where"], [1, "when"]] as const) {
+      const handle = await review();
+      await openDetails(handle);
+      await handle.run(() => screen.getAllByRole("button", { name: /Edit/ })[i].click());
+      expect(handle.store().state.readyToSend).toBe(false);
+      expect(handle.store().state.activeSection).toBe(section);
+      cleanup();
+    }
   });
 
   it("returns to editing without submitting", async () => {

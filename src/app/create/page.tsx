@@ -6,12 +6,14 @@ import { AppShell } from "@/components/AppShell";
 import { RfqProvider, useRfq } from "@/lib/store/rfq-store";
 import { CreateSurface } from "@/components/CreateSurface";
 import { CreateBack } from "@/components/create/CreateBack";
+import { AppHandoff } from "@/components/create/AppHandoff";
 import { StartYourRequestModal, type StartRequestChoice } from "@/components/home/StartYourRequestModal";
 import { canSeedDirect, directRequestDraft, directRequestItem, type DirectPrefill } from "@/lib/agent/direct-draft";
 import { consumeDirectStash } from "@/lib/agent/direct-stash";
 import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
 import { useT } from "@/lib/i18n";
+import { safeStoreUrl } from "@/lib/app-handoff";
 
 /**
  * /create — the RFQ creation flow (web-app/002), reached from the home's Create-request entry and
@@ -31,6 +33,10 @@ export default function CreatePage() {
         <FirstRequestGate />
       </Suspense>
       <AppShell title={t.shell.request}>
+        {/* Store «Request now» handoff to the app: QR popup, in-app screen or phone banner. */}
+        <Suspense fallback={null}>
+          <AppHandoff />
+        </Suspense>
         <CreateBack />
         <CreateSurface />
       </AppShell>
@@ -57,8 +63,9 @@ export default function CreatePage() {
  * write down the machine he just pressed, and then guessing which catalogue row he meant, was the
  * web inventing a step the app never had — and the guess can miss.
  *
- * `?prefill=` stays: it is the label the canvas shows under «YOU WROTE», and the FALLBACK for a
- * listing whose triple is incomplete (an older payload, a half-filled row). Without the ids the flow
+ * `?prefill=` stays only as the FALLBACK for a listing whose triple is incomplete (an older payload,
+ * a half-filled row). With the triple it is ignored: it is the listing's make and model, not the
+ * renter's words, and seeding it named his machine for him (owner, 2026-10-05). Without the ids the flow
  * is exactly what it was — the words in the box, the renter's to edit, the agent's to read.
  */
 function DirectRequestGate() {
@@ -67,12 +74,12 @@ function DirectRequestGate() {
   const supplierId = params.get("supplierId");
   const supplierName = params.get("supplierName");
   const storeId = params.get("storeId");
+  const storeUrl = safeStoreUrl(params.get("storeUrl"));
   const prefill = params.get("prefill");
   const equipment: DirectPrefill = {
     categoryId: params.get("catId"),
     subtypeId: params.get("subId"),
     capacityId: params.get("capId"),
-    label: prefill,
     fuel: params.get("fuel"),
     year: Number(params.get("year")) || null,
   };
@@ -117,8 +124,11 @@ function DirectRequestGate() {
   useEffect(() => {
     // The recipient, whenever the URL names a different one. Kept separate from the seed below: a
     // renter can arrive for a new machine at a supplier the store already names.
-    if ((direct?.supplierId ?? null) !== (supplierId ?? null)) {
-      actions.setDirect(supplierId ? { supplierId, supplierName, storeId } : null);
+    // `storeUrl` follows THIS link, present or absent (owner, 2026-10-06: *"only if he came from it,
+    // if he was on web then back to store will be the web store"*). A press on the web store carries
+    // none, so it must clear one an earlier Supplier OS visit left for the same supplier.
+    if ((direct?.supplierId ?? null) !== (supplierId ?? null) || (direct?.storeUrl ?? null) !== storeUrl) {
+      actions.setDirect(supplierId ? { supplierId, supplierName, storeId, storeUrl } : null);
     }
     if (!supplierId) return;
 
@@ -173,7 +183,7 @@ function DirectRequestGate() {
     }
     // `actions` is rebuilt each render but only wraps dispatch; depending on it would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supplierId, supplierName, storeId, prefill, wanted, inDraft, direct, text]);
+  }, [supplierId, supplierName, storeId, storeUrl, prefill, wanted, inDraft, direct, text]);
 
   return null;
 }

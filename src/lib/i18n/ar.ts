@@ -38,6 +38,7 @@ export const ar: Dictionary = {
     prevMonth: "الشهر السابق",
     nextMonth: "الشهر التالي",
     startAfterEnd: "لا يمكن أن يكون تاريخ البداية في يوم النهاية أو بعده",
+    startInPast: "لا يمكن أن يكون تاريخ البداية في الماضي",
     endBeforeStartPick: "لا يمكن أن يكون تاريخ النهاية في يوم البداية أو قبله",
   },
   nav: {
@@ -240,7 +241,7 @@ export const ar: Dictionary = {
     nextPhoto: "التالي",
     approxLocation: "تقريبي: المدينة فقط",
     noLocation: "لا يوجد موقع لهذه المعدة",
-    directBanner: "هذا الطلب يصل إلى {name} وحده. لا يراه أي مورّد آخر.",
+    directBanner: "هذا الطلب يصل فقط إلى متجر {name}",
     directBannerBack: "العودة إلى المتجر",
     directSupplierFallback: "هذا المورّد",
   },
@@ -679,6 +680,18 @@ export const ar: Dictionary = {
     bidsBanner: "هذه عروض تجريبية لتجربتك: لم يتم التواصل مع موردين حقيقيين.",
     trialBadge: "تجريبي",
     disappearsSoon: "تجريبي - يختفي قريباً",
+  },
+  appHandoff: {
+    brand: "معداتك",
+    storeLabel: "متجر {name}",
+    title: "جارٍ تحويلك إلى طلب معدّتك",
+    body: "قدّم طلبك مباشرة وتفاوض مع المورّد دون وسيط",
+    scanHint: "امسح الرمز للمتابعة على التطبيق",
+    continueWeb: "متابعة على الويب",
+    openInApp: "فتح في التطبيق",
+    continueBrowser: "المتابعة على المتصفح",
+    bannerText: "مصمّمة لسطح المكتب",
+    download: "حمّل التطبيق",
   },
   /** العضوية في شركة — نفس نصوص التطبيق (مفاتيح company* في app_ar.arb). */
   company: {

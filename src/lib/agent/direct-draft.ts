@@ -36,8 +36,6 @@ export interface DirectPrefill {
   categoryId: string | null;
   subtypeId: string | null;
   capacityId: string | null;
-  /** For `rawLabel` only — the words the canvas shows under «YOU WROTE». */
-  label?: string | null;
   /** The listing's own fuel, as the backend spells it (`DIESEL` / `PETROL` / `ELECTRIC`). */
   fuel?: string | null;
   /**
@@ -96,7 +94,12 @@ export function directRequestItem(p: DirectPrefill, id = "i1"): EquipmentItem {
       subcategoryId: p.subtypeId,
       measurementId: p.capacityId,
     },
-    rawLabel: p.label?.trim() || null,
+    /* 🔴 **Null, not the link's `prefill`** (owner, 2026-10-05, on a phone shot of «EQUIPMENT NAME IN
+       MY OWN WORDS» reading «Tadano GR-250N»). `rawLabel` is the renter's OWN words: the name box
+       shows it as his and `app-adapters` posts it as his `customEquipmentName`. The listing's make
+       and model are neither, and the note above says a direct request carries no make. With the
+       triple seeded, the box falls back to the picked type and size. */
+    rawLabel: null,
     verdict: "confident",
     resolved: true,
     ...(fuel ? { fuelType: fuel } : {}),

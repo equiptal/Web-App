@@ -366,6 +366,12 @@ export interface DirectTarget {
   supplierName: string | null;
   /** The store the renter came from — provenance, and where «back to the store» returns to. */
   storeId: string | null;
+  /**
+   * The Supplier OS public store page he pressed «Request now» on (`?storeUrl=`), when he came from
+   * one. «Back to the store» returns HERE rather than to the web's own `/stores/<id>`, because that
+   * is where he came from (owner, 2026-10-06). Only ever set through `safeStoreUrl`.
+   */
+  storeUrl?: string | null;
 }
 
 export interface RfqRequestPayload {

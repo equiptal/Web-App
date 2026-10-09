@@ -51,6 +51,8 @@ export function DatePicker({
   onChange,
   notAfter,
   notBefore,
+  notPast = false,
+  pastConflict,
   conflict,
   label,
   triggerClass,
@@ -61,6 +63,14 @@ export function DatePicker({
   notAfter?: string | null;
   /** A pick on or before this is refused: the END field, bounded by the start date. */
   notBefore?: string | null;
+  /**
+   * A pick before today is refused (owner, 2026-10-07: the request's START date). Today itself is
+   * allowed. Same treatment as the bounds above: the day stays visible, the pick is refused with a
+   * red note, because greyed days read as a broken field (2026-10-04).
+   */
+  notPast?: boolean;
+  /** The red note for a refused past pick. */
+  pastConflict?: string;
   /** The red note shown when a pick is refused. */
   conflict: string;
   /** Accessible name for the trigger. */
@@ -73,7 +83,8 @@ export function DatePicker({
   const intl = locale === "ar" ? "ar-u-nu-latn-ca-gregory" : "en-GB";
 
   const [open, setOpen] = useState(false);
-  const [refused, setRefused] = useState(false);
+  /** The note for the pick just refused, or null. Two rules can refuse, and each says its own reason. */
+  const [refused, setRefused] = useState<string | null>(null);
   const [at, setAt] = useState<{ top: number; left: number } | null>(null);
   /** The month on show, as its first day. */
   const [month, setMonth] = useState(() => {
@@ -126,15 +137,19 @@ export function DatePicker({
     }
     const d = value ? parse(value) : new Date();
     setMonth({ y: d.getFullYear(), m: d.getMonth() });
-    setRefused(false);
+    setRefused(null);
     setOpen(true);
   };
 
   /** Every pick goes through here, so «Today» obeys the same rule as a day in the grid. */
   const pick = (k: string) => {
+    if (notPast && k < todayKey()) {
+      setRefused(pastConflict ?? conflict);
+      return;
+    }
     // The SAME day is refused too (owner, 2026-10-05: *"apply this rule if start and end is the same"*).
     if ((notAfter && k >= notAfter) || (notBefore && k <= notBefore)) {
-      setRefused(true);
+      setRefused(conflict);
       return;
     }
     onChange(k);
@@ -142,7 +157,7 @@ export function DatePicker({
   };
 
   const step = (by: number) => {
-    setRefused(false);
+    setRefused(null);
     setMonth(({ y, m }) => {
       const d = new Date(y, m + by, 1);
       return { y: d.getFullYear(), m: d.getMonth() };
@@ -241,7 +256,7 @@ export function DatePicker({
               className="flex items-start gap-1.5 border-t border-danger/40 bg-danger/[0.08] px-3 py-2 text-meta font-semibold text-danger"
             >
               <Icon name="error" size={14} className="mt-px flex-none" />
-              {conflict}
+              {refused}
             </p>
           )}
         </div>,
