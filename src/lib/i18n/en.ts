@@ -832,6 +832,30 @@ export const en = {
     trialBadge: "TRIAL",
     disappearsSoon: "TRIAL - DISAPPEARS SOON",
   },
+  /**
+   * Excluded operator nationalities (app parity, 2026-10-09). Copied from the app's `app_en.arb`
+   * (`excludedNationalities*`, `nationality*`), not rewritten.
+   */
+  nationality: {
+    label: "Restricted operator nationalities",
+    pick: "Select nationalities",
+    value: "Not: {names}",
+    otherPlaceholder: "Type the operator nationality",
+    names: {
+      Egyptian: "Egyptian",
+      Indian: "Indian",
+      Pakistani: "Pakistani",
+      Bangladeshi: "Bangladeshi",
+      Filipino: "Filipino",
+      Sudanese: "Sudanese",
+      Yemeni: "Yemeni",
+      Syrian: "Syrian",
+      Jordanian: "Jordanian",
+      Nepali: "Nepali",
+      Saudi: "Saudi",
+      Other: "Other",
+    },
+  },
   /** «Request now» from a supplier's store, handed to the app (design «Order Blocker Flow», 1a / 1b / 1c). */
   appHandoff: {
     brand: "Moedatech",

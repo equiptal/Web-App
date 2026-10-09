@@ -89,10 +89,18 @@ export function Dropdown({
   triggerClass,
   disabled = false,
   defaultOpen = false,
+  values,
   onChange,
   emptyAction,
 }: {
   value: string | null;
+  /**
+   * **Several picks** (owner, 2026-10-09: excluded operator nationalities, app parity). Given, the
+   * list ticks every value in it, a press TOGGLES that row through `onChange` and the list stays open,
+   * and the trigger reads the chosen labels joined. `value` is then ignored. Every caller that does
+   * not pass it is the single-pick control it always was.
+   */
+  values?: readonly string[];
   options: DropdownOption[];
   /** Shown on the trigger while nothing is chosen. */
   placeholder: string;
@@ -282,7 +290,12 @@ export function Dropdown({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const selected = options.find((o) => o.value === value);
+  const multi = values !== undefined;
+  const isChosen = (v: string) => (multi ? values.includes(v) : v === value);
+  const selected = multi ? undefined : options.find((o) => o.value === value);
+  const chosenLabel = multi
+    ? options.filter((o) => values.includes(o.value)).map((o) => o.label).join(", ") || null
+    : selected?.label ?? null;
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options;
@@ -333,9 +346,9 @@ export function Dropdown({
         )}
         {/* `bare` shows the caret alone: whatever it sits inside is already saying what it is. */}
         {tone !== "bare" && (
-          <span className={`truncate ${tone === "pill" ? "font-semibold" : ""} ${selected || tone !== "field" ? "" : "text-muted"}`}>
-            {selected?.label ?? placeholder}
-            {!selected && placeholderMark}
+          <span className={`truncate ${tone === "pill" ? "font-semibold" : ""} ${chosenLabel || tone !== "field" ? "" : "text-muted"}`}>
+            {chosenLabel ?? placeholder}
+            {!chosenLabel && placeholderMark}
           </span>
         )}
         <Icon name="expand_more" size={tone === "field" ? 16 : 14} className={`flex-none ${tone === "brand" || tone === "overlay" ? "" : "opacity-50"}`} />
@@ -361,30 +374,30 @@ export function Dropdown({
               />
             </div>
           )}
-          <div id={listId} className="overflow-auto py-1" style={{ maxHeight: at.listMax }} role="listbox" aria-label={label}>
+          <div id={listId} className="overflow-auto py-1" style={{ maxHeight: at.listMax }} role="listbox" aria-label={label} aria-multiselectable={multi || undefined}>
             {filtered.map((o) => (
               <button
                 key={o.value}
                 type="button"
                 role="option"
-                aria-selected={o.value === value}
+                aria-selected={isChosen(o.value)}
                 aria-disabled={o.disabled || undefined}
                 disabled={o.disabled}
                 onClick={() => {
                   onChange(o.value);
-                  setOpen(false);
+                  if (!multi) setOpen(false);
                 }}
                 className={`flex w-full items-start gap-2 px-3 py-1.5 text-start text-body transition ${
                   o.disabled
                     ? "cursor-not-allowed text-disabled-fg"
-                    : o.value === value
+                    : isChosen(o.value)
                       ? "bg-surface2 font-semibold text-navy hover:bg-surface2"
                       : "text-navy-mid hover:bg-surface2"
                 }`}
               >
                 {/* The tick holds its column whether or not it is drawn, so the labels line up. */}
                 <span className="grid h-[18px] w-3.5 flex-none place-items-center">
-                  {o.value === value && <Icon name="check" size={14} className="text-brand" />}
+                  {isChosen(o.value) && <Icon name="check" size={14} className="text-brand" />}
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate">{o.label}</span>

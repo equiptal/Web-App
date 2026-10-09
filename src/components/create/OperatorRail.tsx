@@ -39,6 +39,7 @@ import { useT } from "@/lib/i18n";
 import { useRfq } from "@/lib/store/rfq-store";
 import { Icon, TextInput, Toggle } from "@/components/ui";
 import { CanvasField, ChoiceChips, ChoiceRow, PanelDot } from "@/components/create/Provenance";
+import { ExcludedNationalities } from "@/components/create/ExcludedNationalities";
 import { useProvenance } from "@/components/create/hooks";
 import { OPERATOR_CERTIFICATES, type EquipmentItem, type OperatorCertificate, type Party } from "@/lib/contract";
 import { pin } from "@/lib/uiPins";
@@ -257,6 +258,19 @@ export function OperatorRail({ item, shaking = false, onOpenState }: OperatorRai
         )}
       </div>
 
+      {/* ── Restricted operator nationalities, back (owner, 2026-10-09, app parity) ──────────────
+          ~~Hidden on every surface since 2026-09-22.~~ The app brought it back as an EXCLUSION list
+          (release PR #548). Optional, so no dot. Keyed on the item: the value it opens with decides
+          what an empty list saves (see `ExcludedNationalities`). */}
+      <div className="rounded-sm bg-surface2 p-3.5">
+        <ExcludedNationalities
+          key={item.id}
+          mode={op.nationality}
+          custom={op.nationalityCustom}
+          onChange={({ mode, custom }) => setOp("nationality", { nationality: mode, nationalityCustom: custom })}
+        />
+      </div>
+
       <div className="overflow-hidden rounded-sm bg-surface2">
         <button
           type="button"
@@ -269,16 +283,7 @@ export function OperatorRail({ item, shaking = false, onOpenState }: OperatorRai
         </button>
         {moreOpen && (
           <div className="grid gap-3.5 px-3.5 pb-3.5 sm:grid-cols-2">
-            {/* 🔴 ~~Operator nationality.~~ Hidden on every surface (owner, 2026-09-22, on
-                the app: *"operator nationality is removed in the app, check it there and align
-                web to it"*). See `term-visibility.ts`; the app hides its own in
-                `equipment_step.dart` for the same reason.
-                ⚠️ **The STATE is deliberately KEPT** — `nationality` / `nationalityCustom` are still
-                parsed onto the item, still patched by everything else and still SENT, exactly as the app
-                keeps `_operatorNationality` loaded and written back. A request created before the term was
-                hidden therefore preserves what it holds instead of being silently cleared by an edit; a NEW
-                request leaves it null, because nothing draws the control that used to set it.
-            */}
+            {/* The operator nationality is the excluded list above the «More details» box now. */}
             <CanvasField
               label={t.create.operatorCard.nightShift}
               source={prov.itemSource("operator.night_shift", op.nightShift, undefined, true)}
@@ -290,8 +295,6 @@ export function OperatorRail({ item, shaking = false, onOpenState }: OperatorRai
                 </span>
               </span>
             </CanvasField>
-            {/* ~~The restricted-nationality list.~~ It went with the control above: a box that
-                appears only under an answer nobody can give is a box nobody can reach. */}
           </div>
         )}
       </div>

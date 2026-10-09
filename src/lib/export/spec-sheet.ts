@@ -9,6 +9,7 @@ import {
   type SafetyCertificate,
   type OperatorNeeded,
 } from "@/lib/contract";
+import { excludedOfItem } from "@/lib/contract/nationality";
 
 /** One row of the all-items spec sheet (AC-52). Raw values; the UI maps enums to localized labels. */
 export interface SpecRow {
@@ -23,6 +24,8 @@ export interface SpecRow {
   /** Operator F.A.T split — who covers food / accommodation & transport (only when operator required). */
   fatFood: Party | null;
   fatTransport: Party | null;
+  /** Nationalities the operator must NOT hold, canonical English; empty when none (2026-10-09). */
+  excludedNationalities: string[];
   fuelType: FuelType;
   /** Null when nobody has answered yet — the sheet prints «—» rather than inventing a side.
    *  These three stopped being seeded «me» on 2026-09-08, so a draft exported before the renter
@@ -57,6 +60,7 @@ export function buildSpecRows(draft: RfqDraft, taxonomy: Taxonomy): SpecRow[] {
       operatorCert: item.operatorNeeded === "yes" ? item.operator.certificate : [],
       fatFood: item.operatorNeeded === "yes" ? item.operator.fatFood : null,
       fatTransport: item.operatorNeeded === "yes" ? item.operator.fatAccommodationTransport : null,
+      excludedNationalities: item.operatorNeeded === "yes" ? excludedOfItem(item.operator.nationality, item.operator.nationalityCustom) : [],
       fuelType: item.fuelType,
       fuelResp: item.fuelResponsibilityOverride ?? draft.project.fuelResponsibility,
       delivery: item.deliveryOverride ?? draft.project.deliveryToSite,

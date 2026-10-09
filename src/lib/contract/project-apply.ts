@@ -252,6 +252,7 @@ export function machineTermsOf(item: EquipmentItem): MachineTerms {
 export function machineTermsOfRequestItem(item: {
   operatorIncluded?: "YES" | "NO" | null;
   operatorNationality?: string | null;
+  operatorNationalityCustom?: string | null;
   nightShiftRequired?: boolean | null;
   fatRequired?: boolean | null;
   fuelTypePreference?: string | null;
@@ -268,7 +269,9 @@ export function machineTermsOfRequestItem(item: {
     operatorNeeded: (item.operatorIncluded === "YES" ? "yes" : item.operatorIncluded === "NO" ? "no" : null) as MachineTerms["operatorNeeded"],
     operator: {
       nationality: (item.operatorNationality ?? null) as MachineTerms["operator"]["nationality"],
-      nationalityCustom: "",
+      // ~~`""`~~: the mode came across without its list, so an `excluded` template turned into
+      // «exclude nobody» on every request built from it (2026-10-09).
+      nationalityCustom: item.operatorNationalityCustom ?? "",
       certificate: [] as MachineTerms["operator"]["certificate"],
       certificateOther: "",
       nightShift: item.nightShiftRequired === true,

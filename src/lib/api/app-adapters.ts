@@ -343,9 +343,13 @@ export function draftToCreateRequest(draft: RfqRequestPayload, userId: string): 
         // §4.2 per-item operator sub-fields (only meaningful when an operator is included):
         nightShiftRequired: operatorIncluded ? i.operator.nightShift : undefined, // AC-24
         operatorNationality: operatorIncluded ? i.operator.nationality ?? undefined : undefined, // AC-24
-        // Part 3: free-text nationalities when the rentee restricts them (≤100).
+        // The nationality list (≤100): the EXCLUDED one since 2026-10-09 (app parity), and a legacy
+        // `restricted` one written back unchanged. ~~Only for `restricted`~~, which dropped the list of
+        // every excluded request and left `excluded` meaning «exclude nobody».
         operatorNationalityCustom:
-          operatorIncluded && i.operator.nationality === "restricted" ? i.operator.nationalityCustom?.trim() || undefined : undefined,
+          operatorIncluded && (i.operator.nationality === "excluded" || i.operator.nationality === "restricted")
+            ? i.operator.nationalityCustom?.trim() || undefined
+            : undefined,
         // Operator certs → the app's NON-gating operatorLicenseLevel (CERTIFIED/TUV/SPSP), comma-joined.
         // Web chips are tuv/spsp (the web has no CERTIFIED chip — fine, the app's set is a superset).
         // saso-technical is an EQUIPMENT cert with no operator-license equivalent → routed to safety below.

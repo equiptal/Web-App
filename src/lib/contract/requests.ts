@@ -315,6 +315,8 @@ export interface RequestItem {
   demobilizationByRentee: boolean | null;
   nightShiftRequired: boolean | null;
   operatorNationality: string | null;
+  /** The nationality LIST: excluded names when `operatorNationality === "excluded"` (≤100). */
+  operatorNationalityCustom?: string | null;
   /**
    * The equipment-year ask, as the LIVE wire sends it — a minimum manufacture year (2020).
    *

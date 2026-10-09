@@ -26,6 +26,7 @@
 import { certLabel, requestedMinYear } from "@/lib/contract/bids";
 import type { RequestItem, RequestRecord } from "@/lib/contract/requests";
 import { customEquipmentLabel } from "@/lib/contract/requests";
+import { excludedLabel, excludedOfItem, excludedText } from "@/lib/contract/nationality";
 
 /** `L(en, ar)` — the caller's own bilingual picker, passed in so this file holds no locale state. */
 export type Pick = (en: string, ar: string) => string;
@@ -169,9 +170,14 @@ export function itemDetailRows(it: RequestItem, ar: boolean, L: Pick): Row[] {
   return kept([
     [L("Units", "العدد"), it.numberOfUnits > 0 ? n(it.numberOfUnits) : null],
     [L("Operator", "المشغّل"), it.operatorIncluded == null ? null : it.operatorIncluded === "YES" ? L("Included", "مع مشغّل") : L("Not included", "بدون مشغّل")],
-    /* 🔴 ~~Operator nationality.~~ Hidden on every surface (see `term-visibility.ts`) — app parity,
-       `supplier_request_detail_page.dart` skips it with `isHiddenTermKey`. The FIELD is still
-       parsed onto the record and still sent; only this row is gone. */
+    /* Operator nationality: ONLY the excluded list, by its own row (app parity, 2026-10-09). Any other
+       shape (`any`, a legacy `restricted`, `SAUDI`) stays hidden, as `term-visibility.ts` keeps it. */
+    [excludedLabel(ar ? "ar" : "en"),
+      (() => {
+        if (it.operatorIncluded !== "YES") return null;
+        const names = excludedOfItem(it.operatorNationality, it.operatorNationalityCustom);
+        return names.length ? excludedText(names, ar ? "ar" : "en") : null;
+      })()],
     [L("Fuel", "الوقود"), enumL(it.fuelTypePreference, fuelMap)],
     [L("Diesel included", "الديزل مشمول"), yn(it.dieselIncluded)],
     [L("Delivery to site", "التوصيل للموقع"), mine(it.mobilizationByRentee)],

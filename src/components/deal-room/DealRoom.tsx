@@ -30,6 +30,7 @@ import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/rende
 import "@/components/deal-room/deal-room-proto.css";
 import { computeQuoteTotals, computeRentalTotal, divisorNote } from "@/lib/pricing/rental";
 import { pin } from "@/lib/uiPins";
+import { excludedLabel, excludedOfItem, excludedOfTerm, excludedValueText } from "@/lib/contract/nationality";
 
 // The attachment shape is the SHARED one — this surface and the map's chat dock read the same
 // channel, so a second declaration here is a second thing to keep in step.
@@ -1278,9 +1279,17 @@ function RequestSummaryModal({ room, ar, L, onClose }: {
         [L("Name", "الاسم"), [ar ? d.equipmentLabelAr ?? d.equipmentLabel : d.equipmentLabel, ar ? d.equipmentSizeAr ?? d.equipmentSize : d.equipmentSize].filter(Boolean).join(" · ") || null],
         [L("Units", "عدد الوحدات"), room.requestedUnits > 0 ? String(room.requestedUnits) : null],
         [L("Operator", "المشغّل"), yn(d.operatorIncluded, ["Included", "مشمول"], ["Not included", "غير مشمول"])],
-        /* 🔴 ~~Operator nationality.~~ hidden on every surface (see `term-visibility.ts`). The room's TERM table
-           has dropped it at the parse since 2026-09-18; this details card read the request
-           directly and therefore kept printing it. */
+        /* Operator nationality: ONLY the excluded list, read-only, «Not: …» (app parity, 2026-10-09).
+           It is not a negotiated term: the room's TERM table still drops `operator_nationality` at the
+           parse, so it gets no counter and no mismatch. Any other shape stays hidden. The list comes
+           from the request (`excluded` + its names), or from a resolved `excluded:A,B` value. */
+        [excludedLabel(ar ? "ar" : "en"),
+          (() => {
+            if (d.operatorIncluded !== true) return null;
+            const names = excludedOfItem(d.operatorNationality, d.operatorNationalityCustom);
+            const list = names.length ? names : excludedOfTerm(d.operatorNationality);
+            return list.length ? excludedValueText(list, ar ? "ar" : "en") : null;
+          })()],
         [L("Operators", "عدد المشغّلين"), d.numberOfOperators ? String(d.numberOfOperators) : null],
       ],
     },

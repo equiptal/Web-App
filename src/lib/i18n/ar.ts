@@ -681,6 +681,27 @@ export const ar: Dictionary = {
     trialBadge: "تجريبي",
     disappearsSoon: "تجريبي - يختفي قريباً",
   },
+  /** الجنسيات المستبعدة للمشغّل: من `app_ar.arb` كما هي. التسمية أقصر من الإنجليزية عن قصد. */
+  nationality: {
+    label: "الجنسية المحظورة",
+    pick: "اختر الجنسيات",
+    value: "ليس من: {names}",
+    otherPlaceholder: "اكتب جنسية المشغّل",
+    names: {
+      Egyptian: "مصري",
+      Indian: "هندي",
+      Pakistani: "باكستاني",
+      Bangladeshi: "بنغلاديشي",
+      Filipino: "فلبيني",
+      Sudanese: "سوداني",
+      Yemeni: "يمني",
+      Syrian: "سوري",
+      Jordanian: "أردني",
+      Nepali: "نيبالي",
+      Saudi: "سعودي",
+      Other: "أخرى",
+    },
+  },
   appHandoff: {
     brand: "معداتك",
     storeLabel: "متجر {name}",

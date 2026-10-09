@@ -10,6 +10,7 @@ import { mapBidLiveStatus, type BidLiveStatus } from "@/lib/contract/bid-live-st
 import { companyBrandName, companyNamePartsOf, counterpartyDisplayName } from "@/lib/contract/counterparty-name";
 import { mediaUrl } from "@/lib/contract/stores";
 import { isHiddenTermKey } from "@/lib/contract/term-visibility";
+import { excludedOfItem, excludedOfTerm, excludedValueText } from "@/lib/contract/nationality";
 
 export type BidStatus =
   | "PENDING"
@@ -784,6 +785,18 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
         ? opCertDetail
         : undefined;
 
+  /* The EXCLUDED operator nationalities (app parity, 2026-10-09): a read-only row, never a term.
+     `grey`, so no tally counts it (`bucketBidTerms` keeps only the app's six) and it carries no
+     mismatch. The request's own list, or the `excluded:A,B` value the bid declared for it. */
+  const excludedNat = (() => {
+    if (!reqOperator) return null;
+    const asked = excludedOfItem(s(reqItem.operatorNationality), s(reqItem.operatorNationalityCustom));
+    if (!asked.length) return null;
+    const echoed = excludedOfTerm(s(t3.operator_nationality) ?? s(t3.operatorNationality));
+    const shown = echoed.length ? echoed : asked;
+    return { en: excludedValueText(shown, "en"), ar: excludedValueText(shown, "ar") };
+  })();
+
   return {
     // BID-CARD buckets — mirror the mobile app's bid card exactly: Equipment 6 · Project 4. Operator is
     // ONE row (nationality/FAT are informational, not separate counted terms). Keys stay canonical so
@@ -804,8 +817,11 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
     // card. Carries the full deal-room negotiable + acknowledge terms with live overlay states.
     negotiable: [
       { key: "operator_included", labelEn: "Operator included", labelAr: "تشمل مشغّل", state: operatorIncluded, renteeValue: reqOperator ? "yes" : null },
-      /* 🔴 ~~Operator nationality.~~ Hidden on every surface (see `term-visibility.ts`).
-         It was the comparison's own column and the bid card reads none of it. */
+      /* Operator nationality: ONLY the excluded list, read-only (see `excludedNat`). Any other shape
+         stays hidden (`term-visibility.ts`); the bid card reads none of it. */
+      ...(excludedNat
+        ? [{ key: "excluded_nationalities", labelEn: "Restricted operator nationalities", labelAr: "الجنسية المحظورة", state: "grey" as TermState, detail: excludedNat }]
+        : []),
       { key: "operator_certification", labelEn: "Operator certification", labelAr: "شهادة المشغّل", state: operatorCertState, detail: opCertDetail, renteeValue: reqOpCert, value: opDeclared },
       { key: "safety_certifications", labelEn: "Equipment safety certificates", labelAr: "شهادات سلامة المعدة", state: safetyCertState, detail: safetyDetail, renteeValue: requiredCerts.length ? requiredCerts.join(",") : null },
       { key: "fat_food", labelEn: "Operator food", labelAr: "طعام المشغّل", state: contractState("fat_food", fatFood), renteeValue: fatFood },

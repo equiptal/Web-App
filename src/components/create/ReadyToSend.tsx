@@ -36,6 +36,7 @@ import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import { Dropdown } from "@/components/Dropdown";
 import { shortSite } from "@/lib/contract/project";
+import { nationalityLabel } from "@/lib/contract/nationality";
 
 export function ReadyToSend() {
   const t = useT();
@@ -85,7 +86,7 @@ export function ReadyToSend() {
   const rows = buildSpecRows(draft, taxonomy);
   const tt = t.preview.table;
   const headers = [
-    tt.equipment, tt.category, tt.size, tt.qty, tt.year, tt.operator, tt.operatorCert,
+    tt.equipment, tt.category, tt.size, tt.qty, tt.year, tt.operator, tt.operatorCert, t.nationality.label,
     // `tt.fuel` (the fuel TYPE column) is gone — the renter does not choose it, the system prefills
     // it, and it left the item pills for the same reason. `tt.fuelResp`, who PAYS for it, stays.
     tt.food, tt.transport, tt.fuelResp, tt.delivery, tt.return, tt.certificate,
@@ -101,6 +102,7 @@ export function ReadyToSend() {
     r.year === "any" ? t.options.equipmentYear.any : r.year,
     t.options.operatorNeeded[r.operatorNeeded],
     r.operatorCert.length ? r.operatorCert.map((c) => t.options.safetyCert[c]).join(", ") : "—",
+    r.excludedNationalities.length ? r.excludedNationalities.map((x) => nationalityLabel(x, t.nationality.names)).join(", ") : "—",
     r.fatFood ? t.options.party[r.fatFood] : "—",
     r.fatTransport ? t.options.party[r.fatTransport] : "—",
     // «—» for an unanswered side, the same as F.A.T above it: the three party fields are no longer

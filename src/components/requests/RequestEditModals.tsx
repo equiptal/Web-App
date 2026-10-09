@@ -15,6 +15,7 @@ import { type RequestRecord } from "@/lib/contract/requests";
 import { budgetLabel } from "@/lib/contract/request-fields";
 import "@/components/requests/requests-proto.css";
 import { CARD_FOOTER, btn } from "@/lib/ds";
+import { ExcludedNationalities } from "@/components/create/ExcludedNationalities";
 
 /** The create flow's own picker, and it takes no store — `value`, `label`, `onChange` and nothing else. */
 const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
@@ -174,8 +175,9 @@ const SLA_OPTS: Opt[] = [
 const OFFER_OPTS: Opt[] = [{ v: "24H", en: "24 hours", ar: "24 ساعة" }, { v: "48H", en: "48 hours", ar: "48 ساعة" }, { v: "72H", en: "72 hours", ar: "72 ساعة" }, { v: "1W", en: "1 week", ar: "أسبوع" }];
 const OPERATOR_OPTS: Opt[] = [{ v: "YES", en: "With operator", ar: "مع مشغّل" }, { v: "NO", en: "Without operator", ar: "بدون مشغّل" }];
 const FUEL_OPTS: Opt[] = [{ v: "DIESEL", en: "Diesel", ar: "ديزل" }, { v: "PETROL", en: "Petrol", ar: "بنزين" }, { v: "ELECTRIC", en: "Electric", ar: "كهربائي" }];
-// Match the create form (ItemRow): operator nationality is Restricted / Any (values sent to the backend).
-const NATIONALITY_OPTS: Opt[] = [{ v: "restricted", en: "Restricted", ar: "مقيّدة" }, { v: "any", en: "Any", ar: "أي" }];
+/* 🔴 ~~`NATIONALITY_OPTS`, a single Restricted / Any select.~~ Replaced by the excluded multi-select
+   (owner, 2026-10-09, app parity). On an app request holding `excluded` + «Sudanese,Syrian», picking
+   «Restricted» there kept the list and flipped its meaning to «only Sudanese or Syrian». */
 const BYWHO_OPTS: Opt[] = [{ v: "rentee", en: "Me (renter)", ar: "أنا (المستأجر)" }, { v: "supplier", en: "Supplier", ar: "المؤجّر" }];
 
 /**
@@ -247,7 +249,12 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
   const [customName, setCustomName] = useState(s(it?.customEquipmentName));
   const [units, setUnits] = useState(s(it?.numberOfUnits ?? 1));
   const [operator, setOperator] = useState(s(it?.operatorIncluded ?? "NO"));
-  const [nationality, setNationality] = useState(s(it?.operatorNationality));
+  /* Both columns, as stored. ~~Only `operatorNationality`~~: the item is REPLACED by the save below,
+     so the list it did not send was deleted by every edit. */
+  const [nationality, setNationality] = useState<{ mode: string | null; custom: string | null }>({
+    mode: it?.operatorNationality ?? null,
+    custom: it?.operatorNationalityCustom ?? null,
+  });
   const [nightShift, setNightShift] = useState(!!it?.nightShiftRequired);
   /* The SPLIT, which is what create asks: food and accommodation are two answers. `fatRequired` is
      the deprecated rollup and is DERIVED from them on save, never set beside them. Falling back to
@@ -441,7 +448,8 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
               fatAccommodationTransport: fatStay === "supplier",
               fatRequired: fatFood === "supplier" || fatStay === "supplier",
               nightShiftRequired: nightShift,
-              ...(nationality ? { operatorNationality: nationality } : {}),
+              ...(nationality.mode ? { operatorNationality: nationality.mode } : {}),
+              ...(nationality.mode && nationality.custom ? { operatorNationalityCustom: nationality.custom } : {}),
             }
           : {
               fatFood: undefined,
@@ -449,6 +457,7 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
               fatRequired: undefined,
               nightShiftRequired: undefined,
               operatorNationality: undefined,
+              operatorNationalityCustom: undefined,
             }),
         /* Posted under the deprecated alias, which is what the backend coalesces and what the create
            adapter also sends (`maxEquipmentAge: toManufactureYear(...)`). It is a manufacture YEAR
@@ -531,7 +540,14 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
             <Sel label={L("Operator", "المشغّل")} value={operator} onChange={setOperator} opts={OPERATOR_OPTS} />
             {withOperator && (
               <>
-                <Sel label={L("Operator nationality", "جنسية المشغّل")} value={nationality} onChange={setNationality} opts={NATIONALITY_OPTS} />
+                <div className="col-span-2">
+                  <ExcludedNationalities
+                    mode={nationality.mode}
+                    custom={nationality.custom}
+                    original={{ mode: it?.operatorNationality, custom: it?.operatorNationalityCustom }}
+                    onChange={setNationality}
+                  />
+                </div>
                 {/* Two answers, as the operator rail asks them. One control covering both was this
                     form's own invention. */}
                 <Sel label={L("Food by", "الطعام من قبل")} value={fatFood} onChange={setFatFood} opts={BYWHO_OPTS} />

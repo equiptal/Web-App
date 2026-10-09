@@ -267,6 +267,8 @@ export interface DealItemDetails {
   extendable: boolean | null;
   operatorIncluded: boolean | null;
   operatorNationality: string | null;
+  /** The list behind `operatorNationality === "excluded"` (2026-10-09). */
+  operatorNationalityCustom: string | null;
   numberOfOperators: number | null;
   nightShift: boolean | null;
   equipmentCerts: string[];
@@ -646,6 +648,7 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     extendable: bl(pick("extendable", "rentalExtendable")),
     operatorIncluded: bl(pick("operatorIncluded", "operator", "withOperator")),
     operatorNationality: s(pick("operatorNationality")),
+    operatorNationalityCustom: s(pick("operatorNationalityCustom")),
     numberOfOperators: n(pick("numberOfOperators", "operatorsCount", "operatorCount")),
     nightShift: bl(pick("nightShiftRequired", "nightShift")),
     equipmentCerts: arr(pick("safetyCertifications", "equipmentSafetyCertifications", "equipmentCerts")),

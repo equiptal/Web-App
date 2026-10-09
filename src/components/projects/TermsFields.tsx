@@ -27,6 +27,7 @@ import { useState } from "react";
 import { useT } from "@/lib/i18n";
 import { Icon, Toggle } from "@/components/ui";
 import { Dropdown } from "@/components/Dropdown";
+import { ExcludedNationalities } from "@/components/create/ExcludedNationalities";
 import { SAFETY_CERTIFICATES, OPERATOR_CERTIFICATES, toggleSafetyCert, type Party } from "@/lib/contract/options";
 import { blankTerms, type MachineTerms } from "@/lib/contract/work-order";
 
@@ -259,9 +260,9 @@ export function TermsFields({ value, onChange }: { value: MachineTerms; onChange
                 the headline question and it was the least of the three: food and accommodation are
                 costs somebody pays every day the machine is on site.
 
-                🔴 ~~And nationality third, on the same row.~~ The term is hidden on every
-                surface now (see `term-visibility.ts`), so the row carries the two money questions
-                that were always its point. `sm:grid-cols-3` is kept: a `CertSet` follows in the same
+                🔴 ~~And nationality third, on the same row.~~ It came back on 2026-10-09 as the
+                excluded list, on a row of its own below these two, so this row still carries the two
+                money questions that were always its point. `sm:grid-cols-3` is kept: a `CertSet` follows in the same
                 grid, and re-flowing it to two columns would move a control nobody asked about. */}
             <Pick
               label={w.fatFood}
@@ -277,10 +278,16 @@ export function TermsFields({ value, onChange }: { value: MachineTerms; onChange
               labels={t.options.party}
               onPick={(v) => patchOp({ fatAccommodationTransport: v as never })}
             />
-            {/* ⚠️ **The STATE is KEPT** — `nationality` / `nationalityCustom` are still parsed,
-                still patched by everything else and still sent, exactly as the app keeps its own
-                loaded and written back. A project saved before the term was hidden preserves what it
-                holds instead of being cleared by the next edit. */}
+            {/* Restricted operator nationalities, back as the app's EXCLUDED list (2026-10-09). The
+                value it opens with decides what an empty list saves, so an older project keeps what
+                it holds until the renter picks from this list. */}
+            <div className="sm:col-span-3">
+              <ExcludedNationalities
+                mode={op.nationality}
+                custom={op.nationalityCustom}
+                onChange={({ mode, custom }) => patchOp({ nationality: mode as never, nationalityCustom: custom ?? "" })}
+              />
+            </div>
 
             <CertSet
               legend={w.opCerts}

@@ -26,6 +26,30 @@ reversal, or the reason an odd-looking line is load-bearing.
   Profile switcher did, so switching from the header left pushes in the old language. Signed-in only
   (the toggle shows to visitors) and not awaited, like Profile. Verified: tsc and eslint as above,
   AppShell tests unchanged (14 pre-existing failures with and without).
+- **2026-10-09 - Operator nationality is back, as the app's EXCLUDED multi-select. BUILT on `main`,
+  NOT committed.** App release PR #548: «Restricted operator nationalities», the nationalities the
+  renter does NOT want; `operatorNationality: "excluded"` + `operatorNationalityCustom` comma-joined
+  canonical English, list order then «Other» names, de-duplicated, cut to 100. Rules in
+  `src/lib/contract/nationality.ts`, copied from `term_options.dart` / `equipment_step.dart`. Shown on
+  the operator rail, the project terms panel and the edit-request modal; read back on the review table,
+  the request detail rows and the deal room's details card («Not: …»). `Dropdown` gained an optional
+  `values` multi-select mode. 🔴 Three data bugs fixed with it: the edit modal REPLACES the item and
+  never sent `operatorNationalityCustom`, so every edit deleted the list; `app-adapters` sent the list
+  only for `restricted`; and a past request used as a template copied the mode with the list blanked
+  (`project-apply.ts`), turning `excluded` into «exclude nobody». The old Restricted / Any select is
+  gone: on an excluded app request it flipped the meaning to «only these». Nothing picked writes an
+  OLDER value (`any`, `restricted`, `SAUDI`, `EXPAT`) back unchanged; an emptied excluded list becomes
+  null. Files: `nationality.ts` (new), `ExcludedNationalities.tsx` (new), `Dropdown.tsx`,
+  `OperatorRail.tsx`, `TermsFields.tsx`, `RequestEditModals.tsx`, `app-adapters.ts`, `project-apply.ts`,
+  `requests.ts`, `request-fields.ts`, `spec-sheet.ts`, `ReadyToSend.tsx`, `deal-room.ts`,
+  `DealRoom.tsx`, `bids.ts`, `CompareMatrix.tsx`, `en.ts`, `ar.ts`,
+  `tests/unit/excluded-nationalities.test.tsx`. The bid comparison carries it as a `grey`
+  `excluded_nationalities` row (the request's list, or the bid's echoed `excluded:A,B`), folded onto the
+  matrix's «nationality» column; grey keeps it out of every tally and conflict count. ⚠️ The MAP has no
+  request-term rows to add it to (its panel draws document readiness; `PriceFooter` only counts
+  conflicts), so nothing changed there.
+  ⚠️ `operator_nationality` stays in `HIDDEN_TERM_KEYS`. ⚠️ The agent sync (`agent-adapters`) sends
+  `operator_nationality: "excluded"` with no list; Mansour has not been checked for it.
 - **2026-10-07 - Review pens open the section they name; a past start date is refused. BUILT, NOT
   committed.** (1) Owner: *"edit path from the pen icon in the summary and review screen is not
   working"*, prod and staging. Reproduced on staging: «Edit» on «Where it goes» / «When it runs» DID

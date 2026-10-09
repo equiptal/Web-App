@@ -71,7 +71,7 @@ type ColKey = "rate" | "mob" | "demob" | "firstCycle" | "everyCycle" | "duration
  */
 const TERM_CANON: Record<string, string> = {
   operator: "operator", operator_included: "operator",
-  nationality: "nationality", operator_nationality: "nationality",
+  nationality: "nationality", operator_nationality: "nationality", excluded_nationalities: "nationality",
   fuel_responsibility: "fuel_responsibility",
   payment: "payment", payment_terms: "payment",
   breakdown_sla: "breakdown", breakdown_response_sla: "breakdown",
