@@ -26,6 +26,20 @@ reversal, or the reason an odd-looking line is load-bearing.
   Profile switcher did, so switching from the header left pushes in the old language. Signed-in only
   (the toggle shows to visitors) and not awaited, like Profile. Verified: tsc and eslint as above,
   AppShell tests unchanged (14 pre-existing failures with and without).
+- **2026-10-12 - A bid past the supplier's validity date is no longer shown to the renter, as in the
+  app.** The backend sorts a bid into `expiredBids` exactly when `validUntil < now`; the app's renter
+  offers list (`rentee_requests_bloc.dart` `_onBidsLoaded`) reads `activeBids` ONLY, so such a bid is
+  not there at all. The web flattened both envelopes and drew the expired ones last with an
+  «Expired» band. Now the workspace's cards and suppliers mode drop them (`bidValidityPassed`).
+  Checked and already aligned, no change: ended requests leave the renter's list 14 days after they
+  end (backend `findByRentee`, shared); the bidding deadline is posted + 30 days (backend, shared);
+  the web refuses a start date in the past (2026-10-07). Files: `src/lib/contract/bids.ts`,
+  `src/components/workspace/{RequestsWorkspace,SuppliersMode}.tsx`, `tests/unit/bid-validity.test.ts`.
+  ⚠️ NOT inside `mapBidList`: the deal room finds its own bid through it. ⚠️ The rule reads only the
+  date, as the app's does, so an ACCEPTED bid or one with a live deal room also leaves the cards once
+  its date passes (still reachable from the inbox); reported, not changed. ⚠️ The rail counts,
+  supplier circles and chat tabs read `received-bids`, which has no such filter. Not checked in a
+  browser.
 - **2026-10-12 - OWNER DECISION: options 2A, 3A and 4B of the asks page
   (https://claude.ai/artifact/4PDFd87vwjEsqGDLhYL6CV).** (2A) An ask raised in the side panel is
   reviewed in the chat as the ask BUBBLE it will become, outlined in blue, with Cancel and Send

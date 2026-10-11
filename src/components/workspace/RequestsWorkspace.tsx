@@ -55,6 +55,7 @@ import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey }
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import { fetchMeUser, openQuotationPage, quotationRentee } from "@/lib/quotation/open";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
+import { bidValidityPassed } from "@/lib/contract/bids";
 import { btn, cx } from "@/lib/ds";
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
 import { BIDS_POLL_MS, useLiveTick } from "@/lib/live/useLiveTick";
@@ -238,7 +239,10 @@ export function RequestsWorkspace() {
         const lines = sub.items.length ? mine : [undefined];
         return lines.map((it) => ({ bid: { card: submissionToBidCard(sub, it), source: "offline" } as WorkspaceBid, sub }));
       });
-      setBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
+      // A bid past the supplier's own validity date is not shown, as in the app's renter offers list
+      // (`bidValidityPassed`, 2026-10-12). ~~Shown last with an «Expired» band~~.
+      const current = app.bids.filter((card) => !bidValidityPassed(card));
+      setBids([...current.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
       // What the size filter is worth on this item, whichever way it is currently set.
       setLargerHeld(app.sizeCounts?.larger ?? 0);
       setSubmissionsByBid(Object.fromEntries(offline.map((o) => [o.bid.card.id, o.sub])));

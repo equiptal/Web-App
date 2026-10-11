@@ -15,6 +15,7 @@ import { buildBidQuotationDoc, quotationSupplierInitials } from "@/lib/quotation
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
 import { fetchMeUser, openQuotationPage, quotationRentee } from "@/lib/quotation/open";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
+import { bidValidityPassed } from "@/lib/contract/bids";
 
 /**
  * **Suppliers mode** (owner, 2026-10-11, multi-item decisions 4 and 5; `docs/multi-item-decisions.md`).
@@ -207,7 +208,8 @@ export function SuppliersView({
     Promise.all(itemIds.map((id) => fetchBids(id, true).then((r) => r.bids).catch(() => [])))
       .then((lists) => {
         if (!live) return;
-        setCards(lists.flat().filter((c) => mine.has(c.id)).map((card) => ({ card, source: "app" as const })));
+        // Past its validity date: not shown, as in requests mode and the app (`bidValidityPassed`).
+        setCards(lists.flat().filter((c) => mine.has(c.id) && !bidValidityPassed(c)).map((card) => ({ card, source: "app" as const })));
       });
     return () => { live = false; };
   }, [supplier]);
