@@ -27,6 +27,15 @@ import { MachineGlyph } from "@/components/MachineGlyph";
  */
 export const MAX_IN_CIRCLE = 4;
 
+/** The catalogue artwork's width over its height. */
+const ART_RATIO = 1.34;
+
+/**
+ * How far each machine is enlarged inside its tile, cropping the artwork's own beige margin rather
+ * than the machine (owner, 2026-10-12: the machines read too small in the circle).
+ */
+const TILE_ZOOM = 1.2;
+
 /** Tiles per row for `n` machines: the app's `EquipmentCollage.rowsFor`, capped at {@link MAX_IN_CIRCLE}. */
 export function rowsFor(n: number): number[] {
   if (n <= 2) return [n];
@@ -45,8 +54,9 @@ export interface CircleTile { left: number; top: number; width: number; height: 
  * ring of the photo ground shows round the tiles.
  * ~~One overlapping row, each picture masked to fade into the next~~ (2026-09-22): the app tried the
  * same and dropped it on device, and none of the machines read whole.
- * ⚠️ Two machines take NO gap and no tile radius, as in the app: each is drawn whole (`contain`) in
- * its half. Three or more fill their tiles (`cover`) with a thin gap.
+ * ⚠️ Two machines take NO gap and no tile radius, as in the app, and tiles of the artwork's own
+ * shape. Three or more take square tiles with a thin gap. Every picture fills its tile and is
+ * enlarged by {@link TILE_ZOOM} inside it, which crops the artwork's beige margin.
  */
 export function circleTiles(n: number, size: number): CircleTile[] {
   const rows = rowsFor(Math.min(n, MAX_IN_CIRCLE));
@@ -54,12 +64,16 @@ export function circleTiles(n: number, size: number): CircleTile[] {
   const unit = 100;
   const gap = n === 2 ? 0 : 2;
   const tw = (unit - gap * (per - 1)) / per;
-  const th = (unit - gap * (rows.length - 1)) / rows.length;
+  /* A pair takes the artwork's own 1.34:1 shape (owner, 2026-10-12: «too zoomed out, the background
+     is shown more than the items, especially in 2 items»). ~~Two tall halves of the box~~, which drew
+     each machine at a third of the disc with beige above and below it. */
+  const th = n === 2 ? tw / ART_RATIO : (unit - gap * (rows.length - 1)) / rows.length;
+  const top0 = (unit - (rows.length * th + (rows.length - 1) * gap)) / 2;
   const boxes: [number, number, number, number][] = [];
   rows.forEach((count, ri) => {
     const rowW = count * tw + (count - 1) * gap;
     const left0 = (unit - rowW) / 2;
-    for (let k = 0; k < count; k++) boxes.push([left0 + k * (tw + gap), ri * (th + gap), tw, th]);
+    for (let k = 0; k < count; k++) boxes.push([left0 + k * (tw + gap), top0 + ri * (th + gap), tw, th]);
   });
   let far = 0;
   for (const [x, y, w, h] of boxes) {
@@ -68,7 +82,7 @@ export function circleTiles(n: number, size: number): CircleTile[] {
     }
   }
   const r = size / 2;
-  const margin = size >= 48 ? 2.5 : 1.5;
+  const margin = 1;
   const k = (r - margin) / far;
   return boxes.map(([x, y, w, h]) => ({
     left: r + (x - unit / 2) * k,
@@ -147,16 +161,21 @@ export function CircleArt({
       {shown.map((m, i) => {
         const t = tiles[i];
         return (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
+          <span
             key={`${m.id}-${i}`}
-            src={publicTaxonomyUrl(m.url) ?? ""}
-            alt=""
-            draggable={false}
-            onError={(e) => { e.currentTarget.style.display = "none"; onBroken(m.url as string); }}
-            className={`absolute ${shown.length === 2 ? "object-contain" : "object-cover"}`}
+            className="absolute overflow-hidden"
             style={{ left: t.left, top: t.top, width: t.width, height: t.height, borderRadius: t.radius }}
-          />
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={publicTaxonomyUrl(m.url) ?? ""}
+              alt=""
+              draggable={false}
+              onError={(e) => { e.currentTarget.style.display = "none"; onBroken(m.url as string); }}
+              className="h-full w-full object-cover"
+              style={{ transform: `scale(${TILE_ZOOM})` }}
+            />
+          </span>
         );
       })}
     </span>

@@ -53,6 +53,7 @@ import { buildCompareSheet, type SheetMoneyCol } from "@/lib/export/compare-shee
 import { formatSar, type BidBudget } from "@/lib/pricing/rental";
 import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
+import { fetchMeUser, openQuotationPage, quotationRentee } from "@/lib/quotation/open";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
 import { btn, cx } from "@/lib/ds";
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
@@ -646,15 +647,8 @@ export function RequestsWorkspace() {
     const chosen = checkedBids.size > 0 ? shownAll.filter((b) => checkedBids.has(b.card.id)) : shownAll;
     if (chosen.length === 0) return;
 
-    const [rec, me] = await Promise.all([
-      fetchRequestDetail(item.id).catch(() => null),
-      fetch("/api/me", { cache: "no-store" })
-        .then((r) => (r.ok ? (r.json() as Promise<{ user?: Record<string, string | null | undefined> }>) : null))
-        .catch(() => null),
-    ]);
-    const u = me?.user ?? {};
-    const renteeVerified = tier === "verified";
-    const profileHref = `${window.location.origin}/profile`;
+    const [rec, u] = await Promise.all([fetchRequestDetail(item.id).catch(() => null), fetchMeUser()]);
+    const rentee = quotationRentee(u, tier === "verified", ar);
     const reqItem = (rec as unknown as { equipmentItems?: { mobilizationByRentee?: boolean | null; demobilizationByRentee?: boolean | null }[] } | null)?.equipmentItems?.[0] ?? null;
     const code = item.code ?? fetchedCode ?? item.displayId;
     const reqCode = code.replace(/[^A-Za-z0-9-]/g, "");
@@ -694,25 +688,7 @@ export function RequestsWorkspace() {
               mobByRentee: reqItem?.mobilizationByRentee ?? item.mobByRentee,
               demobByRentee: reqItem?.demobilizationByRentee ?? item.demobByRentee,
             })),
-            rentee: {
-              companyName: u.companyName ?? "",
-              personName: [u.firstName, u.lastName].filter(Boolean).join(" "),
-              crNumber: u.crNumber ?? null,
-              vatNumber: u.vatNumber ?? null,
-              nationalAddress: u.nationalAddress ?? null,
-              phone: u.phone ?? null,
-              email: u.email ?? null,
-              verified: renteeVerified,
-              logoUrl: u.companyLogoUrl ?? null,
-              // The app's two asks on his own box: verify first (no company, no mark to add), then
-              // the empty logo slot. Screen only; the PDF never carries them.
-              asks: {
-                verify: renteeVerified ? null : { href: `${profileHref}?verify=1`, label: ar ? "وثّق شركتك" : "Verify your company" },
-                // Opens the logo dialog on the profile (`CompanyLogoModal`), the web's in-place upload.
-                addLogo:
-                  renteeVerified && !u.companyLogoUrl ? { href: `${profileHref}?logo=1`, label: ar ? "أضف شعارًا" : "Add a logo" } : null,
-              },
-            },
+            rentee,
           }),
         ),
       )
@@ -727,23 +703,7 @@ export function RequestsWorkspace() {
       autoPrint: false,
       tools: { download: ar ? "تنزيل PDF" : "Download PDF", share: ar ? "مشاركة" : "Share", fileName: dlName },
     });
-    // A popup-blocked `window.open` returns null and used to fail silently — a dead click. Fall back
-    // to downloading the self-printing file so the quotation is never a no-op.
-    const w = window.open("", "_blank");
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-      return;
-    }
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${dlName.replace(/[^\w.-]+/g, "_")}.html`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    openQuotationPage(html, dlName);
   }, [ar, item, shownAll, checkedBids, fetchedCode, tier, group?.locationLabel, logoByBid]);
 
   /**
@@ -951,7 +911,9 @@ export function RequestsWorkspace() {
           activeKey={activeSupplier?.key ?? null}
           onPick={setSupplierKey}
           onRequests={() => setView("requests")}
-          requestMachines={railMachines(group, ar)}
+          // The newest requests' first pictures, one per request: a fixed picture, not the one
+          // on screen.
+          requestMachines={groups.flatMap((g) => railMachines(g, ar).filter((m) => m.url).slice(0, 1)).slice(0, 3)}
         />
       ) : (
         <RequestRail
@@ -967,6 +929,7 @@ export function RequestsWorkspace() {
         <SuppliersView
           supplier={activeSupplier}
           groups={groups}
+          verified={tier === "verified"}
           unreadByBid={unreadByBid}
           onOpenRequest={(groupId) => {
             setView("requests");

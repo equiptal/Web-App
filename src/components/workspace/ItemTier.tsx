@@ -83,7 +83,7 @@ export function ItemTier({
   const bids = (n: number) => (n === 1 ? t.workspace.oneBid : t.workspace.bidsCount.replace("{n}", String(n)));
 
   return (
-    <div {...pin("item-tier")} ref={boxRef} className="relative flex flex-wrap items-center gap-4">
+    <div {...pin("item-tier")} ref={boxRef} className="relative flex min-w-0 flex-nowrap items-center gap-4">
       {/* The label wears an icon, exactly as SOURCE does one group along (owner, 2026-08-28).
           The two groups share this row and narrow the same panel — one by machine, one by where the
           bid came from — so they must read as a matched pair. A bare word beside an iconned one made
@@ -120,7 +120,9 @@ export function ItemTier({
             aria-current={on ? "true" : undefined}
             title={name(it) ?? undefined}
             className={cx(
-              "inline-flex max-w-[260px] items-center gap-1.5 border-b-2 pb-0.5 text-meta font-semibold transition-colors",
+              /* One line, never wrapping (owner, 2026-10-12): long names shrink and cut at their own
+                 end, so «+N more» stays on the row. */
+              "inline-flex min-w-0 max-w-[260px] items-center gap-1.5 whitespace-nowrap border-b-2 pb-0.5 text-meta font-semibold transition-colors",
               on ? "border-brand text-navy" : "border-transparent text-muted hover:text-navy-mid",
             )}
           >

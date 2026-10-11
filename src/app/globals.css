@@ -152,6 +152,11 @@
      AC forbids. So the ask keeps the blue it shipped with, under a name that says it is the ask's
      colour rather than a general "info", and `--info` below takes the OS value as written. */
   --action: #1a7ec8;
+  /* The renter's OWN chat bubbles and offer cards, the app's `renteeBlue` role (owner, 2026-10-12:
+     «the bubbles are orange not blue, why?»). Bound HERE because `.dlproto` re-points `--action` and
+     `--rentee` at the brand orange inside the chat, and a custom property cannot reach past its own
+     override to the value above it. */
+  --mine-bubble: var(--action);
   --info: #3b556e;           /* OS `info` — slate, deliberately not cyan */
   --info-soft: #e7ebee;      /* OS `info-bg` */
   --info-deep: #22384e;      /* the ink, which is where this family lives */

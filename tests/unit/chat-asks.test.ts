@@ -6,6 +6,9 @@ import {
   companyDocNames,
   hasOpenQuoteRequest,
   openCompanyDocAsks,
+  availabilityAskState,
+  companyAskState,
+  quoteAskState,
 } from "@/lib/contract/chat-asks";
 
 /**
@@ -58,5 +61,30 @@ describe("which ask a message answers", () => {
     const all = [quote, file("f", "q1"), { id: "t", quoted_message_id: "q1", text: "ok" }];
     expect(chatAskFor(all[1], all)?.id).toBe("q1");
     expect(chatAskFor(all[2], all)).toBeNull();
+  });
+});
+
+/**
+ * The ask bar's pills (owner, 2026-10-12): the clock while an ask waits, the green tick once it is
+ * answered. ~~Availability ticked as soon as every machine had been ASKED~~, which read as answered
+ * while the supplier had not replied.
+ */
+describe("what each ask pill shows", () => {
+  it("quotation: idle, waiting on an open ask, a tick once a file answers it", () => {
+    expect(quoteAskState([])).toBe("idle");
+    expect(quoteAskState([quote])).toBe("waiting");
+    expect(quoteAskState([quote, file("f", "q1")])).toBe("answered");
+  });
+
+  it("company papers: waiting while any paper asked is missing, a tick when all came", () => {
+    expect(companyAskState([])).toBe("idle");
+    expect(companyAskState([company, file("f1", "c1", "cr")])).toBe("waiting");
+    expect(companyAskState([company, file("f1", "c1", "cr"), file("f2", "c1", "vat_cert")])).toBe("answered");
+  });
+
+  it("availability: pressable while a machine is unasked, the clock while asked, the tick when all confirmed", () => {
+    expect(availabilityAskState([{ confirmed: false, asked: false }, { confirmed: true, asked: false }])).toBe("idle");
+    expect(availabilityAskState([{ confirmed: false, asked: true }, { confirmed: true, asked: false }])).toBe("waiting");
+    expect(availabilityAskState([{ confirmed: true, asked: true }, { confirmed: true, asked: false }])).toBe("answered");
   });
 });

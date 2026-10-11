@@ -79,7 +79,6 @@ export interface BidSubject {
   name: string;
   imageUrl: string | null;
   imageIsPhoto: boolean;
-  line?: string | null;
 }
 
 /** The request facts a card prices against, per bid, when one row holds bids on several requests. */
@@ -267,7 +266,9 @@ export function BidCards({
               key={g.key}
               className={cx("flex flex-none flex-col gap-2 rounded-lg p-2.5", g.header ? "bg-action/10" : "")}
             >
-              <div className="flex h-10 min-w-0 items-center">{g.header}</div>
+              {/* One line (owner, 2026-10-12): «One request · 2 bids ›». ~~A 40px band holding a
+                  small request card~~, which left white space above every card in the row. */}
+              <div className="flex h-5 min-w-0 items-center">{g.header}</div>
               <div className="flex flex-1 items-stretch gap-5">
                 {g.bidIds.map((id) => {
                   const b = bids.find((x) => x.card.id === id);
@@ -594,7 +595,7 @@ function BidCardTile({
               award, and it is the one fact the removed badge held that nothing else on the card
               carries - the green band says THAT it was accepted, never how much of it. */}
           <div className="truncate text-label font-semibold text-muted">
-            {subject?.line ?? [card.supplierCity || null, unitsLine].filter(Boolean).join(" · ")}
+            {[card.supplierCity || null, unitsLine].filter(Boolean).join(" · ")}
           </div>
         </div>
         {/* ── The pill column, as the app builds it (`v3_bid_card._pillColumn`) ─────────────────

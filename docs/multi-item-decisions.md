@@ -19,3 +19,5 @@ named so they are not re-proposed.
 choice: the chat and the map showing different machines made no sense to him.
 
 All six BUILT on `main` on 2026-10-11, not committed; see the matching `docs/CHANGELOG.md` entry.
+
+2026-10-12, owner's UAT on staging: in suppliers mode a request panel's header is ONE line, «One request · N bids ›» (no request card); each card's second line is the city and units as in requests mode; the bids stay tickable with «Download quotation» on the right beside «All chats»; the «Requests» tile is a fixed picture of three small machine circles.

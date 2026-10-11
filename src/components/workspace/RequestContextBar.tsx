@@ -184,7 +184,7 @@ export function RequestContextBar({
                   {i > 0 && <span className="flex-none text-white/40" aria-hidden="true">·</span>}
                   <span className="min-w-0 max-w-[150px] truncate">
                     {m.typeName}
-                    {m.qty > 1 && <span className="tabular text-white/45"> ×{m.qty}</span>}
+                    {m.qty > 1 && <span className="font-extrabold text-white/70"> ×{m.qty}</span>}
                   </span>
                 </Fragment>
               ))
@@ -194,7 +194,7 @@ export function RequestContextBar({
             {multi && restCount > 0 && (
               /* Orange, and it says what it is (decision 2). Latin digits in both locales,
                  product-wide since 2026-09-04. */
-              <span className="tabular flex-none whitespace-nowrap font-extrabold text-brand">
+              <span className="flex-none whitespace-nowrap font-extrabold text-brand">
                 {t.workspace.chipMore.replace("{n}", String(restCount))}
               </span>
             )}

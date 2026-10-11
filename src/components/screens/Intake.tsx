@@ -315,6 +315,17 @@ export function Intake() {
     place();
   }, [place, state.projectTypedLine]);
 
+  /* The box grows with its text (owner, 2026-10-12: «make the text box dynamic to the text length»),
+     up to half the window, and only then scrolls. ~~A fixed box with its own scrollbar~~ from the
+     third line. Before `place` measures, so he lands on the grown box. */
+  useLayoutEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, Math.round(window.innerHeight / 2))}px`;
+    place();
+  }, [state.text, place]);
+
   useEffect(() => {
     const onResize = () => place();
     window.addEventListener("resize", onResize);

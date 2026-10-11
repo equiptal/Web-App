@@ -1269,6 +1269,8 @@ export const ar: Dictionary = {
     eqYardAskedWhat: "ما طلبته",
     eqYardConfirmedWhy: "حدّد المورد الساحة التي تنتقل منها، فهذه المسافة مؤكّدة لعرضك.",
     eqYardUnconfirmedWhy: "غير مؤكّدة لهذا العرض: اضغط لتعرف ما معناه ولتسأل.",
+    eqAskAvailability: "اطلب تأكيد التوفّر",
+    eqAvailabilityAsked: "طُلب تأكيد التوفّر",
     eqReadinessOnFile: "{done} من {total} مستند على الملف",
     eqOpenFile: "افتح ملف المعدّة",
     eqDocuments: "مستندات المعدّة",
@@ -1508,7 +1510,7 @@ export const ar: Dictionary = {
     supplierBidsAcross: "{b} عروض على {r} طلبات",
     supplierOneBid: "عرض واحد",
     oneRequestBids: "طلب واحد · {n} عروض",
-    supplierChat: "محادثة",
+    supplierChat: "كل المحادثات",
     supplierNoBids: "لا توجد عروض من هذا المورد على طلباتك الحالية",
     // تُقرأ من نسخة شروط الطلب المحمولة على العرض، لا تُشتقّ من نوع الإيجار.
     chipOperator: "مع مشغّل",

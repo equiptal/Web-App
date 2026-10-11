@@ -90,7 +90,7 @@ describe("the bar draws the REQUEST, not the line being read", () => {
     expect(bar).toContain('<span className="min-w-0 max-w-[150px] truncate">');
     expect(bar).toContain("{m.typeName}");
     // «×N» stays inside its name's own block.
-    expect(bar).toContain('{m.qty > 1 && <span className="tabular text-white/45"> ×{m.qty}</span>}');
+    expect(bar).toContain('{m.qty > 1 && <span className="font-extrabold text-white/70"> ×{m.qty}</span>}');
     // Plain text: no pill around a name.
     const names = bar.slice(bar.indexOf("shownNames.map("), bar.indexOf("{multi && restCount > 0 && ("));
     expect(names).not.toContain("rounded-full");

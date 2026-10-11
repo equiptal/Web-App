@@ -126,6 +126,9 @@ export interface EquipmentListProps {
    * `asked` says whether his question is already with the supplier.
    */
   onYardPress: (machine: FleetMachine, asked: boolean) => void;
+  /** The card's own «Ask availability» (owner, 2026-10-12, option 4B): this machine, straight to the
+   *  chat's review step, no explanation first. Absent, the card draws no button. */
+  onAskAvailability?: (machine: FleetMachine) => void;
   /**
    * Whether this machine's availability ask is already with the lessor and unanswered — the owner's
    * "one ask, one card" rule (2026-08-10), asked of the workspace because only it can see the
@@ -215,6 +218,7 @@ export function EquipmentList({
   onOpenDetail,
   onFocusMachine,
   onYardPress,
+  onAskAvailability,
   askPending,
   onToggleShowAll,
   scrollRef,
@@ -431,6 +435,7 @@ export function EquipmentList({
               onOpenDetail={onOpenDetail}
               onFocusMachine={onFocusMachine}
               onYardPress={onYardPress}
+              onAskAvailability={onAskAvailability}
               askPending={askPending}
               itemImageUrl={itemImageUrl}
             />
@@ -478,6 +483,7 @@ function EquipmentCard({
   onOpenDetail,
   onFocusMachine,
   onYardPress,
+  onAskAvailability,
   askPending,
   request,
   itemImageUrl,
@@ -503,6 +509,7 @@ function EquipmentCard({
    * asked machine the question he already put.
    */
   onYardPress: (machine: FleetMachine, asked: boolean) => void;
+  onAskAvailability?: (machine: FleetMachine) => void;
   askPending?: (machine: FleetMachine) => boolean;
   /** The request this machine is read against — the source of WHICH certificates the readiness
    *  fraction scores (owner, 2026-08-11). Absent → the photos and the ownership paper alone, which
@@ -695,6 +702,24 @@ function EquipmentCard({
           {/* The yard is outside the request city's own radius — the fact that turns a delivery into a
               mobilisation. It qualifies the distance, so it follows it. */}
           {card.outOfCity && <div className="bm-eq-far">{t.bidMap.eqOutOfCity}</div>}
+
+          {/* ── «Ask availability», on the card (owner, 2026-10-12, option 4B) ──────────────────
+              One machine, one press, so asking about one never needs a picker; the chat's own pill
+              asks about every machine not yet asked. Once asked it says so and stops offering. Not on
+              a confirmed machine: there is nothing left to ask. */}
+          {yard !== "ok" && onAskAvailability && (
+            yard === "asked" ? (
+              <span className="bm-eq-ask is-asked">
+                <span className="material-icons-outlined" aria-hidden="true">schedule</span>
+                {t.bidMap.eqAvailabilityAsked}
+              </span>
+            ) : (
+              <button type="button" className="bm-eq-ask" onClick={() => onAskAvailability(machine)}>
+                <span className="material-icons-outlined" aria-hidden="true">event_available</span>
+                {t.bidMap.eqAskAvailability}
+              </button>
+            )
+          )}
         </div>
       </div>
     </li>

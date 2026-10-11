@@ -326,7 +326,7 @@
 }
 .dlproto .msg.mine {
   align-self: flex-end;
-  background: var(--rentee);
+  background: var(--mine-bubble);
   border: 0;
   color: var(--surface);
   border-start-end-radius: 4px;
@@ -1033,7 +1033,7 @@
    `align-self`). 80% of the chat, capped so a wide inbox column does not stretch a card across it.
    Orange TEXT is `--brand-deep`; `--brand` is a fill only. */
 .dlproto .oc { width: min(80%, 360px); flex: 0 0 auto; padding: 10px 12px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); border-radius: 4px 18px 18px 18px; margin-right: auto; color: var(--navy); }
-.dlproto .oc.mine { background: var(--rentee); border-color: var(--rentee); color: var(--surface); border-radius: 18px 4px 18px 18px; margin-right: 0; margin-left: auto; }
+.dlproto .oc.mine { background: var(--mine-bubble); border-color: var(--mine-bubble); color: var(--surface); border-radius: 18px 4px 18px 18px; margin-right: 0; margin-left: auto; }
 .dlproto .oc.old { opacity: 0.6; }
 .dlproto .oc-h { display: flex; align-items: center; gap: 5px; }
 .dlproto .oc-h .material-icons-outlined { font-size: 15px; color: var(--brand-deep); }
@@ -1081,9 +1081,25 @@
 /* ── Asks and answers as bubbles (alignment 1.1, 1.3, 1.12 a; the app's `_AskBubble`) ────────────
    Same sides and widths as the offer card: your own SOLID on the right, the other side white on the
    left, physical in both languages. The sentence wraps (never cut); the state sits at the END. */
-.dlproto .ab { width: min(80%, 360px); flex: 0 0 auto; padding: 10px 12px 8px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); border-radius: 4px 18px 18px 18px; margin-right: auto; color: var(--navy); text-align: start; }
-.dlproto .ab.mine { background: var(--rentee); border-color: var(--rentee); color: var(--surface); border-radius: 18px 4px 18px 18px; margin-right: 0; margin-left: auto; }
+/* The bubble takes its sentence's own width, up to 80% of the chat, and wraps only past that
+   (owner, 2026-10-12: «we have enough space so dont wrap text»). ~~A fixed min(80%, 360px)~~. */
+.dlproto .ab { width: max-content; min-width: min(80%, 300px); max-width: min(80%, 560px); flex: 0 0 auto; padding: 10px 12px 8px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); border-radius: 4px 18px 18px 18px; margin-right: auto; color: var(--navy); text-align: start; }
+.dlproto .ab.mine { background: var(--mine-bubble); border-color: var(--mine-bubble); color: var(--surface); border-radius: 18px 4px 18px 18px; margin-right: 0; margin-left: auto; }
 .dlproto .ab.press { cursor: pointer; }
+/* A draft, not sent yet (owner, 2026-10-12, option 2A): your own bubble's shape and side, outlined in
+   its blue and white inside, with Cancel and Send under it. */
+.dlproto .ab.mine.draft { background: var(--surface); color: var(--navy); border: 1.5px dashed var(--mine-bubble); }
+.dlproto .ab.mine.draft .ab-ic { color: var(--brand-deep); }
+.dlproto .ab.mine.draft .ab-tm { color: var(--muted); }
+.dlproto .ab.mine.draft .ab-ub { background: var(--surface2); }
+.dlproto .ab.mine.draft .ab-tt { color: var(--muted); }
+.dlproto .ab.mine.draft .ab-tt b { color: var(--navy); }
+.dlproto .ab.mine.draft .ab-th { background: var(--surface3); color: var(--muted); }
+.dlproto .ab-act { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.dlproto .ab-btn { height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--navy); font: inherit; font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.dlproto .ab-btn.send { background: var(--mine-bubble); border-color: var(--mine-bubble); color: var(--surface); }
+.dlproto .ab-btn:disabled { opacity: 0.5; cursor: default; }
+.dlproto .ab-btn .material-icons-outlined { font-size: 15px; }
 .dlproto .ab-r1 { display: flex; align-items: flex-start; gap: 6px; }
 .dlproto .ab-ic { flex: none; margin-top: 2px; font-size: 17px; }
 .dlproto .ab-ic.accent { color: var(--brand-deep); }
@@ -1134,11 +1150,31 @@
 .dlproto .askbar-p { flex: 1 0 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font: inherit; cursor: pointer; }
 .dlproto .askbar-p .material-icons-outlined { font-size: 18px; color: var(--brand-deep); }
 .dlproto .askbar-l { font-size: 10.5px; font-weight: 700; line-height: 1.2; white-space: nowrap; color: var(--navy); }
-.dlproto .askbar-p.done, .dlproto .askbar-p.pend { background: var(--surface2); cursor: default; }
+.dlproto .askbar-p.done, .dlproto .askbar-p.pend { background: var(--surface2); }
 .dlproto .askbar-p.done .askbar-l, .dlproto .askbar-p.pend .askbar-l { color: var(--muted); }
 .dlproto .askbar-p.done .material-icons-outlined { color: var(--ok); }
 .dlproto .askbar-p.pend .material-icons-outlined { color: var(--muted); }
 .dlproto .askbar-p:disabled { cursor: default; }
+/* ── The asks inside the message box (owner, 2026-10-12, option B, bigger) ───────────────────────
+   `.dlproto.bm-chat` so these outrank `.bidmap .bm-chat-compose`, the composer's own footer rules,
+   wherever the two sheets load in either order. */
+.dlproto.bm-chat .askfoot { flex-shrink: 0; padding: 10px 18px 12px; background: var(--surface); border-top: 1px solid var(--border); }
+.dlproto.bm-chat .askbox { border: 1px solid var(--border-strong); border-radius: 16px; background: var(--surface); }
+.dlproto.bm-chat .askbox:focus-within { border-color: var(--navy-mid); }
+.dlproto.bm-chat .askbox .askbar { gap: 8px; padding: 10px 10px 0; border-top: 0; background: transparent; scrollbar-width: none; }
+.dlproto.bm-chat .askbox .askbar-p { flex: 0 0 auto; flex-direction: row; gap: 7px; height: 38px; padding: 0 16px 0 12px; border: 0; border-radius: 10px; background: var(--surface2); }
+.dlproto.bm-chat .askbox .askbar-p:not(:disabled):hover { background: var(--surface3); }
+.dlproto.bm-chat .askbox .askbar-p .material-icons-outlined { font-size: 20px; }
+.dlproto.bm-chat .askbox .askbar-l { font-size: 13px; }
+.dlproto.bm-chat .askbox .askbar-p.done, .dlproto.bm-chat .askbox .askbar-p.pend { background: transparent; }
+.dlproto.bm-chat .askbox .bm-chat-compose { min-height: 0; padding: 8px 8px 8px 12px; border-top: 0; background: transparent; }
+.dlproto.bm-chat .askbox .bm-chat-input { border: 0; background: transparent; padding: 10px 4px; font-size: 13.5px; }
+.dlproto.bm-chat .askbox .bm-chat-input:focus-visible { outline: none; }
+.dlproto.bm-chat .askbox .bm-chat-compose .ib { border: 0; }
+
+/* The inbox's equipment papers dialog: one section per offered machine. */
+.askdocs { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; }
+.askdocs-h { margin: 0; font-size: 13px; font-weight: 800; color: var(--navy); }
 /* The pickers live in the house Dialog, outside `.dlproto`, so they are not scoped under it. */
 .askpick { display: flex; flex-direction: column; gap: 6px; }
 .askpick-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font: inherit; text-align: start; cursor: pointer; }

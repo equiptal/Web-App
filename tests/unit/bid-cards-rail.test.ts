@@ -126,7 +126,8 @@ describe("the bid card's subtext", () => {
 
   it("names the city and the units, and nothing else", () => {
     // Suppliers mode (2026-10-11) may name the request instead, through `subject.line`; the rule is unchanged.
-    expect(CODE).toContain('{subject?.line ?? [card.supplierCity || null, unitsLine].filter(Boolean).join(" · ")}');
+    // Suppliers mode too (owner, 2026-10-12): ~~a lone bid named its request here~~, now the city and units as everywhere.
+    expect(CODE).toContain('{[card.supplierCity || null, unitsLine].filter(Boolean).join(" · ")}');
   });
 
   it("drops the «Supplier» caption and the yard's distance", () => {

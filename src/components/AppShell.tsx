@@ -782,7 +782,10 @@ function AppShellInner({ children, title, fullBleed, pageScroll }: AppShellProps
                 return (
                   <button
                     onClick={() => (isFn ? back() : router.push(target!.href))}
-                    className="inline-flex items-center gap-1.5 text-body font-semibold text-muted-dark transition hover:text-navy"
+                    /* Pulled toward the window's edge, 8 to 12px from it whatever `PAGE_X` is at that
+                       width (owner, 2026-10-12: «the back on all top bars more on the left»).
+                       ~~On the page's own gutter, 16 to 40px in~~. The content keeps the gutter. */
+                    className="-ms-2 inline-flex items-center gap-1.5 text-body font-semibold text-muted-dark transition hover:text-navy sm:-ms-3 lg:-ms-5 xl:-ms-7"
                   >
                     <ArrowBackIcon size={16} className="rtl:-scale-x-100" />
                     {t.shell.back}

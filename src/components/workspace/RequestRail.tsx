@@ -26,11 +26,13 @@ import { MachineGlyph } from "@/components/MachineGlyph";
  * takes the picture's own height has nothing to fit and nothing left to band.
  */
 function CircleZoom({ machines, onClose }: { machines: RailMachine[]; onClose: () => void }) {
-  const { locale } = useLocale();
   /* 🔴 **The MACHINES name the dialog, not the RFQ code** (owner, 2026-09-22: *"show their names
      at top instead of the rfq"*). He opened it by pressing a picture, so «RFQ-00137» answered a
      question he had not asked; what the circle holds is the thing he is looking at. */
-  const title = machines.map((m) => m.name).join(locale === "ar" ? "، " : ", ");
+  /* Type names alone, a dot between them (owner, 2026-10-12: «show clearly the names separate,
+     between them dots»). ~~Full names joined by commas~~: each full name carries its own «·» before
+     the size, so the commas between machines were lost among them. Sizes stay under each picture. */
+  const title = machines.map((m) => m.typeName || m.name).join(" · ");
   return (
     <Dialog open onClose={onClose} size={machines.length > 1 ? "lg" : "md"} title={title}>
       <div {...pin("circle-zoom")} className={`grid gap-4 ${machines.length > 1 ? "sm:grid-cols-2" : ""}`}>
@@ -51,7 +53,7 @@ function CircleZoom({ machines, onClose }: { machines: RailMachine[]; onClose: (
               )}
             </span>
             <figcaption className="mt-2 text-body font-semibold text-navy">
-              {m.qty > 1 && <span className="tabular text-muted-dark">{m.qty} \u00d7</span>}
+              {m.qty > 1 && <span className="text-muted-dark">{m.qty} × </span>}
               {m.name}
             </figcaption>
           </figure>
@@ -70,7 +72,8 @@ function CircleZoom({ machines, onClose }: { machines: RailMachine[]; onClose: (
  *
  * **The ring says which request is being read, as the app draws it** (owner, 2026-10-11: V1 of the
  * multi-item review, `offers_filter_bar.dart`): a 2.5px navy ring and a navy badge on the selected
- * circle; a 1.5px grey ring, a grey badge and 55% on the others. Closed stays greyscale at 50%.
+ * circle; a 1.5px grey ring, a grey badge and 80% on the others (owner, 2026-10-12: at the app's 55%
+ * «the non selected is not clear»). Closed stays greyscale at 50%.
  * ~~No ring at all, the selected tile told apart only by full opacity and a navy caption~~ (owner,
  * 2026-08-27 and 2026-08-31): too faint, the selected circle did not stand out. ~~Brand for the
  * request being read, green for one with bids waiting~~ stays withdrawn: the ring has one colour
@@ -209,7 +212,9 @@ export function RequestRail({
       <Link {...pin("rail-create-tile")} href="/create" className="group flex flex-none flex-col items-center gap-1">
         {/* The same hairline the real circles wear now, dashed — a 2px dash beside 1px solids read
             as a different control rather than an empty slot in the same set. */}
-        <span className="grid h-14 w-14 place-items-center rounded-full border border-dashed border-border text-muted transition group-hover:border-brand group-hover:text-brand">
+        {/* Orange (owner, 2026-10-12): «New» and «Suppliers» are actions, not requests, so they
+            wear the brand ring where the requests wear grey. */}
+        <span className="grid h-14 w-14 place-items-center rounded-full border-[1.5px] border-dashed border-brand text-brand-deep transition group-hover:bg-brand-soft">
           <Icon name="add" size={20} />
         </span>
         <span className="flex h-[22px] flex-col items-center text-label font-semibold leading-[13px] text-muted">{t.workspace.newRequest}</span>
@@ -268,7 +273,7 @@ export function RequestRail({
              tile at half opacity, and «CLOSED» under the name. **Being read** is full opacity and a
              navy semibold caption where the others are muted. Neither ever depended on the ring —
              it was the third way of saying two things. */
-          const dim = active ? "" : tile.closed ? "opacity-50" : "opacity-[.55]";
+          const dim = active ? "" : tile.closed ? "opacity-50" : "opacity-80";
           const raised = fmtRaised(tile.createdAt, ar);
           return (
             <button

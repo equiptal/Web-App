@@ -424,7 +424,8 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
                         unanswered, never refused (AC-20). */}
                     {yardState != null && yardState !== "ok" && (
                       <span className="mp-yard-badge">
-                        {yardState === "asked" ? L("Asked", "طُلب") : L("Not confirmed", "غير مؤكّدة")}
+                        {/* Names WHAT was asked (owner, 2026-10-12). ~~«Asked»~~ alone. */}
+                        {yardState === "asked" ? L("Availability asked", "طُلب تأكيد التوفّر") : L("Not confirmed", "غير مؤكّدة")}
                       </span>
                     )}
                     {yardState != null && (

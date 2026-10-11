@@ -126,3 +126,32 @@ export function chatAskFor<M extends ChatAskMessage>(message: M, messages: reado
   if (!id || !(hasAttachment(message) || isAskDecline(message))) return null;
   return messages.find((m) => m.id === id && (isQuoteRequest(m) || companyDocKeysOf(m) != null)) ?? null;
 }
+
+/**
+ * What an ask bar pill shows (owner, 2026-10-12: «if ask is waiting reply then show clock, if
+ * answered then green tick»). `idle` is pressable with its own icon; `waiting` is the clock;
+ * `answered` the green tick.
+ */
+export type AskPillState = "idle" | "waiting" | "answered";
+
+/** Quotation: never asked is idle, an open ask waits, and the last one answered is a tick. */
+export function quoteAskState(messages: readonly ChatAskMessage[]): AskPillState {
+  if (!messages.some(isQuoteRequest)) return "idle";
+  return hasOpenQuoteRequest(messages) ? "waiting" : "answered";
+}
+
+/** Company papers: an open ask waits; asks that were all answered or declined are a tick. */
+export function companyAskState(messages: readonly ChatAskMessage[]): AskPillState {
+  if (!messages.some((m) => companyDocKeysOf(m) != null)) return "idle";
+  return openCompanyDocAsks(messages).size > 0 ? "waiting" : "answered";
+}
+
+/**
+ * Availability over the offered machines: any machine neither confirmed nor asked keeps the pill
+ * pressable; otherwise one still waiting on its answer is the clock, and all confirmed is the tick.
+ * ~~A tick as soon as every machine had been ASKED~~, which read as answered while he had not replied.
+ */
+export function availabilityAskState(units: readonly { confirmed: boolean; asked: boolean }[]): AskPillState {
+  if (units.some((u) => !u.confirmed && !u.asked)) return "idle";
+  return units.some((u) => !u.confirmed) ? "waiting" : "answered";
+}

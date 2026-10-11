@@ -96,11 +96,11 @@ import { pin } from "@/lib/uiPins";
 export type CompanyDownloadTarget = DocDownloadTarget;
 
 /**
- * The keys a renter is allowed to tick — **only rows that carry a url**.
+ * The keys a renter may tick to DOWNLOAD — **only rows that carry a url**.
  *
- * This is `docRowMode` read at the company panel: a company row is never requestable, so its only
- * possible mode is `download`, and **the panel therefore has exactly one mode and can never mix**
- * (owner's UI design, 2026-08-08). The equipment tab reaches the same rule from the other side, where an
+ * ~~The panel's whole tick rule: a company row is never requestable, so the panel had one mode~~
+ * (owner's UI design, 2026-08-08). Since 2026-10-12 (option 3A) a missing paper can be ticked to ASK
+ * for it wherever the host passes `onAsk`; this still answers the download half. The equipment tab reaches the same rule from the other side, where an
  * absent paper is the row worth ticking because ticking it *asks for it*.
  */
 export function companySelectableKeys(rows: readonly CompanyDocRow[]): CompanyDocKey[] {
@@ -142,23 +142,35 @@ export interface CompanyPanelProps {
   ar: boolean;
   L: (en: string, ar: string) => string;
   onBack: () => void;
+  /**
+   * Ask the supplier for the ticked MISSING papers (owner, 2026-10-12, option 3A: «ask in the
+   * documents view, not only in the chat»). Handed up: the chat dock sends it, after the renter
+   * reviews it there. Absent, the panel is download-only, as it was.
+   */
+  onAsk?: (keys: CompanyDocKey[]) => void;
+  /** Papers already asked for and still waiting: never tickable again, and they say so. */
+  asked?: ReadonlySet<CompanyDocKey>;
 }
 
-export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: CompanyPanelProps) {
+export function CompanyPanel({ companyName, verified, docs, ar, L, onBack, onAsk, asked }: CompanyPanelProps) {
   const rows = useMemo(() => companyDocRows({ verified, docs }), [verified, docs]);
   const attention = attentionCount(rows);
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set<string>());
 
-  // **One mode, always** — a company row is never requestable, so `selectionModeOf` can only ever answer
-  // `download` or neutral, and the mixing this machinery exists to prevent cannot arise here. Reading it
-  // through the same functions the equipment tab uses is what keeps the two panels one grammar rather
-  // than a shared component with a fork in it.
-  const mode = selectionModeOf(rows, selected);
+  /* 🔴 **A missing paper is now a row to ASK for** (owner, 2026-10-12, option 3A), reversing the
+     2026-08-08 «a company row is never requestable» (RM3-AC-72) wherever the host can send the ask.
+     The two modes cannot mix for the same reason they cannot on the equipment tab: the mode is the
+     first tick's kind (`selectionModeOf`), and the other kind's rows go inert until it is cleared. */
+  const askRows = useMemo(
+    () => rows.map((r) => ({ ...r, requestable: !!onAsk && r.status === "missing" && !asked?.has(r.key) })),
+    [rows, onAsk, asked],
+  );
+  const mode = selectionModeOf(askRows, selected);
 
-  // A key with no url never enters the set. `companyDownloadBatch` filters again on the way out, so the
+  // A row with no mode never enters the set. `companyDownloadBatch` filters again on the way out, so the
   // guard is belt-and-braces — but keeping the set clean is what makes the button's count truthful.
-  const openable = useMemo(() => new Set<string>(companySelectableKeys(rows)), [rows]);
+  const openable = useMemo(() => new Set<string>(askRows.filter((r) => docRowMode(r) !== null).map((r) => r.key)), [askRows]);
 
   const toggle = (key: string) =>
     setSelected((prev) => {
@@ -180,6 +192,7 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
     });
 
   const targets = companyDownloadBatch(rows, selected);
+  const askKeys = mode === "request" ? askRows.filter((r) => r.requestable && selected.has(r.key)).map((r) => r.key) : [];
 
   const labelOf = useCallback((t: DocDownloadTarget) => L(t.label.en, t.label.ar), [L]);
   const onDone = useCallback(({ failed }: { failed: number }) => {
@@ -233,15 +246,16 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
           <DocRowList
             groupLabel={L("Company documents", "مستندات الشركة")}
             attention={attention}
-            rows={rows.map((r) => ({
+            rows={askRows.map((r) => ({
               key: r.key,
               name: L(r.label.en, r.label.ar),
-              status: L(r.statusLine.en, r.statusLine.ar),
+              status: asked?.has(r.key) && r.status === "missing"
+                ? L("asked, awaiting reply", "طُلب، بانتظار الرد")
+                : L(r.statusLine.en, r.statusLine.ar),
               dot: r.status,
               thumbUrl: null,
               downloadUrl: r.downloadUrl,
-              // No file behind it, so nothing for a batch to save — and never a tick that does nothing.
-              // `download` or `null`, never `request`: this panel has one mode by construction.
+              // A file to save, a missing paper to ask for, or neither (asked already, or no host to send).
               mode: docRowMode(r),
               selectable: docRowSelectable(r, mode),
             }))}
@@ -254,14 +268,25 @@ export function CompanyPanel({ companyName, verified, docs, ar, L, onBack }: Com
           {/* The batch is DOWNLOAD, never a request (AC-72), and there is only ever ONE button here —
               the equipment tab's disabled second button would name an act this panel refuses to offer.
               Same `.mp-send` affordance, so the renter reads it the same way; the verb is what differs. */}
-          <button
-            type="button"
-            className="mp-send"
-            disabled={running || targets.length === 0}
-            onClick={() => run(targets)}
-          >
-            {sendLabel}
-          </button>
+          {mode === "request" && onAsk ? (
+            <button
+              type="button"
+              className="mp-send"
+              disabled={askKeys.length === 0}
+              onClick={() => { onAsk(askKeys); setSelected(new Set<string>()); }}
+            >
+              {L(`Ask the supplier (${askKeys.length})`, `اطلبها من المؤجر (${arDigits(askKeys.length)})`)}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="mp-send"
+              disabled={running || targets.length === 0}
+              onClick={() => run(targets)}
+            >
+              {sendLabel}
+            </button>
+          )}
 
           {batch.phase === "done" && (
             <p className="mp-note" dir={ar ? "rtl" : "ltr"} role="status">

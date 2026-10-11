@@ -72,11 +72,13 @@ describe("one machine or many, in one 52px circle", () => {
     }
   });
 
-  it("Given two machines, Then they sit whole side by side with no gap; three or more fill their tiles", () => {
+  it("Given two machines, Then they sit side by side with no gap, in tiles of the artwork's shape", () => {
     const [a, b2] = circleTiles(2, 52);
     expect(a.left + a.width).toBeCloseTo(b2.left, 5);
     expect(a.radius).toBe(0);
-    expect(art).toContain('shown.length === 2 ? "object-contain" : "object-cover"');
+    // Owner, 2026-10-12: «too zoomed out, especially in 2 items». ~~Two tall halves, `contain`~~.
+    expect(a.width / a.height).toBeCloseTo(1.34, 5);
+    expect(art).toContain("transform: `scale(${TILE_ZOOM})`");
     // The second row of three is centred under the first.
     const three = circleTiles(3, 52);
     expect(three[2].left + three[2].width / 2).toBeCloseTo(26, 5);
@@ -136,11 +138,11 @@ describe("a double press opens the picture and still picks the request", () => {
      * not rendering it is how a dialog quietly goes back to showing the code.
      */
     const zoom = code.slice(code.indexOf("function CircleZoom"), code.indexOf("export function RequestRail"));
-    expect(zoom).toContain("const title = machines.map((m) => m.name).join(");
     expect(zoom).toContain("title={title}");
     expect(code).not.toContain("title={zoom.label}");
-    // ⚠️ The Arabic list separator, or the names read with a Latin comma inside an RTL block.
-    expect(zoom).toContain('locale === "ar" ? "، " : ", "');
+    // Owner, 2026-10-12: type names with a dot between them. ~~Full names joined by commas~~, which
+    // were lost among each name's own «·» before its size.
+    expect(zoom).toContain('const title = machines.map((m) => m.typeName || m.name).join(" · ");');
   });
 
   it("Given a zoomed picture, Then it sits on the circle's own ground with no band", () => {

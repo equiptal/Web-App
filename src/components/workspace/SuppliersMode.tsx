@@ -1,17 +1,20 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchBids } from "@/lib/api/client";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { cx, PAGE_X } from "@/lib/ds";
+import { btn, cx, PAGE_MAX, PAGE_X } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
-import { CircleArt } from "@/components/workspace/CircleArt";
 import { BidCards, type BidCardGroup, type BidContext, type BidSubject } from "@/components/workspace/BidCards";
-import { railMachines, type RailMachine, type WorkspaceBid } from "@/lib/contract/workspace";
+import type { RailMachine, WorkspaceBid } from "@/lib/contract/workspace";
 import type { RequestGroup } from "@/lib/contract/requests";
 import { supplierRuns, type SupplierEntry } from "@/lib/contract/suppliers-view";
+import { buildBidQuotationDoc, quotationSupplierInitials } from "@/lib/quotation/bid-quotation";
+import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
+import { fetchMeUser, openQuotationPage, quotationRentee } from "@/lib/quotation/open";
+import { quotationDownloadName } from "@/lib/compare/quotation-token";
 
 /**
  * **Suppliers mode** (owner, 2026-10-11, multi-item decisions 4 and 5; `docs/multi-item-decisions.md`).
@@ -42,19 +45,28 @@ function initial(name: string) {
   return name.trim().charAt(0).toUpperCase() || "?";
 }
 
+/** Where the three small circles of an action tile sit: two on top, one centred below. */
+const FACE_SPOT = ["start-1 top-2", "end-1 top-2", "start-[14px] bottom-1"];
+
+/** The orange ring of the rail's action tiles, «New», «Suppliers» and «Requests» (owner, 2026-10-12). */
+function ActionRing() {
+  return <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full border-[1.5px] border-brand" />;
+}
+
 /** The «Suppliers» tile at the END of the request rail: the newest bidders' marks, stacked. */
 export function SuppliersTile({ suppliers, onPress }: { suppliers: SupplierEntry[]; onPress: () => void }) {
   const t = useT();
   const faces = suppliers.slice(0, 3);
   return (
     <button {...pin("rail-suppliers-tile")} type="button" onClick={onPress} className="group flex flex-none flex-col items-center gap-1">
-      <span className="relative h-14 w-14 rounded-full bg-surface">
+      {/* 52px, the request circles' own size. */}
+      <span className="relative h-[52px] w-[52px] rounded-full bg-surface">
         {faces.map((s, i) => (
           <span
             key={s.key}
             className={cx(
               "absolute grid h-6 w-6 place-items-center overflow-hidden rounded-full border border-surface bg-surface2 text-label font-semibold text-navy",
-              i === 0 ? "start-1.5 top-2" : i === 1 ? "end-1.5 top-2" : "start-4 bottom-1.5",
+              FACE_SPOT[i],
             )}
           >
             {s.logoUrl ? (
@@ -65,7 +77,7 @@ export function SuppliersTile({ suppliers, onPress }: { suppliers: SupplierEntry
             )}
           </span>
         ))}
-        <Ring active={false} />
+        <ActionRing />
       </span>
       <span className="flex h-[22px] flex-col items-center text-label font-semibold leading-[13px] text-navy-mid group-hover:text-navy">
         {t.workspace.viewSuppliers}
@@ -86,7 +98,7 @@ export function SupplierRail({
   activeKey: string | null;
   onPick: (key: string) => void;
   onRequests: () => void;
-  /** The request on screen before the switch, drawn on the «Requests» tile. */
+  /** Machines from the newest requests, drawn on the «Requests» tile as the Suppliers tile draws faces. */
   requestMachines: RailMachine[];
 }) {
   const t = useT();
@@ -104,7 +116,7 @@ export function SupplierRail({
                 onClick={() => onPick(s.key)}
                 aria-current={active ? "true" : undefined}
                 title={s.name}
-                className={cx("flex max-w-[104px] flex-none flex-col items-center gap-1 text-center transition", active ? "" : "opacity-[.55]")}
+                className={cx("flex max-w-[104px] flex-none flex-col items-center gap-1 text-center transition", active ? "" : "opacity-80")}
               >
                 <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full">
                   <span className="grid h-[52px] w-[52px] place-items-center overflow-hidden rounded-full bg-surface text-body font-extrabold text-navy">
@@ -135,16 +147,25 @@ export function SupplierRail({
           })}
         </div>
         <button {...pin("rail-requests-tile")} type="button" onClick={onRequests} className="group flex flex-none flex-col items-center gap-1">
-          <span className="relative grid h-14 w-14 place-items-center rounded-full">
-            <span className="grid h-[52px] w-[52px] place-items-center overflow-hidden rounded-full bg-photo-ground">
-              <CircleArt
-                machines={requestMachines}
-                fallback={requestMachines.find((m) => m.url)?.url ?? null}
-                fallbackIsPhoto={requestMachines.find((m) => m.url)?.isPhoto ?? false}
-                onBroken={() => {}}
-              />
-            </span>
-            <Ring active={false} />
+          {/* One fixed picture (owner, 2026-10-12): three machines in small circles, stacked the way
+              the «Suppliers» tile stacks faces. ~~The request on screen before the switch~~, which
+              changed with every pick and read as one more request rather than the way back. */}
+          <span className="relative h-[52px] w-[52px] rounded-full bg-surface">
+            {requestMachines.slice(0, 3).map((m, i) => (
+              <span
+                key={`${m.id}-${i}`}
+                className={cx(
+                  "absolute grid h-6 w-6 place-items-center overflow-hidden rounded-full border border-surface bg-photo-ground",
+                  FACE_SPOT[i],
+                )}
+              >
+                {m.url && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={m.url} alt="" className={cx("h-full w-full", m.isPhoto ? "object-cover" : "scale-[1.34] object-contain")} />
+                )}
+              </span>
+            ))}
+            <ActionRing />
           </span>
           <span className="flex h-[22px] flex-col items-center text-label font-semibold leading-[13px] text-navy-mid group-hover:text-navy">
             {t.workspace.viewRequests}
@@ -159,11 +180,14 @@ export function SupplierRail({
 export function SuppliersView({
   supplier,
   groups,
+  verified,
   unreadByBid,
   onOpenRequest,
 }: {
   supplier: SupplierEntry;
   groups: RequestGroup[];
+  /** The renter's tier is `verified`, for the quotation's letterhead. */
+  verified: boolean;
   unreadByBid: Record<string, number>;
   onOpenRequest: (groupId: string) => void;
 }) {
@@ -188,6 +212,18 @@ export function SuppliersView({
     return () => { live = false; };
   }, [supplier]);
 
+  /* Ticks, as in requests mode: the download covers the ticked bids, else all of his. A new
+     supplier starts with none. */
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  useEffect(() => setChecked(new Set()), [supplier]);
+  const toggle = useCallback((bidId: string) => {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(bidId)) next.add(bidId);
+      return next;
+    });
+  }, []);
+
   const subjectByBid: Record<string, BidSubject> = {};
   const contextByBid: Record<string, BidContext> = {};
   for (const r of runs) {
@@ -197,8 +233,6 @@ export function SuppliersView({
         name,
         imageUrl: item?.item?.imageUrl ?? null,
         imageIsPhoto: item?.item?.imageIsPhoto ?? false,
-        // A lone bid names its request on its second line; inside a panel the header does.
-        line: r.bids.length === 1 ? r.group?.locationLabel ?? null : null,
       };
       if (item) {
         contextByBid[bidId] = {
@@ -214,19 +248,83 @@ export function SuppliersView({
   const cardGroups: BidCardGroup[] = runs
     .map((r) => ({
       key: r.key,
-      header: r.bids.length > 1 && r.group ? <RunHeader group={r.group} count={r.bids.length} onOpen={() => onOpenRequest(r.group!.id)} /> : null,
+      header: r.bids.length > 1 && r.group ? <RunHeader count={r.bids.length} onOpen={() => onOpenRequest(r.group!.id)} /> : null,
       bidIds: r.bids.map((b) => b.bidId).filter((id) => have.has(id)),
     }))
     .filter((g) => g.bidIds.length > 0);
+
+  /**
+   * **His quotation, one section per REQUEST** (owner, 2026-10-12: the download stays in suppliers
+   * mode). The paper and its builders are requests mode's own (`downloadQuotation`); what differs is
+   * the cut. There it is one section per supplier on one request; here the supplier is fixed and the
+   * bids span requests, so each request gets its own section with its own reference and site.
+   * ⚠️ Transport legs come off the request list (`mobByRentee`), not the detail record requests mode
+   * re-reads, to avoid one detail call per machine.
+   */
+  const downloadQuotation = useCallback(async () => {
+    if (!cards) return;
+    const byId = new Map(cards.map((c) => [c.card.id, c.card]));
+    const u = await fetchMeUser();
+    const rentee = quotationRentee(u, verified, ar);
+    const codes: string[] = [];
+    const sections = runs
+      .map((r) => {
+        const entries = r.bids
+          .filter((b) => byId.has(b.bidId) && (checked.size === 0 || checked.has(b.bidId)))
+          .map(({ bidId, item }) => {
+            const code = item?.code ?? item?.displayId ?? "";
+            codes.push(code);
+            return {
+              bid: byId.get(bidId)!,
+              itemLabel: item?.item ? (ar ? item.item.nameAr || item.item.name : item.item.name) : code,
+              requestCode: code,
+              startDate: item?.startDate ?? null,
+              endDate: item?.endDate ?? null,
+              durationDays: item?.durationDays ?? null,
+              rentalType: item?.rentalType ?? null,
+              mobByRentee: item?.mobByRentee ?? null,
+              demobByRentee: item?.demobByRentee ?? null,
+            };
+          });
+        return { r, entries };
+      })
+      .filter((s) => s.entries.length > 0)
+      .map(({ r, entries }, si) => {
+        const reference = entries[0].requestCode;
+        return renderQuotationSection(
+          buildBidQuotationDoc({
+            lang: ar ? "ar" : "en",
+            quotationNumber: `Q-${reference.replace(/[^A-Za-z0-9-]/g, "")}-${quotationSupplierInitials(supplier.name)}${si + 1}`,
+            reference,
+            workSite: r.group?.locationLabel ?? null,
+            sealUrl: `${window.location.origin}/moedatech-logomark.svg`,
+            supplierLogoUrl: supplier.logoUrl,
+            entries,
+            rentee,
+          }),
+        );
+      });
+    if (sections.length === 0) return;
+    const dlName = quotationDownloadName(codes[0], codes);
+    const html = wrapQuotationPage(sections.join(""), {
+      lang: ar ? "ar" : "en",
+      title: dlName,
+      autoPrint: false,
+      tools: { download: ar ? "تنزيل PDF" : "Download PDF", share: ar ? "مشاركة" : "Share", fileName: dlName },
+    });
+    openQuotationPage(html, dlName);
+  }, [cards, runs, checked, supplier, verified, ar]);
 
   const across = supplier.bids.length === 1
     ? t.workspace.supplierOneBid
     : fmt(t.workspace.supplierBidsAcross, { b: String(supplier.bids.length), r: String(supplier.requestCount) });
 
   return (
-    <div className={`mx-auto w-full ${PAGE_X} mt-2 flex flex-col gap-3 pb-8`}>
-      {/* ── The supplier card, where the request card stands in requests mode ─────────────────── */}
-      <div className="flex items-center gap-3">
+    /* The same column as requests mode, so the cards start and end on the same lines. */
+    <div className={`mx-auto w-full ${PAGE_MAX} ${PAGE_X} mt-2 flex flex-col gap-2 pb-8`}>
+      {/* ── The supplier card, where the request card stands; the download and «All chats» on
+          the trailing end, where requests mode keeps its download ─────────────────────────────── */}
+      <div className="flex items-center gap-2">
         <div {...pin("supplier-card")} className="control-lg flex min-w-0 max-w-[35rem] items-center gap-2 rounded-md border border-navy bg-navy !px-3 text-white">
           <span className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full bg-surface text-label font-extrabold text-navy">
             {supplier.logoUrl ? (
@@ -241,10 +339,23 @@ export function SuppliersView({
             <span className="truncate text-label font-semibold leading-[13px] text-white/60">{across}</span>
           </span>
         </div>
+        <span className="flex-1" aria-hidden />
+        <button
+          type="button"
+          disabled={!cards || cards.length === 0}
+          onClick={() => void downloadQuotation()}
+          className={btn("secondary", "md", { className: "whitespace-nowrap transition" })}
+        >
+          {t.workspace.downloadQuotation}
+          {checked.size > 0 && (
+            <span className="rounded-full bg-navy px-1.5 text-label font-semibold leading-[18px] text-white">{checked.size}</span>
+          )}{" "}
+          <Icon name="download" size={14} />
+        </button>
         {supplier.linkId && (
           <Link
             href={`/inbox?supplier=${encodeURIComponent(supplier.linkId)}`}
-            className="control-lg inline-flex flex-none items-center gap-1.5 rounded-md border border-border bg-surface !px-3 text-meta font-semibold text-navy hover:border-navy-mid"
+            className={btn("secondary", "md", { className: "whitespace-nowrap transition" })}
           >
             <Icon name="chat_bubble_outline" size={16} />
             {t.workspace.supplierChat}
@@ -259,10 +370,10 @@ export function SuppliersView({
       ) : cardGroups.length === 0 ? (
         <p className="py-12 text-center text-body font-semibold text-muted">{t.workspace.supplierNoBids}</p>
       ) : (
-        <div className="rounded-md border border-border bg-surface">
+        <div className="rounded-sm border border-border bg-surface">
           <BidCards
             bids={cards}
-            checked={new Set()}
+            checked={checked}
             unreadByBid={unreadByBid}
             submissionsByBid={{}}
             durationDays={null}
@@ -270,8 +381,7 @@ export function SuppliersView({
             subjectByBid={subjectByBid}
             contextByBid={contextByBid}
             groups={cardGroups}
-            selectable={false}
-            onToggle={() => {}}
+            onToggle={toggle}
           />
         </div>
       )}
@@ -279,52 +389,21 @@ export function SuppliersView({
   );
 }
 
-/** A panel's header: a small request card, «One request · N bids», and the way to that request. */
-function RunHeader({ group, count, onOpen }: { group: RequestGroup; count: number; onOpen: () => void }) {
+/**
+ * A panel's header, ONE line (owner, 2026-10-12): «One request · N bids ›», pressing it opens the
+ * request. ~~A small request card with its site, its machines and «Open the request ›»~~: it pushed
+ * every card in the row down and named again what the cards under it already say.
+ */
+function RunHeader({ count, onOpen }: { count: number; onOpen: () => void }) {
   const t = useT();
-  const { locale } = useLocale();
-  const ar = locale === "ar";
-  const machines = railMachines(group, ar);
-  const shown = machines.slice(0, 3);
-  const rest = machines.length - shown.length;
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2.5">
-      <span className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full bg-photo-ground">
-        <CircleArt
-          machines={machines}
-          fallback={machines.find((m) => m.url)?.url ?? null}
-          fallbackIsPhoto={machines.find((m) => m.url)?.isPhoto ?? false}
-          onBroken={() => {}}
-          size={32}
-        />
-      </span>
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-meta font-extrabold text-navy">{group.locationLabel}</span>
-          <span className="flex-none rounded-full bg-surface px-2 text-label font-semibold text-navy">
-            {fmt(t.workspace.oneRequestBids, { n: String(count) })}
-          </span>
-        </span>
-        <span className="flex min-w-0 items-center gap-1.5 text-label font-semibold text-muted">
-          {shown.map((m, i) => (
-            <Fragment key={m.id}>
-              {i > 0 && <span className="flex-none text-muted-light" aria-hidden="true">·</span>}
-              <span className="min-w-0 max-w-[150px] truncate">
-                {m.typeName}
-                {m.qty > 1 && <span className="tabular text-muted-light"> ×{m.qty}</span>}
-              </span>
-            </Fragment>
-          ))}
-          {rest > 0 && (
-            <span className="tabular flex-none whitespace-nowrap font-extrabold text-brand-deep">
-              {t.workspace.chipMore.replace("{n}", String(rest))}
-            </span>
-          )}
-        </span>
-      </span>
-      <button type="button" onClick={onOpen} className="ms-auto flex-none whitespace-nowrap text-label font-semibold text-navy-mid underline underline-offset-2 hover:text-navy">
-        {t.workspace.openRequest} ›
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={onOpen}
+      className="inline-flex items-center gap-0.5 whitespace-nowrap text-label font-semibold text-navy hover:text-navy-mid"
+    >
+      {fmt(t.workspace.oneRequestBids, { n: String(count) })}
+      <Icon name="chevron_right" size={14} className="rtl:rotate-180" />
+    </button>
   );
 }

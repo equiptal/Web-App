@@ -72,6 +72,7 @@ import {
 import { STREAM_API_KEY, leaseStream, watchDealRoom } from "@/lib/chat/stream-connection";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import { Dialog, DialogButton } from "@/components/Dialog";
+import { EquipmentDocuments } from "@/components/map/panel/EquipmentDocuments";
 import { Icon } from "@/components/Icon";
 import { containsPhoneNumber } from "@/lib/contract/contact-guard";
 import type { BidCard } from "@/lib/contract/bids";
@@ -99,7 +100,7 @@ import {
 import { roundOverride, type DealRound } from "@/lib/contract/deal-rounds";
 import { computeDealTotals, type DealRoomView } from "@/lib/contract/deal-room";
 import { dealSystemEventIcon, dealSystemLine } from "@/lib/contract/deal-system-event";
-import { offerFooterFor, offerThread, previousOfferRate, type ThreadEntry } from "@/lib/contract/offer-thread";
+import { OPENING_OFFER_KEY, offerFooterFor, offerThread, previousOfferRate, type ThreadEntry } from "@/lib/contract/offer-thread";
 import {
   COMPANY_DOC_KEYS,
   COMPANY_DOCS_REQUEST_KIND,
@@ -110,7 +111,11 @@ import {
   companyDocKeysOf,
   companyDocLabel,
   companyDocNames,
+  availabilityAskState,
+  companyAskState,
   hasOpenQuoteRequest,
+  quoteAskState,
+  type AskPillState,
   openCompanyDocAsks,
   answerDocKeyOf,
   isAskDecline,
@@ -290,11 +295,25 @@ export interface ChatDockProps {
   /** A send is in flight; both draft buttons go inert so the confirm cannot fire twice. */
   draftBusy?: boolean;
   /**
+   * Company papers the renter ticked in the side panel's Company documents and has not sent yet
+   * (owner, 2026-10-12, option 3A), by the chat's own keys (`COMPANY_DOC_KEYS`). Drawn as the ask
+   * bubble's draft with Cancel and Send; Send posts the chat ask through this dock's own seam.
+   */
+  companyDraft?: readonly string[] | null;
+  /** «Cancel» on the company draft, or its send landed: either way the surface drops it. */
+  onCompanyDraftDone?: () => void;
+  /** The company papers asked for in this conversation and still waiting, reported up for the panel's
+   *  rows. Same silence rule as {@link onOutstandingAsks}. */
+  onCompanyAsks?: (keys: ReadonlySet<string>) => void;
+  /**
    * Open the machine a request card names (the owner's reason for the card, 2026-08-10: a supplier
    * reading an ask should land on the machine he has to act on). Omitted makes every card inert, which
    * is why {@link canOpenMachine} exists beside it rather than the card guessing.
    */
   onOpenMachine?: (equipmentId: string) => void;
+  /** Open a machine on its DOCUMENTS tab, for the ask bar's «Equipment docs». Falls back to
+   *  {@link onOpenMachine} when the surface has no such open. */
+  onOpenMachineDocs?: (equipmentId: string) => void;
   /** Whether the surface can actually open this machine. The dock knows the FLEET; the surface knows
    *  which of those machines have a detail to open, and a card that looked pressable and did nothing
    *  would be worse than one that never claimed to be. */
@@ -322,10 +341,14 @@ export function ChatDock({
   sendNonce = 0,
   onOutstandingAsks,
   draft = null,
+  companyDraft = null,
+  onCompanyDraftDone,
+  onCompanyAsks,
   onConfirmDraft,
   onCancelDraft,
   draftBusy = false,
   onOpenMachine,
+  onOpenMachineDocs,
   canOpenMachine,
   machineLabel = null,
 }: ChatDockProps) {
@@ -394,7 +417,7 @@ export function ChatDock({
    *  bubbles can name their machines and the ask bar knows what is on the offer. */
   const [tabFleet, setTabFleet] = useState<{ bidId: string; machines: FleetMachine[] } | null>(null);
   /** The ask bar's open picker, its ticks, and a send in flight (alignment 1.3). */
-  const [askPicker, setAskPicker] = useState<"availability" | "docsUnit" | "company" | null>(null);
+  const [askPicker, setAskPicker] = useState<"docsUnit" | "docsAll" | "company" | null>(null);
   const [askPicks, setAskPicks] = useState<ReadonlySet<string>>(() => new Set());
   const [askBusy, setAskBusy] = useState(false);
   const [companyDocs, setCompanyDocs] = useState<{ bidId: string; payload: CompanyDocsPayload } | null>(null);
@@ -600,11 +623,11 @@ export function ChatDock({
      it did nothing. Deliberately keyed on the draft's ARRIVAL only: it must not re-open a dock the
      renter closed while the draft is still staged. */
   useEffect(() => {
-    if (!draft) return;
+    if (!draft && !companyDraft) return;
     setOpen(true);
     setActiveBidId(bid.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft]);
+  }, [draft, companyDraft]);
 
   /* ── the request loop's context (V11) ────────────────────────────────────────────────────────── */
 
@@ -687,6 +710,14 @@ export function ChatDock({
     onOutstandingAsks(outstandingAsks);
   }, [onOutstandingAsks, outstandingAsks, loadedRoomId, anchorRoomId, messages.length]);
 
+  // The company papers still waiting, for the side panel's rows (option 3A). The same silence rule.
+  const openCompanyKeys = useMemo(() => [...openCompanyDocAsks(messages)].sort().join(","), [messages]);
+  useEffect(() => {
+    if (!onCompanyAsks) return;
+    if (!dockMayReportAsks({ loadedRoomId, anchorRoomId, messageCount: messages.length })) return;
+    onCompanyAsks(new Set(openCompanyKeys ? openCompanyKeys.split(",") : []));
+  }, [onCompanyAsks, openCompanyKeys, loadedRoomId, anchorRoomId, messages.length]);
+
   /** The document vocabulary. ONE table, in `request-card.ts`, since `/deal-room/[id]` renders the
    *  same chips off the same channel (owner, 2026-08-11) — never the raw key, and never two words
    *  for one paper on two surfaces. */
@@ -746,18 +777,43 @@ export function ChatDock({
       rentalUnits: o.rentalUnits, mobUnits: null, demobUnits: null, mobExcluded: false, demobExcluded: false, at: null,
     };
   }, [activeRoom]);
+  /* ── A new chat opens on the supplier's quotation (owner, 2026-10-12: «when i open any new chat it
+     must show the counter offer card with the below cards like the app, not after sending a
+     message») ──
+     Before any room exists the bid itself is the offer on the table, so its card is drawn from the
+     BID, with Counter and Accept, and the ask bar is live under it. Nothing is created by drawing it:
+     the first press that SENDS (an ask, a counter, an accept, a message) goes through `deliver`,
+     the one seam that creates the room (RM3-AC-47). The anchor bid only: a sibling tab's price is not
+     on this component. */
+  const preRoomOpening: DealRound | null = useMemo(() => {
+    if (!active || active.dealRoomId || active.bidId !== bid.id) return null;
+    const rate = bid.openingPrice ?? bid.price;
+    if (rate == null) return null;
+    return {
+      role: "supplier", rate, priceUnit: bid.priceUnit, mobPrice: bid.mobPrice, demobPrice: bid.demobPrice,
+      rentalUnits: bid.unitsOffered, mobUnits: null, demobUnits: null, mobExcluded: false, demobExcluded: false, at: null,
+    };
+  }, [active, bid]);
   const thread = useMemo(
-    () => offerThread(messages, {
-      // Only the conversation actually loaded for this tab: a shut dock reads the anchor's room.
-      roomOpen: activeRoomId != null && loadedRoomId === activeRoomId,
-      opening: openingRound,
-      awaiting: roomStatus === "AWAITING_SUPPLIER_CONFIRMATION",
-    }),
-    [messages, activeRoomId, loadedRoomId, openingRound, roomStatus],
+    () => preRoomOpening
+      ? {
+          entries: [{ kind: "offer", key: OPENING_OFFER_KEY, round: preRoomOpening, opening: true, offerIndex: 0, at: null }] as ThreadEntry<ChatMsg>[],
+          offerRates: [preRoomOpening.rate],
+        }
+      : offerThread(messages, {
+          // Only the conversation actually loaded for this tab: a shut dock reads the anchor's room.
+          roomOpen: activeRoomId != null && loadedRoomId === activeRoomId,
+          opening: openingRound,
+          awaiting: roomStatus === "AWAITING_SUPPLIER_CONFIRMATION",
+        }),
+    [preRoomOpening, messages, activeRoomId, loadedRoomId, openingRound, roomStatus],
   );
   const iHaveCountered = thread.entries.some((e) => e.kind === "offer" && e.round.role === "rentee");
+  /** Counter or Accept from a card. With no room yet the press is the negotiate act that creates
+   *  it, through `deliver`, which posts nothing here and hands back the new room's id. */
   const openSheet = (flow: "counter" | "take") => {
-    if (activeRoomId) setSheet({ roomId: activeRoomId, flow });
+    if (activeRoomId) { setSheet({ roomId: activeRoomId, flow }); return; }
+    void deliver(async (_channel, roomId) => { setSheet({ roomId, flow }); });
   };
 
   /** «Details» on the latest offer: the room's position priced the way the sheet prices it. */
@@ -992,14 +1048,33 @@ export function ChatDock({
 
   /** The renter's availability or papers ask about one machine. Its state is the supplier's reply. */
   const renteeAskBubble = (m: ChatMsg, a: RenteeRequestCardPayload, mine: boolean) => {
-    const id = a.equipmentId as string;
-    const u = fleetById.get(id);
     const answer = repliesByRef.get(a.ref)?.resolution ?? null;
     const foot =
       answer == null ? <AskStatus icon="schedule" label={L("Awaiting reply", "بانتظار الرد")} tone="muted" />
       : answer === "provided" ? <AskStatus icon="check_circle" label={L("Replied", "تم الرد")} tone="ok" />
       : answer === "partial" ? <AskStatus icon="hourglass_top" label={L("Partly answered", "ردّ جزئي")} tone="warn" />
       : <AskStatus icon="block" label={L("Not available", "غير متوفر")} tone="bad" />;
+    return askBubbleView(a, { key: m.id, time: chatCardTime(m.created_at, ar), foot, mine });
+  };
+
+  /** A draft's two buttons: Cancel, then Send in the bubble's blue. */
+  const draftActions = (busyNow: boolean, onCancel: () => void, onSend: () => void) => (
+    <>
+      <button type="button" className="ab-btn" disabled={busyNow} onClick={onCancel}>{t.chatDock.draftCancel}</button>
+      <button type="button" className="ab-btn send" disabled={busyNow} onClick={onSend}>
+        <span className="material-icons-outlined" aria-hidden="true">send</span>
+        {t.chatDock.draftSend}
+      </button>
+    </>
+  );
+
+  /** One machine ask as its bubble: sent (with its state) or a draft (with Cancel and Send). */
+  const askBubbleView = (
+    a: { kind: string; docTypes?: readonly string[] | null; equipmentId?: string | null; serial?: string | null },
+    o: { key: string; time: string; foot: ReactNode; mine?: boolean; actions?: ReactNode },
+  ) => {
+    const id = a.equipmentId as string;
+    const u = fleetById.get(id);
     const docs = (a.docTypes ?? []).map((t) => requestDocLabel(t, L)).join(ar ? "، " : ", ");
     const name = machineName(id) ?? (fleetOnTab ? L("This equipment is no longer listed", "هذه المعدّة لم تعد مدرجة") : a.serial ?? "");
     const type = u
@@ -1007,20 +1082,22 @@ export function ChatDock({
           .map((s) => (s ?? "").trim()).filter(Boolean).join(" · ")
       : "";
     const rest = [type, u?.year != null ? String(u.year) : ""].filter(Boolean).join(" · ");
-    const opens = !!onOpenMachine && (canOpenMachine ?? fleetHas)(id);
+    const opens = !o.actions && !!onOpenMachine && (canOpenMachine ?? fleetHas)(id);
     return (
       <AskBubble
-        key={m.id}
-        mine={mine}
+        key={o.key}
+        mine={o.mine ?? true}
+        draft={!!o.actions}
+        actions={o.actions}
         icon={a.kind === "availability" ? "event_available" : "description"}
         sentence={
           a.kind === "availability"
             ? L("I need you to confirm this equipment is available for this request", "أحتاج تأكيد توفّر هذه المعدّة لهذا الطلب")
             : L(`I need the ${docs} for this equipment`, `أحتاج ${docs} لهذه المعدّة`)
         }
-        time={chatCardTime(m.created_at, ar)}
+        time={o.time}
         unit={<AskUnitBox name={name} rest={rest} photoUrl={u ? heroPhotoUrl(u) : null} pin={opens} />}
-        foot={foot}
+        foot={o.foot}
         onClick={opens ? () => onOpenMachine?.(id) : undefined}
       />
     );
@@ -1106,18 +1183,16 @@ export function ChatDock({
   };
   const availabilityOpen = offered.filter((u) => unitAvailability(u) !== "confirmed" && !availabilityAsked(u.equipmentId));
   const askedCompany = openCompanyDocAsks(messages);
+  /** A chat ask, through `deliver`, so the first ask in a new chat is what creates its room. */
   const sendChatAsk = async (fields: { text: string; kind: string; docs?: string[] }) => {
-    const ch = channelRef.current;
-    if (!ch || askBusy) return false;
+    if (askBusy) return false;
     setAskBusy(true);
     setFileErr(null);
     try {
       // Extra data rides on the message root, where the app reads it (`extraData['kind']`).
-      await ch.sendMessage(fields as Parameters<Channel["sendMessage"]>[0]);
-      return true;
-    } catch {
-      setFileErr(L("The request couldn't be sent", "تعذّر إرسال الطلب"));
-      return false;
+      const ok = await deliver(async (channel) => { await channel.sendMessage(fields as Parameters<Channel["sendMessage"]>[0]); });
+      if (!ok) setFileErr(L("The request couldn't be sent", "تعذّر إرسال الطلب"));
+      return ok;
     } finally {
       setAskBusy(false);
     }
@@ -1127,40 +1202,48 @@ export function ChatDock({
     void sendChatAsk({ text: L("I need the quotation for this request", "أحتاج عرض السعر لهذا الطلب"), kind: QUOTE_REQUEST_KIND });
   };
   const sendAvailability = async (ids: string[]) => {
-    if (!activeRoomId || askBusy || ids.length === 0) return;
+    if (askBusy || ids.length === 0) return;
     setAskBusy(true);
     setFileErr(null);
     try {
-      // Each machine is its own ask, as the map sends them.
-      for (const id of ids) {
-        const draft = composeAvailabilityRequest(id);
-        if (draft) await sendRenteeRequest(activeRoomId, draft);
-      }
-      setAskPicker(null);
-      refresh();
-    } catch {
-      setFileErr(L("The request couldn't be sent", "تعذّر إرسال الطلب"));
+      // Each machine is its own ask, as the map sends them. Through `deliver` for the room id, so the
+      // first ask in a new chat creates it.
+      const ok = await deliver(async (_channel, roomId) => {
+        for (const id of ids) {
+          const draft = composeAvailabilityRequest(id);
+          if (draft) await sendRenteeRequest(roomId, draft);
+        }
+      });
+      if (ok) setAskPicker(null);
+      else setFileErr(L("The request couldn't be sent", "تعذّر إرسال الطلب"));
     } finally {
       setAskBusy(false);
     }
   };
+  /* One press asks about EVERY machine not yet confirmed or asked (owner, 2026-10-12, option 4B).
+     ~~A picker of machines~~: asking about one machine is the card's own «Ask availability» in the
+     side panel now, so the chat's pill has no choice left to offer. */
   const askAvailability = () => {
     if (availabilityOpen.length === 0) return;
-    if (offered.length === 1) { void sendAvailability([offered[0].equipmentId]); return; }
-    setAskPicks(new Set());
-    setAskPicker("availability");
+    void sendAvailability(availabilityOpen.map((u) => u.equipmentId));
   };
   /** The machine's own documents, where the renter ticks the papers he needs and asks. */
   const openMachineDocs = (id: string) => {
     setAskPicker(null);
-    if (onOpenMachine) onOpenMachine(id);
+    if (onOpenMachineDocs) onOpenMachineDocs(id);
+    else if (onOpenMachine) onOpenMachine(id);
     else onOpenEquipment?.();
   };
   const askEquipmentDocs = () => {
+    // Off the map (the inbox): no machine to open here, so every offered machine's papers in one
+    // dialog, with «Show in map» at its top (owner, 2026-10-12).
+    if (!onOpenMachineDocs && !onOpenMachine) { setAskPicker("docsAll"); return; }
     if (offered.length === 1) openMachineDocs(offered[0].equipmentId);
     else setAskPicker("docsUnit");
   };
   const askCompanyDocs = () => {
+    // On the map, the side panel's Company documents, where the renter ticks and asks (option 3A).
+    if (onOpenCompanyDocs) { onOpenCompanyDocs(); return; }
     setAskPicks(new Set());
     setAskPicker("company");
     if (activeBidKey && companyDocs?.bidId !== activeBidKey) {
@@ -1168,29 +1251,36 @@ export function ChatDock({
       fetchBidCompanyDocuments(key).then((payload) => setCompanyDocs({ bidId: key, payload })).catch(() => {});
     }
   };
+  const companyAskText = (keys: readonly string[]) =>
+    L(`I need the company's ${companyDocNames(keys, false)}`, `أحتاج ${companyDocNames(keys, true)} للشركة`);
+  const sendCompanyKeys = (keys: readonly string[]) =>
+    sendChatAsk({ text: companyAskText(keys), kind: COMPANY_DOCS_REQUEST_KIND, docs: [...keys] });
   const sendCompanyAsk = async () => {
     const keys = COMPANY_DOC_KEYS.filter((k) => askPicks.has(k));
     if (keys.length === 0) return;
-    const ok = await sendChatAsk({
-      text: L(`I need the company's ${companyDocNames(keys, false)}`, `أحتاج ${companyDocNames(keys, true)} للشركة`),
-      kind: COMPANY_DOCS_REQUEST_KIND,
-      docs: [...keys],
-    });
-    if (ok) setAskPicker(null);
+    if (await sendCompanyKeys(keys)) setAskPicker(null);
   };
-  const askBar: { key: string; icon: string; label: string; done?: boolean; pending?: boolean; onTap: () => void }[] =
-    STREAM_API_KEY && activeRoomId && loadedRoomId === activeRoomId
+  /* Each pill shows its ask's state: the clock while it waits, the green tick once answered
+     (owner, 2026-10-12). `locked` is a pill that has nothing left to ask: an open quotation, or every
+     machine asked. An answered quotation or a company ask can be asked again. */
+  const availState = availabilityAskState(
+    offered.map((u) => ({ confirmed: unitAvailability(u) === "confirmed", asked: availabilityAsked(u.equipmentId) })),
+  );
+  const quoteState = quoteAskState(messages);
+  const askBar: { key: string; icon: string; label: string; state: AskPillState; locked: boolean; onTap: () => void }[] =
+    // A loaded room, or a new chat that has none yet (the first ask creates it).
+    STREAM_API_KEY && active && (activeRoomId ? loadedRoomId === activeRoomId : true)
       ? [
-          { key: "quote", icon: "receipt_long", label: L("Quotation", "عرض السعر"), pending: hasOpenQuoteRequest(messages), onTap: askQuotation },
+          { key: "quote", icon: "receipt_long", label: L("Quotation", "عرض السعر"), state: quoteState, locked: quoteState === "waiting", onTap: askQuotation },
           ...(offered.length > 0
             ? [
-                { key: "avail", icon: "event_available", label: L("Availability", "تأكيد التوفّر"), done: availabilityOpen.length === 0, onTap: askAvailability },
+                { key: "avail", icon: "event_available", label: L("Availability", "تأكيد التوفّر"), state: availState, locked: availState !== "idle", onTap: askAvailability },
                 ...(onOpenMachine || onOpenEquipment
-                  ? [{ key: "docs", icon: "description", label: L("Equipment docs", "مستندات المعدّة"), onTap: askEquipmentDocs }]
+                  ? [{ key: "docs", icon: "description", label: L("Equipment docs", "مستندات المعدّة"), state: "idle" as AskPillState, locked: false, onTap: askEquipmentDocs }]
                   : []),
               ]
             : []),
-          { key: "company", icon: "domain", label: L("Company docs", "مستندات الشركة"), onTap: askCompanyDocs },
+          { key: "company", icon: "domain", label: L("Company docs", "مستندات الشركة"), state: companyAskState(messages), locked: false, onTap: askCompanyDocs },
         ]
       : [];
   const unitLabel = (u: FleetMachine) =>
@@ -1312,7 +1402,7 @@ export function ChatDock({
     }
   }
 
-  async function deliver(post: (channel: Channel) => Promise<void>): Promise<boolean> {
+  async function deliver(post: (channel: Channel, roomId: string) => Promise<void>): Promise<boolean> {
     if (!active || busy) return false;
     setBusy(true);
     try {
@@ -1331,13 +1421,13 @@ export function ChatDock({
         try {
           const client = await lease.connect(tok.userId, tok.token);
           const channel = await watchDealRoom(client, roomId);
-          await post(channel);
+          await post(channel, roomId);
         } finally {
           lease.release();
         }
       } else {
         if (!channelRef.current) return false;
-        await post(channelRef.current);
+        await post(channelRef.current, active.dealRoomId);
       }
       refresh();
       return true;
@@ -1756,9 +1846,9 @@ export function ChatDock({
           <div {...pin("chat-dock-thread")} className="bm-chat-body">
             {!STREAM_API_KEY ? (
               <div className="bm-chat-note">{t.chatDock.unavailable}</div>
-            ) : !active?.dealRoomId ? (
+            ) : !active?.dealRoomId && thread.entries.length === 0 ? (
               // Compose-only. The tab exists, the room does not, and NOTHING here creates one — the
-              // send does (RM3-AC-47).
+              // send does (RM3-AC-47). With the bid's price known, its quotation card shows instead.
               <div className="bm-chat-note">{t.chatDock.composeOnly}</div>
             ) : thread.entries.length === 0 ? (
               <div className="bm-chat-note">{t.chatDock.empty}</div>
@@ -1960,7 +2050,38 @@ export function ChatDock({
 
               Nothing has been written at this point. «إلغاء» leaves no trace, and «أرسل الطلب» is
               what creates the room and posts the card. */}
-          {draft && activeBidId === bid.id && (
+          {/* 🔴 The draft is the ASK BUBBLE it will become, outlined, with Cancel and Send (owner,
+              2026-10-12, option 2A). ~~The request card in its draft state~~, a different object from
+              what lands in the chat once sent. An «another unit» ask, or one naming no machine, has no
+              bubble (`isBubbleAsk`) and keeps the card. */}
+          {draft && activeBidId === bid.id && draft.equipmentId && draft.kind !== "alternative" && (
+            <div {...pin("chat-dock-draft")} className="bm-chat-draft">
+              {askBubbleView(
+                { kind: draft.kind, docTypes: draft.docTypes ?? null, equipmentId: draft.equipmentId, serial: null },
+                {
+                  key: "draft",
+                  time: "",
+                  foot: null,
+                  actions: draftActions(draftBusy, () => onCancelDraft?.(), () => onConfirmDraft?.()),
+                },
+              )}
+            </div>
+          )}
+          {companyDraft && companyDraft.length > 0 && activeBidId === bid.id && (
+            <div className="bm-chat-draft">
+              <AskBubble
+                mine
+                draft
+                icon="domain"
+                sentence={companyAskText(companyDraft)}
+                time=""
+                actions={draftActions(askBusy, () => onCompanyDraftDone?.(), () => {
+                  void sendCompanyKeys(companyDraft).then((ok) => { if (ok) onCompanyDraftDone?.(); });
+                })}
+              />
+            </div>
+          )}
+          {draft && activeBidId === bid.id && !(draft.equipmentId && draft.kind !== "alternative") && (
             <div {...pin("chat-dock-draft")} className="bm-chat-draft">
               <RequestCard
                 view={requestCardView(draftSubject(draft), cardCtx, { draft: true })}
@@ -1980,18 +2101,24 @@ export function ChatDock({
               conversation, so it must not enter the stream and scroll away. */}
           {fileErr && <div className="bm-chat-err" role="status">{fileErr}</div>}
 
-          {/* The renter's asks, above the composer (alignment 1.3). A label never wraps or cuts. */}
+          {/* ── The asks INSIDE the message box (owner, 2026-10-12, option B, «make it bigger») ──
+              One rounded box holds the asks along its top and the typing row under it, so they read
+              as one control. ~~Four tall boxes stretched across a band of their own, a line between
+              them and the composer~~ (alignment 1.3, 2026-10-11). A label never wraps or cuts.
+              ⚠️ The footer is taller than the price bar beside it now (was the same 76px). */}
+          <div className="askfoot">
+          <div className="askbox">
           {askBar.length > 0 && (
             <div {...pin("chat-dock-askbar")} className="askbar">
               {askBar.map((it) => (
                 <button
                   key={it.key}
                   type="button"
-                  className={`askbar-p${it.done ? " done" : ""}${it.pending ? " pend" : ""}`}
-                  disabled={it.done || it.pending || askBusy}
+                  className={`askbar-p${it.state === "answered" ? " done" : ""}${it.state === "waiting" ? " pend" : ""}`}
+                  disabled={it.locked || askBusy}
                   onClick={it.onTap}
                 >
-                  <span className="material-icons-outlined" aria-hidden="true">{it.done ? "check_circle" : it.pending ? "schedule" : it.icon}</span>
+                  <span className="material-icons-outlined" aria-hidden="true">{it.state === "answered" ? "check_circle" : it.state === "waiting" ? "schedule" : it.icon}</span>
                   <span className="askbar-l">{it.label}</span>
                 </button>
               ))}
@@ -2083,6 +2210,8 @@ export function ChatDock({
               </>
             )}
           </div>
+          </div>
+          </div>
         </section>
       )}
 
@@ -2100,42 +2229,8 @@ export function ChatDock({
         />
       )}
 
-      {/* The ask bar's pickers: which machines, which machine, which company papers. */}
-      {askPicker === "availability" && (
-        <Dialog
-          open
-          onClose={() => setAskPicker(null)}
-          size="sm"
-          title={L("Pick the equipment", "اختر المعدّة")}
-          subtitle={L("From the equipment in this offer. Each one is sent as its own request", "من معدّات هذا العرض. يُرسل طلب منفصل لكل معدّة")}
-          footer={
-            <DialogButton tone="primary" full disabled={askPicks.size === 0 || askBusy} onClick={() => void sendAvailability([...askPicks])}>
-              {L(`Send request (${askPicks.size})`, `أرسل الطلب (${askPicks.size})`)}
-            </DialogButton>
-          }
-        >
-          <div className="askpick">
-            {offered.map((u) => {
-              const confirmed = unitAvailability(u) === "confirmed";
-              const asked = availabilityAsked(u.equipmentId);
-              const locked = confirmed || asked;
-              return (
-                <label key={u.equipmentId} className={`askpick-row${locked ? " off" : ""}`}>
-                  <input
-                    type="checkbox"
-                    disabled={locked}
-                    checked={askPicks.has(u.equipmentId)}
-                    onChange={() => setAskPicks((s) => { const n = new Set(s); if (!n.delete(u.equipmentId)) n.add(u.equipmentId); return n; })}
-                  />
-                  <span className="askpick-n">{unitLabel(u)}</span>
-                  {confirmed && <span className="askpick-s ok">{L("Confirmed", "مؤكّدة")}</span>}
-                  {!confirmed && asked && <span className="askpick-s">{L("Asked", "تم الطلب")}</span>}
-                </label>
-              );
-            })}
-          </div>
-        </Dialog>
-      )}
+      {/* The ask bar's dialogs: which machine's papers, every machine's papers off the map, and the
+          company papers off the map. */}
       {askPicker === "docsUnit" && (
         <Dialog open onClose={() => setAskPicker(null)} size="sm" title={L("Pick the equipment", "اختر المعدّة")}>
           <div className="askpick">
@@ -2144,6 +2239,33 @@ export function ChatDock({
                 <span className="askpick-n">{unitLabel(u)}</span>
                 <span className="material-icons-outlined" aria-hidden="true">chevron_right</span>
               </button>
+            ))}
+          </div>
+        </Dialog>
+      )}
+      {askPicker === "docsAll" && (
+        <Dialog open onClose={() => setAskPicker(null)} size="lg" title={L("Equipment documents", "مستندات المعدّات")}>
+          <div className="askpick">
+            {onOpenEquipment && (
+              <button type="button" className="askpick-row" onClick={() => { setAskPicker(null); onOpenEquipment(); }}>
+                <span className="material-icons-outlined" aria-hidden="true">map</span>
+                <span className="askpick-n">{L("Show in map", "اعرض على الخريطة")}</span>
+                <span className="material-icons-outlined" aria-hidden="true">chevron_right</span>
+              </button>
+            )}
+            {/* Read-only here: asking for a paper is the map's (the button above), where the panel
+                that composes the ask lives. A file opens in a new tab. */}
+            {offered.map((u) => (
+              <section key={u.equipmentId} className="askdocs">
+                <h3 className="askdocs-h">{unitLabel(u)}</h3>
+                <EquipmentDocuments
+                  machine={u}
+                  request={bid}
+                  ar={ar}
+                  L={L}
+                  onView={(s) => { window.open(s.url, "_blank", "noopener"); }}
+                />
+              </section>
             ))}
           </div>
         </Dialog>

@@ -26,6 +26,94 @@ reversal, or the reason an odd-looking line is load-bearing.
   Profile switcher did, so switching from the header left pushes in the old language. Signed-in only
   (the toggle shows to visitors) and not awaited, like Profile. Verified: tsc and eslint as above,
   AppShell tests unchanged (14 pre-existing failures with and without).
+- **2026-10-12 - OWNER DECISION: options 2A, 3A and 4B of the asks page
+  (https://claude.ai/artifact/4PDFd87vwjEsqGDLhYL6CV).** (2A) An ask raised in the side panel is
+  reviewed in the chat as the ask BUBBLE it will become, outlined in blue, with Cancel and Send
+  (~~the request card's draft state~~); an «another unit» ask or one naming no machine keeps the card.
+  The send is still the surface's `confirmDraft`. (3A) Company papers are asked for in the side
+  panel's Company documents: a missing paper gets a tick, «Ask the supplier (N)» stages a draft
+  bubble in the chat, and Send posts the chat ask through `deliver`. Papers asked and waiting are
+  untickable and read «asked, awaiting reply». This REVERSES RM3-AC-72 / 2026-08-08 («a company row is
+  never requestable») where the host passes `onAsk`; without it the panel is download-only as before.
+  On the map the chat's «Company docs» opens the panel; in the inbox it keeps its dialog. (4B) Each
+  fleet card has «Ask availability» (into the same review step as every map ask), and states
+  «Availability asked» once out; the chat's «Availability» asks every unasked machine in one press
+  (~~a picker~~). Rejected: 2 keep the card; 3 the popup only; 4A cards in a pick mode. Files:
+  `src/components/map/{ChatDock,BidMapWorkspace,EquipmentList}.tsx`, `src/components/map/panel/CompanyPanel.tsx`,
+  `src/components/deal-room/{AskBubble.tsx,deal-room-proto.css}`, `src/components/map/map-proto.css`,
+  `src/lib/i18n/{en,ar}.ts`, tests `company-panel-ask`, `card-ask-availability`, `chat-dock`,
+  `rentee-map-surface`. ⚠️ The panel calls the VAT paper `vat` and the chat `vat_cert`; the surface
+  maps between them. Not checked in a browser.
+- **2026-10-12 - OWNER DECISION: the chat's asks sit INSIDE the message box, bigger (option B of
+  the asks page, https://claude.ai/artifact/4PDFd87vwjEsqGDLhYL6CV).** One rounded box holds the four
+  asks along its top (38px pills, 20px icons, 13px labels) and the typing row under it. ~~Four tall
+  boxes across their own band, a line between them and the composer~~; rejected: slim chips on the
+  chat ground (A), one «Ask» button with a menu (C, hides the asks). Files:
+  `src/components/map/ChatDock.tsx`, `src/components/deal-room/deal-room-proto.css`. ⚠️ The chat's
+  footer is now taller than the price bar beside it; the two columns no longer end on one line.
+  ⚠️ The rules are `.dlproto.bm-chat`-scoped to outrank `.bidmap .bm-chat-compose` whatever the
+  sheet order. Not checked in a browser.
+- **2026-10-12 - Ask pills show waiting vs answered, the inbox gets an equipment papers dialog,
+  the machine bar drops machines with no bid, Back sits nearer the edge.** (1) The Availability pill
+  showed the green tick once every machine had been ASKED, so a question still waiting read as
+  answered. Each pill now takes its state from `chat-asks.ts` (`quoteAskState`, `companyAskState`,
+  `availabilityAskState`): clock while waiting, tick once answered; only an open quotation or
+  all-machines-asked locks a pill, so an answered quotation or a company ask can be asked again.
+  (2) The machine detail's badge reads «Availability asked» (~~«Asked»~~). (3) In the inbox, with no
+  map to open, «Equipment docs» opens a dialog of every offered machine's papers (read-only,
+  `EquipmentDocuments`), «Show in map» at its top. (4) The machine bar shows only machines he bid
+  on (~~dashed «No bid from him» chips~~), and drops the mono face on its prices. (5) The shell's
+  Back is pulled 8 to 12px from the window edge on every page; content keeps `PAGE_X`. Files:
+  `src/lib/contract/chat-asks.ts`, `src/components/map/{ChatDock,MachineBar}.tsx`,
+  `src/components/map/panel/EquipmentDetail.tsx`, `src/components/AppShell.tsx`,
+  `src/components/deal-room/deal-room-proto.css`, tests `chat-asks`, `machine-bar`, `chat-dock`,
+  `rentee-map-surface`, `yard-card`. ⚠️ The inbox dialog cannot compose an ask: asking for a paper
+  stays on the map, where the panel's one send seam is. Not checked in a browser.
+- **2026-10-12 - Chat UAT round: own bubbles blue, a new chat opens on the quotation, Equipment
+  docs lands on Documents, the intake box grows.** (1) Own messages, offer cards and ask bubbles
+  were ORANGE: `.dlproto` points `--action` and so `--rentee` at the brand, so "solid in the
+  renter's colour" painted brand orange. They take `--mine-bubble` now, bound on `:root` to the blue
+  `--action`, the app's `renteeBlue` role. (2) Ask bubbles take their sentence's width up to 80% of
+  the chat (~~fixed 360px, which wrapped a one-line ask~~). (3) A chat with no deal room yet showed
+  only «No messages yet»; it now draws the bid's quotation card (Counter, Accept) and the ask bar,
+  as the app does. Nothing is created by drawing them: an ask, Counter or Accept goes through
+  `deliver`, still the one place that calls `ensureDealRoom` (RM3-AC-47), which now hands its post
+  the room id. (4) «Equipment docs» opened the machine tab; `onOpenMachineDocs` opens it on
+  Documents (a `key` remounts a detail already open). (5) The Create box grows with its text up to
+  half the window, then scrolls. Files: `src/app/globals.css`, `src/components/deal-room/deal-room-proto.css`,
+  `src/components/map/{ChatDock,BidMapWorkspace}.tsx`, `src/components/screens/Intake.tsx`,
+  `tests/unit/{chat-dock,rentee-map-surface}.test.ts`. ⚠️ Counter or Accept on a new chat's card
+  creates the room on the PRESS, before the sheet is submitted, as the bid card's and the price
+  footer's own buttons already do. ⚠️ Only the anchor bid's tab gets the pre-room card; a sibling
+  tab's price is not on the dock. Not checked in a browser.
+- **2026-10-12 - Suppliers mode, owner's UAT round: one-line panel header, download kept, «All
+  chats».** A request panel's header was a small request card (site, machines, «Open the request ›»)
+  in a 40px band, and every lone card took an empty band of the same height, so the row opened on
+  white space. Now the header is one line, «One request · N bids ›», pressing it opens the request,
+  and the band is 20px. Each card's second line is the city and units, as in requests mode
+  (~~a lone bid named its request there~~). The bids are tickable again and «Download quotation»
+  sits on the right beside the chat link, now «All chats»; the paper is one section per REQUEST for
+  this supplier. The «Requests» tile is one fixed picture: the newest requests' machines in three
+  small circles, stacked like the Suppliers tile's faces (~~the request on screen before the switch~~).
+  The quotation's renter box and popup fallback moved into `src/lib/quotation/open.ts`, shared by
+  both modes' downloads; requests mode's paper is unchanged. Files:
+  `src/components/workspace/{SuppliersMode,BidCards,RequestsWorkspace}.tsx`, `src/lib/quotation/open.ts`,
+  `src/lib/i18n/{en,ar}.ts`. ⚠️ The suppliers-mode paper takes the transport legs off the request
+  list, not the detail record requests mode re-reads. ⚠️ The deal room still builds its own renter
+  box (`DealRoom.tsx`), a third copy left as it was. Not checked in a browser.
+- **2026-10-12 - Request rail UAT fixes: clearer unselected circles, bigger machines, cleaner
+  names.** Owner on staging: unselected circles at the app's 55% were "not clear", now 80% (the
+  supplier rail too); the combined picture showed more beige than machine, so a pair now takes tiles
+  of the artwork's 1.34:1 shape instead of two tall halves, the edge margin is 1px and every picture
+  is enlarged 1.2x inside its tile; the zoom dialog's title lists type names with « · » between them
+  instead of full names with commas; the request card's «×N» is extrabold body font, not the mono
+  `tabular` face, and so is its orange «+N more». The Items row never wraps: names shrink and
+  cut at their own end so «+N more» stays on the line. «New», «Suppliers» and «Requests» wear
+  an orange ring (actions, not requests); the Suppliers and Requests tiles are 52px like the
+  request circles (were 56). Also fixed: the zoom caption printed a literal `\u00d7` (a JSX text escape, since
+  facc3bd4). Files: `src/components/workspace/{CircleArt,ItemTier,RequestRail,RequestContextBar,SuppliersMode}.tsx`.
+  ⚠️ Tiles still sit inside the circle (decision 1, R1); the zoom crops the artwork's own margin, so a
+  machine drawn to its image edge may lose a sliver. Not checked in a browser.
 - **2026-10-11 - The intake's side panel folds a multi-item request into ONE row. BUILT on
   `staging` (worktree), NOT committed.** The panel beside the agent's input listed one row per
   machine, so a submission of three read as three requests and only the first looked like the request.

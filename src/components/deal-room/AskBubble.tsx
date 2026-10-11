@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
  * the end. Your own bubble is SOLID in your role colour on the RIGHT; the other side's is white on the
  * LEFT, in both languages (1.12 a). Drawing only: every word and state is the caller's.
  */
-export function AskBubble({ mine, icon, tone = "accent", sentence, time, unit, rows, foot, onClick }: {
+export function AskBubble({ mine, icon, tone = "accent", sentence, time, unit, rows, foot, onClick, draft = false, actions }: {
   mine: boolean;
   /** Material icon before the sentence. */
   icon: string;
@@ -26,6 +26,11 @@ export function AskBubble({ mine, icon, tone = "accent", sentence, time, unit, r
   foot?: ReactNode;
   /** The renter's bubble opens the machine it is about. */
   onClick?: () => void;
+  /** Not sent yet (owner, 2026-10-12, option 2A): the same bubble, outlined and white, with
+   *  {@link actions} under it. Sending turns it into the solid bubble in place. */
+  draft?: boolean;
+  /** A draft's Cancel and Send. */
+  actions?: ReactNode;
 }) {
   const body = (
     <>
@@ -37,21 +42,23 @@ export function AskBubble({ mine, icon, tone = "accent", sentence, time, unit, r
       {rows && rows.length > 0 && <div className="ab-rows">{rows}</div>}
       {unit}
       {foot && <div className="ab-foot">{foot}</div>}
+      {actions && <div className="ab-act">{actions}</div>}
     </>
   );
+  const cls = `ab ${mine ? "mine" : "them"}${draft ? " draft" : ""}`;
   // A `div` with a button's role rather than a `<button>`: the bubble holds block content.
   return onClick ? (
     <div
       role="button"
       tabIndex={0}
-      className={`ab ${mine ? "mine" : "them"} press`}
+      className={`${cls} press`}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
     >
       {body}
     </div>
   ) : (
-    <div className={`ab ${mine ? "mine" : "them"}`}>{body}</div>
+    <div className={cls}>{body}</div>
   );
 }
 

@@ -1582,6 +1582,8 @@ export const en = {
     // The chips' own explanations, on hover and to a screen reader.
     eqYardConfirmedWhy: "The supplier named the yard this machine moves from, so this distance is confirmed for your offer.",
     eqYardUnconfirmedWhy: "Not confirmed for this offer: press to see what that means and to ask.",
+    eqAskAvailability: "Ask availability",
+    eqAvailabilityAsked: "Availability asked",
     // The dots beside the file icon: the machine's papers, scored the way the app scores them.
     eqReadinessOnFile: "{done} of {total} documents on file",
     eqOpenFile: "Open this machine's file",
@@ -1888,7 +1890,7 @@ export const en = {
     supplierBidsAcross: "{b} bids across {r} requests",
     supplierOneBid: "1 bid",
     oneRequestBids: "One request · {n} bids",
-    supplierChat: "Chat",
+    supplierChat: "All chats",
     supplierNoBids: "No bids from this supplier on your current requests",
     // Read off the bid's copy of the request terms, not derived from the rental type.
     chipOperator: "With operator",
