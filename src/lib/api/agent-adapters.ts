@@ -476,6 +476,9 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
       ...defaultOperatorDetails(),
       nightShift: li.night_shift_required ?? false,
       nationality: li.operator_nationality ?? null,
+      // The excluded list travels with its mode (Mansour, 2026-10-09). Only for `excluded`: a single
+      // stated nationality has no list.
+      nationalityCustom: li.operator_nationality === "excluded" ? li.operator_nationality_custom ?? null : null,
       certificate: agentCert, // AC-24/50: operator license level(s) (multi-select)
       certByAgent: agentCert.length > 0, // agent set it → project-level Safety cert won't override
       // AC-24: F.A.T split — who covers the operator's Food vs Accommodation & Transport. Mansour now
@@ -628,7 +631,11 @@ export function draftToRfqCorrection(
       demobilization_by_rentee: renteeSide(it.returnOverride ?? project.returnFromSite),
       minimum_equipment_year: yearOut(it.equipmentYear ?? project.advanced.equipmentYear),
       night_shift_required: opIncluded ? it.operator.nightShift : null,
-      operator_nationality: opIncluded ? it.operator.nationality ?? null : null,
+      /* `excluded` is not a nationality, and its list never travels here, so it reached the agent's
+         learning examples as a meaningless word (Mansour's vocabulary for this field is a nationality,
+         `rfq-prompt.ts:263`). Null for it; older values go as before. The app sends none of this
+         field in its own correction (`rfq_parse_service.dart`). */
+      operator_nationality: opIncluded && it.operator.nationality !== "excluded" ? it.operator.nationality ?? null : null,
       operator_license_levels: licenseLevels.length ? licenseLevels : null,
       fat_required: opIncluded ? it.operator.fatRequired ?? null : null,
       fat_food_by_rentee: opIncluded ? renteeSide(it.operator.fatFood) : null,

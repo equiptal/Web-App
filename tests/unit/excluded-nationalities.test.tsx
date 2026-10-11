@@ -12,6 +12,7 @@ import {
   saveExcluded,
 } from "@/lib/contract/nationality";
 import { draftToCreateRequest } from "@/lib/api/app-adapters";
+import { agentOutputToDraft, draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { machineTermsOfRequestItem } from "@/lib/contract/project-apply";
 import { bucketBidTerms, mapBid } from "@/lib/contract/bids";
 import type { RfqRequestPayload } from "@/lib/contract";
@@ -91,6 +92,23 @@ describe("what is posted", () => {
     const noOp = draftToCreateRequest(makeAgentDraft({ items: [makeItem({ operatorNeeded: "no", operator: op })] }) as RfqRequestPayload, "46").equipmentItems[0];
     expect(noOp.operatorNationality).toBeUndefined();
     expect(noOp.operatorNationalityCustom).toBeUndefined();
+  });
+
+  it("tells the agent nothing for excluded, and an older value as before", () => {
+    const line = (nationality: string) => {
+      const d = makeAgentDraft({ items: [makeItem({ operatorNeeded: "yes", operator: { ...makeItem().operator, nationality, nationalityCustom: "Sudanese" } })] }) as RfqRequestPayload;
+      return draftToRfqCorrection({ project: d.project, items: d.items, preferences: d.preferences }, [] as never).line_items[0];
+    };
+    expect(line("excluded").operator_nationality).toBeNull();
+    expect(line("restricted").operator_nationality).toBe("restricted");
+  });
+
+  it("reads the agent's excluded list onto the line, so the field opens with it ticked", () => {
+    const out = { line_items: [{ category: "Excavator", operator_included: true, operator_nationality: "excluded", operator_nationality_custom: "Syrian,Indian" }] };
+    const item = agentOutputToDraft(out as never).items[0];
+    expect(item.operator.nationality).toBe("excluded");
+    expect(item.operator.nationalityCustom).toBe("Syrian,Indian");
+    expect(hydrateExcluded(item.operator.nationality, item.operator.nationalityCustom).picked.sort()).toEqual(["Indian", "Syrian"]);
   });
 
   it("a past request used as a template keeps its list", () => {

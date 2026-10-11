@@ -48,8 +48,13 @@ reversal, or the reason an odd-looking line is load-bearing.
   matrix's «nationality» column; grey keeps it out of every tally and conflict count. ⚠️ The MAP has no
   request-term rows to add it to (its panel draws document readiness; `PriceFooter` only counts
   conflicts), so nothing changed there.
-  ⚠️ `operator_nationality` stays in `HIDDEN_TERM_KEYS`. ⚠️ The agent sync (`agent-adapters`) sends
-  `operator_nationality: "excluded"` with no list; Mansour has not been checked for it.
+  ⚠️ `operator_nationality` stays in `HIDDEN_TERM_KEYS`. The agent correction (`agent-adapters`, POST
+  `/rfq/:id/correct`) sends `operator_nationality: null` for `excluded`: Mansour accepts any value there,
+  but «excluded» without its list is not a nationality and only polluted its learning examples. Older
+  values go as before; the app sends none of this field (checked in Normalization-Agent, by reading).
+  The PARSE now reads Mansour's `operator_nationality_custom` onto the line with `excluded`
+  (`agent-adapters.ts` `toItem`): Mansour returns «operator not Syrian» as `excluded` + the list since
+  2026-10-09, and without this read the web would post `excluded` with no list, «exclude nobody».
 - **2026-10-07 - Review pens open the section they name; a past start date is refused. BUILT, NOT
   committed.** (1) Owner: *"edit path from the pen icon in the summary and review screen is not
   working"*, prod and staging. Reproduced on staging: «Edit» on «Where it goes» / «When it runs» DID

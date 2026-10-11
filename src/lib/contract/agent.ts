@@ -38,6 +38,9 @@ export interface RFQLineItem {
   night_shift_required?: boolean | null;
   number_of_operators?: number | null;
   operator_nationality?: string | null;
+  /** With `operator_nationality: "excluded"`: the excluded names, canonical English, comma-joined
+   *  (Mansour, 2026-10-09). Without it an `excluded` line would mean «exclude nobody». */
+  operator_nationality_custom?: string | null;
   operator_license_level?: AgentOperatorLicenseLevel | null; // back-compat: first of the array
   operator_license_levels?: AgentOperatorLicenseLevel[] | null; // ALL operator certs the RFQ named
   // Emitted by Mansour but previously dropped by the adapter — now consumed:
