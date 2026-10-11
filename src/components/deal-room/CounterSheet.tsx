@@ -16,7 +16,10 @@ const DealRoom = dynamic(() => import("@/components/deal-room/DealRoom").then((m
  * This mounts the same `DealRoom` in its sheet-only mode, portalled to `<body>` so no card's
  * `overflow` or rail clips the fixed overlay. `onExit` fires on close, on a sent counter, and when
  * the room cannot be opened.
+ *
+ * `flow="take"` is «Accept» on the supplier's offer card in the chat (alignment 1.2): the plain accept
+ * when everything matches, else this sheet opened on HIS offer (see `DealRoom`'s `taking`).
  */
-export function CounterSheet({ roomId, onExit }: { roomId: string; onExit: () => void }) {
-  return createPortal(<DealRoom id={roomId} initialFlow="counter" sheetOnly onExit={onExit} />, document.body);
+export function CounterSheet({ roomId, onExit, flow = "counter" }: { roomId: string; onExit: () => void; flow?: "counter" | "take" }) {
+  return createPortal(<DealRoom id={roomId} initialFlow={flow} sheetOnly onExit={onExit} />, document.body);
 }

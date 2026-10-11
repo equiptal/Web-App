@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { groupBiddingClosed, type RequestGroup, type RequestListItem } from "@/lib/contract/requests";
 import { railMachines } from "@/lib/contract/workspace";
-import { CircleArt, MAX_IN_CIRCLE } from "@/components/workspace/CircleArt";
+import { CircleArt } from "@/components/workspace/CircleArt";
 import { cx } from "@/lib/ds";
 import { formatSar, type BidBudget } from "@/lib/pricing/rental";
 import { yourBudgetLabel } from "@/lib/contract/request-fields";
@@ -33,6 +33,9 @@ import { pin } from "@/lib/uiPins";
  * The unit count is a `<span>`, not a control. It states a quantity; it does not do anything, and a
  * pill that looks pressable but is not is worse than a plain one.
  */
+/** Names on the card before «+N more» (multi-item decision 2). */
+const NAMES_SHOWN = 3;
+
 export function RequestContextBar({
   group,
   item,
@@ -77,15 +80,17 @@ export function RequestContextBar({
      image in both places. */
   const lead = live.find((m) => m.url) ?? null;
 
-  /* The machines NAMED, up to the same three the circle draws, each with its own count. Past three
-     a bare «+N» rather than a sentence: the row is one line inside a 44px control and the drawer
-     one press away lists every line in full. */
+  /* ── The machines NAMED: up to three, then «+N more» in orange (owner, 2026-10-11, multi-item
+     decision 2, option C2) ───────────────────────────────────────────────────────────────────────
+     ~~One sentence of every machine and its size, cut by `truncate` wherever the width ran out~~:
+     it cut in the middle of a name («Crawler Excavator · 20 t…») and the pale «+N» after it was
+     easy to miss. Now each name is its OWN block with a fixed maximum width, so a long one is cut
+     at its own end only and never runs into the next; «×N» stays inside its name's block; sizes are
+     left to the full list, one press away. PLAIN text, not pills: the whole card is the one thing
+     here that opens, and a pill would look like a second control. */
   const multi = machines.length > 1;
-  const shownNames = live.slice(0, MAX_IN_CIRCLE);
+  const shownNames = live.slice(0, NAMES_SHOWN);
   const restCount = live.length - shownNames.length;
-  const namesLine = shownNames
-    .map((m) => (m.qty > 1 ? `${m.qty} × ${m.name}` : m.name))
-    .join(ar ? "\u060c " : ", ");
 
   return (
     <div {...pin("request-context")} className="relative flex flex-none items-stretch">
@@ -116,7 +121,7 @@ export function RequestContextBar({
         disabled={!onOpenRequest}
         title={group.address ?? group.locationLabel}
         className={cx(
-          "group control-lg flex min-w-0 max-w-[30rem] items-center gap-2 border border-navy bg-navy !px-3 text-start transition-colors",
+          "group control-lg flex min-w-0 max-w-[35rem] items-center gap-2 border border-navy bg-navy !px-3 text-start transition-colors",
           // With a budget the card continues into the grey section, so only the LEADING corners round.
           budget ? "rounded-s-md" : "rounded-md",
           onOpenRequest ? "hover:bg-navy-mid" : "cursor-default",
@@ -136,16 +141,11 @@ export function RequestContextBar({
             transparent margin needs something behind it, and on navy that has to be the light tone
             or the margin swallows the machine. */}
         <span className="grid h-8 w-8 flex-none place-items-center overflow-hidden rounded-full border border-white/15 bg-surface3">
-          {/* 🔴 **The RAIL's montage, at 32px** - the same component, so the two discs cannot drift
-              apart in fit, in spread or in how many machines they admit. Every ruling behind it
-              lives in `CircleArt`: the photograph takes the crop and the drawing the scale, each
-              cell is masked so the pictures lose their own rectangular edges, and the row is capped
-              at three.
-
-              ⚠️ **A 32px disc holding three machines gives each ~12px**, which reads as a montage
-              rather than as three machines. That is the cost of putting the request here rather
-              than one of its lines, and the lever is this number - never a second cap inside
-              `CircleArt`, which the rail reads too. */}
+          {/* 🔴 **The RAIL's picture, at 32px** - the same component, so the two discs cannot drift
+              apart in how they lay out or how many machines they admit. Every ruling behind it lives
+              in `CircleArt`: the app's rows of tiles, fitted inside the circle, four at most
+              (multi-item decision 1). At 32px a tile is ~13px, so the lever, if it grates, is this
+              number - never a second cap inside `CircleArt`, which the rail reads too. */}
           <CircleArt
             machines={live}
             fallback={lead?.url ?? null}
@@ -178,11 +178,24 @@ export function RequestContextBar({
             </span>
           </span>
           <span {...pin("context-machines")} className="flex min-w-0 items-center gap-1.5 text-label font-semibold leading-[13px] text-white/60">
-            <span className="truncate">{multi ? namesLine : label}</span>
+            {multi ? (
+              shownNames.map((m, i) => (
+                <Fragment key={m.id}>
+                  {i > 0 && <span className="flex-none text-white/40" aria-hidden="true">·</span>}
+                  <span className="min-w-0 max-w-[150px] truncate">
+                    {m.typeName}
+                    {m.qty > 1 && <span className="tabular text-white/45"> ×{m.qty}</span>}
+                  </span>
+                </Fragment>
+              ))
+            ) : (
+              <span className="truncate">{label}</span>
+            )}
             {multi && restCount > 0 && (
-              /* Latin digits in both locales, product-wide since 2026-09-04. */
-              <span className="tabular flex-none rounded-full bg-white/15 px-1.5 text-label font-semibold text-white/70">
-                +{restCount}
+              /* Orange, and it says what it is (decision 2). Latin digits in both locales,
+                 product-wide since 2026-09-04. */
+              <span className="tabular flex-none whitespace-nowrap font-extrabold text-brand">
+                {t.workspace.chipMore.replace("{n}", String(restCount))}
               </span>
             )}
             {!multi && qty > 1 && (

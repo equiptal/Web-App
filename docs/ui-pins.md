@@ -100,9 +100,13 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**26.4** | Circle — the request's machines on one ground | `src/components/workspace/CircleArt.tsx` |
 | &nbsp;&nbsp;**26.5** | Circle — the zoomed view behind a double press | `src/components/workspace/RequestRail.tsx` |
 | &nbsp;&nbsp;**26.6** | Rail — the back arrow, once scrolled | `src/components/workspace/RequestRail.tsx` |
+| &nbsp;&nbsp;**26.7** | Rail — «Suppliers» tile at the end (switch to suppliers mode) | `src/components/workspace/SuppliersMode.tsx` |
+| &nbsp;&nbsp;**26.8** | Suppliers mode — the supplier circles row | `src/components/workspace/SuppliersMode.tsx` |
+| &nbsp;&nbsp;**26.9** | Suppliers mode — «Requests» tile at the end (back to requests) | `src/components/workspace/SuppliersMode.tsx` |
 | **27** | Request context bar (location + machines) | `src/components/workspace/RequestContextBar.tsx` |
 | &nbsp;&nbsp;**27.1** | Context bar — the machines the request asked for | `src/components/workspace/RequestContextBar.tsx` |
 | &nbsp;&nbsp;**27.2** | Your budget card, beside the request context bar | `src/components/workspace/RequestContextBar.tsx` |
+| &nbsp;&nbsp;**27.3** | Suppliers mode — the supplier card | `src/components/workspace/SuppliersMode.tsx` |
 | **28** | Request details modal | `src/components/workspace/RequestDetailsModal.tsx` |
 | &nbsp;&nbsp;**28.5** | Bid size filter — include larger equipment | `src/components/workspace/BidSizeFilter.tsx` |
 | **29** | Bid cards | `src/components/workspace/BidCards.tsx` |
@@ -121,6 +125,7 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**45.1** | Bid map — canvas side | `src/components/map/BidMapWorkspace.tsx` |
 | &nbsp;&nbsp;**45.2** | Bid map — side panel | `src/components/map/BidMapWorkspace.tsx` |
 | &nbsp;&nbsp;**45.3** | Bid map — «Other bids» strip in the back bar | `src/components/map/OtherOffers.tsx` |
+| &nbsp;&nbsp;**45.4** | Bid map — this supplier's bids on the request's other machines | `src/components/map/MachineBar.tsx` |
 | **46** | Map canvas | `src/components/map/MapCanvas.tsx` |
 | &nbsp;&nbsp;**46.1** | Map — one machine's marker | `src/components/map/MapCanvas.tsx` |
 | **47** | Fleet card (equipment list) | `src/components/map/EquipmentList.tsx` |
@@ -174,6 +179,9 @@ The registry is `src/lib/uiPins.ts` — it is the authority for levels 1 and 2, 
 | &nbsp;&nbsp;**57.4** | Chat drawer — composer | `src/components/map/ChatDock.tsx` |
 | &nbsp;&nbsp;**57.5** | Chat drawer — staged request card | `src/components/map/ChatDock.tsx` |
 | &nbsp;&nbsp;**57.6** | Chat drawer — negotiation event (grey pill) | `src/components/map/ChatDock.tsx` |
+| &nbsp;&nbsp;**57.7** | Chat drawer — offer card (price, counter, accept) | `src/components/deal-room/OfferChatCard.tsx` |
+| &nbsp;&nbsp;**57.8** | Chat drawer — the renter's ask buttons above the composer | `src/components/map/ChatDock.tsx` |
+| &nbsp;&nbsp;**57.9** | Chat drawer — the machine being negotiated, under the supplier | `src/components/map/ChatDock.tsx` |
 | **60** | Inbox | `src/components/inbox/InboxView.tsx` |
 | &nbsp;&nbsp;**60.1** | Inbox — the chats column | `src/components/inbox/InboxView.tsx` |
 | &nbsp;&nbsp;**60.2** | Inbox — one chat row | `src/components/inbox/InboxView.tsx` |

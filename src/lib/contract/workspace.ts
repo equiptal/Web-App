@@ -35,6 +35,8 @@ export interface RailMachine {
   isPhoto: boolean;
   /** Units asked for on that line. */
   qty: number;
+  /** The type without its size, for the request card's names line. Falls back to `name`. */
+  typeName: string;
 }
 
 export interface RailTile {
@@ -135,6 +137,7 @@ export function railMachines(group: RequestGroup, ar = false): RailMachine[] {
     url: i.item?.imageUrl ?? null,
     isPhoto: i.item?.imageIsPhoto ?? false,
     qty: i.item?.qty ?? 1,
+    typeName: (ar ? i.item?.typeNameAr || i.item?.typeName : i.item?.typeName) || ((ar ? i.item?.nameAr || i.item?.name : i.item?.name) ?? i.displayId),
   }));
 }
 

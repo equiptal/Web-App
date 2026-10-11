@@ -313,25 +313,28 @@
    shadow both now share; and the tail notch moves to the far edge. */
 .dlproto .msg { max-width: 80%; margin: 0; padding: 9px 12px; border-radius: var(--radius-lg); font-size: 12.5px; line-height: 1.7; }
 .dlproto .msg .meta { font-size: 10.5px; font-weight: 700; margin-top: 5px; opacity: 0.7; }
+/* 🔴 **Your own message is SOLID in your role colour with white ink** (app release #548, alignment
+   1.12 a, 2026-10-11). ~~A pale `--action` wash with navy ink~~ (2026-08-19). The small corner is the
+   TOP corner on the sender's side. Plain text still follows the language: in Arabic your own text sits
+   on the left, which is why these corners are logical rather than physical. */
 .dlproto .msg.them {
   align-self: flex-start;
   background: var(--surface);
-  border: 0;
+  border: 0.5px solid color-mix(in srgb, var(--border) 50%, transparent);
   color: var(--navy);
-  border-end-end-radius: 4px;
+  border-start-start-radius: 4px;
 }
 .dlproto .msg.mine {
   align-self: flex-end;
-  background: color-mix(in srgb, var(--action) 12%, white);
+  background: var(--rentee);
   border: 0;
-  color: var(--navy);
-  border-end-start-radius: 4px;
+  color: var(--surface);
+  border-start-end-radius: 4px;
 }
 .dlproto .msg.mine .meta { text-align: end; }
-/* «حفظ» beside an attachment, in the bubble's own ink both sides — the outgoing fill is pale now, so
-   the white this used to be on `.msg.mine` would be invisible. */
+/* «حفظ» beside an attachment, in the bubble's own ink on both sides. */
 .dlproto .msg .msg-att-dl { color: var(--action); }
-.dlproto .msg.mine .msg-att-dl { color: var(--action); }
+.dlproto .msg.mine .msg-att-dl { color: var(--surface); }
 /* supplier-started banner */
 .dlproto .started-banner { display: flex; align-items: center; gap: 8px; margin: 10px 0; padding: 10px 13px; border-radius: var(--radius-md); background: var(--info-bg); color: var(--info); font-size: 12.5px; font-weight: 700; }
 .dlproto .started-banner .material-icons-outlined { font-size: 17px; flex: 0 0 auto; }
@@ -341,7 +344,7 @@
 .dlproto .msg-att-file { display: inline-flex; align-items: center; gap: 7px; margin-top: 6px; padding: 8px 11px; border-radius: var(--radius-md); background: rgba(0,0,0,.06); color: inherit; text-decoration: none; font-size: 12.5px; font-weight: 700; max-width: 240px; }
 /* `rgba(255,255,255,.18)` was a white wash for the saturated outgoing fill this bubble no longer has;
    on pale `var(--surface3)` it is invisible. Both sides now take the same dark wash. */
-.dlproto .msg.mine .msg-att-file { background: rgba(0, 0, 0, 0.06); }
+.dlproto .msg.mine .msg-att-file { background: rgba(255, 255, 255, 0.16); }
 .dlproto .msg-att-file .material-icons-outlined { font-size: 18px; flex: 0 0 auto; }
 .dlproto .msg-att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -435,7 +438,7 @@
   /* 🔴 **THE PAPER.** Owner, 2026-09-22: *"i want the previosu 3 sheets style layout ... i
      mean for the frame and general layout"*, pointing at `main` / `beta`, where the sheet is a
      white PAPER centred on a grey desk under a numbered step rail.
-     ⚠️ **940, not beta's 800**, and the number is not a taste: `.ng-cmp` is already capped at
+     ⚠️ **940, not beta's 800**, and the number is not a taste: `.ng-cmp` was capped at (the compare card, removed 2026-10-11)
      940 and `.ng-grow` at 820, so at this width nothing that is ALREADY capped changes size and
      everything uncapped comes in to meet them. Importing beta's 800 would have shrunk the
      compare card that was measured at 940 on 2026-09-22. */
@@ -813,54 +816,8 @@
 .ng-grow.agreed .k { color: var(--muted-dark); }
 .ng-grow.agreed .v { color: var(--ok); }
 
-/* ── the supplier's standing offer, against yours ───────────────────────────────────────────────
-   🔴 **THE APP'S 2026-09-21 MOCK.** A WHITE card, the two totals side by side across a VERTICAL
-   hairline, the gap pill riding the card's TOP EDGE, and one row per leg beneath, always open.
-
-   ~~A navy card with the pill on a horizontal rule BETWEEN the two totals, and the per-leg rows
-   behind a «gap, line by line» expander.~~ Three faults, and the mock fixes all three: the sheet
-   around it is light, so the one navy block read as a foreign panel dropped onto the page; the
-   expander cost a press to reach the only content anyone can act on; and a pill on a rule between
-   the totals made the rule look like a divider with a label rather than a measurement between two
-   ends. */
-/* 🔴 **CAPPED AND CENTRED, and that is the DESKTOP half of this port.** The app draws this on a
-   phone, where the two totals are a thumb apart and the rule between them reads as a measurement.
-   Run across a 1500px sheet they sit at opposite edges with a field of white between, and the card
-   stops being a comparison at all. Capping ONE summary card is not the column cap this sheet
-   withdrew on 2026-09-19: the bands, the table and the sections still run the width. */
-.ng-cmp { position: relative; max-width: 940px; margin: 11px auto 16px; padding: 20px 14px 6px; background: var(--surface); border: 1px solid var(--border-hair); border-radius: 14px; }
-/* Overhangs the card's top edge by half its height. The card's own border runs behind it, so the
-   pill carries one of its own or it reads as a hole punched in the edge. */
-.ng-cmp-pill { position: absolute; top: -11px; inset-inline-start: 50%; transform: translateX(-50%); border-radius: 100px; padding: 3px 12px; font-size: 11px; font-weight: 800; white-space: nowrap; background: var(--brand-soft); border: 1px solid var(--brand-soft); color: var(--brand-deep); }
-[dir="rtl"] .ng-cmp-pill { transform: translateX(50%); }
-.ng-cmp-pill.ok { background: var(--ok-soft); border-color: color-mix(in srgb, var(--ok) 35%, transparent); color: var(--ok); }
-.ng-cmp-duo { display: grid; grid-template-columns: 1fr 1px 1fr; align-items: stretch; }
-.ng-cmp-duo::before { content: ""; grid-column: 2; background: var(--border-hair); }
-.ng-cmp-side { grid-column: 3; text-align: center; }
-/* ⚠️ THEIRS leads and carries the emphasis: it is the figure on the table, the one being answered,
-   and in both directionalities the leading slot is read first. Mine is muted beside it — not because
-   it matters less, but because I already know it. */
-.ng-cmp-side.lead { grid-column: 1; }
-.ng-cmp-side .k { font-size: 11px; font-weight: 700; color: var(--muted-light); margin-bottom: 4px; }
-.ng-cmp-side .v { font-size: 24px; font-weight: 800; color: var(--muted); }
-.ng-cmp-side.lead .v { color: var(--navy); }
-.ng-cmp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 9px 0; border-top: 1px solid var(--surface2); }
-.ng-cmp-row:first-of-type { margin-top: 12px; }
-.ng-cmp-row .k { flex: 0 0 auto; font-size: 12.5px; font-weight: 700; color: var(--navy-deep); }
-.ng-cmp-row .sides { flex: 1 1 auto; min-width: 0; font-size: 11.5px; color: var(--muted); text-align: end; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ng-cmp-row .sides .lab { color: var(--muted-light); }
-.ng-cmp-row .sides b { font-weight: 800; color: var(--navy-deep); }
-/* ⏳ while they have not answered — the delta pill says nothing in that case, so this is the only
-   signal. */
-.ng-cmp-row .sides b.wait { color: var(--warn-deep); }
-.ng-delta { flex: 0 0 auto; border-radius: 100px; padding: 2px 8px; font-size: 10.5px; font-weight: 800; background: var(--brand-soft); color: var(--brand-deep); }
-.ng-delta.ok { background: var(--ok-soft); color: var(--ok); }
-/* Did the SUPPLIER move since his own last round, and which way. Nothing at all on his first round:
-   without it the card answers "how far apart are we" and never "did he move". */
-.ng-cmp-prev { flex: 1 0 100%; text-align: end; font-size: 10.5px; font-weight: 800; }
-.ng-cmp-prev.ok { color: var(--ok); }
-.ng-cmp-prev.bad { color: var(--danger); }
-.ng-cmp-prev.flat { color: var(--muted-light); }
+/* ~~The supplier's standing offer against yours (`.ng-cmp*`, `.ng-delta`).~~ Removed 2026-10-11 with
+   the app's own (alignment 1.12 c). */
 
 /* ── the review step ────────────────────────────────────────────────────────────────────────────
    Two cards, each under a NAVY header of the same shape (app parity): the price you are about to
@@ -994,6 +951,7 @@
 .dlproto .msg.mine .msg-tr { color: rgba(255, 255, 255, .85); }
 .dlproto .msg-tr:disabled { opacity: .6; cursor: default; }
 .dlproto .msg-loc .material-icons-outlined { color: var(--info); }
+.dlproto .msg.mine .msg-loc .material-icons-outlined { color: inherit; }
 /* `.msg-att-lock` (the dashed not-allowed chip shown until the deal was confirmed) is gone — chat
    attachments are open to both parties at any status. */
 /* Explicit SAVE beside an attachment. The attachment itself opens; this keeps a copy. */
@@ -1068,3 +1026,125 @@
   width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex: 0 0 auto;
 }
 .dlproto .dr-sibs button.on .dot { background: rgba(255, 255, 255, .55); }
+
+/* ── Offer cards in the chat (alignment 1.2, 1.12 a, d; the app's `offer_chat_card.dart`) ─────────
+   Your own offer SOLID in your role colour on the RIGHT, the other side's white on the LEFT, in both
+   languages: physical sides, so Arabic does not mirror them (`margin-left/right: auto`, not
+   `align-self`). 80% of the chat, capped so a wide inbox column does not stretch a card across it.
+   Orange TEXT is `--brand-deep`; `--brand` is a fill only. */
+.dlproto .oc { width: min(80%, 360px); flex: 0 0 auto; padding: 10px 12px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); border-radius: 4px 18px 18px 18px; margin-right: auto; color: var(--navy); }
+.dlproto .oc.mine { background: var(--rentee); border-color: var(--rentee); color: var(--surface); border-radius: 18px 4px 18px 18px; margin-right: 0; margin-left: auto; }
+.dlproto .oc.old { opacity: 0.6; }
+.dlproto .oc-h { display: flex; align-items: center; gap: 5px; }
+.dlproto .oc-h .material-icons-outlined { font-size: 15px; color: var(--brand-deep); }
+.dlproto .oc-ti { flex: 1; min-width: 0; font-size: 11px; font-weight: 800; color: var(--brand-deep); }
+.dlproto .oc-tm { flex: none; font-size: 9px; font-weight: 600; color: var(--muted); }
+.dlproto .oc.mine .oc-h .material-icons-outlined, .dlproto .oc.mine .oc-ti { color: var(--surface); }
+.dlproto .oc.mine .oc-tm { color: rgba(255, 255, 255, 0.8); }
+.dlproto .oc-pr { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
+.dlproto .oc-money { display: inline-flex; align-items: baseline; gap: 3px; color: var(--navy-deep); flex: none; }
+.dlproto .oc-was { font-size: 11px; font-weight: 700; color: var(--danger); text-decoration: line-through; margin-right: 2px; }
+.dlproto .oc-cur { font-size: 10.5px; font-weight: 700; color: var(--muted); }
+.dlproto .oc-rate { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; line-height: 1.1; }
+.dlproto .oc-u { font-size: 11px; font-weight: 700; color: var(--muted); }
+.dlproto .oc.mine .oc-money { color: var(--surface); }
+.dlproto .oc.mine .oc-was { color: var(--danger-soft); }
+.dlproto .oc.mine .oc-cur, .dlproto .oc.mine .oc-u, .dlproto .oc.mine .oc-pu { color: rgba(255, 255, 255, 0.8); }
+.dlproto .oc-pu { flex: 1; min-width: 0; font-size: 10.5px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.dlproto .oc-det { flex: none; display: inline-flex; align-items: center; padding: 4px 0; background: none; border: 0; font: inherit; font-size: 11px; font-weight: 700; color: var(--action); cursor: pointer; }
+.dlproto .oc-det .material-icons-outlined { font-size: 15px; }
+.dlproto .oc.mine .oc-det { color: var(--surface); }
+.dlproto .oc-dt { margin-top: 6px; padding-top: 6px; border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
+.dlproto .oc-dt-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; font-weight: 600; line-height: 1.6; }
+.dlproto .oc-dt-row span:last-child { direction: ltr; font-weight: 700; }
+.dlproto .oc-dt-row.total { margin-top: 2px; font-size: 12px; font-weight: 800; }
+/* ONE row, ONE height: each control an equal share. The label never wraps and never cuts; it shrinks
+   with the row (1.12 d), which is what the container's width unit is for. */
+.dlproto .oc-acts { display: flex; gap: 6px; margin-top: 10px; container-type: inline-size; }
+.dlproto .oc-acts > * { flex: 1 1 0; min-width: 0; }
+.dlproto .oc-btn { min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 7px 8px; border-radius: 8px; font: inherit; font-weight: 800; line-height: 1.25; white-space: nowrap; cursor: pointer; }
+.dlproto .oc-btn .material-icons-outlined { flex: none; font-size: 14px; }
+.dlproto .oc-btn-t { font-size: clamp(8.5px, 3.7cqi, 11.5px); }
+.dlproto .oc-btn:disabled { opacity: 0.6; cursor: default; }
+.dlproto .oc-btn.primary { border: 0; color: var(--surface); }
+.dlproto .oc-btn.primary.ok { background: var(--ok); }
+.dlproto .oc-btn.primary.brand { background: var(--brand); }
+.dlproto .oc-btn.ghost { background: var(--surface); border: 1px solid color-mix(in srgb, var(--brand) 45%, transparent); color: var(--brand-deep); }
+.dlproto .oc-stat { display: flex; justify-content: flex-end; margin-top: 8px; }
+.dlproto .oc-sl { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.dlproto .oc-sl .material-icons-outlined { font-size: 13px; }
+.dlproto .oc-sl.pos { color: var(--ok); }
+.dlproto .oc.mine .oc-sl { color: var(--surface); }
+/* An outcome keeps its green on your own solid card, on a small white chip. */
+.dlproto .oc.mine .oc-sl.pos { color: var(--ok); background: var(--surface); border-radius: 999px; padding: 3px 7px; }
+
+/* ── Asks and answers as bubbles (alignment 1.1, 1.3, 1.12 a; the app's `_AskBubble`) ────────────
+   Same sides and widths as the offer card: your own SOLID on the right, the other side white on the
+   left, physical in both languages. The sentence wraps (never cut); the state sits at the END. */
+.dlproto .ab { width: min(80%, 360px); flex: 0 0 auto; padding: 10px 12px 8px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); border-radius: 4px 18px 18px 18px; margin-right: auto; color: var(--navy); text-align: start; }
+.dlproto .ab.mine { background: var(--rentee); border-color: var(--rentee); color: var(--surface); border-radius: 18px 4px 18px 18px; margin-right: 0; margin-left: auto; }
+.dlproto .ab.press { cursor: pointer; }
+.dlproto .ab-r1 { display: flex; align-items: flex-start; gap: 6px; }
+.dlproto .ab-ic { flex: none; margin-top: 2px; font-size: 17px; }
+.dlproto .ab-ic.accent { color: var(--brand-deep); }
+.dlproto .ab-ic.ok { color: var(--ok); }
+.dlproto .ab-ic.bad { color: var(--danger); }
+.dlproto .ab.mine .ab-ic { color: var(--surface); }
+.dlproto .ab-t { flex: 1; min-width: 0; font-size: 13px; font-weight: 700; line-height: 1.5; }
+.dlproto .ab-tm { flex: none; margin-top: 3px; font-size: 9px; font-weight: 700; color: var(--muted); }
+.dlproto .ab.mine .ab-tm { color: rgba(255, 255, 255, 0.8); }
+.dlproto .ab-rows { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
+.dlproto .ab-ub { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 5px 6px; border-radius: 8px; background: var(--surface2); }
+.dlproto .ab.mine .ab-ub { background: rgba(255, 255, 255, 0.16); }
+.dlproto .ab-th { flex: none; width: 30px; height: 30px; border-radius: 6px; overflow: hidden; display: grid; place-items: center; background: var(--surface3); color: var(--muted); }
+.dlproto .ab-th img { width: 100%; height: 100%; object-fit: cover; }
+.dlproto .ab-th .material-icons-outlined { font-size: 16px; }
+.dlproto .ab.mine .ab-th { background: rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.8); }
+.dlproto .ab-tt { flex: 1; min-width: 0; font-size: 11px; font-weight: 700; line-height: 1.6; color: var(--muted); }
+.dlproto .ab-tt b { font-weight: 800; color: var(--navy); }
+.dlproto .ab.mine .ab-tt { color: rgba(255, 255, 255, 0.8); }
+.dlproto .ab.mine .ab-tt b { color: var(--surface); }
+.dlproto .ab-pin { flex: none; font-size: 18px; color: var(--muted); }
+.dlproto .ab.mine .ab-pin { color: rgba(255, 255, 255, 0.8); }
+.dlproto .ab-fc { display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 8px; border: 0; border-radius: 8px; background: var(--surface2); color: var(--navy); font: inherit; text-align: start; }
+.dlproto .ab.mine .ab-fc { background: var(--surface); }
+.dlproto button.ab-fc { cursor: pointer; }
+.dlproto .ab-fi { flex: none; font-size: 14px; }
+.dlproto .ab-fi.accent { color: var(--brand-deep); }
+.dlproto .ab-fi.green { color: var(--ok); }
+.dlproto .ab-nm { flex: 1; min-width: 0; font-size: 11.5px; font-weight: 600; line-height: 1.6; }
+.dlproto .ab-sb { display: block; font-size: 10px; font-weight: 500; line-height: 1.4; color: var(--muted); }
+.dlproto .ab-dl { flex: none; font-size: 14px; color: var(--muted); }
+.dlproto .ab-note { font-size: 12px; font-weight: 500; line-height: 1.45; }
+.dlproto .ab-foot { display: flex; justify-content: flex-end; margin-top: 8px; }
+.dlproto .ab-st { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+.dlproto .ab-st .material-icons-outlined { font-size: 13px; }
+.dlproto .ab-st.muted { color: var(--muted); }
+.dlproto .ab-st.ok { color: var(--ok); }
+.dlproto .ab-st.warn { color: var(--warn-deep); }
+.dlproto .ab-st.bad { color: var(--danger); }
+.dlproto .ab.mine .ab-st.muted { color: var(--surface); }
+.dlproto .ab.mine .ab-st.ok, .dlproto .ab.mine .ab-st.warn, .dlproto .ab.mine .ab-st.bad { background: var(--surface); border-radius: 999px; padding: 3px 7px; }
+
+/* ── The renter's ask bar (alignment 1.3; the app's `ask_quick_bar.dart`) ────────────────────────
+   Four pills above the composer. A label is one line, never cut: the pills share the row evenly
+   when they fit and the row scrolls sideways when they do not. Asked and waiting: a grey clock;
+   nothing left to ask: a green tick. Both greyed and inert. */
+.dlproto .askbar { display: flex; gap: 6px; padding: 8px 12px 0; background: var(--surface); border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent); overflow-x: auto; }
+.dlproto .askbar-p { flex: 1 0 auto; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font: inherit; cursor: pointer; }
+.dlproto .askbar-p .material-icons-outlined { font-size: 18px; color: var(--brand-deep); }
+.dlproto .askbar-l { font-size: 10.5px; font-weight: 700; line-height: 1.2; white-space: nowrap; color: var(--navy); }
+.dlproto .askbar-p.done, .dlproto .askbar-p.pend { background: var(--surface2); cursor: default; }
+.dlproto .askbar-p.done .askbar-l, .dlproto .askbar-p.pend .askbar-l { color: var(--muted); }
+.dlproto .askbar-p.done .material-icons-outlined { color: var(--ok); }
+.dlproto .askbar-p.pend .material-icons-outlined { color: var(--muted); }
+.dlproto .askbar-p:disabled { cursor: default; }
+/* The pickers live in the house Dialog, outside `.dlproto`, so they are not scoped under it. */
+.askpick { display: flex; flex-direction: column; gap: 6px; }
+.askpick-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font: inherit; text-align: start; cursor: pointer; }
+.askpick-row.off { background: var(--surface2); cursor: default; }
+.askpick-row input { flex: none; accent-color: var(--rentee, var(--action)); }
+.askpick-n { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--navy); }
+.askpick-s { flex: none; font-size: 11px; font-weight: 700; color: var(--muted); }
+.askpick-s.ok { color: var(--ok); }
+.askpick-s.bad { color: var(--danger); }

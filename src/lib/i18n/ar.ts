@@ -216,6 +216,7 @@ export const ar: Dictionary = {
     perJob: "/ مهمة",
     noEquipment: "لا توجد معدات مدرجة بعد.",
     error: "تعذّر تحميل هذا المتجر.",
+    notLive: "هذا المتجر غير متاح حالياً",
     retry: "إعادة المحاولة",
     loading: "جارٍ التحميل…",
     requestThis: "اطلب هذه المعدة",
@@ -946,6 +947,9 @@ export const ar: Dictionary = {
     jobTitle: "المسمى الوظيفي",
     companyName: "اسم الشركة",
     companyNamePlaceholder: "اسم شركتك",
+    individualOrCompany: "هل أنت فرد أو شركة؟",
+    individual: "فرد",
+    company: "شركة",
     email: "البريد الإلكتروني",
     whatsapp: "رقم واتساب",
     optional: "اختياري",
@@ -959,6 +963,7 @@ export const ar: Dictionary = {
       city: "اختر مدينتك.",
       jobTitle: "اختر مسماك الوظيفي.",
       companyName: "أدخل اسم الشركة.",
+      entity: "اختر فرد أو شركة",
       email: "أدخل بريدًا إلكترونيًا صحيحًا.",
       emailRequired: "البريد الإلكتروني مطلوب وصحيح.",
       whatsapp: "أدخل رقم جوال سعودي صحيح.",
@@ -1250,7 +1255,7 @@ export const ar: Dictionary = {
     // حُذف `eqNoCerts` (المالك، 2026-08-19): المعدّة التي لم يُطلب لها أيّ شهادة لا يُكتب لها شيء —
     // لا في صفّ البطاقة الرابع ولا في صندوق المؤشّر على الخريطة. لم يبقَ له قارئ.
     eqDistanceUnit: "كم من مشروعك",
-    eqNoDistance: "الموقع غير محدّد",
+    eqNoDistance: "لا توجد ساحة بعد",
     // ── شارة المسافة والشرح خلفها (المالك، 2026-08-28) ─────────────────────────
     // المسافة الحمراء ليست مسافة سيئة، بل مسافة لم يعد بها أحد — وهذه الجملة هي ما تشرحه أول ضغطة.
     eqYardExplainTitle: "كيف تعمل هذه المسافة",
@@ -1497,6 +1502,14 @@ export const ar: Dictionary = {
     chipStarts: "يبدأ {date}",
     chipDuration: "{n} يوم",
     chipMore: "+{n} أخرى",
+    // وضع الموردين (قرارات الطلبات المتعددة 4 و5، 2026-10-11).
+    viewSuppliers: "الموردون",
+    viewRequests: "الطلبات",
+    supplierBidsAcross: "{b} عروض على {r} طلبات",
+    supplierOneBid: "عرض واحد",
+    oneRequestBids: "طلب واحد · {n} عروض",
+    supplierChat: "محادثة",
+    supplierNoBids: "لا توجد عروض من هذا المورد على طلباتك الحالية",
     // تُقرأ من نسخة شروط الطلب المحمولة على العرض، لا تُشتقّ من نوع الإيجار.
     chipOperator: "مع مشغّل",
     tabCards: "البطاقات",

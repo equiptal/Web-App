@@ -99,6 +99,8 @@ export async function readInboxChatSummaries({
         const messages: SummarizableMessage[] = (channel.state?.messages ?? []).map((m) => ({
           type: m.type,
           text: m.text ?? null,
+          custom: (m as { custom?: unknown }).custom ?? null,
+          attachmentCount: m.attachments?.length ?? 0,
           deletedAt: m.deleted_at ?? null,
           createdAt: m.created_at ?? null,
           user: m.user ? { id: m.user.id } : null,

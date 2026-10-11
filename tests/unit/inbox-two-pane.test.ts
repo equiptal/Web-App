@@ -200,7 +200,7 @@ describe("the thin price bar", () => {
 
 describe("the row", () => {
   it("Given a conversation, Then the row quotes its last message", () => {
-    expect(VIEW).toContain("inboxPreview({");
+    expect(VIEW).toContain("inboxPreviewLine(chat, L)");
     expect(VIEW).toContain("inboxTimeLabel({");
   });
 

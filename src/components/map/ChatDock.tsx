@@ -48,10 +48,16 @@ import type { Channel } from "stream-chat";
 import { CallModal } from "@/components/deal-room/CallModal";
 import { CancelReasonsModal } from "@/components/deal-room/CancelReasonsModal";
 import { ChatCard } from "@/components/deal-room/ChatCard";
+import { CounterSheet } from "@/components/deal-room/CounterSheet";
+import { OfferChatCard, OfferGhostButton, OfferPrimaryButton, OfferStateLine } from "@/components/deal-room/OfferChatCard";
+import { AskBubble, AskFileChip, AskNote, AskStatus, AskUnitBox } from "@/components/deal-room/AskBubble";
+import { heroPhotoUrl } from "@/components/map/panel/machine-panel-model";
 import { VoiceRecorder } from "@/components/deal-room/VoiceRecorder";
 import { RequestCard } from "@/components/map/RequestCard";
 import { fleetMachineResolver } from "@/components/map/request-card-ctx";
-import { closeDealRoom, fetchReceivedBids, fetchStreamToken } from "@/lib/api/client";
+import { closeDealRoom, fetchBidCompanyDocuments, fetchBidFleet, fetchDealRoom, fetchReceivedBids, fetchStreamToken, sendRenteeRequest } from "@/lib/api/client";
+import type { CompanyDocsPayload } from "@/lib/contract/company-documents";
+import { unitAvailability } from "@/lib/contract/bid-map";
 import {
   CHAT_ACCEPT,
   CHAT_MAX_MEDIA,
@@ -90,7 +96,27 @@ import {
   requestRepliesByRef,
   requestThreadCards,
 } from "@/lib/contract/deal-rounds";
+import { roundOverride, type DealRound } from "@/lib/contract/deal-rounds";
+import { computeDealTotals, type DealRoomView } from "@/lib/contract/deal-room";
 import { dealSystemEventIcon, dealSystemLine } from "@/lib/contract/deal-system-event";
+import { offerFooterFor, offerThread, previousOfferRate, type ThreadEntry } from "@/lib/contract/offer-thread";
+import {
+  COMPANY_DOC_KEYS,
+  COMPANY_DOCS_REQUEST_KIND,
+  QUOTE_REQUEST_KIND,
+  chatAskAnswered,
+  chatAskDeclined,
+  chatAskFor,
+  companyDocKeysOf,
+  companyDocLabel,
+  companyDocNames,
+  hasOpenQuoteRequest,
+  openCompanyDocAsks,
+  answerDocKeyOf,
+  isAskDecline,
+  isQuoteRequest,
+} from "@/lib/contract/chat-asks";
+import { canonicalDocType, composeAvailabilityRequest, isAskOutstanding } from "@/lib/contract/rentee-request";
 import { isDealActionMessage } from "@/lib/contract/inbox-chat";
 import type { FleetMachine } from "@/lib/contract/fleet";
 import type { InboxBid } from "@/lib/contract/inbox";
@@ -131,6 +157,13 @@ type ChatMsg = {
   /** Read through `dockMessageView` — the deal room renders these, so the dock must not drop them. */
   attachments?: { type?: string; image_url?: string; thumb_url?: string; asset_url?: string; title?: string; mime_type?: string; fallback?: string }[];
   custom?: Record<string, unknown>;
+  /** The app's chat-only asks (alignment 1.1), spread onto the root by the SDK: `quote_request`,
+   *  `company_docs_request` with its `docs`, `ask_declined`; `docKey` names the paper one file is. */
+  kind?: unknown;
+  docs?: unknown;
+  docKey?: unknown;
+  /** The message this one replies to: how a file answers a chat-only ask. */
+  quoted_message_id?: string | null;
 };
 
 export interface ChatDockProps {
@@ -266,6 +299,12 @@ export interface ChatDockProps {
    *  which of those machines have a detail to open, and a card that looked pressable and did nothing
    *  would be worse than one that never claimed to be. */
   canOpenMachine?: (equipmentId: string) => boolean;
+  /**
+   * The machine being negotiated, named under the supplier in the header (owner, 2026-10-11,
+   * multi-item decision 6). Given only on a multi-item request where he has two or more bids, and
+   * then the tab strip is not drawn: the map's machine bar moves the page AND the chat together.
+   */
+  machineLabel?: string | null;
 }
 
 export function ChatDock({
@@ -288,6 +327,7 @@ export function ChatDock({
   draftBusy = false,
   onOpenMachine,
   canOpenMachine,
+  machineLabel = null,
 }: ChatDockProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -343,6 +383,23 @@ export function ChatDock({
   /** Mic active → the composer hands its whole row to the recorder (deal-room parity). */
   const [voiceRecording, setVoiceRecording] = useState(false);
   const [dismissedNotice, setDismissedNotice] = useState<string | null>(null);
+  /**
+   * The ACTIVE tab's room, for the offer cards (alignment 1.2): its status decides the latest offer's
+   * buttons, its bid is the opening offer, and its columns price «Details». Re-read whenever the
+   * message count moves or the sheet closes, since a counter or an accept arrives as a message.
+   */
+  const [room, setRoom] = useState<DealRoomView | null>(null);
+  const [roomTick, setRoomTick] = useState(0);
+  /** The active tab's fleet when the page did not hand one in (the inbox, a sibling tab), so the
+   *  bubbles can name their machines and the ask bar knows what is on the offer. */
+  const [tabFleet, setTabFleet] = useState<{ bidId: string; machines: FleetMachine[] } | null>(null);
+  /** The ask bar's open picker, its ticks, and a send in flight (alignment 1.3). */
+  const [askPicker, setAskPicker] = useState<"availability" | "docsUnit" | "company" | null>(null);
+  const [askPicks, setAskPicks] = useState<ReadonlySet<string>>(() => new Set());
+  const [askBusy, setAskBusy] = useState(false);
+  const [companyDocs, setCompanyDocs] = useState<{ bidId: string; payload: CompanyDocsPayload } | null>(null);
+  /** The negotiation sheet opened from an offer card: the same `CounterSheet` the bid card opens. */
+  const [sheet, setSheet] = useState<{ roomId: string; flow: "counter" | "take" } | null>(null);
   /** Ticks on mount · focus · post-send · poll — the four refresh points, and the ONLY moments the
    *  arrival notice is recomputed. That is what makes the notice refresh-timed rather than live. */
   const [refreshTick, setRefreshTick] = useState(0);
@@ -512,6 +569,31 @@ export function ChatDock({
     void ch.markRead().catch(() => {});
   }, [open, messages, loadedRoomId, activeRoomId]);
 
+  useEffect(() => {
+    if (!activeRoomId) {
+      setRoom(null);
+      return;
+    }
+    let live = true;
+    fetchDealRoom(activeRoomId)
+      .then((r) => { if (live) setRoom(r); })
+      // No room means no offer buttons and no opening card; the conversation itself is unaffected.
+      .catch(() => { if (live) setRoom(null); });
+    return () => { live = false; };
+  }, [activeRoomId, messages.length, roomTick]);
+
+  const activeBidKey = active?.bidId ?? null;
+  const pageFleetCovers = activeBidKey === bid.id && fleet != null;
+  useEffect(() => {
+    if (!activeBidKey || pageFleetCovers) return;
+    let live = true;
+    fetchBidFleet(activeBidKey)
+      .then((r) => { if (live) setTabFleet({ bidId: activeBidKey, machines: r.machines }); })
+      // No fleet: the bubbles fall back to the serial and the machine asks stay off the bar.
+      .catch(() => {});
+    return () => { live = false; };
+  }, [activeBidKey, pageFleetCovers]);
+
   /* A composed ask OPENS the dock and lands on the anchor tab — the prototype's `composeRequest` sets
      `activePanel='chat'; drawerOpen=true` for the same reason. The renter pressed «اطلب…» somewhere in
      the panel; if the card he now has to confirm were behind a closed dock, the press would look like
@@ -648,6 +730,472 @@ export function ChatDock({
     }),
     [L, active?.bidId, activeRow?.supplierName, bid.id, bid.supplierName, fleet, machineOf, fleetHas, repliesByRef, docLabel, onOpenMachine, canOpenMachine, typeWord],
   );
+
+  /* ── offers in the chat (alignment 1.2, the app's `offer_thread.dart`) ──────────────────────────
+     The supplier's bid opens the room as a card, each counter is a card, and only the latest carries
+     buttons: «Counter this price» and «Accept», which open the SAME sheet the bid card's two buttons
+     open (`CounterSheet`). The bid card keeps its own two buttons; these are a second door to the
+     same place, as in the app. */
+  const activeRoom = room && room.id === activeRoomId ? room : null;
+  const roomStatus = activeRoom?.status ?? phase;
+  const openingRound: DealRound | null = useMemo(() => {
+    const o = activeRoom?.opening;
+    if (!o || o.rate == null) return null;
+    return {
+      role: "supplier", rate: o.rate, priceUnit: o.priceUnit, mobPrice: o.mobPrice, demobPrice: o.demobPrice,
+      rentalUnits: o.rentalUnits, mobUnits: null, demobUnits: null, mobExcluded: false, demobExcluded: false, at: null,
+    };
+  }, [activeRoom]);
+  const thread = useMemo(
+    () => offerThread(messages, {
+      // Only the conversation actually loaded for this tab: a shut dock reads the anchor's room.
+      roomOpen: activeRoomId != null && loadedRoomId === activeRoomId,
+      opening: openingRound,
+      awaiting: roomStatus === "AWAITING_SUPPLIER_CONFIRMATION",
+    }),
+    [messages, activeRoomId, loadedRoomId, openingRound, roomStatus],
+  );
+  const iHaveCountered = thread.entries.some((e) => e.kind === "offer" && e.round.role === "rentee");
+  const openSheet = (flow: "counter" | "take") => {
+    if (activeRoomId) setSheet({ roomId: activeRoomId, flow });
+  };
+
+  /** «Details» on the latest offer: the room's position priced the way the sheet prices it. */
+  const offerDetails = (round: DealRound) => {
+    if (!activeRoom) return null;
+    const tt = computeDealTotals(activeRoom, roundOverride(activeRoom, round));
+    const nf = (n: number) => Math.round(n).toLocaleString("en-US");
+    const row = (k: string, v: number, total = false) => (
+      <div key={k} className={`oc-dt-row${total ? " total" : ""}`}><span>{k}</span><span>{nf(v)}</span></div>
+    );
+    return (
+      <>
+        {row(L("Base rental", "الإيجار الأساسي"), tt.rentalTotal)}
+        {!tt.mobExcluded && tt.mobTotal > 0 && row(L("Mobilization", "التعبئة: موب"), tt.mobTotal)}
+        {!tt.demobExcluded && tt.demobTotal > 0 && row(L("Return", "الإرجاع: ديموب"), tt.demobTotal)}
+        {row(L("Subtotal before VAT", "المجموع قبل الضريبة"), tt.subtotal)}
+        {row(L("VAT 15%", "ضريبة القيمة المضافة 15٪"), tt.vat)}
+        {row(L("Total (SAR)", "الإجمالي (ر.س)"), tt.grand, true)}
+      </>
+    );
+  };
+
+  /** The app's `dealPriceUnitSuffix`: month, week, else day. */
+  const unitSuffixOf = (unit: string | null) =>
+    unit === "PER_MONTH" ? L("/month", "/شهر") : unit === "PER_WEEK" ? L("/week", "/أسبوع") : L("/day", "/يوم");
+  const fmtRate = (n: number | null) => (n == null ? "-" : Math.round(n).toLocaleString("en-US"));
+
+  /** One non-message line of the thread: «room opened», an offer, or the accepted card. */
+  const threadCard = (e: Exclude<ThreadEntry<ChatMsg>, { kind: "message" }>) => {
+    if (e.kind === "opened") {
+      return (
+        <div key={e.key} {...pin("chat-dock-event")} className="bm-chat-pill">
+          <span className="material-icons-outlined" aria-hidden="true">meeting_room</span>
+          <span className="bm-chat-pill-t">{L("Deal room opened", "تم فتح غرفة التفاوض")}</span>
+        </div>
+      );
+    }
+    const offers = thread.offerRates;
+    let lastOfferRound: DealRound | null = null;
+    for (const x of thread.entries) if (x.kind === "offer") lastOfferRound = x.round;
+    const round = e.kind === "offer" ? e.round : lastOfferRound;
+    if (!round) return null;
+    const units = round.rentalUnits ?? activeRoom?.numberOfUnits ?? 1;
+    const perUnit = units > 1 ? L("per unit", "للوحدة") : null;
+    const time = chatCardTime(e.at, ar);
+    const unitSuffix = unitSuffixOf(round.priceUnit ?? activeRoom?.priceUnit ?? null);
+    if (e.kind === "accepted") {
+      // «You accepted the offer», drawn as the renter's own card, at the price on the table.
+      return (
+        <OfferChatCard
+          key={e.key}
+          mine
+          title={L("You accepted the offer", "قبلت العرض")}
+          rate={fmtRate(round.rate)}
+          currency={L("SAR", "ر.س")}
+          unitSuffix={unitSuffix}
+          previousRate={null}
+          perUnit={perUnit}
+          time={time}
+          details={offerDetails(round)}
+          detailsLabel={L("Details", "التفاصيل")}
+          status={<OfferStateLine label={L("Waiting for supplier response", "بانتظار رد المؤجر")} icon="schedule" />}
+        />
+      );
+    }
+    const isLatest = e.offerIndex === offers.length - 1;
+    const mine = round.role === "rentee";
+    const kind = offerFooterFor({ isLatest, status: roomStatus, isMine: mine });
+    const prev = kind === "counterAndAccept" ? previousOfferRate(offers, e.offerIndex) : null;
+    const counterLabel = iHaveCountered ? L("Edit your counter-offer", "تعديل العرض المقابل") : L("Counter this price", "اطلب سعراً أقل");
+    let footer: ReactNode[] = [];
+    let status: ReactNode = null;
+    switch (kind) {
+      case "superseded":
+        footer = [<OfferStateLine key="s" label={L("This offer was updated", "تم تحديث هذا العرض")} icon="history" />];
+        break;
+      case "agreed":
+        footer = [
+          <OfferStateLine key="s" label={L("Agreed on this price", "تم الاتفاق على هذا السعر")} icon="check_circle" positive />,
+          // The room's quotation lives on the sheet's footer; the sheet opens read-only on a closed room.
+          <OfferPrimaryButton key="q" tone="brand" icon="download" label={L("Download quotation", "تنزيل عرض السعر")} onClick={() => openSheet("counter")} />,
+        ];
+        break;
+      case "waiting":
+        status = <OfferStateLine label={L("Accepted", "تم القبول")} icon="check_circle" positive />;
+        break;
+      case "editOwn":
+        footer = [<OfferGhostButton key="c" label={counterLabel} onClick={() => openSheet("counter")} />];
+        status = <OfferStateLine label={L("Awaiting reply", "بانتظار الرد")} icon="schedule" />;
+        break;
+      case "counterAndAccept":
+        footer = [
+          <OfferGhostButton key="c" label={counterLabel} onClick={() => openSheet("counter")} />,
+          <OfferPrimaryButton key="a" icon="check" label={L("Accept", "قبول")} onClick={() => openSheet("take")} />,
+        ];
+        break;
+      case "none":
+        break;
+    }
+    return (
+      <OfferChatCard
+        key={e.key}
+        mine={mine}
+        title={
+          e.opening ? L("Quotation", "عرض السعر")
+          : round.role === "supplier" ? L("Updated quotation", "عرض السعر المحدّث")
+          : L("Counter-offer from the renter", "عرض مقابل من المستأجر")
+        }
+        rate={fmtRate(round.rate)}
+        currency={L("SAR", "ر.س")}
+        unitSuffix={unitSuffix}
+        previousRate={prev == null ? null : fmtRate(prev)}
+        perUnit={perUnit}
+        time={time}
+        superseded={!isLatest}
+        details={isLatest ? offerDetails(round) : null}
+        detailsLabel={L("Details", "التفاصيل")}
+        footer={footer}
+        status={status}
+      />
+    );
+  };
+
+  /* ── asks and answers as bubbles (alignment 1.1, 1.3; the app's `rentee_request_card.dart`) ────
+     An availability or equipment-papers ask about one machine is the renter's bubble: one sentence,
+     the machine line, and its state at the end, read off the supplier's reply. The answer is HIS
+     bubble, with a grey line above it naming what happened, and one row per machine or paper. The
+     quotation and company-papers asks are chat messages answered by a file sent as a reply. An
+     «another unit» ask, or one naming no machine, keeps its card (`isBubbleAsk`). */
+  const fleetOnTab = pageFleetCovers ? fleet : tabFleet && tabFleet.bidId === activeBidKey ? tabFleet.machines : null;
+  const fleetById = useMemo(() => new Map((fleetOnTab ?? []).map((u) => [u.equipmentId, u])), [fleetOnTab]);
+  const askByRef = useMemo(() => {
+    const out = new Map<string, RenteeRequestCardPayload>();
+    for (const c of threadCards) if (c.ask) out.set(c.ask.ref, c.ask);
+    return out;
+  }, [threadCards]);
+  /** Two or more machines asked about: every answer row also names its machine. */
+  const asksSpanMachines = useMemo(
+    () => new Set([...askByRef.values()].map((a) => a.equipmentId).filter(Boolean)).size > 1,
+    [askByRef],
+  );
+  const counterpartyName = activeRow?.supplierName ?? activeRoom?.supplier.name ?? (active?.bidId === bid.id ? bid.supplierName : "");
+  /** The name a machine goes by (make and model), else its serial. */
+  const machineName = (id: string | null | undefined, serial?: string | null): string | null => {
+    const u = id ? fleetById.get(id) : undefined;
+    const name = u ? [u.manufacturer, u.modelName].filter(Boolean).join(" ").trim() : "";
+    return name || serial || null;
+  };
+  const isBubbleAsk = (a: RenteeRequestCardPayload) => !!a.equipmentId && a.kind !== "alternative";
+  /** A paper this machine holds, by the ask's type, for the answer's file row. */
+  const paperUrl = (id: string, type: string): string | null => {
+    const u = fleetById.get(id);
+    if (!u) return null;
+    const want = canonicalDocType(type);
+    return (
+      u.documentKeys.find((d) => canonicalDocType(d.type) === want && d.url)?.url
+      ?? u.photoKeys.find((ph) => canonicalDocType(ph.slot) === want && ph.url)?.url
+      ?? null
+    );
+  };
+  const openUrl = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
+  const answerPill = (key: string, positive: boolean, text: string) => (
+    <div key={`${key}-pill`} {...pin("chat-dock-event")} className="bm-chat-pill">
+      <span className="material-icons-outlined" aria-hidden="true">{positive ? "check_circle" : "cancel"}</span>
+      <span className="bm-chat-pill-t">{text}</span>
+    </div>
+  );
+
+  /** A chat-only ask (quotation, company papers), drawn like every other ask bubble. */
+  const chatAskBubble = (m: ChatMsg, mine: boolean) => {
+    const keys = companyDocKeysOf(m);
+    const answered = chatAskAnswered(messages, m.id);
+    const declined = chatAskDeclined(messages, m.id);
+    const foot = answered
+      ? <AskStatus icon="check_circle" label={L("Replied", "تم الرد")} tone="ok" />
+      : declined
+        ? <AskStatus icon="block" label={L("Not available", "غير متوفر")} tone="bad" />
+        : <AskStatus icon="schedule" label={L("Awaiting reply", "بانتظار الرد")} tone="muted" />;
+    return (
+      <AskBubble
+        key={m.id}
+        mine={mine}
+        icon={keys ? "domain" : "receipt_long"}
+        sentence={
+          keys
+            ? L(`I need the company's ${companyDocNames(keys, false)}`, `أحتاج ${companyDocNames(keys, true)} للشركة`)
+            : L("I need the quotation for this request", "أحتاج عرض السعر لهذا الطلب")
+        }
+        time={chatCardTime(m.created_at, ar)}
+        foot={foot}
+      />
+    );
+  };
+
+  /** The supplier's file or «Not available» answering a chat-only ask, with its grey line above. */
+  const chatAskReply = (m: ChatMsg, ask: ChatMsg, mine: boolean) => {
+    const quote = isQuoteRequest(ask);
+    const docKey = answerDocKeyOf(m);
+    const paperKeys = docKey ? [docKey] : companyDocKeysOf(ask) ?? [];
+    const positive = !isAskDecline(m);
+    const who = counterpartyName;
+    const pillText = !positive
+      ? L(`${who} answered Not available`, `${who} ردّ: غير متوفّر`)
+      : quote
+        ? L(`${who} sent the quotation`, `${who} أرسل عرض السعر`)
+        : L(`${who} sent ${companyDocNames(paperKeys, false)}`, `${who} أرسل ${companyDocNames(paperKeys, true)}`);
+    const view = dockMessageView(m);
+    const file = view.attachments.find((a) => a.url);
+    const note = positive ? (m.text ?? "").trim() : "";
+    const fileName = quote ? L("Quotation", "عرض السعر") : companyDocNames(paperKeys, ar);
+    return (
+      <Fragment key={m.id}>
+        {answerPill(m.id, positive, pillText)}
+        <AskBubble
+          mine={mine}
+          icon={positive ? "check_circle" : "block"}
+          tone={positive ? "ok" : "bad"}
+          sentence={
+            !positive
+              ? quote ? L("Sorry, the quotation isn't available", "للأسف عرض السعر غير متوفّر") : L("Sorry, I don't have these documents", "للأسف لا أملك هذه المستندات")
+              : quote ? L("Here is the quotation", "تفضّل، هذا عرض السعر") : L("Here are the company documents", "تفضّل، مستندات الشركة")
+          }
+          time={chatCardTime(m.created_at, ar)}
+          rows={[
+            ...(note ? [<AskNote key="n" text={note} />] : []),
+            ...(file?.url ? [<AskFileChip key="f" name={fileName || L("Document", "مستند")} download onClick={() => openUrl(file.url as string)} />] : []),
+          ]}
+        />
+      </Fragment>
+    );
+  };
+
+  /** The renter's availability or papers ask about one machine. Its state is the supplier's reply. */
+  const renteeAskBubble = (m: ChatMsg, a: RenteeRequestCardPayload, mine: boolean) => {
+    const id = a.equipmentId as string;
+    const u = fleetById.get(id);
+    const answer = repliesByRef.get(a.ref)?.resolution ?? null;
+    const foot =
+      answer == null ? <AskStatus icon="schedule" label={L("Awaiting reply", "بانتظار الرد")} tone="muted" />
+      : answer === "provided" ? <AskStatus icon="check_circle" label={L("Replied", "تم الرد")} tone="ok" />
+      : answer === "partial" ? <AskStatus icon="hourglass_top" label={L("Partly answered", "ردّ جزئي")} tone="warn" />
+      : <AskStatus icon="block" label={L("Not available", "غير متوفر")} tone="bad" />;
+    const docs = (a.docTypes ?? []).map((t) => requestDocLabel(t, L)).join(ar ? "، " : ", ");
+    const name = machineName(id) ?? (fleetOnTab ? L("This equipment is no longer listed", "هذه المعدّة لم تعد مدرجة") : a.serial ?? "");
+    const type = u
+      ? [ar ? u.subcategoryNameAr || u.subcategoryName : u.subcategoryName, ar ? u.measurementNameAr || u.measurementName : u.measurementName]
+          .map((s) => (s ?? "").trim()).filter(Boolean).join(" · ")
+      : "";
+    const rest = [type, u?.year != null ? String(u.year) : ""].filter(Boolean).join(" · ");
+    const opens = !!onOpenMachine && (canOpenMachine ?? fleetHas)(id);
+    return (
+      <AskBubble
+        key={m.id}
+        mine={mine}
+        icon={a.kind === "availability" ? "event_available" : "description"}
+        sentence={
+          a.kind === "availability"
+            ? L("I need you to confirm this equipment is available for this request", "أحتاج تأكيد توفّر هذه المعدّة لهذا الطلب")
+            : L(`I need the ${docs} for this equipment`, `أحتاج ${docs} لهذه المعدّة`)
+        }
+        time={chatCardTime(m.created_at, ar)}
+        unit={<AskUnitBox name={name} rest={rest} photoUrl={u ? heroPhotoUrl(u) : null} pin={opens} />}
+        foot={foot}
+        onClick={opens ? () => onOpenMachine?.(id) : undefined}
+      />
+    );
+  };
+
+  /** The supplier's answer to a bubble ask: his bubble, one sentence, one row per machine or paper,
+   *  no quote of the ask. Availability names the machine and the yard of the BID's fleet. */
+  const renteeReplyBubble = (m: ChatMsg, reply: { inReplyTo: string; equipmentId?: string | null; resolution: string; deliveredTypes: string[] | null }, a: RenteeRequestCardPayload, mine: boolean) => {
+    const positive = reply.resolution === "provided" || reply.resolution === "partial";
+    const availability = a.kind === "availability";
+    const id = reply.equipmentId ?? a.equipmentId ?? null;
+    const machine = machineName(id, a.serial);
+    const who = counterpartyName;
+    const pillText = !positive
+      ? L(`${who} answered Not available`, `${who} ردّ: غير متوفّر`)
+      : availability
+        ? machine ? L(`${who} confirmed ${machine}`, `${who} أكّد توفّر ${machine}`) : L(`${who} confirmed availability`, `${who} أكّد التوفّر`)
+        : (() => {
+            const types = reply.deliveredTypes?.length ? reply.deliveredTypes : a.docTypes ?? [];
+            if (types.length === 0) return L(`${who} sent the documents`, `${who} أرسل المستندات`);
+            const names = types.map((t) => requestDocLabel(t, L)).join(ar ? "، " : ", ");
+            return L(`${who} sent ${names}`, `${who} أرسل ${names}`);
+          })();
+    const papers = !positive || availability
+      ? []
+      : reply.deliveredTypes?.length ? reply.deliveredTypes
+      : reply.resolution === "provided" ? a.docTypes ?? []
+      : [];
+    const rows: ReactNode[] = [];
+    if (availability && (positive || asksSpanMachines) && machine) {
+      const u = id ? fleetById.get(id) : undefined;
+      const yard = (u?.yardName ?? "").trim() || (u?.yardCity ?? "").trim();
+      rows.push(
+        <AskFileChip
+          key="m"
+          icon="location_on"
+          iconTone="green"
+          name={machine}
+          subtitle={positive && yard ? L(`Fleet ${yard}`, `أسطول ${yard}`) : null}
+        />,
+      );
+    }
+    for (const p of papers) {
+      const url = id ? paperUrl(id, p) : null;
+      rows.push(
+        <AskFileChip
+          key={p}
+          name={requestDocLabel(p, L)}
+          subtitle={asksSpanMachines ? machine : null}
+          download
+          onClick={url ? () => openUrl(url) : id && onOpenMachine ? () => onOpenMachine(id) : undefined}
+        />,
+      );
+    }
+    return (
+      <Fragment key={m.id}>
+        {answerPill(m.id, positive, pillText)}
+        <AskBubble
+          mine={mine}
+          icon={positive ? "check_circle" : "block"}
+          tone={positive ? "ok" : "bad"}
+          sentence={
+            availability
+              ? positive ? L("Yes, it's available for this request", "المعدّة متوفّرة لهذا الطلب") : L("Sorry, it's not available", "للأسف المعدّة غير متوفّرة")
+              : positive ? L("Here are the documents", "تفضّل، هذه المستندات") : L("Sorry, I don't have these documents", "للأسف لا أملك هذه المستندات")
+          }
+          time={chatCardTime(m.created_at, ar)}
+          rows={rows}
+        />
+      </Fragment>
+    );
+  };
+
+  /* ── the renter's ask bar (alignment 1.3; the app's `ask_quick_bar.dart`) ───────────────────────
+     A second door, not a new feature: the quotation and company-papers asks are chat messages, the
+     availability ask goes through the same `POST …/requests` the map sends, and the equipment-papers
+     ask hands off to the machine's own documents, where the renter already ticks and asks. Shown
+     once the room's conversation is loaded; the two machine asks wait for the offer's fleet. */
+  const offered = (fleetOnTab ?? []).filter((u) => u.inBid);
+  const availabilityAsked = (id: string) => {
+    const draft = composeAvailabilityRequest(id);
+    return draft != null && isAskOutstanding(draft, outstandingAsks);
+  };
+  const availabilityOpen = offered.filter((u) => unitAvailability(u) !== "confirmed" && !availabilityAsked(u.equipmentId));
+  const askedCompany = openCompanyDocAsks(messages);
+  const sendChatAsk = async (fields: { text: string; kind: string; docs?: string[] }) => {
+    const ch = channelRef.current;
+    if (!ch || askBusy) return false;
+    setAskBusy(true);
+    setFileErr(null);
+    try {
+      // Extra data rides on the message root, where the app reads it (`extraData['kind']`).
+      await ch.sendMessage(fields as Parameters<Channel["sendMessage"]>[0]);
+      return true;
+    } catch {
+      setFileErr(L("The request couldn't be sent", "تعذّر إرسال الطلب"));
+      return false;
+    } finally {
+      setAskBusy(false);
+    }
+  };
+  const askQuotation = () => {
+    if (hasOpenQuoteRequest(messages)) return;
+    void sendChatAsk({ text: L("I need the quotation for this request", "أحتاج عرض السعر لهذا الطلب"), kind: QUOTE_REQUEST_KIND });
+  };
+  const sendAvailability = async (ids: string[]) => {
+    if (!activeRoomId || askBusy || ids.length === 0) return;
+    setAskBusy(true);
+    setFileErr(null);
+    try {
+      // Each machine is its own ask, as the map sends them.
+      for (const id of ids) {
+        const draft = composeAvailabilityRequest(id);
+        if (draft) await sendRenteeRequest(activeRoomId, draft);
+      }
+      setAskPicker(null);
+      refresh();
+    } catch {
+      setFileErr(L("The request couldn't be sent", "تعذّر إرسال الطلب"));
+    } finally {
+      setAskBusy(false);
+    }
+  };
+  const askAvailability = () => {
+    if (availabilityOpen.length === 0) return;
+    if (offered.length === 1) { void sendAvailability([offered[0].equipmentId]); return; }
+    setAskPicks(new Set());
+    setAskPicker("availability");
+  };
+  /** The machine's own documents, where the renter ticks the papers he needs and asks. */
+  const openMachineDocs = (id: string) => {
+    setAskPicker(null);
+    if (onOpenMachine) onOpenMachine(id);
+    else onOpenEquipment?.();
+  };
+  const askEquipmentDocs = () => {
+    if (offered.length === 1) openMachineDocs(offered[0].equipmentId);
+    else setAskPicker("docsUnit");
+  };
+  const askCompanyDocs = () => {
+    setAskPicks(new Set());
+    setAskPicker("company");
+    if (activeBidKey && companyDocs?.bidId !== activeBidKey) {
+      const key = activeBidKey;
+      fetchBidCompanyDocuments(key).then((payload) => setCompanyDocs({ bidId: key, payload })).catch(() => {});
+    }
+  };
+  const sendCompanyAsk = async () => {
+    const keys = COMPANY_DOC_KEYS.filter((k) => askPicks.has(k));
+    if (keys.length === 0) return;
+    const ok = await sendChatAsk({
+      text: L(`I need the company's ${companyDocNames(keys, false)}`, `أحتاج ${companyDocNames(keys, true)} للشركة`),
+      kind: COMPANY_DOCS_REQUEST_KIND,
+      docs: [...keys],
+    });
+    if (ok) setAskPicker(null);
+  };
+  const askBar: { key: string; icon: string; label: string; done?: boolean; pending?: boolean; onTap: () => void }[] =
+    STREAM_API_KEY && activeRoomId && loadedRoomId === activeRoomId
+      ? [
+          { key: "quote", icon: "receipt_long", label: L("Quotation", "عرض السعر"), pending: hasOpenQuoteRequest(messages), onTap: askQuotation },
+          ...(offered.length > 0
+            ? [
+                { key: "avail", icon: "event_available", label: L("Availability", "تأكيد التوفّر"), done: availabilityOpen.length === 0, onTap: askAvailability },
+                ...(onOpenMachine || onOpenEquipment
+                  ? [{ key: "docs", icon: "description", label: L("Equipment docs", "مستندات المعدّة"), onTap: askEquipmentDocs }]
+                  : []),
+              ]
+            : []),
+          { key: "company", icon: "domain", label: L("Company docs", "مستندات الشركة"), onTap: askCompanyDocs },
+        ]
+      : [];
+  const unitLabel = (u: FleetMachine) =>
+    [u.manufacturer, u.modelName].filter(Boolean).join(" ").trim()
+    || (ar ? u.subcategoryNameAr || u.subcategoryName : u.subcategoryName) || u.serialNumber || "";
 
   /* ── the arrival notice (004a §2.1) ──────────────────────────────────────────────────────────── */
 
@@ -996,6 +1544,7 @@ export function ChatDock({
                 names the firm, and a renter who wants to know who he is dealing with presses the
                 name — not a menu behind three dots. Where this surface cannot raise the panel (no
                 handler), the band stays a plain label rather than a button that does nothing. */}
+            <span className={machineLabel ? "bm-chat-id" : "contents"}>
             <span
               className={`bm-chat-who${onOpenCompanyDocs ? " is-link" : ""}`}
               {...(onOpenCompanyDocs
@@ -1027,6 +1576,8 @@ export function ChatDock({
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
               )}
+            </span>
+              {machineLabel && <span {...pin("chat-dock-machine")} className="bm-chat-subj">{machineLabel}</span>}
             </span>
             {/* ── The call control, restored (owner, 2026-08-12) ───────────────────────────────
                 ~~"the call control was excluded by name"~~, in the band's own comment above. It was
@@ -1182,7 +1733,7 @@ export function ChatDock({
           {belowHeader}
 
           {/* A tab per item — and NO strip at all when this counterparty holds one bid (RM3-AC-44). */}
-          {tabs.length > 1 && (
+          {tabs.length > 1 && !machineLabel && (
             <div {...pin("chat-dock-tabs")} className="bm-chat-tabs" role="tablist">
               {tabs.map((tab) => (
                 <button
@@ -1209,10 +1760,12 @@ export function ChatDock({
               // Compose-only. The tab exists, the room does not, and NOTHING here creates one — the
               // send does (RM3-AC-47).
               <div className="bm-chat-note">{t.chatDock.composeOnly}</div>
-            ) : messages.length === 0 ? (
+            ) : thread.entries.length === 0 ? (
               <div className="bm-chat-note">{t.chatDock.empty}</div>
             ) : (
-              messages.map((m) => {
+              thread.entries.map((entry) => {
+                if (entry.kind !== "message") return threadCard(entry);
+                const m = entry.message;
                 const card = chatCardOfMessage(m);
                 /* ── WHOSE message this is, and why it is asked of the channel ──────────────────
                    Owner, 2026-08-11: *"not floating cards in the middle, same on the supplier view
@@ -1225,6 +1778,15 @@ export function ChatDock({
                    chair and inverted from the supplier's, and the two of them read the SAME channel.
                    Authorship is the one reading that is correct from both. */
                 const mine = myStreamId != null && m.user?.id === myStreamId;
+                // ── The app's bubbles (alignment 1.1, 1.3) ───────────────────────────────────
+                const askAnswered = chatAskFor(m, messages);
+                if (askAnswered) return chatAskReply(m, askAnswered, mine);
+                if (isQuoteRequest(m) || companyDocKeysOf(m)) return chatAskBubble(m, mine);
+                if (card?.type === RENTEE_REQUEST_CARD_TYPE && isBubbleAsk(card.card)) return renteeAskBubble(m, card.card, mine);
+                if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) {
+                  const asked = askByRef.get(card.reply.inReplyTo);
+                  if (asked && isBubbleAsk(asked)) return renteeReplyBubble(m, card.reply, asked, mine);
+                }
                 // The renter's own ask keeps its CARD form — he and the supplier look at the same
                 // object, and it is the one thing in the thread with an identity strip and a live
                 // verdict on it. The prototype renders it with the same function it renders the draft
@@ -1418,6 +1980,24 @@ export function ChatDock({
               conversation, so it must not enter the stream and scroll away. */}
           {fileErr && <div className="bm-chat-err" role="status">{fileErr}</div>}
 
+          {/* The renter's asks, above the composer (alignment 1.3). A label never wraps or cuts. */}
+          {askBar.length > 0 && (
+            <div {...pin("chat-dock-askbar")} className="askbar">
+              {askBar.map((it) => (
+                <button
+                  key={it.key}
+                  type="button"
+                  className={`askbar-p${it.done ? " done" : ""}${it.pending ? " pend" : ""}`}
+                  disabled={it.done || it.pending || askBusy}
+                  onClick={it.onTap}
+                >
+                  <span className="material-icons-outlined" aria-hidden="true">{it.done ? "check_circle" : it.pending ? "schedule" : it.icon}</span>
+                  <span className="askbar-l">{it.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* ── The composer (owner, 2026-08-11) ────────────────────────────────────────────────
               «just add things already exist in the existing chat like upload and voice note, the
               composer». So: the deal room's OWN attach control and its OWN `VoiceRecorder`, sending
@@ -1517,6 +2097,105 @@ export function ChatDock({
           name={bid.supplierName}
           canCall={canCall}
           onClose={() => setCallOpen(false)}
+        />
+      )}
+
+      {/* The ask bar's pickers: which machines, which machine, which company papers. */}
+      {askPicker === "availability" && (
+        <Dialog
+          open
+          onClose={() => setAskPicker(null)}
+          size="sm"
+          title={L("Pick the equipment", "اختر المعدّة")}
+          subtitle={L("From the equipment in this offer. Each one is sent as its own request", "من معدّات هذا العرض. يُرسل طلب منفصل لكل معدّة")}
+          footer={
+            <DialogButton tone="primary" full disabled={askPicks.size === 0 || askBusy} onClick={() => void sendAvailability([...askPicks])}>
+              {L(`Send request (${askPicks.size})`, `أرسل الطلب (${askPicks.size})`)}
+            </DialogButton>
+          }
+        >
+          <div className="askpick">
+            {offered.map((u) => {
+              const confirmed = unitAvailability(u) === "confirmed";
+              const asked = availabilityAsked(u.equipmentId);
+              const locked = confirmed || asked;
+              return (
+                <label key={u.equipmentId} className={`askpick-row${locked ? " off" : ""}`}>
+                  <input
+                    type="checkbox"
+                    disabled={locked}
+                    checked={askPicks.has(u.equipmentId)}
+                    onChange={() => setAskPicks((s) => { const n = new Set(s); if (!n.delete(u.equipmentId)) n.add(u.equipmentId); return n; })}
+                  />
+                  <span className="askpick-n">{unitLabel(u)}</span>
+                  {confirmed && <span className="askpick-s ok">{L("Confirmed", "مؤكّدة")}</span>}
+                  {!confirmed && asked && <span className="askpick-s">{L("Asked", "تم الطلب")}</span>}
+                </label>
+              );
+            })}
+          </div>
+        </Dialog>
+      )}
+      {askPicker === "docsUnit" && (
+        <Dialog open onClose={() => setAskPicker(null)} size="sm" title={L("Pick the equipment", "اختر المعدّة")}>
+          <div className="askpick">
+            {offered.map((u) => (
+              <button key={u.equipmentId} type="button" className="askpick-row" onClick={() => openMachineDocs(u.equipmentId)}>
+                <span className="askpick-n">{unitLabel(u)}</span>
+                <span className="material-icons-outlined" aria-hidden="true">chevron_right</span>
+              </button>
+            ))}
+          </div>
+        </Dialog>
+      )}
+      {askPicker === "company" && (
+        <Dialog
+          open
+          onClose={() => setAskPicker(null)}
+          size="sm"
+          title={L("Company docs", "مستندات الشركة")}
+          footer={
+            <DialogButton tone="primary" full disabled={askPicks.size === 0 || askBusy} onClick={() => void sendCompanyAsk()}>
+              {askPicks.size === 0 ? L("Ask for it", "اطلبه") : L(`Ask for (${askPicks.size})`, `اطلبها (${askPicks.size})`)}
+            </DialogButton>
+          }
+        >
+          <div className="askpick">
+            {COMPANY_DOC_KEYS.map((k) => {
+              const doc = companyDocs?.bidId === activeBidKey ? companyDocs.payload.documents.find((d) => d.documentKey === k) : undefined;
+              const asked = askedCompany.has(k);
+              const loading = companyDocs?.bidId !== activeBidKey;
+              return (
+                <label key={k} className={`askpick-row${doc || asked || loading ? " off" : ""}`}>
+                  <input
+                    type="checkbox"
+                    disabled={!!doc || asked || loading}
+                    checked={askPicks.has(k)}
+                    onChange={() => setAskPicks((s) => { const n = new Set(s); if (!n.delete(k)) n.add(k); return n; })}
+                  />
+                  <span className="askpick-n">{companyDocLabel(k, ar)}</span>
+                  {doc?.downloadUrl ? (
+                    <a className="askpick-s ok" href={doc.downloadUrl} target="_blank" rel="noopener noreferrer">{L("View", "عرض")}</a>
+                  ) : doc ? (
+                    <span className="askpick-s ok">{L("On file", "موجود")}</span>
+                  ) : asked ? (
+                    <span className="askpick-s">{L("Asked", "تم الطلب")}</span>
+                  ) : !loading ? (
+                    <span className="askpick-s bad">{L("No document yet", "لا يوجد مستند بعد")}</span>
+                  ) : null}
+                </label>
+              );
+            })}
+          </div>
+        </Dialog>
+      )}
+
+      {/* «Counter this price» / «Accept» from an offer card: the bid card's own sheet, over this screen. */}
+      {sheet && (
+        <CounterSheet
+          roomId={sheet.roomId}
+          flow={sheet.flow}
+          onExit={() => { setSheet(null); setRoomTick((n) => n + 1); }}
         />
       )}
 

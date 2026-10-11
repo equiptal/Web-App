@@ -232,6 +232,13 @@ export interface DealRoomView {
   lastCounterBy: string | null;
   /** Convenience: is it the renter's turn to act (accept/counter)? */
   myTurn: boolean;
+  /**
+   * The supplier's BID as he placed it, the first offer card in the chat (alignment 1.2, app
+   * `supplierOpeningRound`). Not a chat message: it lives on the bid. `rate` above is the CURRENT
+   * price and cannot stand in for it. An absent offered count is one unit, as every badge reads it.
+   * Optional so a view built without a bid (tests, older fixtures) simply has no opening card.
+   */
+  opening?: { rate: number | null; priceUnit: string | null; mobPrice: number | null; demobPrice: number | null; rentalUnits: number };
   /** Negotiable terms (excluding the implicit PRICE term, which the rate card handles). */
   terms: DealTerm[];
   /** True when a non-PRICE term is still disputed — the backend blocks accept-all until resolved. */
@@ -701,6 +708,13 @@ export function mapDealRoom(raw: unknown): DealRoomView {
     requestGroupId: s(reqObj.requestGroupId) ?? s(d.requestGroupId),
     lastCounterBy,
     myTurn,
+    opening: {
+      rate: n(bid.priceAmount),
+      priceUnit: s(bid.priceUnit),
+      mobPrice: n(bid.mobPrice),
+      demobPrice: n(bid.demobPrice),
+      rentalUnits: offeredUnits ?? 1,
+    },
     terms,
     hasDisputedTerms,
     supplierFirstEntry: d.supplierFirstEntry === true,

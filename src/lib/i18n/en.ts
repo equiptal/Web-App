@@ -264,6 +264,7 @@ export const en = {
     perJob: "/ job",
     noEquipment: "No equipment listed yet.",
     error: "We couldn't load this store.",
+    notLive: "This store is not available right now",
     retry: "Retry",
     loading: "Loading…",
     requestThis: "Request this equipment",
@@ -1142,6 +1143,10 @@ export const en = {
     jobTitle: "Job title",
     companyName: "Company name",
     companyNamePlaceholder: "Your company name",
+    /** App parity (`individualOrCompany`, `profileTypeIndividual`, `profileTypeCompany`). */
+    individualOrCompany: "Are you an individual or a company?",
+    individual: "Individual",
+    company: "Company",
     email: "Email",
     whatsapp: "WhatsApp number",
     optional: "optional",
@@ -1154,7 +1159,8 @@ export const en = {
       lastName: "Last name must be 2–50 characters.", // AC-02/03
       city: "Select your city.", // AC-02
       jobTitle: "Select your job title.", // AC-02
-      companyName: "Enter your company name.", // app parity: required on the complete pass
+      companyName: "Enter your company name.", // app parity: required for a company
+      entity: "Choose individual or company",
       email: "Enter a valid email address.",
       emailRequired: "A valid email address is required.",
       whatsapp: "Enter a valid Saudi mobile number.", // AC-04
@@ -1545,7 +1551,7 @@ export const en = {
        the place is (owner, 2026-09-12: *"if no yard then show no equipment in map and show
        unspecified location"*). Saying «distance» invited the reading that the yard is known and the
        arithmetic failed. */
-    eqNoDistance: "Location not specified",
+    eqNoDistance: "No yard yet",
     // ── The distance chip, and the tutorial behind it (owner, 2026-08-28) ──────────────────
     // The card's dominant fact is now the distance, painted with the availability it is only as good
     // as. A red distance is not a bad distance — it is a distance nobody has promised — and that is
@@ -1876,6 +1882,14 @@ export const en = {
     chipStarts: "Starts {date}",
     chipDuration: "{n} days",
     chipMore: "+{n} more",
+    // Suppliers mode (multi-item decisions 4 and 5, 2026-10-11).
+    viewSuppliers: "Suppliers",
+    viewRequests: "Requests",
+    supplierBidsAcross: "{b} bids across {r} requests",
+    supplierOneBid: "1 bid",
+    oneRequestBids: "One request · {n} bids",
+    supplierChat: "Chat",
+    supplierNoBids: "No bids from this supplier on your current requests",
     // Read off the bid's copy of the request terms, not derived from the rental type.
     chipOperator: "With operator",
     // The two tabs and the export beside them.

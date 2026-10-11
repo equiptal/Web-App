@@ -10,6 +10,10 @@
  * dictionary, which is what makes them testable without rendering anything.
  */
 
+import { chatCardOfMessage } from "./deal-rounds";
+import { dealSystemLine, termEventLine } from "./deal-system-event";
+import { RENTEE_REQUEST_CARD_TYPE, RENTEE_REQUEST_REPLY_CARD_TYPE } from "./rentee-request";
+
 /**
  * The row's one-line preview of the last message.
  *
@@ -112,12 +116,21 @@ export interface InboxChatSummary {
    * receipt, so there are exactly TWO tick states — sent and read — and no invented middle one.
    */
   readByOther: boolean;
+  /** An EVENT's raw text (a counter, a term accepted, a rate proposed), kept so the row can say WHAT
+   *  happened in the reader's language (app, 2026-10-07). Null for speech. */
+  eventText: string | null;
+  /** The backend's `custom` payload: asks, answers and term events are told apart here. */
+  custom: unknown;
+  /** The message carries a file, photo, voice note or video. */
+  hasAttachment: boolean;
 }
 
 /** The shape this module needs off a Stream message; deliberately narrower than the SDK's type. */
 export interface SummarizableMessage {
   type?: string;
   text?: string | null;
+  custom?: unknown;
+  attachmentCount?: number;
   deletedAt?: Date | string | null;
   createdAt?: Date | string | null;
   user?: { id?: string } | null;
@@ -180,7 +193,51 @@ export function summarizeChannelMessages({
         return at != null && at.getTime() >= sentAt.getTime();
       });
 
-    return { text: isSystem || !hasText ? null : rawText, sentAt, isMine, readByOther };
+    return {
+      text: isSystem || !hasText ? null : rawText,
+      eventText: isSystem && hasText ? rawText : null,
+      custom: m.custom ?? null,
+      hasAttachment: (m.attachmentCount ?? 0) > 0,
+      sentAt,
+      isMine,
+      readByOther,
+    };
   }
   return null;
+}
+
+/**
+ * **The row's one line, saying what happened** (alignment 1.4). A port of the app's
+ * `inbox_preview_line.dart`; the first rule that matches wins:
+ *   1. the renter's ask card: «Asked to confirm availability» / «Asked for documents» / «Asked for
+ *      another unit», with «You: » when it is his;
+ *   2. the supplier's answer card: «Answered a request»;
+ *   3. an event: the term event from its payload, else the localized narration line;
+ *   4. no text but a file (the quotation and company-paper answers): «Sent a file»;
+ *   5. otherwise {@link inboxPreview}: the text, or «Update in the deal room» when nothing is readable.
+ * The quotation and company-papers asks and «Not available» are plain text, so they land on rule 5.
+ */
+export function inboxPreviewLine(chat: InboxChatSummary, L: (en: string, ar: string) => string): string {
+  const you = L("You: ", "أنت: ");
+  const mine = (s: string) => (chat.isMine ? `${you}${s}` : s);
+  const card = chatCardOfMessage({ custom: chat.custom });
+  if (card?.type === RENTEE_REQUEST_CARD_TYPE) {
+    switch (card.card.kind) {
+      case "availability": return mine(L("Asked to confirm availability", "طلب تأكيد التوفّر"));
+      case "document": return mine(L("Asked for documents", "طلب مستندات"));
+      default: return mine(L("Asked for another unit", "طلب معدّة أخرى"));
+    }
+  }
+  if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE) return mine(L("Answered a request", "ردّ على طلب"));
+  if (chat.eventText) {
+    const line = termEventLine(chat.eventText, chat.custom, L) ?? dealSystemLine(chat.eventText, L);
+    if (line.trim()) return line;
+  }
+  if (!chat.text?.trim() && chat.hasAttachment) return mine(L("Sent a file", "أرسل ملفًا"));
+  return inboxPreview({
+    text: chat.text,
+    isMine: chat.isMine,
+    youPrefix: you,
+    updateLabel: L("Update in the deal room", "تحديث في غرفة الصفقة"),
+  });
 }

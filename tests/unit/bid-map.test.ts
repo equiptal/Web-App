@@ -181,7 +181,7 @@ describe("resolveUnitLocation — position, kept separate from commitment", () =
   });
 
   it("drops the DISTANCE with the point, because the backend computed it FROM that point", () => {
-    // Keeping it would print «5720.8 km» beside «Location not specified», which is the two halves of
+    // Keeping it would print «5720.8 km» beside «No yard yet», which is the two halves of
     // the bug disagreeing on one card.
     expect(resolveUnitLocation(unit({ locationSource: "bid_yard", lat: 0, lng: 0, distanceKm: 5720.8 })).distanceKm).toBeNull();
   });

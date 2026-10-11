@@ -485,13 +485,13 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     // 2026-08-26). What the AC was actually about survives and is asserted below: the two routes
     // wear ONE style, and neither bubble is a boxed notice.
     expect(them).not.toContain("box-shadow");
-    expect(them).toMatch(/border:\s*0/);
-    // Outgoing is the PALE fill with dark ink, not a brand colour with white text — the single change
-    // a reader of the deal room actually sees, and the one most likely to be "fixed" back.
+    // The other side's bubble is white with a hairline at half strength, as the app draws it.
+    expect(them).toContain("var(--surface)");
+    // 🔴 Outgoing is SOLID in the renter's colour with white ink (app release #548, alignment
+    // 1.12 a, 2026-10-11). ~~The pale fill with dark ink~~ (2026-08-19) is reversed by the app.
     const mine = cssBlockOf(dealCss, ".dlproto .msg.mine {");
-    expect(mine.toLowerCase()).toContain("color-mix(in srgb, var(--action) 12%, white)");
-    expect(mine.toLowerCase()).toContain("var(--navy)");
-    expect(mine).not.toContain("var(--rentee)"); // the blue fill it used to carry
+    expect(mine).toContain("var(--rentee)");
+    expect(mine).toContain("color: var(--surface)");
     // And the fork is GONE, not merely equal. Two blocks holding the same values is how they came to
     // hold different ones.
     expect(cssSrc).not.toContain(".bidmap .bm-chat .msg");
@@ -514,7 +514,7 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
        from opposite ends. `is-mine` for an ask and `is-them` for a reply is therefore not a rule —
        it is the renter's chair hardcoded, and it inverts the moment the reader changes. The side has
        to come off the Stream author, exactly as the plain bubbles below it already take theirs. */
-    const stream = dockSrc.slice(dockSrc.indexOf("messages.map((m) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
+    const stream = dockSrc.slice(dockSrc.indexOf("thread.entries.map((entry) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
     expect(stream).toContain("const mine = myStreamId != null && m.user?.id === myStreamId;");
     /* BOTH card wrappers are driven by that one reading, and neither states a side literally: the
        renter's request card, and the bare form an unfoldable reply keeps.
@@ -537,7 +537,7 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
        because each takes its own author's side, and both stating the answer in different words. The
        request's card carries the answer now (through `cardCtx.reply`, worded by `replyAnswerLine`),
        and the reply's card is suppressed. */
-    const stream = dockSrc.slice(dockSrc.indexOf("messages.map((m) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
+    const stream = dockSrc.slice(dockSrc.indexOf("thread.entries.map((entry) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
     // Not imported and not called — the withdrawn function is named only in the comment that records
     // why it is gone.
     expect(dockSrc).not.toMatch(/^\s*replyCardView,$/m);
@@ -596,9 +596,11 @@ describe("no tab strip for a single bid (RM3-AC-44)", () => {
     // far as a `node` env can — what stays UNPROVEN here is the PAINTED result, i.e. that the strip
     // element is absent from the DOM and leaves no empty row behind. That needs a component harness
     // (RM3-TC-11, manual-verify).
-    expect(dockSrc).toContain("{tabs.length > 1 && (");
+    // 🔴 And none where the map's machine bar is drawn (owner, 2026-10-11, multi-item decision 6):
+    // the bar moves the page AND the chat, so the tabs would be a second, weaker way to do the same.
+    expect(dockSrc).toContain("{tabs.length > 1 && !machineLabel && (");
     const strip = dockSrc.indexOf('className="bm-chat-tabs"');
-    const guard = dockSrc.indexOf("{tabs.length > 1 && (");
+    const guard = dockSrc.indexOf("{tabs.length > 1 && !machineLabel && (");
     expect(strip).toBeGreaterThan(-1);
     expect(guard).toBeGreaterThan(-1);
     expect(guard).toBeLessThan(strip); // the guard wraps the strip; it does not follow it
@@ -1009,7 +1011,7 @@ describe("the dock's composer sends what the deal room sends, the way the deal r
     // `ChatCard`. An attachment carries no `custom.type`, so it has to fall through BOTH of those to
     // the bubble — otherwise the file the composer just gained would be invisible where it lands.
     const stream = dockSrc.slice(
-      dockSrc.indexOf("messages.map((m) => {"),
+      dockSrc.indexOf("thread.entries.map((entry) => {"),
       dockSrc.indexOf("<div ref={bottomRef} />"),
     );
     expect(stream.length).toBeGreaterThan(500); // positive control on the slice

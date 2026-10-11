@@ -3476,3 +3476,8 @@ main:has(.bidmap) > .page-back-bar {
 .bidmap .bm-chat-menu button.danger .material-icons-outlined { color: var(--danger); }
 .bidmap .bm-chat-menu button.danger:hover { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 
+/* The chat header with the machine being negotiated under the supplier's name (multi-item decision 6,
+   2026-10-11). Drawn only on a multi-item request where he has two or more bids. */
+.bidmap .bm-chat-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.bidmap .bm-chat-id .bm-chat-who { flex: none; }
+.bidmap .bm-chat-subj { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--muted); }

@@ -190,6 +190,10 @@ export const PIN_REGISTRY = {
   "circle-art": { n: "26.4", label: "Circle — the request's machines on one ground", file: "src/components/workspace/CircleArt.tsx" },
   "circle-zoom": { n: "26.5", label: "Circle — the zoomed view behind a double press", file: "src/components/workspace/RequestRail.tsx" },
   "rail-scroll-back": { n: "26.6", label: "Rail — the back arrow, once scrolled", file: "src/components/workspace/RequestRail.tsx" },
+  "rail-suppliers-tile": { n: "26.7", label: "Rail — «Suppliers» tile at the end (switch to suppliers mode)", file: "src/components/workspace/SuppliersMode.tsx" },
+  "supplier-rail": { n: "26.8", label: "Suppliers mode — the supplier circles row", file: "src/components/workspace/SuppliersMode.tsx" },
+  "rail-requests-tile": { n: "26.9", label: "Suppliers mode — «Requests» tile at the end (back to requests)", file: "src/components/workspace/SuppliersMode.tsx" },
+  "supplier-card": { n: "27.3", label: "Suppliers mode — the supplier card", file: "src/components/workspace/SuppliersMode.tsx" },
   // 27 was the request strip, a full-width band above the tabs. It is the context bar now — the
   // location and the item, and the item switcher the strip used to carry as chips (owner, 2026-08-27).
   "item-tier": { n: "26.3", label: "Item tier — one chip per machine", file: "src/components/workspace/ItemTier.tsx" },
@@ -276,6 +280,10 @@ export const PIN_REGISTRY = {
   "chat-dock-composer": { n: "57.4", label: "Chat drawer — composer", file: "src/components/map/ChatDock.tsx" },
   "chat-dock-draft": { n: "57.5", label: "Chat drawer — staged request card", file: "src/components/map/ChatDock.tsx" },
   "chat-dock-event": { n: "57.6", label: "Chat drawer — negotiation event (grey pill)", file: "src/components/map/ChatDock.tsx" },
+  "chat-offer": { n: "57.7", label: "Chat drawer — offer card (price, counter, accept)", file: "src/components/deal-room/OfferChatCard.tsx" },
+  "chat-dock-askbar": { n: "57.8", label: "Chat drawer — the renter's ask buttons above the composer", file: "src/components/map/ChatDock.tsx" },
+  "chat-dock-machine": { n: "57.9", label: "Chat drawer — the machine being negotiated, under the supplier", file: "src/components/map/ChatDock.tsx" },
+  "machine-bar": { n: "45.4", label: "Bid map — this supplier's bids on the request's other machines", file: "src/components/map/MachineBar.tsx" },
 
   /* ── 60–69  inbox, stores ─────────────────────────────────────────────────────────────────── */
   "inbox-view": { n: "60", label: "Inbox", file: "src/components/inbox/InboxView.tsx" },

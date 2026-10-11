@@ -702,6 +702,10 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       // carries nothing back: the renter closing the dock must stay closed, and a tab press still
       // moves nothing on the surface.
       "initialOpen",
+      // `machineLabel` joined on 2026-10-11 (multi-item decision 6): the machine being negotiated,
+      // named under the supplier. It travels DOWN and carries nothing back; what moves the map now is
+      // the page's machine bar, a route change, never a setter handed to this dock.
+      "machineLabel",
       "onCancelDraft",
       "onConfirmDraft",
       // `onOpenCompanyDocs` joined on 2026-08-19 with the dock's ⋮ kebab. It is a REPORT, not a
@@ -748,10 +752,14 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
        fails it. */
     expect(dock.match(/<RequestCard/g)).toHaveLength(2);
     expect(dock.match(/onOpenMachine=\{onOpenMachine\}/g)).toHaveLength(2);
-    // Eight mentions in all: the prop declaration, the destructure, the resolver that decides whether
-    // a press is offered at all, its dependency, and the two `prop={prop}` pairs above. Anything
-    // more is a second consumer, which is what this line exists to catch.
-    expect(dock.match(/onOpenMachine/g)).toHaveLength(8);
+    // Eight mentions for the cards: the prop declaration, the destructure, the resolver that decides
+    // whether a press is offered at all, its dependency, and the two `prop={prop}` pairs above.
+    // 🔴 Seven more since 2026-10-11 (app release #548, alignment 1.1 and 1.3), each a press on
+    // something that NAMES the machine, never the tab strip: the renter's ask bubble (gate + press),
+    // a paper row on the supplier's answer when the fleet holds no file (gate + press), and the ask
+    // bar's «Equipment docs» hand-off to the machine's own documents (gate, press, and the ask bar's
+    // condition for drawing it). Anything beyond these is a new consumer, which is what this catches.
+    expect(dock.match(/onOpenMachine/g)).toHaveLength(15);
   });
 
   it("declares callbacks that REPORT or ACT, and none that hands out map state", () => {

@@ -485,7 +485,13 @@ export interface RequestListItem {
    * that from the URL at the point of render would mean sniffing a bucket path; deciding it here,
    * where the slot is chosen, costs a boolean and cannot go stale.
    */
-  item: { name: string; nameAr: string; qty: number; imageUrl: string | null; imageIsPhoto: boolean; categoryId: string | null } | null;
+  item: {
+    name: string; nameAr: string; qty: number; imageUrl: string | null; imageIsPhoto: boolean; categoryId: string | null;
+    /** The machine's TYPE without its size («Spider Lift», not «Spider Lift · 49 m»), for the request
+     *  card's names line, where sizes are left to the full list (multi-item decision 2). Absent on
+     *  older fixtures, where callers fall back to `name`. */
+    typeName?: string; typeNameAr?: string;
+  } | null;
 }
 
 /** A submission group — one or more single-item requests that share a `requestGroupId`. */
@@ -652,6 +658,8 @@ export function mapRequestListItem(r: RequestRecord): RequestListItem {
       ? {
           name: itemName(it, false),
           nameAr: itemName(it, true),
+          typeName: it.subtypeName || itemName(it, false),
+          typeNameAr: it.subtypeNameAr || it.subtypeName || itemName(it, true),
           qty: it.numberOfUnits ?? 1,
           imageUrl: publicTaxonomyUrl(it.subtypeEquipmentImageUrl ?? it.subtypeImageUrl ?? it.categoryImageUrl),
           imageIsPhoto: Boolean(it.subtypeEquipmentImageUrl),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
@@ -68,12 +68,13 @@ function CircleZoom({ machines, onClose }: { machines: RailMachine[]; onClose: (
  * A closed request keeps its place in the rail rather than dropping out of it: its bids are still
  * worth reading, and a rail that silently loses rows teaches the renter not to trust it.
  *
- * **The ring says one thing: whether the request is shut** (owner, 2026-08-27). Grey for closed and
- * dimmed with it; nothing at all otherwise. ~~Brand for the request being read, green for one with
- * bids waiting.~~ Three colours on a row of circles, and two of them competed — an active request
- * with bids waiting could not show both, so the orange won and the green news was lost on the one
- * tile the renter was looking at. Which tile is being read is carried by its full opacity and its
- * navy caption, which is what carried it alongside the ring anyway.
+ * **The ring says which request is being read, as the app draws it** (owner, 2026-10-11: V1 of the
+ * multi-item review, `offers_filter_bar.dart`): a 2.5px navy ring and a navy badge on the selected
+ * circle; a 1.5px grey ring, a grey badge and 55% on the others. Closed stays greyscale at 50%.
+ * ~~No ring at all, the selected tile told apart only by full opacity and a navy caption~~ (owner,
+ * 2026-08-27 and 2026-08-31): too faint, the selected circle did not stand out. ~~Brand for the
+ * request being read, green for one with bids waiting~~ stays withdrawn: the ring has one colour
+ * and one meaning.
  *
  * **EVERY circle carries a ×, and what it does depends on the request** (owner, 2026-09-22:
  * *"i want it to be on all circules instead of the share even if active"*).
@@ -96,6 +97,7 @@ export function RequestRail({
   activeKey,
   onPick,
   onDismiss,
+  trailing,
 }: {
   tiles: RailTile[];
   activeKey: string | null;
@@ -108,6 +110,9 @@ export function RequestRail({
    * request the caption under it calls closed.
    */
   onDismiss?: ((key: string) => void) | null;
+  /** What sits at the END of the row, after the forward arrow: the «Suppliers» tile (owner,
+   *  2026-10-11, multi-item decision 4, P3). */
+  trailing?: ReactNode;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -263,7 +268,7 @@ export function RequestRail({
              tile at half opacity, and «CLOSED» under the name. **Being read** is full opacity and a
              navy semibold caption where the others are muted. Neither ever depended on the ring —
              it was the third way of saying two things. */
-          const dim = active ? "" : tile.closed ? "opacity-50" : "opacity-[.72]";
+          const dim = active ? "" : tile.closed ? "opacity-50" : "opacity-[.55]";
           const raised = fmtRaised(tile.createdAt, ar);
           return (
             <button
@@ -294,7 +299,9 @@ export function RequestRail({
                   44 / 40 / 36 are the numbers the percentages were computing anyway. Stated
                   outright there is nothing left to resolve, so the clip is 36px on every tile and
                   every machine, whatever its shape. */}
-              {/* ── A HAIRLINE, not a white band (owner, 2026-08-31) ──────────────────────────────
+              {/* 🔴 The edge is now the RING drawn over the picture below (owner, 2026-10-11, V1); this
+                  outer span only reserves the tile's 56px. The note that follows is the history.
+                  ── A HAIRLINE, not a white band (owner, 2026-08-31) ──────────────────────────────
                   *"Remove the white outlines, they are too thick — keep a very thin border."*
 
                   The band was never a ring: it was the disc's own 4px padding, kept on 2026-08-27
@@ -307,7 +314,7 @@ export function RequestRail({
                   the circle has an edge, and the edge is a line rather than a band. The clip grows
                   from 48 to 52 with the space that frees, so the machines got BIGGER as the outline
                   got thinner. */}
-              <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full border border-border bg-surface p-px">
+              <span className="relative grid h-14 w-14 flex-none place-items-center rounded-full">
                 <span className="relative h-[52px] w-[52px] rounded-full">
                   {/* 🔴 **The disc is painted the PHOTOGRAPHS own ground when it holds one**
                       (owner, 2026-09-21). That is what lets several machines merge into one
@@ -364,6 +371,14 @@ export function RequestRail({
                       onBroken={(url) => setBroken((b) => new Set(b).add(url))}
                     />
                   </span>
+                  {/* The selection ring, drawn OVER the picture so no photograph covers it (the app's
+                      `foregroundDecoration`). Under the badges, which come after it. */}
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none absolute inset-0 rounded-full ${
+                      active ? "border-[2.5px] border-navy" : "border-[1.5px] border-border"
+                    }`}
+                  />
                   {/* ── The unit count, and nothing else (owner, 2026-08-25) ─────────────────────
                       A bid count used to sit here and outrank the units, on the reasoning that a
                       bid is news and a count is not. The ring already carries that news: green
@@ -416,7 +431,9 @@ export function RequestRail({
                       /* `font-semibold`, not `font-extrabold` (owner, 2026-08-31: *"the font for the
                          unit or multi-item badge is thick, make it thinner"*). At 10px on a coloured
                          pill, 800 renders as a blob; 600 is legible and stops shouting. */
-                      className="absolute -bottom-px -end-px flex items-center gap-1 rounded-full border border-surface bg-brand px-1 py-[1px] text-label font-semibold leading-[13px] text-brand-fg"
+                      /* Navy on the selected circle, grey on the others (owner, 2026-10-11, V1).
+                         ~~`bg-brand`~~: an orange badge on every tile outshouted the selection. */
+                      className={`absolute -bottom-px -end-px flex items-center gap-1 rounded-full border border-surface ${active ? "bg-navy" : "bg-muted"} px-1 py-[1px] text-label font-semibold leading-[13px] text-white`}
                       title={t.workspace.itemsBadge.replace("{n}", String(tile.items))}
                     >
                       <Icon name="layers" size={9} />
@@ -424,7 +441,7 @@ export function RequestRail({
                     </span>
                   ) : tile.units > 1 ? (
                     <span
-                      className="absolute -bottom-px -end-px min-w-[19px] rounded-full border border-surface bg-navy px-1 text-label font-semibold leading-[15px] text-white"
+                      className={`absolute -bottom-px -end-px min-w-[19px] rounded-full border border-surface ${active ? "bg-navy" : "bg-muted"} px-1 text-label font-semibold leading-[15px] text-white`}
                       title={t.workspace.unitsTitle.replace("{n}", String(tile.units))}
                     >
                       {t.workspace.unitsBadge.replace("{n}", String(tile.units))}
@@ -469,6 +486,7 @@ export function RequestRail({
       >
         <Icon name="chevron_right" size={16} className="rtl:scale-x-[-1]" />
       </button>
+      {trailing}
     </div>
     {/* ⚠️ Mounted at the rail's ROOT, outside the scroller and outside the 96px band. That band is
         `overflow-hidden`; a `position: fixed` layer escapes an overflow clip (only a transformed

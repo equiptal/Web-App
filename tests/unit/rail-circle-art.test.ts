@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { MAX_IN_CIRCLE, circleTiles, rowsFor } from "@/components/workspace/CircleArt";
 
 /**
  * **The rail's circle, when a request holds more than one machine.**
@@ -40,85 +41,45 @@ describe("one machine or many, in one 52px circle", () => {
     expect(art).toContain("if (art.length < 2) {");
   });
 
-  it("Given more than three, Then only three are drawn and nothing says «+N»", () => {
+  it("Given more than four, Then four are drawn, as the app's list thumbnail", () => {
     /**
-     * 🔴 His number (*"show 3 items at most in the circule"*). A fourth machine is 13px wide, which
-     * is a mark rather than a machine — and the count badge already states how many lines the
-     * request really holds, so an overflow marker inside the circle would say it twice.
+     * 🔴 Owner, 2026-10-11, multi-item decision 1: the app's group rules, kept round.
+     * ~~Three, side by side, masked to fade into each other~~ (2026-09-21 / 22): the app tried
+     * the overlapping row and dropped it on device. Its list cap is four, as 2 by 2.
      */
-    expect(shared).toContain("export const MAX_IN_CIRCLE = 3;");
+    expect(MAX_IN_CIRCLE).toBe(4);
     expect(art).toContain("art.slice(0, MAX_IN_CIRCLE)");
     expect(art).not.toContain("+{extra}");
   });
 
-  it("Given several machines, Then they sit in ONE row on ONE ground", () => {
-    /**
-     * 🔴 ~~A grid of cells with a hairline between them, each on its own grey tile.~~ (owner,
-     * 2026-09-21: *"cant u merge their backgorudn like they sit on one background and zoom them
-     * out?"*). Framed thumbnails in a 52px circle read as broken pictures rather than as one
-     * request holding several machines.
-     */
-    /* ⚠️ The disc's DIAMETER is the caller's (52 on the rail, 32 on the context bar), so what
-       is pinned is its shape and its clip - a fixed 52 here would fail on the bar for being right. */
-    expect(art).toContain('className="flex items-center justify-center overflow-hidden rounded-full"');
-    expect(art).toContain("style={{ height: size, width: size }}");
-    // No cell ground, no hairline, no grid.
-    expect(art).not.toContain("bg-border");
-    expect(art).not.toContain("gap-px");
-    expect(art).not.toContain("row-span-2");
-    // Each is drawn off its share of the width, which is what «zoom them out» means here.
-    expect(art).toContain("width: `${SPREAD / shown.length}%`");
+  it("Given 2, 3 or 4 machines, Then the rows are the app's: side by side, 2 + 1, 2 by 2", () => {
+    expect(rowsFor(2)).toEqual([2]);
+    expect(rowsFor(3)).toEqual([2, 1]);
+    expect(rowsFor(4)).toEqual([2, 2]);
+    expect(rowsFor(7)).toEqual([2, 2]);
   });
 
-  it("Given the row, Then each machine is BIGGER than its share and overlaps the next", () => {
-    /**
-     * Owner, 2026-09-22: *"u can make them a little bigger and closer"*.
-     *
-     * ⚠️ The two numbers are ONE decision and the test says so rather than restating them: the
-     * row's total width is `SPREAD - OVERLAP` at ANY count, because the boost is `SPREAD / n` and
-     * the pull-back `OVERLAP / (n - 1)`. Two machines at 66% overlap by 16 and three at 44% by 8,
-     * and either way the row oversails the disc by the same amount, which the round clip takes.
-     * Pinning «66» and «16» instead would go stale the first time the cap moved.
-     */
-    expect(shared).toContain("const SPREAD = 132;");
-    expect(shared).toContain("const OVERLAP = 16;");
-    expect(art).toContain("marginInlineStart: `-${OVERLAP / (shown.length - 1)}%`");
-    // ⚠️ Only AFTER the first, or the row is pushed off its own leading edge.
-    expect(art).toContain("...(i > 0 ?");
-    /* 🔴 `flex-none` is what makes the boost survive: the row is deliberately wider than the
-       disc, and a flex item that may shrink is shrunk straight back to fit. */
-    const rowImg = art.slice(art.indexOf("{shown.map("));
-    expect(rowImg).toContain("flex-none");
-    // ⚠️ LOGICAL, never `marginLeft`: the rail mirrors whole under `dir="rtl"`.
-    expect(art).not.toContain("marginLeft");
+  it("Given any count at the rail's and the card's sizes, Then every tile sits INSIDE the circle", () => {
+    for (const size of [52, 32]) {
+      for (const n of [2, 3, 4]) {
+        const r = size / 2;
+        for (const t of circleTiles(n, size)) {
+          for (const [x, y] of [[t.left, t.top], [t.left + t.width, t.top], [t.left, t.top + t.height], [t.left + t.width, t.top + t.height]]) {
+            expect(Math.hypot(x - r, y - r)).toBeLessThanOrEqual(r);
+          }
+        }
+      }
+    }
   });
 
-  it("Given each picture, Then its own EDGE is masked away so the grounds merge", () => {
-    /**
-     * Owner, 2026-09-22, on the shipped montage: *"cant we merge them in one background? not shown
-     * as 2 seperate imeages"*.
-     *
-     * The ground colour alone was not enough. Every render shares one beige sweep, which is what
-     * `--photo-ground` matches, but each carries a VIGNETTE - measured on `taxonomy-icons`
-     * spider-lift, corners #d8d4cd against a disc of #e3ded7, eleven levels darker. `object-contain`
-     * draws the whole file, vignette included, so each machine sat inside a faintly darker rectangle
-     * with hard edges, and two of those read as two pasted pictures.
-     *
-     * Compared at the real 52px, magnified 7x, against both alternatives: `object-cover` fills the
-     * half and shreds the machine (2.7x crop, hard vertical seam where the two meet), and a
-     * top-and-bottom fade leaves the left and right edges standing.
-     */
-    expect(shared).toContain("const CELL_MASK =");
-    /* 🔴 `closest-side`, and the element must BE the picture - see the case below. An
-       ellipse sized in PERCENTAGES is sized to the BOX, and with a box taller than the picture the
-       solid core swallowed it whole and faded nothing. */
-    expect(shared).toContain("radial-gradient(closest-side, black 68%, transparent 100%)");
-    const rowImg = art.slice(art.indexOf("{shown.map("));
-    expect(rowImg).toContain("maskImage: CELL_MASK");
-    expect(rowImg).toContain("WebkitMaskImage: CELL_MASK");
-    // ⚠️ Per CELL, never on the disc: the disc's own edge is the circle, and fading that greys the rim.
-    const disc = art.slice(art.indexOf("flex items-center justify-center"), art.indexOf("{shown.map("));
-    expect(disc).not.toContain("maskImage");
+  it("Given two machines, Then they sit whole side by side with no gap; three or more fill their tiles", () => {
+    const [a, b2] = circleTiles(2, 52);
+    expect(a.left + a.width).toBeCloseTo(b2.left, 5);
+    expect(a.radius).toBe(0);
+    expect(art).toContain('shown.length === 2 ? "object-contain" : "object-cover"');
+    // The second row of three is centred under the first.
+    const three = circleTiles(3, 52);
+    expect(three[2].left + three[2].width / 2).toBeCloseTo(26, 5);
   });
 
   it("Given the disc under them, Then it is the PHOTOGRAPHS' own ground", () => {
@@ -135,26 +96,6 @@ describe("one machine or many, in one 52px circle", () => {
     expect(code).toContain('img ? "bg-photo-ground" : "bg-surface3"');
   });
 
-  it("Given a machine in the row, Then the ELEMENT IS THE PICTURE, and is not scaled", () => {
-    /**
-     * 🔴 `h-auto` is load-bearing, not tidiness: a CSS mask is sized to the ELEMENT BOX, never
-     * to the picture inside it. With `h-full` the box was 26x52 while `contain` drew the picture
-     * 26x19.4, so the mask's solid core spanned +/-17.9px and the picture only +/-9.7px - every
-     * pixel of it inside the solid part, horizontal edges untouched, rectangle intact. Measured in
-     * a browser; the source reads as though it is fading something.
-     *
-     * ⚠️ No `object-fit` follows from it: at its own aspect there is nothing to fit. And no
-     * scale, unlike the single picture - the 1.34 exists to hide one drawing's letterbox band
-     * against the round edge, and here the neighbours are the rest of the band.
-     */
-    const rowImg = art.slice(art.indexOf("{shown.map("));
-    expect(rowImg).toContain('className="h-auto flex-none"');
-    expect(rowImg).not.toContain("object-contain");
-    expect(rowImg).not.toContain("object-cover");
-    expect(rowImg).not.toContain("scale-[1.34]");
-    // …and the single-picture path keeps it, so the two cases have not been collapsed.
-    expect(shared).toContain('const fitOf = (isPhoto: boolean) => (isPhoto ? "object-cover" : "scale-[1.34] object-contain");');
-  });
 });
 
 describe("a double press opens the picture and still picks the request", () => {

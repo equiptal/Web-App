@@ -26,6 +26,101 @@ reversal, or the reason an odd-looking line is load-bearing.
   Profile switcher did, so switching from the header left pushes in the old language. Signed-in only
   (the toggle shows to visitors) and not awaited, like Profile. Verified: tsc and eslint as above,
   AppShell tests unchanged (14 pre-existing failures with and without).
+- **2026-10-11 - The intake's side panel folds a multi-item request into ONE row. BUILT on
+  `staging` (worktree), NOT committed.** The panel beside the agent's input listed one row per
+  machine, so a submission of three read as three requests and only the first looked like the request.
+  Now: the combined picture (`CircleArt`, the request card's rows), the first machine's name and
+  «+N more» in orange; pressing it opens the request's machines, each pressable exactly as before
+  (`pressRow` unchanged). A one-machine request is the same row as before. Files:
+  `src/components/create/RequestsRail.tsx` (`byRequest`, `MultiRailRow`),
+  `tests/unit/intake-rail-fold.test.ts`. ⚠️ Rows are grouped by the template's `option.id`, the
+  chart group's id (a request group or a work order), which is what `listTemplates` stamps on every
+  machine of one group. The floor chips under the box are unchanged. Not checked in a browser.
+- **2026-10-11 - Multi-item requests follow the app (release #548, alignment 1.6), six owner
+  decisions, recorded in `docs/multi-item-decisions.md`. BUILT on `main`, NOT committed.**
+  (1) The request picture keeps the CIRCLE but lays the machines out by the app's rows (2 side by
+  side, 2 + 1, 2 by 2), fitted so no tile is cut (`circleTiles`); four at most. ~~One overlapping row
+  of three, masked to fade together~~, which the app had dropped on device. (2) The navy request card
+  names up to three machine TYPES as plain text, each cut only at its own end, «×N» kept with it,
+  then «+N more» in orange. (3) The Items row: the request's picture on the label, each machine's own
+  picture before its name (no icons), and the overflow as an orange «+N more» pill whose list shows
+  picture, units and bids. (4) A «Suppliers» tile at the END of the request rail switches to
+  suppliers mode; a «Requests» tile at the end of the supplier row switches back. (5) Suppliers mode:
+  one supplier at a time, newest bidder first; a supplier card where the request card was; the
+  workspace's own bid cards in the same horizontal row, with the machine on the top line instead of
+  the supplier; bids on one submission in a light-blue panel headed by the request (`supplierRuns`).
+  (6) The bid map gets a machine bar under the back header: this supplier's bid on each machine of the
+  request, one press moves the whole map (route change), and the chat names the machine under the
+  supplier and drops its own tabs. Shown only on a multi-item request where he has two or more bids.
+  Files: `src/components/workspace/{CircleArt,RequestContextBar,ItemTier,BidCards,RequestRail,RequestsWorkspace,SuppliersMode}.tsx`,
+  `src/lib/contract/{suppliers-view,machine-bar,requests,workspace}.ts`, `src/components/map/{MachineBar,ChatDock,BidMapWorkspace}.tsx`,
+  `src/app/bids/[bidId]/equipment/page.tsx`, `src/components/map/map-proto.css`, `src/lib/uiPins.ts`, `src/lib/i18n/{en,ar}.ts`.
+  ⚠️ Decision 6 REVERSES spec RM3-AC-49 («switching tabs does not move the map»), by the owner's
+  choice; the tests that pinned it now say so. ⚠️ Suppliers mode reads platform bids only: a
+  shared-link bid has no supplier account to group by. ⚠️ The mode is page state, not in the URL, so
+  a reload lands in requests mode. ⚠️ The machine bar and the supplier row read `received-bids`; a
+  bid past that feed's first page would be missing from both. Not checked in a browser.
+- **2026-10-11 - OWNER DECISION: the selected request circle stands out the app's way (multi-item
+  review, option V1). BUILT on `main`, NOT committed.** The selected circle in the request rail gets
+  a 2.5px navy ring and a navy count badge; every other circle a 1.5px grey ring, a grey badge, and
+  55% opacity (was 72%). Closed stays greyscale at 50%. Taken from the app's `offers_filter_bar.dart`
+  and its My Bids circles. Rejected: V2 (ring on the selected circle only, keeping the no-outline
+  rule for the rest) and V3 (V1 plus an 8% lift). This REVERSES the owner's 2026-08-27 «remove all
+  outlines even grey» and 2026-08-31 «remove the white outlines» rulings for the rail: with no ring
+  the selected circle did not stand out. The multi-item badge is navy/grey now, not brand orange.
+  Files: `src/components/workspace/RequestRail.tsx`. ⚠️ The ring is a BORDER on an overlay span
+  over the picture, not on the tile and not a shadow: a border on the 56px tile would shrink the
+  fixed 52px picture inside it, and lint bans shadows. Not checked in a browser.
+- **2026-10-11 - Deal room chat and inbox follow the app (release #548, alignment 1.1 to 1.4 and
+  1.12 a, b, c, d, i), from `Moedatech-App/docs/handoffs/web-deal-room-reference.html`. BUILT on `main`,
+  NOT committed.** (1) Offers are chat cards: the bid opens the room after «Deal room opened», each
+  `rate_proposal` is a card, only the latest has buttons (other side: «Counter this price» + «Accept»;
+  your own: edit + «Awaiting reply»; awaiting: «Accepted»; closed: «Agreed on this price»), older ones
+  fade, and «You accepted the offer» sits last while the supplier has not confirmed. Rules in
+  `offer-thread.ts` (port of `offer_thread.dart`). (2) Asks and answers are bubbles: your own SOLID
+  renter blue on the right, the other side white on the left; every answer has its own bubble with a
+  grey line above it; the new chat-only asks `quote_request` / `company_docs_request` / `ask_declined`
+  are drawn and sent (`chat-asks.ts`, port of `quote_request.dart`). (3) An ask bar above the
+  composer: Quotation, Availability, Equipment docs, Company docs. (4) Inbox preview says what
+  happened (`inboxPreviewLine`, port of `inbox_preview_line.dart`), and `dealSystemLine` now ports
+  every pattern of the app's `localizedSystemMessage`. (5) Sheet: «Accept» on his offer while
+  something differs opens the counter sheet on HIS position with the differing terms accepted
+  (`initialFlow="take"`, the app's `takeTheirOffer`); the price comparison box is removed (1.12 c).
+  The bid card keeps its own two buttons; the chat's are a second door to the same `CounterSheet`.
+  Files: `src/lib/contract/{offer-thread,chat-asks,inbox-chat,deal-system-event,deal-room}.ts`,
+  `src/components/deal-room/{OfferChatCard,AskBubble,CounterSheet,DealRoom}.tsx`,
+  `src/components/deal-room/deal-room-proto.css`, `src/components/map/ChatDock.tsx`,
+  `src/components/inbox/InboxView.tsx`, `src/lib/chat/inbox-chat-summary.ts`, `src/lib/uiPins.ts`.
+  ⚠️ The opening card reads `room.opening` (the BID's price), never `room.rate`, which is the CURRENT
+  price. ⚠️ «Accept» via `take` accepts the SUPPLIER's latest round (`taking` in `doAccept`), not the
+  live round, which may be the renter's own counter: that is the bug the app fixed on 2026-10-08.
+  ⚠️ Offer and ask bubbles use PHYSICAL sides (`margin-left/right: auto`); plain text keeps logical
+  sides, so in Arabic your own text sits on the left, as in the app. ⚠️ Known differences from the
+  app: «Equipment docs» hands off to the machine's own documents (the web has no request here to
+  work out which papers are askable); «Download quotation» on a closed room opens the read-only sheet,
+  whose footer carries the quotation (opening it after a fetch is blocked as a pop-up); the inbox
+  keeps its price bar under the header; the retired `/deal-room/[id]` page was not restyled beyond
+  the shared bubble colours. Not checked in a browser.
+- **2026-10-11 - Bid map: a machine with no yard location reads «No yard yet» / «لا توجد ساحة بعد», the
+  app's wording (alignment 1.12 h). BUILT on `main`, NOT committed.** Reverses the 2026-09-12 wording
+  «Location not specified»; owner chose app parity. Only the words changed: the (0, 0) sentinel rule and
+  the withheld placeholder yard name are untouched. The other 1.12 small items (e, f, g, j, k, l) were
+  ruled not for the web. Files: `src/lib/i18n/{en,ar}.ts` (`bidMap.eqNoDistance`),
+  `src/components/map/panel/EquipmentDetail.tsx`. ⚠️ The panel writes the same words inline through `L`;
+  reword both or the list and the panel disagree.
+- **2026-10-11 - Release PR #548 alignment, first batch: 1.7, 1.10, 1.11. BUILT on `main`, NOT
+  committed.** (1.7) Sign-up asks «Are you an individual or a company?» first (app's
+  `profile_form_page.dart` strings and navy/orange buttons, inline instead of the app's modal because
+  the form already sits in the account dialog); the company name shows and is required only for a
+  company, and an individual sends no `companyName`. The choice is not stored, as in the app.
+  (1.10) A store whose owner has no live package (404 `STORE_NOT_LIVE`, E9019) reads «This store is not
+  available right now», with no Retry; any other failure keeps «couldn't load» and Retry. (1.11) The
+  agent's operator nationality is copied onto a line ONLY in the excluded shape with its list; a single
+  value is dropped, because «operator not Syrian» could arrive as `"Syrian"`. Files:
+  `OnboardingForm.tsx`, `StoreDetailSurface.tsx`, `agent-adapters.ts`, `en.ts`, `ar.ts`, tests
+  `onboarding-gate`, `store-not-live` (new), `excluded-nationalities`. ⚠️ The alignment doc's 1.9
+  (`POST /deal-rooms/{id}/call-tapped`) does not exist on the backend: the app sends
+  `deal_room_call_tapped` to PostHog from the phone, and the web has no PostHog. Not built.
 - **2026-10-09 - Operator nationality is back, as the app's EXCLUDED multi-select. BUILT on `main`,
   NOT committed.** App release PR #548: «Restricted operator nationalities», the nationalities the
   renter does NOT want; `operatorNationality: "excluded"` + `operatorNationalityCustom` comma-joined

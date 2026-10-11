@@ -142,6 +142,9 @@ export interface BidMapWorkspaceProps {
   openCompanyDocs?: boolean;
   /** Arriving from a chat icon: the dock opens with the surface (owner, 2026-08-26). */
   openChat?: boolean;
+  /** The machine being negotiated, under the supplier's name in the chat; also hides the chat's own
+   *  machine tabs, since the page's machine bar moves the whole map (multi-item decision 6). */
+  chatMachineLabel?: string | null;
 }
 
 
@@ -154,6 +157,7 @@ export function BidMapWorkspace({
   onOpenCompanyDocs,
   openCompanyDocs = false,
   openChat = false,
+  chatMachineLabel = null,
 }: BidMapWorkspaceProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -1235,6 +1239,7 @@ export function BidMapWorkspace({
         <ChatDock
           bid={bid}
           initialOpen={openChat}
+          machineLabel={chatMachineLabel}
           groupKey={requestGroupKey}
           // The room as the SENDER knows it — the bid's own, or the one the first ask created. The
           // dock otherwise waits for `GET /received-bids` to mention a room that already exists, and

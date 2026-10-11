@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   inboxPreview,
+  inboxPreviewLine,
   inboxTimeLabel,
+  type InboxChatSummary,
   isDealActionMessage,
   summarizeChannelMessages,
   type SummarizableMessage,
@@ -234,5 +236,38 @@ describe("the reader degrades rather than throwing", () => {
     // The list paints BEFORE this read and never waits for it: the chat line is decoration over a
     // list that already works, so a throw here must never reach the screen.
     expect(strip(read("lib/chat/inbox-chat-summary.ts"))).toMatch(/\}\s*catch\s*\{/);
+  });
+});
+
+/** Alignment 1.4: the app's `inbox_preview_line.dart`, rule for rule, first match wins. */
+describe("the row says what happened", () => {
+  const en = (e: string) => e;
+  const ar = (_e: string, a: string) => a;
+  const chat = (over: Partial<InboxChatSummary> = {}): InboxChatSummary => ({
+    text: null, sentAt: new Date(2026, 9, 11), isMine: false, readByOther: false,
+    eventText: null, custom: null, hasAttachment: false, ...over,
+  });
+  const ask = { type: "rentee_request", ref: "RQ-1", scope: "equipment", equipmentId: "eq-1", serial: "S", kind: "availability" };
+
+  it("names the ask, with «You: » when it is the renter's", () => {
+    expect(inboxPreviewLine(chat({ custom: ask, isMine: true }), en)).toBe("You: Asked to confirm availability");
+    expect(inboxPreviewLine(chat({ custom: { ...ask, kind: "document", docTypes: ["istimara"] } }), ar)).toBe("طلب مستندات");
+  });
+
+  it("names an answer", () => {
+    const reply = { type: "rentee_request_reply", inReplyTo: "RQ-1", equipmentId: "eq-1", resolution: "declined" };
+    expect(inboxPreviewLine(chat({ custom: reply }), en)).toBe("Answered a request");
+  });
+
+  it("states an event in the reader's language, never prefixed", () => {
+    expect(inboxPreviewLine(chat({ eventText: "Q declined the deal" }), ar)).toBe("Q رفض الصفقة");
+    const counter = { type: "counter", termKey: "payment_terms" };
+    expect(inboxPreviewLine(chat({ eventText: "Q قدّم عرضًا مضادًا على شروط الدفع", custom: counter }), en)).toBe("Q countered Payment Terms");
+  });
+
+  it("says «Sent a file» for a file with no words, and keeps the text and the update line otherwise", () => {
+    expect(inboxPreviewLine(chat({ hasAttachment: true, isMine: true }), en)).toBe("You: Sent a file");
+    expect(inboxPreviewLine(chat({ text: "I need the quotation for this request", isMine: true }), en)).toBe("You: I need the quotation for this request");
+    expect(inboxPreviewLine(chat(), ar)).toBe("تحديث في غرفة الصفقة");
   });
 });

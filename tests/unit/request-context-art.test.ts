@@ -63,7 +63,7 @@ describe("the bar draws the REQUEST, not the line being read", () => {
      * drawing takes, how far the pictures overlap and how many of them a circle admits — and the
      * two discs sit one row apart, so a disagreement is visible and nothing fails when it happens.
      */
-    expect(bar).toContain('import { CircleArt, MAX_IN_CIRCLE } from "@/components/workspace/CircleArt";');
+    expect(bar).toContain('import { CircleArt } from "@/components/workspace/CircleArt";');
     expect(bar).toContain("<CircleArt");
     // No private copy of the artwork.
     expect(barCode).not.toContain("<img");
@@ -80,33 +80,32 @@ describe("the bar draws the REQUEST, not the line being read", () => {
     expect(contract).toContain("machines: railMachines(g, ar),");
   });
 
-  it("Given several machines, Then the line names up to three of them, with their counts", () => {
+  it("Given several machines, Then up to three TYPE names, each its own block, cut only at its own end", () => {
     /**
-     * Owner, 2026-09-22: *"mak it also show the items name in the navy card"*. The same three the
-     * circle draws — a name for a machine the circle had no room for would be the row disagreeing
-     * with itself.
+     * Owner, 2026-10-11, multi-item decision 2 (C2). ~~One sentence of every name and size, cut by
+     * one `truncate` wherever the width ran out~~: it cut in the middle of a name.
      */
-    expect(bar).toContain("const shownNames = live.slice(0, MAX_IN_CIRCLE);");
-    expect(bar).toContain("m.qty > 1 ? `${m.qty} × ${m.name}` : m.name");
-    // The Arabic list separator: a Latin comma between two Arabic names inside an RTL block reorders.
-    expect(bar).toContain('join(ar ? "\\u060c " : ", ")');
+    expect(bar).toContain("const NAMES_SHOWN = 3;");
+    expect(bar).toContain("const shownNames = live.slice(0, NAMES_SHOWN);");
+    expect(bar).toContain('<span className="min-w-0 max-w-[150px] truncate">');
+    expect(bar).toContain("{m.typeName}");
+    // «×N» stays inside its name's own block.
+    expect(bar).toContain('{m.qty > 1 && <span className="tabular text-white/45"> ×{m.qty}</span>}');
+    // Plain text: no pill around a name.
+    const names = bar.slice(bar.indexOf("shownNames.map("), bar.indexOf("{multi && restCount > 0 && ("));
+    expect(names).not.toContain("rounded-full");
   });
 
-  it("Given more than three, Then a bare «+N» says so and the digits stay Latin", () => {
-    // Latin digits in both locales, product-wide since 2026-09-04; `tabular` so the pill does not
-    // change width between 2 and 3.
+  it("Given more than three, Then «+N more» in orange", () => {
     expect(bar).toContain("const restCount = live.length - shownNames.length;");
     expect(bar).toContain("{multi && restCount > 0 && (");
-    expect(bar).toContain("+{restCount}");
+    expect(bar).toContain("font-extrabold text-brand");
+    expect(bar).toContain('t.workspace.chipMore.replace("{n}", String(restCount))');
   });
 
   it("Given ONE machine, Then the row is exactly what it was: its name and its unit count", () => {
-    /**
-     * ⚠️ The ordinary case must not pay for the multi-item one. A single-line request keeps
-     * `itemLabel` and the `×n` pill; joining a list of one would drop the pill for nothing.
-     */
     expect(bar).toContain("const multi = machines.length > 1;");
-    expect(bar).toContain("{multi ? namesLine : label}");
+    expect(bar).toContain('<span className="truncate">{label}</span>');
     expect(bar).toContain("{!multi && qty > 1 && (");
   });
 });
