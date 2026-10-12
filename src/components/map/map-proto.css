@@ -3476,3 +3476,15 @@ main:has(.bidmap) > .page-back-bar {
 .bidmap .bm-chat-menu button.danger .material-icons-outlined { color: var(--danger); }
 .bidmap .bm-chat-menu button.danger:hover { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 
+/* The chat header with the machine being negotiated under the supplier's name (multi-item decision 6,
+   2026-10-11). Drawn only on a multi-item request where he has two or more bids. */
+.bidmap .bm-chat-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.bidmap .bm-chat-id .bm-chat-who { flex: none; }
+.bidmap .bm-chat-subj { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--muted); }
+
+/* «Ask availability» on a fleet card (owner, 2026-10-12, option 4B). The ask's blue (RM3-AC-33). */
+/* `pointer-events: auto`: the card's text column lets presses fall through to its select layer. */
+.bidmap .bm-eq-ask { pointer-events: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px 0 8px; border: 1px solid var(--action); border-radius: 999px; background: var(--surface); color: var(--action); font: inherit; font-size: 11px; font-weight: 800; white-space: nowrap; cursor: pointer; }
+.bidmap .bm-eq-ask:hover { background: color-mix(in srgb, var(--action) 8%, var(--surface)); }
+.bidmap .bm-eq-ask .material-icons-outlined { font-size: 15px; }
+.bidmap .bm-eq-ask.is-asked { border-style: dashed; border-color: var(--border-strong); color: var(--muted); cursor: default; }

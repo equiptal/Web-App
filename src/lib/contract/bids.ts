@@ -1473,6 +1473,22 @@ export function bucketBidTerms(
   return { rows, byBucket, counts: { conflict: byBucket.conflict.length, pending: byBucket.pending.length, matched: byBucket.matched.length } };
 }
 
+/**
+ * **The supplier's own validity date has passed** — the backend's `isExpired`, word for word
+ * (`rentee.service.ts`: `bid.validUntil ? new Date(bid.validUntil) < now : false`), which is what sorts
+ * a bid into `expiredBids`. No date means no expiry.
+ *
+ * The app's renter offers list reads `activeBids` ONLY (`rentee_requests_bloc.dart` `_onBidsLoaded`),
+ * so such a bid is not shown to the renter at all. The workspace follows that (owner, 2026-10-12:
+ * «see the expiry and hiding bids rules in the app and align»). ⚠️ Not applied inside
+ * {@link mapBidList}: the deal room finds its own bid through the same list and must still find it.
+ */
+export function bidValidityPassed(card: Pick<BidCard, "validUntil">, now: number = Date.now()): boolean {
+  if (!card.validUntil) return false;
+  const t = new Date(card.validUntil).getTime();
+  return !Number.isNaN(t) && t < now;
+}
+
 /** Flatten the `{activeBids, expiredBids}` envelope → active first, then expired. */
 export function mapBidList(raw: unknown): BidCard[] {
   const r = (raw ?? {}) as Record<string, unknown>;

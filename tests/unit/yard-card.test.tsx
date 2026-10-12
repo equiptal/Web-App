@@ -95,7 +95,8 @@ describe("the machine detail draws the fleet card's yard card", () => {
     );
     const card = document.querySelector("button.bm-eq-yard.asked");
     expect(card).not.toBeNull();
-    expect(card!.querySelector(".mp-yard-badge")?.textContent).toBe("Asked");
+    // Names what was asked (owner, 2026-10-12). ~~«Asked»~~ alone.
+    expect(card!.querySelector(".mp-yard-badge")?.textContent).toBe("Availability asked");
     await userEvent.click(card!);
     // `asked: true` is what makes the layer show the question he put instead of offering to ask again.
     expect(onYardPress.mock.calls[0][1]).toBe(true);

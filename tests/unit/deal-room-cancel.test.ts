@@ -253,7 +253,15 @@ describe("dealSystemLine (the app's localizedSystemMessage)", () => {
     expect(dealSystemLine("Request Summary", ar)).toBe("ملخص الطلب");
   });
 
+  it("localises the app's other narration lines (alignment 1.4)", () => {
+    expect(dealSystemLine("Q declined the deal", ar)).toBe("Q رفض الصفقة");
+    expect(dealSystemLine("Q proposed a rate: 2,500 PER_DAY", ar)).toBe("Q اقترح سعرًا: 2,500 يوم");
+    expect(dealSystemLine("Q countered Payment Terms", en)).toBe("Q countered Payment Terms");
+    expect(dealSystemLine("Q countered Payment Terms", ar)).toBe("Q قدّم عرضًا مضادًا على شروط الدفع");
+    expect(dealSystemLine("Q has closed this deal room.", en)).toBe("Q closed the deal room");
+  });
+
   it("returns an unmatched line as it arrived, never a blank", () => {
-    expect(dealSystemLine("Q declined the deal", ar)).toBe("Q declined the deal");
+    expect(dealSystemLine("Something new from the backend", ar)).toBe("Something new from the backend");
   });
 });

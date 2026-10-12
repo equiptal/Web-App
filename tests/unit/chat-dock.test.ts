@@ -335,7 +335,19 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
       // there is no path that posts into a room without first passing the create-if-missing branch.
       expect(dockSrc.slice(body.start, body.end), sender).not.toContain("channelRef");
     }
-    expect(dockSrc.match(/\bdeliver\(/g) ?? []).toHaveLength(SENDERS.length + 1); // + the declaration
+    /* 🔴 Three more since 2026-10-12, each a renter PRESS (owner: a new chat opens on the quotation
+       with the ask bar live, «not after sending a message»): a chat ask, an availability ask, and
+       Counter/Accept on the opening card. Each is a create act §4.5 already names (a request card,
+       negotiate/accept), and each reaches the room through this seam rather than holding a channel. */
+    const PRESSES = ["const sendChatAsk = async", "const sendAvailability = async", "const openSheet = ("];
+    for (const press of PRESSES) {
+      const at = dockSrc.indexOf(press);
+      expect(at, press).toBeGreaterThan(-1);
+      const region = dockSrc.slice(at, dockSrc.indexOf("\n  const ", at + press.length));
+      expect(region, press).toContain("deliver(");
+      expect(region, press).not.toContain("channelRef");
+    }
+    expect(dockSrc.match(/\bdeliver\(/g) ?? []).toHaveLength(SENDERS.length + PRESSES.length + 1); // + the declaration
   });
 
   it("reaches no room-creating client function by any other name", () => {
@@ -485,13 +497,15 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
     // 2026-08-26). What the AC was actually about survives and is asserted below: the two routes
     // wear ONE style, and neither bubble is a boxed notice.
     expect(them).not.toContain("box-shadow");
-    expect(them).toMatch(/border:\s*0/);
-    // Outgoing is the PALE fill with dark ink, not a brand colour with white text — the single change
-    // a reader of the deal room actually sees, and the one most likely to be "fixed" back.
+    // The other side's bubble is white with a hairline at half strength, as the app draws it.
+    expect(them).toContain("var(--surface)");
+    // 🔴 Outgoing is SOLID in the renter's colour with white ink (app release #548, alignment
+    // 1.12 a, 2026-10-11). ~~The pale fill with dark ink~~ (2026-08-19) is reversed by the app.
     const mine = cssBlockOf(dealCss, ".dlproto .msg.mine {");
-    expect(mine.toLowerCase()).toContain("color-mix(in srgb, var(--action) 12%, white)");
-    expect(mine.toLowerCase()).toContain("var(--navy)");
-    expect(mine).not.toContain("var(--rentee)"); // the blue fill it used to carry
+    // Blue, the app's `renteeBlue` (owner, 2026-10-12). ~~`--rentee`~~, which `.dlproto` points at
+    // the brand orange.
+    expect(mine).toContain("var(--mine-bubble)");
+    expect(mine).toContain("color: var(--surface)");
     // And the fork is GONE, not merely equal. Two blocks holding the same values is how they came to
     // hold different ones.
     expect(cssSrc).not.toContain(".bidmap .bm-chat .msg");
@@ -514,7 +528,7 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
        from opposite ends. `is-mine` for an ask and `is-them` for a reply is therefore not a rule —
        it is the renter's chair hardcoded, and it inverts the moment the reader changes. The side has
        to come off the Stream author, exactly as the plain bubbles below it already take theirs. */
-    const stream = dockSrc.slice(dockSrc.indexOf("messages.map((m) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
+    const stream = dockSrc.slice(dockSrc.indexOf("thread.entries.map((entry) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
     expect(stream).toContain("const mine = myStreamId != null && m.user?.id === myStreamId;");
     /* BOTH card wrappers are driven by that one reading, and neither states a side literally: the
        renter's request card, and the bare form an unfoldable reply keeps.
@@ -537,7 +551,7 @@ describe("opening a chat tab creates NO deal room (RM3-AC-47)", () => {
        because each takes its own author's side, and both stating the answer in different words. The
        request's card carries the answer now (through `cardCtx.reply`, worded by `replyAnswerLine`),
        and the reply's card is suppressed. */
-    const stream = dockSrc.slice(dockSrc.indexOf("messages.map((m) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
+    const stream = dockSrc.slice(dockSrc.indexOf("thread.entries.map((entry) => {"), dockSrc.indexOf("<div ref={bottomRef} />"));
     // Not imported and not called — the withdrawn function is named only in the comment that records
     // why it is gone.
     expect(dockSrc).not.toMatch(/^\s*replyCardView,$/m);
@@ -596,9 +610,11 @@ describe("no tab strip for a single bid (RM3-AC-44)", () => {
     // far as a `node` env can — what stays UNPROVEN here is the PAINTED result, i.e. that the strip
     // element is absent from the DOM and leaves no empty row behind. That needs a component harness
     // (RM3-TC-11, manual-verify).
-    expect(dockSrc).toContain("{tabs.length > 1 && (");
+    // 🔴 And none where the map's machine bar is drawn (owner, 2026-10-11, multi-item decision 6):
+    // the bar moves the page AND the chat, so the tabs would be a second, weaker way to do the same.
+    expect(dockSrc).toContain("{tabs.length > 1 && !machineLabel && (");
     const strip = dockSrc.indexOf('className="bm-chat-tabs"');
-    const guard = dockSrc.indexOf("{tabs.length > 1 && (");
+    const guard = dockSrc.indexOf("{tabs.length > 1 && !machineLabel && (");
     expect(strip).toBeGreaterThan(-1);
     expect(guard).toBeGreaterThan(-1);
     expect(guard).toBeLessThan(strip); // the guard wraps the strip; it does not follow it
@@ -1009,7 +1025,7 @@ describe("the dock's composer sends what the deal room sends, the way the deal r
     // `ChatCard`. An attachment carries no `custom.type`, so it has to fall through BOTH of those to
     // the bubble — otherwise the file the composer just gained would be invisible where it lands.
     const stream = dockSrc.slice(
-      dockSrc.indexOf("messages.map((m) => {"),
+      dockSrc.indexOf("thread.entries.map((entry) => {"),
       dockSrc.indexOf("<div ref={bottomRef} />"),
     );
     expect(stream.length).toBeGreaterThan(500); // positive control on the slice
@@ -1162,3 +1178,71 @@ function cssBlockOf(css: string, selector: string): string {
   const open = css.indexOf("{", at);
   return css.slice(open + 1, css.indexOf("}", open));
 }
+
+/* ── The 2026-10-12 UAT round, checked against the rules above so the new paths cannot quietly break
+   the old ones: a new chat draws its quotation WITHOUT creating a room, the ask bar never asks twice,
+   and the inbox (no map) has its own way to the papers. */
+describe("a new chat, the ask pills and the papers (owner, 2026-10-12)", () => {
+  it("draws the bid's quotation only while there is NO room, and builds it from the bid alone", () => {
+    const at = dockSrc.indexOf("const preRoomOpening");
+    const block = dockSrc.slice(at, dockSrc.indexOf("const thread = useMemo", at));
+    expect(block).toContain("active.dealRoomId");
+    expect(block).toContain("bid.openingPrice ?? bid.price");
+    // Drawing it creates nothing: no send, no room call, inside the memo that builds it.
+    expect(block).not.toMatch(/deliver\(|ensureDealRoom|sendRenteeRequest/);
+  });
+
+  it("opens the sheet on an existing room directly, and only a PRESS on a new chat goes through deliver", () => {
+    const at = dockSrc.indexOf("const openSheet = (");
+    const body = dockSrc.slice(at, dockSrc.indexOf("  };", at));
+    expect(body).toMatch(/if \(activeRoomId\) \{ setSheet\(\{ roomId: activeRoomId, flow \}\); return; \}/);
+    expect(body).toContain("deliver(");
+  });
+
+  it("locks a pill only when there is nothing left to ask, and draws its state from the shared rules", () => {
+    expect(dockSrc).toContain("disabled={it.locked || askBusy}");
+    expect(dockSrc).toContain('locked: quoteState === "waiting"');
+    expect(dockSrc).toContain('locked: availState !== "idle"');
+    expect(dockSrc).toContain("availabilityAskState(");
+    expect(dockSrc).toContain("quoteAskState(messages)");
+    expect(dockSrc).toContain("companyAskState(messages)");
+  });
+
+  it("lands «Equipment docs» on the DOCUMENTS tab on the map, and in a dialog off it", () => {
+    expect(dockSrc).toContain("if (onOpenMachineDocs) onOpenMachineDocs(id);");
+    expect(dockSrc).toContain('if (!onOpenMachineDocs && !onOpenMachine) { setAskPicker("docsAll"); return; }');
+    const dialog = dockSrc.slice(dockSrc.indexOf('askPicker === "docsAll"'), dockSrc.indexOf('askPicker === "company"'));
+    // «Show in map» at its top, and the papers read-only: no ask is composed outside the map.
+    expect(dialog.indexOf("Show in map")).toBeLessThan(dialog.indexOf("<EquipmentDocuments"));
+    expect(dialog).not.toContain("onRequest=");
+  });
+});
+
+/* ── Options 2A, 3A and 4B of the asks page (owner, 2026-10-12) ──────────────────────────────── */
+describe("asks reviewed as bubbles, company papers from the panel, availability in one press", () => {
+  it("2A: a machine ask is reviewed as its own bubble, outlined, with Cancel and Send", () => {
+    const at = dockSrc.indexOf("{draft && activeBidId === bid.id && draft.equipmentId && draft.kind !== \"alternative\" && (");
+    expect(at).toBeGreaterThan(-1);
+    const block = dockSrc.slice(at, dockSrc.indexOf("</div>", at));
+    expect(block).toContain("askBubbleView(");
+    expect(block).toContain("draftActions(draftBusy, () => onCancelDraft?.(), () => onConfirmDraft?.())");
+    // The send is still the SURFACE's (`onConfirmDraft`), never a post from here.
+    expect(block).not.toMatch(/deliver\(|sendRenteeRequest/);
+  });
+
+  it("2A: an «another unit» ask, or one naming no machine, keeps the card", () => {
+    expect(dockSrc).toContain("{draft && activeBidId === bid.id && !(draft.equipmentId && draft.kind !== \"alternative\") && (");
+  });
+
+  it("3A: on the map «Company docs» opens the panel; off it, the dialog", () => {
+    expect(dockSrc).toContain("if (onOpenCompanyDocs) { onOpenCompanyDocs(); return; }");
+    // The panel's draft is sent through the chat's own ask, so through `deliver`.
+    expect(dockSrc).toContain("void sendCompanyKeys(companyDraft).then((ok) => { if (ok) onCompanyDraftDone?.(); });");
+    expect(dockSrc).toMatch(/const sendCompanyKeys = \(keys: readonly string\[\]\) =>\s+sendChatAsk\(/);
+  });
+
+  it("4B: the chat's Availability asks every machine not yet asked, with no picker", () => {
+    expect(dockSrc).toContain("void sendAvailability(availabilityOpen.map((u) => u.equipmentId));");
+    expect(dockSrc).not.toContain('setAskPicker("availability")');
+  });
+});

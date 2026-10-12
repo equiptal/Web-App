@@ -109,7 +109,7 @@ describe("the routing that was already right is left alone", () => {
   });
 });
 
-describe("the company name is asked for, and required", () => {
+describe("the company name is asked for, and required FOR A COMPANY", () => {
   /**
    * 🔴 **Restored and REQUIRED** (app parity, `profile_form_page._companyNameIsValid`, and the
    * owner: *"company is required in the profile form ... they are in app so align"*).
@@ -128,7 +128,17 @@ describe("the company name is asked for, and required", () => {
 
   it("Given a blank company, Then the form refuses at two characters", () => {
     // The app's own floor, not a rounder number: `_companyNameCtrl.text.trim().length >= 2`.
-    expect(FORM).toContain("if (companyName.trim().length < 2) next_fe.companyName = o.errors.companyName;");
+    expect(FORM).toContain("if (isCompany && companyName.trim().length < 2) next_fe.companyName = o.errors.companyName;");
+  });
+
+  /**
+   * «Are you an individual or a company?» first (alignment 1.7, app PR #548). The field shows and is
+   * required only for a company; an individual sends no `companyName`; nothing is chosen for him.
+   */
+  it("Given the question, Then it is asked first, required, and starts unanswered", () => {
+    expect(FORM).toContain('useState<"individual" | "company" | null>(null)');
+    expect(FORM).toContain("if (!entity) next_fe.entity = o.errors.entity;");
+    expect(FORM).toContain("{isCompany && (");
   });
 
   /**
@@ -137,7 +147,7 @@ describe("the company name is asked for, and required", () => {
    * half the accounts never send. Both routes already forwarded `companyName` while the UI was gone,
    * so nothing on the wire changed.
    */
-  it("Given either submit path, Then the company goes with it", () => {
-    expect(FORM.match(/companyName: companyName\.trim\(\),/g)).toHaveLength(2);
+  it("Given either submit path, Then the company goes with it, and only for a company", () => {
+    expect(FORM.match(/companyName: isCompany \? companyName\.trim\(\) : undefined,/g)).toHaveLength(2);
   });
 });

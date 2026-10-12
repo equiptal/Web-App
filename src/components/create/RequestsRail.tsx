@@ -13,6 +13,7 @@ import type { ProjectSummary } from "@/lib/contract/project";
 import type { TemplateOption } from "@/lib/contract/project-apply";
 import { pin } from "@/lib/uiPins";
 import { MachineGlyph } from "@/components/MachineGlyph";
+import { CircleArt } from "@/components/workspace/CircleArt";
 
 /**
  * The renter's past requests, in a rail beside the intake (owner, 2026-09-16, handing over
@@ -327,6 +328,8 @@ export function RequestsRail({ rail }: { rail: RequestRail }) {
    * all. Behind a toggle he has both.
    */
   const [sheet, setSheet] = useState(false);
+  /** The multi-item requests opened to their machines, by the request's id. Shut by default. */
+  const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
     try {
@@ -409,18 +412,43 @@ export function RequestsRail({ rail }: { rail: RequestRail }) {
               {open && (
                 <div className="pb-1.5 pt-0.5">
                   {rail.isLoading(p.id) && <p className="px-6 py-1 text-label text-muted-light">{t.browse.loading}</p>}
-                  {rows.map((row) => (
-                    <RailRowButton
-                      key={row.itemId}
-                      row={row}
-                      on={rail.picked === row.itemId}
-                      busy={rail.busy}
-                      onPress={() => {
-                        void rail.pressRow(p.id, row);
-                        setSheet(false);
-                      }}
-                    />
-                  ))}
+                  {byRequest(rows).map((run) => {
+                    const press = (row: RailRow) => {
+                      void rail.pressRow(p.id, row);
+                      setSheet(false);
+                    };
+                    if (run.length === 1) {
+                      const row = run[0];
+                      return <RailRowButton key={row.itemId} row={row} on={rail.picked === row.itemId} busy={rail.busy} onPress={() => press(row)} />;
+                    }
+                    /* ── A multi-item request is ONE row (owner, 2026-10-11) ───────────────────────
+                       ~~One row per machine~~, which read as several requests with the first
+                       standing for the rest. Now: the combined picture, the first machine's name and
+                       an orange «+N more», the request card's own rule. Pressing it opens the
+                       request's machines, each pressable exactly as before. */
+                    const key = run[0].option.id;
+                    const open = unfolded.has(key);
+                    return (
+                      <div key={key}>
+                        <MultiRailRow
+                          rows={run}
+                          open={open}
+                          on={run.some((r) => r.itemId === rail.picked)}
+                          onToggle={() =>
+                            setUnfolded((s) => {
+                              const next = new Set(s);
+                              if (!next.delete(key)) next.add(key);
+                              return next;
+                            })
+                          }
+                        />
+                        {open &&
+                          run.map((row) => (
+                            <RailRowButton key={row.itemId} row={row} on={rail.picked === row.itemId} busy={rail.busy} onPress={() => press(row)} nested />
+                          ))}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -535,14 +563,57 @@ export function RequestsRail({ rail }: { rail: RequestRail }) {
   );
 }
 
-function RailRowButton({ row, on, busy, onPress }: { row: RailRow; on: boolean; busy: boolean; onPress: () => void }) {
+/** A project's rows in runs, one per request or work order, in the chart's own order. */
+export function byRequest(rows: RailRow[]): RailRow[][] {
+  const runs = new Map<string, RailRow[]>();
+  for (const r of rows) {
+    const run = runs.get(r.option.id);
+    if (run) run.push(r);
+    else runs.set(r.option.id, [r]);
+  }
+  return [...runs.values()];
+}
+
+/** A multi-item request, folded: the combined picture, the first machine, «+N more» in orange. */
+function MultiRailRow({ rows, open, on, onToggle }: { rows: RailRow[]; open: boolean; on: boolean; onToggle: () => void }) {
+  const t = useT();
+  const machines = rows.map((r) => ({ id: r.itemId, name: r.name, url: r.imageUrl, isPhoto: false, qty: r.qty, typeName: r.name }));
+  return (
+    <button
+      {...pin("intake-rail-row")}
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      className={`flex w-full items-center gap-2 rounded-md py-1 pe-1.5 ps-6 text-start transition ${on ? "bg-brand-soft" : "hover:bg-surface2"}`}
+    >
+      <span className="grid h-6 w-6 flex-none place-items-center overflow-hidden rounded-full border border-border bg-photo-ground">
+        <CircleArt
+          machines={machines}
+          fallback={machines.find((m) => m.url)?.url ?? null}
+          fallbackIsPhoto={false}
+          onBroken={() => {}}
+          size={22}
+        />
+      </span>
+      <span className={`min-w-0 flex-1 truncate text-label ${on ? "font-semibold text-brand-deep" : "text-muted"}`}>
+        {rows[0].name}
+      </span>
+      <span className="flex-none whitespace-nowrap text-label font-extrabold text-brand-deep">
+        {t.workspace.chipMore.replace("{n}", String(rows.length - 1))}
+      </span>
+      <Icon name="expand_more" size={14} className={`flex-none text-muted-light transition-transform ${open ? "rotate-180" : ""}`} />
+    </button>
+  );
+}
+
+function RailRowButton({ row, on, busy, onPress, nested = false }: { row: RailRow; on: boolean; busy: boolean; onPress: () => void; nested?: boolean }) {
   return (
     <button
       {...pin("intake-rail-row")}
       type="button"
       disabled={busy}
       onClick={onPress}
-      className={`flex w-full items-center gap-2 rounded-md py-1 pe-1.5 ps-6 text-start transition disabled:cursor-not-allowed ${
+      className={`flex w-full items-center gap-2 rounded-md py-1 pe-1.5 ${nested ? "ps-10" : "ps-6"} text-start transition disabled:cursor-not-allowed ${
         on ? "bg-brand-soft" : "hover:bg-surface2"
       }`}
     >

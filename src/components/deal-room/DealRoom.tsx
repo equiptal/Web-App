@@ -104,7 +104,7 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
    * Negotiate again for the thing he had already asked for. It seeds `openFlow` and nothing else — no
    * part of the flow is reachable, or duplicated, through this prop.
    */
-  initialFlow?: "counter" | "accept";
+  initialFlow?: "counter" | "accept" | "take";
   /**
    * 🔴 **Only the sheet, over the screen the renter is on** (owner, 2026-09-29: *"i see the
    * quotation sheets for negotiation loading over the old ui of the deal room chat, i want it to be
@@ -141,6 +141,13 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
   // App parity: a single guided flow modal (3 steps: Terms → Price → Summary) handles both Counter and
   // Accept. `flowMode` picks which — null = closed.
   const [flowMode, setFlowMode] = useState<"counter" | "accept" | null>(null);
+  /**
+   * «Accept» pressed on the supplier's offer card in the chat while something still differs
+   * (alignment 1.2, app `takeTheirOffer`, 2026-10-08). The sheet opens on HIS position, every
+   * differing term already accepted at his value, so it matches and offers «Accept offer». Before
+   * this the app opened on the renter's own last counter, and accepting re-sent her old price.
+   */
+  const [taking, setTaking] = useState(false);
   const [counterErr, setCounterErr] = useState<string | null>(null);
   const [callOpen, setCallOpen] = useState(false); // call-supplier modal (shows the number + dial/copy)
   const [menuOpen, setMenuOpen] = useState(false); // ⋮ kebab (equipment · company · cancel)
@@ -552,9 +559,22 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
     // Counter's own condition is `room.myTurn` — a field of the room — so it needs nothing else.
     // Where the chat never connects at all the accept link simply never fires, leaving the renter on
     // the room: the same place a blocked accept leaves him, under the same strip.
-    if (initialFlow === "accept" && !chatReady && STREAM_API_KEY) return;
+    if (initialFlow !== "counter" && !chatReady && STREAM_API_KEY) return;
     seededFlow.current = true; // whatever the verdict — closing the sheet must not reopen it
-    if (flowGate.current[initialFlow]) {
+    if (initialFlow === "take") {
+      // Everything already matches: the plain accept. Otherwise the counter sheet on HIS offer.
+      if (flowGate.current.accept) {
+        openFlow("accept");
+      } else {
+        for (const t of room.terms) {
+          if (t.state === "fixed" || !isConflictingTerm(t) || t.supplierDeclared == null) continue;
+          setResolution(t.key, "accept", t.supplierDeclared);
+        }
+        setTaking(true);
+        openFlow("counter");
+      }
+      arrivedForFlow.current = true;
+    } else if (flowGate.current[initialFlow]) {
       openFlow(initialFlow);
       // The room was never the destination — see `closeFlow`.
       arrivedForFlow.current = true;
@@ -626,7 +646,10 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
       // counter of 2 units with delivery removed could record 3 units with delivery on. The app sends
       // its draft, which is seeded from this same live round; an excluded leg sends no count, because
       // exclusion wins server-side and nulls it anyway.
-      const lp = liveRoundOf(room, messages);
+      // Taking his offer accepts HIS position, not the live one, which may be her own last counter.
+      const lp = taking
+        ? latestRoundBy(withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room)), "supplier")
+        : liveRoundOf(room, messages);
       await acceptDeal(id, contractType, {
         termResolutions: resolutionUpdates(),
         agreedUnits: lp?.rentalUnits ?? room.agreedUnits ?? room.numberOfUnits,
@@ -848,6 +871,7 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
       onAccept={doAccept}
       // Accept from the counter's review step goes through the accept flow, gate and all.
       onAcceptInstead={() => setFlowMode("accept")}
+      takeTheirOffer={taking}
       onOpenQuotation={openQuotation}
     />
   );
@@ -1466,7 +1490,7 @@ function CounterFlow({
   mode, room, ar, L, busy, error,
   resolutions, onResolveLocal, onReopenLocal, unresolvedCount,
   periodLabel, periods, hasDuration, units, messages, onClose, onCounter, onAccept,
-  onAcceptInstead, onOpenQuotation,
+  onAcceptInstead, onOpenQuotation, takeTheirOffer = false,
 }: {
   mode: "counter" | "accept";
   room: DealRoomView;
@@ -1501,6 +1525,8 @@ function CounterFlow({
   onAcceptInstead?: () => void;
   /** The room's own quotation, from step ③ — the same document its CTA opens, never a second one. */
   onOpenQuotation?: () => void;
+  /** Seed the draft from the SUPPLIER's latest round rather than the live one (app `takeTheirOffer`). */
+  takeTheirOffer?: boolean;
 }) {
   /**
    * A settled room still opens the sheet, read-only, and says why in its header (owner, 2026-09-08).
@@ -1527,6 +1553,8 @@ function CounterFlow({
   const flowRounds = withOpeningRound(collapseRounds(reconstructRounds(messages as unknown[])), roomOpeningRound(room));
   const latestRound = flowRounds.length ? flowRounds[flowRounds.length - 1] : null;
   const supRound = latestRoundBy(flowRounds, "supplier");
+  /** The round the draft starts from: the live one, or HIS when the renter is taking his offer. */
+  const seedRound = takeTheirOffer ? supRound ?? latestRound : latestRound;
   // Accept is gated behind a binding-commitment warning first (app parity). Counter skips it.
   const [bindingOk, setBindingOk] = useState(mode === "counter");
   const [page, setPage] = useState(0); // 0 = Terms, 1 = Price, 2 = Summary
@@ -1541,9 +1569,9 @@ function CounterFlow({
   // Price seeds from the LIVE position too (app resolveLivePosition: latest?.rate ?? room.lastProposedRate
   // ?? bid.priceAmount). room.rate already collapses lastProposedRate → bid.priceAmount, so preferring the
   // latest reconstructed round first guards against any lag between the DB column and the chat message.
-  const seedRate = latestRound?.rate ?? room.rate;
-  const seedMob = latestRound?.mobPrice ?? room.mobPrice;
-  const seedDemob = latestRound?.demobPrice ?? room.demobPrice;
+  const seedRate = seedRound?.rate ?? room.rate;
+  const seedMob = seedRound?.mobPrice ?? room.mobPrice;
+  const seedDemob = seedRound?.demobPrice ?? room.demobPrice;
   const [rateStr, setRateStr] = useState(seedRate ? String(seedRate) : "");
   const [mobStr, setMobStr] = useState(seedMob ? String(seedMob) : "");
   const [demobStr, setDemobStr] = useState(seedDemob ? String(seedDemob) : "");
@@ -1554,16 +1582,16 @@ function CounterFlow({
   // Seed from the LIVE position (app resolveLivePosition precedence: latest reconstructed round → room
   // columns → offered/requested → clamp) so the supplier's countered units land on the rentee side.
   const cap = Math.max(1, room.requestedUnits || units || 1);
-  const liveRental = Math.max(1, Math.min(cap, latestRound?.rentalUnits ?? room.agreedUnits ?? units ?? 1));
+  const liveRental = Math.max(1, Math.min(cap, seedRound?.rentalUnits ?? room.agreedUnits ?? units ?? 1));
   // Seeded UNCAPPED (app parity: `effectiveMobUnits` has no clamp) — the stepper's own `max` is what
   // stops the renter PROPOSING more trips than machines; a count already on the table is shown as it is.
-  const liveMob = Math.max(0, latestRound?.mobUnits ?? room.mobUnits ?? liveRental);
-  const liveDemob = Math.max(0, latestRound?.demobUnits ?? room.demobUnits ?? liveRental);
+  const liveMob = Math.max(0, seedRound?.mobUnits ?? room.mobUnits ?? liveRental);
+  const liveDemob = Math.max(0, seedRound?.demobUnits ?? room.demobUnits ?? liveRental);
   const [rentalUnits, setRentalUnits] = useState<number>(liveRental);
   const [mobUnitsN, setMobUnitsN] = useState<number>(liveMob);
   const [demobUnitsN, setDemobUnitsN] = useState<number>(liveDemob);
-  const [mobExcluded, setMobExcluded] = useState<boolean>(latestRound?.mobExcluded ?? room.mobExcluded);
-  const [demobExcluded, setDemobExcluded] = useState<boolean>(latestRound?.demobExcluded ?? room.demobExcluded);
+  const [mobExcluded, setMobExcluded] = useState<boolean>(seedRound?.mobExcluded ?? room.mobExcluded);
+  const [demobExcluded, setDemobExcluded] = useState<boolean>(seedRound?.demobExcluded ?? room.demobExcluded);
   /* 🔴 ~~`cmpOpen` — the compare card's «The gap, line by line» expander.~~ **Gone 2026-09-21 with
      the app's own:** the totals say how far apart the two sides are, the per-leg rows say WHERE, and
      that is the only part anyone can act on. It is always open now. */
@@ -1780,8 +1808,8 @@ function CounterFlow({
   const draftChanged =
     rate !== (seedRate ?? 0) || mob !== (seedMob ?? 0) || demob !== (seedDemob ?? 0) ||
     rentalUnits !== liveRental || mobUnitsN !== liveMob || demobUnitsN !== liveDemob ||
-    mobExcluded !== (latestRound?.mobExcluded ?? room.mobExcluded) ||
-    demobExcluded !== (latestRound?.demobExcluded ?? room.demobExcluded);
+    mobExcluded !== (seedRound?.mobExcluded ?? room.mobExcluded) ||
+    demobExcluded !== (seedRound?.demobExcluded ?? room.demobExcluded);
   const hasSomethingToSend = draftChanged || Object.keys(resolutions).length > 0;
   const doSubmit = () =>
     editable
@@ -1929,24 +1957,7 @@ function CounterFlow({
   ].filter(Boolean).join(" ");
   const refMobPrice = supRound?.mobPrice ?? room.mobPrice;
   const refDemobPrice = supRound?.demobPrice ?? room.demobPrice;
-  /**
-   * 🔴 **The card needs a position on BOTH sides** (app parity, `NegotiationPriceStep`): the renter
-   * has none until she has actually countered, and drawing it before that echoes the supplier's own
-   * numbers back at her under «Your total» — the very mirror the app's `resolveLivePosition` fix was
-   * about. ~~`room.lastCounterBy === "supplier"`.~~ That asked who moved last, not whether there are
-   * two positions to compare.
-   */
-  const myRound = latestRoundBy(flowRounds, "rentee");
-  const showCompare = editable && supRound != null && myRound != null;
   const priceDiff = Math.abs(total - supTotal);
-  /**
-   * The supplier's round BEFORE their standing one — the baseline for «… from their last offer».
-   * Correct only because `collapseRounds` folded consecutive same-role messages: an edit-while-
-   * waiting appends a second message rather than replacing the first, so without the collapse this
-   * would diff against a round the supplier never actually sent.
-   */
-  const supRounds = flowRounds.filter((r) => r.role === "supplier");
-  const supPrev = supRounds.length > 1 ? supRounds[supRounds.length - 2] : null;
   /** The FULL close gate (app `_Footer.allMatched`): every negotiable term matched, no price gap,
    *  and nothing edited locally. Only then may Accept stand beside the send. */
   const allMatched = unresolvedCount === 0 && priceDiff < 0.005 && !draftChanged;
@@ -2052,95 +2063,9 @@ function CounterFlow({
     </>
   );
 
-  /* ── the supplier's standing offer, against yours ─────────────────────────────────────────────
-     🔴 **THE APP'S 2026-09-21 MOCK, matched exactly** — a WHITE card, the two totals side by side
-     across a vertical hairline, the gap pill riding the card's TOP EDGE, and one row per leg
-     beneath, ALWAYS OPEN.
-
-     ~~A navy card whose per-leg rows hid behind a «The gap, line by line» expander, with the pill on
-     a horizontal rule BETWEEN the two totals.~~ Three things were wrong with it and the mock fixes
-     all three: the sheet around it is light, so the one navy block read as a foreign panel dropped
-     onto the page; the expander cost a press to reach the only content that answers WHERE the gap
-     is; and a pill sitting on a rule between the totals made the rule look like a divider with a
-     label rather than a measurement between two ends.
-
-     ⚠️ **Theirs LEADS and carries the emphasis.** It is the figure on the table — the one being
-     answered — and in both directionalities the leading slot is read first. Mine is muted beside it,
-     not because it matters less but because I already know it. */
-  const cmpMoney = (v: number, excluded: boolean): string =>
-    excluded ? `— ${L("Removed", "مُلغى")}` : v === 0 ? L("Free", "مجاناً") : nf(v);
-
-  /** Did the SUPPLIER move since his own last round, and which way. Nothing to say on his first
-   *  round: without this the card answers "how far apart are we" and never "did he move", and
-   *  movement is the whole reason to read a second round. */
-  const vsPrevious = (theirs: number, prev: number | null, theirEx: boolean, prevEx: boolean) => {
-    if (prev == null) return null;
-    const sup = L("the supplier", "المورد");
-    const d = theirs - prev;
-    const [text, tone] =
-      !prevEx && theirEx ? [`✓ ${L(`Removed by ${sup}, your call`, `ألغاه ${sup}، قرارك`)}`, "ok"]
-      : prevEx && !theirEx ? [`⚠ ${L(`Restored by ${sup}`, `أعاده ${sup}`)}`, "bad"]
-      : theirs === 0 && prev > 0 ? [`▼ ${L("Made it free", "جعله مجانياً")}`, "ok"]
-      : theirs === prev ? [`— ${L("Unchanged from last", "ثابت عن السابق")}`, "flat"]
-      : theirs > prev ? [L(`+${nf(d)} from their last offer`, `+${nf(d)} عن عرضه السابق`), "bad"]
-      : [L(`−${nf(Math.abs(d))} from their last offer`, `−${nf(Math.abs(d))} عن عرضه السابق`), "ok"];
-    return <span className={`ng-cmp-prev ${tone}`}>{text}</span>;
-  };
-
-  const compareCard = () => {
-    const matched = priceDiff < 0.005;
-    /* ⚠️ A cancelled leg carries NO price — the counter sends the flag and a null price (a bare null
-       price is dropped by the validator, so exclusion is the only signal). Keying "have they
-       answered?" off the price alone drew «⏳» on a line they had explicitly removed. */
-    const rows: { lbl: string; mine: number; mineEx: boolean; theirs: number | null; theirEx: boolean; prev: number | null; prevEx: boolean }[] = [
-      { lbl: L("Rental", "الإيجار"), mine: rate, mineEx: false, theirs: supDeal.rate ?? null, theirEx: false, prev: supPrev?.rate ?? null, prevEx: false },
-      { lbl: L("Mobilization", "توصيل"), mine: mob, mineEx: mEx, theirs: supDeal.mobPrice ?? null, theirEx: supDeal.mobExcluded, prev: supPrev?.mobPrice ?? null, prevEx: supPrev?.mobExcluded ?? false },
-      { lbl: L("Demobilization", "الإرجاع"), mine: demob, mineEx: dEx, theirs: supDeal.demobPrice ?? null, theirEx: supDeal.demobExcluded, prev: supPrev?.demobPrice ?? null, prevEx: supPrev?.demobExcluded ?? false },
-    ];
-    return (
-      <div className="ng-cmp">
-        {/* Drawn whether or not they match — green «✓ Matched» in the agreed case. Nothing at all
-            left the matched card looking unfinished, and the reader could not tell it from a card
-            still waiting for a figure. */}
-        <span className={`ng-cmp-pill${matched ? " ok" : ""}`}>
-          {matched ? `✓ ${L("Matched", "مطابق")}` : `${L("Difference", "الفرق")} ${nf(priceDiff)}`}
-        </span>
-        <div className="ng-cmp-duo">
-          <div className="ng-cmp-side lead">
-            <div className="k">{L("Supplier's total", "إجمالي عرض المورد")}</div>
-            <div className="v">{nf(supTotal)}</div>
-          </div>
-          <div className="ng-cmp-side">
-            <div className="k">{L("Your total", "إجمالي عرضك")}</div>
-            <div className="v">{nf(total)}</div>
-          </div>
-        </div>
-        {rows.map((r) => {
-          const theyAnswered = r.theirs != null || r.theirEx;
-          const theirs = r.theirs ?? 0;
-          const delta = theyAnswered ? theirs - r.mine : null;
-          const same = delta != null && Math.abs(delta) < 0.005;
-          return (
-            <div key={r.lbl} className="ng-cmp-row">
-              <span className="k">{r.lbl}</span>
-              <span className="sides">
-                <span className="lab">{L("You", "أنت")}</span> <b>{cmpMoney(r.mine, r.mineEx)}</b>
-                {" "}
-                <span className="lab">{L("Supplier", "المورد")}</span>{" "}
-                {theyAnswered ? <b>{cmpMoney(theirs, r.theirEx)}</b> : <b className="wait">⏳</b>}
-              </span>
-              {delta != null && (
-                <span className={`ng-delta${same ? " ok" : ""}`}>
-                  {same ? `✓ ${L("Matched", "مطابق")}` : `${delta > 0 ? "+" : "−"}${nf(Math.abs(delta))}`}
-                </span>
-              )}
-              {vsPrevious(theirs, r.prev, r.theirEx, r.prevEx)}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+  /* 🔴 ~~`compareCard` — the supplier's standing offer against yours, above the paper.~~ Removed
+     2026-10-11 with the app's own (release #548, alignment 1.12 c): the offers are chat cards now,
+     and the rows of the table below already say, line by line, where each figure stands. */
 
   /**
    * A term, in the prototype's three states.
@@ -2501,7 +2426,6 @@ function CounterFlow({
           {/* ── ① the price ─────────────────────────────────────────────────────────────────── */}
           {page === 0 && (
             <div {...pin("ng-sheet-price")} className="qp-paper" style={{ zoom: String(paperZoom) }}>
-              {showCompare && compareCard()}
               {qhead()}
                 {/* 🔴 **These fields are EX-VAT and nothing said so** (app parity, `dealPricesExVat`).
                     The bid price sheet asks the supplier outright which basis he is quoting on and

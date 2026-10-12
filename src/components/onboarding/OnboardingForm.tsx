@@ -105,6 +105,13 @@ export function OnboardingForm({
   const [city, setCity] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
+  /**
+   * «Are you an individual or a company?» (alignment 1.7, app parity: `profile_form_page.dart`, PR
+   * #548). Asked first; the company name is shown and required only for a company, and an individual
+   * sends none. The answer itself is not stored, as in the app.
+   */
+  const [entity, setEntity] = useState<"individual" | "company" | null>(null);
+  const isCompany = entity === "company";
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [cities, setCities] = useState<Opt[]>(FALLBACK_CITIES);
@@ -178,8 +185,9 @@ export function OnboardingForm({
     if (lastName.trim().length < 2 || lastName.trim().length > 50) next_fe.lastName = o.errors.lastName;
     if (!city.trim()) next_fe.city = o.errors.city;
     if (!jobTitle.trim()) next_fe.jobTitle = o.errors.jobTitle;
-    // App parity (`profile_form_page._companyNameIsValid`): two characters, on the COMPLETE pass.
-    if (companyName.trim().length < 2) next_fe.companyName = o.errors.companyName;
+    if (!entity) next_fe.entity = o.errors.entity;
+    // App parity (`profile_form_page._companyNameIsValid`): two characters, for a COMPANY only.
+    if (isCompany && companyName.trim().length < 2) next_fe.companyName = o.errors.companyName;
     // Email is optional by default, required in the combined create gate, and omitted entirely when
     // showEmail is false (already collected + persisted at the phone/OTP step). When shown + present,
     // it must be a valid address.
@@ -206,7 +214,7 @@ export function OnboardingForm({
         lastName: lastName.trim(),
         city: city.trim(),
         jobTitle: jobTitle.trim(),
-        companyName: companyName.trim(),
+        companyName: isCompany ? companyName.trim() : undefined,
         whatsapp: whatsapp.trim() || undefined,
       });
       setBusy(false);
@@ -235,7 +243,7 @@ export function OnboardingForm({
           lastName: lastName.trim(),
           city: city.trim(),
           jobTitle: jobTitle.trim(),
-          companyName: companyName.trim(),
+          companyName: isCompany ? companyName.trim() : undefined,
             email: showEmail ? email.trim() || undefined : undefined,
           whatsapp: whatsapp.trim() || undefined,
         }),
@@ -283,6 +291,35 @@ export function OnboardingForm({
       </div>
 
       <div className="flex flex-col gap-4 p-6">
+        {/* Individual or company, first (alignment 1.7). The app's two solid buttons, navy and
+            orange, so neither reads as the default; the chosen one stays filled. */}
+        <div>
+          <p className={labelCls}>
+            {o.individualOrCompany} <span className="text-danger">*</span>
+          </p>
+          <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label={o.individualOrCompany}>
+            {(["individual", "company"] as const).map((v) => {
+              const on = entity === v;
+              const fill = v === "individual" ? "border-navy bg-navy text-white" : "border-brand bg-brand text-white";
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setEntity(v)}
+                  className={`h-10 rounded-sm border text-body font-extrabold transition ${
+                    on ? fill : entity ? "border-border bg-surface text-muted hover:text-navy" : fill
+                  }`}
+                >
+                  {v === "individual" ? o.individual : o.company}
+                </button>
+              );
+            })}
+          </div>
+          {fe.entity && <p className="mt-1 text-meta text-danger">{fe.entity}</p>}
+        </div>
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className={labelCls}>{o.firstName}</label>
@@ -420,6 +457,7 @@ export function OnboardingForm({
             same words.
 
             ⚠️ Two characters, matching `_companyNameIsValid`. */}
+        {isCompany && (
         <div>
           <label className={labelCls}>
             {o.companyName} <span className="text-danger">*</span>
@@ -433,6 +471,7 @@ export function OnboardingForm({
           />
           {fe.companyName && <p className="mt-1 text-meta text-danger">{fe.companyName}</p>}
         </div>
+        )}
 
         <div className={`grid grid-cols-1 gap-3 ${showEmail ? "sm:grid-cols-2" : ""}`}>
           {showEmail && (

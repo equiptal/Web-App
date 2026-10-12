@@ -5,7 +5,8 @@ import { useLocale, useT } from "@/lib/i18n";
 import type { RequestListItem } from "@/lib/contract/requests";
 import { cx, POPOVER } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
-import { MachineGlyph } from "@/components/MachineGlyph";
+import { Icon } from "@/components/ui";
+import { CircleArt } from "@/components/workspace/CircleArt";
 
 /** Three names, then «+n». A fourth pushes the row wider than the machine names it is naming. */
 const SHOWN = 3;
@@ -26,6 +27,12 @@ const SHOWN = 3;
  * So this renders no chrome of its own — no background, no rule, no height. The source row owns
  * those, and this is a group inside it. The number after each name is the UNITS asked for — this row
  * is about the request, and what arrived against it is the source filter's business one group along.
+ *
+ * ── Pictures, and an overflow that cannot be missed (owner, 2026-10-11, multi-item decision 3, T3) ──
+ * The «Items» label carries the request's combined picture (the rail's own `CircleArt`), and each
+ * tab its machine's own picture before the name. No icons. ~~A grey «+1» in the same weight as the
+ * names~~: it was the only way to reach the hidden machines' bids and it read as decoration. It is an
+ * orange pill now, «+N more», and its list shows each hidden machine with its picture, units and bids.
  *
  * ── The chosen item is always among the three ─────────────────────────────────────────────────
  * The first three in the order the renter asked for them, except that a selection outside that slice
@@ -73,16 +80,34 @@ export function ItemTier({
 
   const name = (it: RequestListItem) =>
     it.item ? (ar ? it.item.nameAr || it.item.name : it.item.name) : it.displayId;
+  const bids = (n: number) => (n === 1 ? t.workspace.oneBid : t.workspace.bidsCount.replace("{n}", String(n)));
 
   return (
-    <div {...pin("item-tier")} ref={boxRef} className="relative flex flex-wrap items-center gap-4">
+    <div {...pin("item-tier")} ref={boxRef} className="relative flex min-w-0 flex-nowrap items-center gap-4">
       {/* The label wears an icon, exactly as SOURCE does one group along (owner, 2026-08-28).
           The two groups share this row and narrow the same panel — one by machine, one by where the
           bid came from — so they must read as a matched pair. A bare word beside an iconned one made
           the source look like the row's only control. `precision_manufacturing` is the machine glyph
           this workspace already uses for an item (`RequestDetailsModal`), at the same 14px. */}
       <span className="inline-flex flex-none items-center gap-1.5 text-label font-extrabold uppercase tracking-wide text-muted">
-        <MachineGlyph size={14} /> {t.workspace.itemsInRequest}
+        {/* The whole request's picture, the same component the rail and the request card draw. */}
+        <span className="grid h-[22px] w-[22px] flex-none place-items-center overflow-hidden rounded-full bg-photo-ground">
+          <CircleArt
+            machines={items.map((it) => ({
+              id: it.id,
+              name: name(it) ?? "",
+              url: it.item?.imageUrl ?? null,
+              isPhoto: it.item?.imageIsPhoto ?? false,
+              qty: it.item?.qty ?? 1,
+              typeName: name(it) ?? "",
+            }))}
+            fallback={items.find((it) => it.item?.imageUrl)?.item?.imageUrl ?? null}
+            fallbackIsPhoto={items.find((it) => it.item?.imageUrl)?.item?.imageIsPhoto ?? false}
+            onBroken={() => {}}
+            size={22}
+          />
+        </span>
+        {t.workspace.itemsInRequest}
       </span>
 
       {shown.map((it) => {
@@ -95,16 +120,19 @@ export function ItemTier({
             aria-current={on ? "true" : undefined}
             title={name(it) ?? undefined}
             className={cx(
-              "max-w-[220px] truncate border-b-2 pb-0.5 text-meta font-semibold transition-colors",
+              /* One line, never wrapping (owner, 2026-10-12): long names shrink and cut at their own
+                 end, so «+N more» stays on the row. */
+              "inline-flex min-w-0 max-w-[260px] items-center gap-1.5 whitespace-nowrap border-b-2 pb-0.5 text-meta font-semibold transition-colors",
               on ? "border-brand text-navy" : "border-transparent text-muted hover:text-navy-mid",
             )}
           >
-            {name(it)}
+            <ItemPic item={it} />
+            <span className="min-w-0 truncate">{name(it)}</span>
             {/* UNITS asked for, not bids received (owner, 2026-08-28). This row is about the request:
                 how many of this machine the renter wanted. What arrived against it is the panel's
                 business, and the source filter beside this one already counts that. */}
             {(it.item?.qty ?? 1) > 1 && (
-              <span className={on ? "text-muted" : "text-muted/70"}> ×{it.item?.qty}</span>
+              <span className={cx("flex-none", on ? "text-muted" : "text-muted/70")}>×{it.item?.qty}</span>
             )}
           </button>
         );
@@ -116,13 +144,10 @@ export function ItemTier({
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-haspopup="menu"
-          aria-label={t.workspace.chipMore.replace("{n}", String(rest.length))}
-          className={cx(
-            "flex-none border-b-2 pb-0.5 text-meta font-semibold transition-colors",
-            open ? "border-brand text-navy" : "border-transparent text-muted hover:text-navy-mid",
-          )}
+          className="inline-flex flex-none items-center gap-0.5 rounded-full bg-brand py-0.5 pe-1.5 ps-2.5 text-meta font-extrabold text-white transition-colors hover:bg-brand-hover"
         >
-          +{rest.length}
+          {t.workspace.chipMore.replace("{n}", String(rest.length))}
+          <Icon name="expand_more" size={16} className={cx("transition-transform", open && "rotate-180")} />
         </button>
       )}
 
@@ -139,10 +164,12 @@ export function ItemTier({
               }}
               className="flex w-full items-center gap-2 rounded-sm px-2.5 py-1.5 text-start text-meta font-semibold text-navy-mid transition-colors hover:bg-surface2 hover:text-navy"
             >
+              <ItemPic item={it} />
               <span className="flex-1 truncate">{name(it)}</span>
               {(it.item?.qty ?? 1) > 1 && (
                 <span className="flex-none text-label text-muted">×{it.item?.qty}</span>
               )}
+              <span className="flex-none text-label text-muted">{bids(it.bidCount)}</span>
             </button>
           ))}
         </div>
@@ -150,3 +177,26 @@ export function ItemTier({
     </div>
   );
 }
+
+/** A machine's own picture, round, before its name: the photo cropped to fill, a catalogue drawing
+ *  contained on the photo ground (the rail's fit). Nothing when there is no picture: no icon. */
+function ItemPic({ item }: { item: RequestListItem }) {
+  const [broken, setBroken] = useState(false);
+  const url = broken ? null : item.item?.imageUrl ?? null;
+  const photo = item.item?.imageIsPhoto ?? false;
+  return (
+    <span className="grid h-[22px] w-[22px] flex-none place-items-center overflow-hidden rounded-full bg-photo-ground">
+      {url && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={url}
+          alt=""
+          draggable={false}
+          onError={() => setBroken(true)}
+          className={cx("h-full w-full", photo ? "object-cover" : "scale-[1.34] object-contain")}
+        />
+      )}
+    </span>
+  );
+}
+

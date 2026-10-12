@@ -28,13 +28,15 @@ import { AppShell, PageBack, useBackBarSlot } from "@/components/AppShell";
 import { useAuthGate } from "@/components/auth/AuthGate";
 import { BidMapWorkspace } from "@/components/map/BidMapWorkspace";
 import { OtherOffers } from "@/components/map/OtherOffers";
+import { MachineBar } from "@/components/map/MachineBar";
 import { Icon } from "@/components/ui";
-import { fetchBidDetail, fetchReceivedBids } from "@/lib/api/client";
+import { fetchBidDetail, fetchReceivedBids, fetchRequestGroup } from "@/lib/api/client";
+import { showsMachineBar, supplierMachines, type SupplierMachine } from "@/lib/contract/machine-bar";
 import { isOffPlatformBid, isOffPlatformBidId } from "@/lib/contract/bid-equipment-access";
 import { otherOffers, type OtherOffer } from "@/lib/contract/other-offers";
 import type { BidCard } from "@/lib/contract/bids";
 import type { RequestRecord } from "@/lib/contract/requests";
-import { useT } from "@/lib/i18n";
+import { useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { btn } from "@/lib/ds";
 
@@ -126,6 +128,9 @@ function BidEquipment({ bidId, onRequestId }: { bidId: string; onRequestId: (id:
   const [request, setRequest] = useState<RequestRecord | null>(null);
   /** The other suppliers on this request — the back header's strip (owner, 2026-09-04). */
   const [siblings, setSiblings] = useState<OtherOffer[]>([]);
+  /** This supplier's bids on the other machines of the same request (multi-item decision 6). */
+  const [machines, setMachines] = useState<SupplierMachine[]>([]);
+  const { locale } = useLocale();
   /** The bar the shell draws around Back, so the strip can render in it (owner, 2026-09-07). */
   const backSlot = useBackBarSlot();
   const [failed, setFailed] = useState(false);
@@ -186,17 +191,36 @@ function BidEquipment({ bidId, onRequestId }: { bidId: string; onRequestId: (id:
     let live = true;
     const rid = request?.id ?? null;
     if (!rid) return;
+    // The raw record types it as unknown; only a string id is a group.
+    const gid = typeof request?.requestGroupId === "string" && request.requestGroupId ? request.requestGroupId : null;
     void (async () => {
       try {
-        const r = await fetchReceivedBids();
+        const [r, g] = await Promise.all([
+          fetchReceivedBids(),
+          // The submission's machines, his bid or not: the machine bar lists every one.
+          gid ? fetchRequestGroup(gid).catch(() => null) : Promise.resolve(null),
+        ]);
         if (!live) return;
         setSiblings(otherOffers(r.bids, rid, bidId));
+        setMachines(
+          g && bid
+            ? supplierMachines(g.requests, r.bids, {
+                bidId,
+                supplierCompanyId: bid.supplierCompanyId ?? null,
+                supplierId: bid.supplierId ?? null,
+                supplierName: bid.supplierName,
+              })
+            : [],
+        );
       } catch {
-        // No strip, and nothing said about it: the map is what the renter came for.
+        // No strip and no bar, and nothing said about it: the map is what the renter came for.
       }
     })();
     return () => { live = false; };
-  }, [bidId, request?.id]);
+    // `bid` is read for its supplier only, which a bid id fixes; re-running on every refetch of the
+    // same bid would refetch the lists for nothing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bidId, request?.id, request?.requestGroupId, bid?.id]);
 
   /* The request this offer answers, handed to the page so Back can point at it (owner, 2026-09-08).
      In an effect rather than during render: it sets state on an ancestor, and doing that while
@@ -230,6 +254,7 @@ function BidEquipment({ bidId, onRequestId }: { bidId: string; onRequestId: (id:
       {/* The strip lives in the page's BACK HEADER (owner, 2026-09-07), which the shell draws — so it
           goes in through the bar's own trailing slot. `OtherOffers` renders nothing below two. */}
       {backSlot && createPortal(<OtherOffers offers={siblings} currentBidId={bid.id} />, backSlot)}
+      {showsMachineBar(machines) && <MachineBar machines={machines} currentBidId={bid.id} />}
     <BidMapWorkspace
       bid={bid}
       request={request}
@@ -242,6 +267,16 @@ function BidEquipment({ bidId, onRequestId }: { bidId: string; onRequestId: (id:
       // `?chat=1` — the chat icon on a bid card lands here now: the conversation lives in this dock,
       // and the deal room is no longer somewhere a renter is sent to talk (owner, 2026-08-26).
       openChat={openChat}
+      // With the machine bar the chat follows the bid on screen: no tabs of its own, and the machine
+      // being negotiated named under the supplier (multi-item decision 6).
+      chatMachineLabel={
+        showsMachineBar(machines)
+          ? (() => {
+              const m = machines.find((x) => x.bidId === bid.id);
+              return m ? (locale === "ar" ? m.nameAr : m.name) : null;
+            })()
+          : null
+      }
       // The surface owns its own writes now (V11/V12): the four requests, the chat dock's first
       // message and the footer's hand-off each create the deal room themselves, and none of them
       // needs a handler from here. V9's company panel still lands with the ticket that owns it, so

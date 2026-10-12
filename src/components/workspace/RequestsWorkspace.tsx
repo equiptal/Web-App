@@ -23,6 +23,7 @@ import { submissionToBidCard, type LinkBidSubmission } from "@/lib/contract/link
 import {
   EMPTY_SELECTION,
   filterBySource,
+  railMachines,
   railTiles,
   isNewEntryRequest,
   resolveSelection,
@@ -34,6 +35,9 @@ import {
   type WorkspaceSelection,
 } from "@/lib/contract/workspace";
 import { RequestRail } from "@/components/workspace/RequestRail";
+import { SupplierRail, SuppliersTile, SuppliersView } from "@/components/workspace/SuppliersMode";
+import { supplierEntries } from "@/lib/contract/suppliers-view";
+import type { InboxBid } from "@/lib/contract/inbox";
 import { hiddenRequests, hideRequest } from "@/lib/access/hidden-requests";
 import { HIDE_BIDLESS_REQUESTS } from "@/lib/flags";
 import { RequestContextBar } from "@/components/workspace/RequestContextBar";
@@ -49,7 +53,9 @@ import { buildCompareSheet, type SheetMoneyCol } from "@/lib/export/compare-shee
 import { formatSar, type BidBudget } from "@/lib/pricing/rental";
 import { buildBidQuotationDoc, quotationSupplierInitials, quotationSupplierKey } from "@/lib/quotation/bid-quotation";
 import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/render";
+import { fetchMeUser, openQuotationPage, quotationRentee } from "@/lib/quotation/open";
 import { quotationDownloadName } from "@/lib/compare/quotation-token";
+import { bidValidityPassed } from "@/lib/contract/bids";
 import { btn, cx } from "@/lib/ds";
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
 import { BIDS_POLL_MS, useLiveTick } from "@/lib/live/useLiveTick";
@@ -99,6 +105,14 @@ export function RequestsWorkspace() {
   const [showLarger, setShowLarger] = useState(false);
   const [largerHeld, setLargerHeld] = useState(0);
   const [reloads, setReloads] = useState(0);
+  /* ── Requests mode or suppliers mode (owner, 2026-10-11, multi-item decisions 4 and 5) ──────────
+     The rail's «Suppliers» tile, at its END, reads every bid one supplier at a time. Held here rather
+     than in the URL: it is a way of reading the same page, and Back still leaves the page. */
+  const [view, setView] = useState<"requests" | "suppliers">("requests");
+  const [supplierKey, setSupplierKey] = useState<string | null>(null);
+  /** Every received bid, across all requests: the suppliers row and its counts. */
+  const [received, setReceived] = useState<InboxBid[]>([]);
+  const suppliers = useMemo(() => supplierEntries(received), [received]);
   /* ── The open drawer is a STEP, so it lives in the URL (owner, 2026-09-07) ────────────────────
      *"Back must take the user back to the step he was in, not only the page screen."*
 
@@ -225,7 +239,10 @@ export function RequestsWorkspace() {
         const lines = sub.items.length ? mine : [undefined];
         return lines.map((it) => ({ bid: { card: submissionToBidCard(sub, it), source: "offline" } as WorkspaceBid, sub }));
       });
-      setBids([...app.bids.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
+      // A bid past the supplier's own validity date is not shown, as in the app's renter offers list
+      // (`bidValidityPassed`, 2026-10-12). ~~Shown last with an «Expired» band~~.
+      const current = app.bids.filter((card) => !bidValidityPassed(card));
+      setBids([...current.map((card): WorkspaceBid => ({ card, source: "app" })), ...offline.map((o) => o.bid)]);
       // What the size filter is worth on this item, whichever way it is currently set.
       setLargerHeld(app.sizeCounts?.larger ?? 0);
       setSubmissionsByBid(Object.fromEntries(offline.map((o) => [o.bid.card.id, o.sub])));
@@ -279,6 +296,7 @@ export function RequestsWorkspace() {
       .then((r) => {
         if (!live) return;
         setUnreadByBid(Object.fromEntries(r.bids.map((b) => [b.bidId, b.unreadCount])));
+        setReceived(r.bids);
         // The supplier's mark, SIGNED, for the quotation (owner, 2026-09-23). The bid projection
         // only holds a bare key, which the private bucket refuses; this list is where the dashboard's
         // working avatar comes from.
@@ -633,15 +651,8 @@ export function RequestsWorkspace() {
     const chosen = checkedBids.size > 0 ? shownAll.filter((b) => checkedBids.has(b.card.id)) : shownAll;
     if (chosen.length === 0) return;
 
-    const [rec, me] = await Promise.all([
-      fetchRequestDetail(item.id).catch(() => null),
-      fetch("/api/me", { cache: "no-store" })
-        .then((r) => (r.ok ? (r.json() as Promise<{ user?: Record<string, string | null | undefined> }>) : null))
-        .catch(() => null),
-    ]);
-    const u = me?.user ?? {};
-    const renteeVerified = tier === "verified";
-    const profileHref = `${window.location.origin}/profile`;
+    const [rec, u] = await Promise.all([fetchRequestDetail(item.id).catch(() => null), fetchMeUser()]);
+    const rentee = quotationRentee(u, tier === "verified", ar);
     const reqItem = (rec as unknown as { equipmentItems?: { mobilizationByRentee?: boolean | null; demobilizationByRentee?: boolean | null }[] } | null)?.equipmentItems?.[0] ?? null;
     const code = item.code ?? fetchedCode ?? item.displayId;
     const reqCode = code.replace(/[^A-Za-z0-9-]/g, "");
@@ -681,25 +692,7 @@ export function RequestsWorkspace() {
               mobByRentee: reqItem?.mobilizationByRentee ?? item.mobByRentee,
               demobByRentee: reqItem?.demobilizationByRentee ?? item.demobByRentee,
             })),
-            rentee: {
-              companyName: u.companyName ?? "",
-              personName: [u.firstName, u.lastName].filter(Boolean).join(" "),
-              crNumber: u.crNumber ?? null,
-              vatNumber: u.vatNumber ?? null,
-              nationalAddress: u.nationalAddress ?? null,
-              phone: u.phone ?? null,
-              email: u.email ?? null,
-              verified: renteeVerified,
-              logoUrl: u.companyLogoUrl ?? null,
-              // The app's two asks on his own box: verify first (no company, no mark to add), then
-              // the empty logo slot. Screen only; the PDF never carries them.
-              asks: {
-                verify: renteeVerified ? null : { href: `${profileHref}?verify=1`, label: ar ? "وثّق شركتك" : "Verify your company" },
-                // Opens the logo dialog on the profile (`CompanyLogoModal`), the web's in-place upload.
-                addLogo:
-                  renteeVerified && !u.companyLogoUrl ? { href: `${profileHref}?logo=1`, label: ar ? "أضف شعارًا" : "Add a logo" } : null,
-              },
-            },
+            rentee,
           }),
         ),
       )
@@ -714,23 +707,7 @@ export function RequestsWorkspace() {
       autoPrint: false,
       tools: { download: ar ? "تنزيل PDF" : "Download PDF", share: ar ? "مشاركة" : "Share", fileName: dlName },
     });
-    // A popup-blocked `window.open` returns null and used to fail silently — a dead click. Fall back
-    // to downloading the self-printing file so the quotation is never a no-op.
-    const w = window.open("", "_blank");
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-      return;
-    }
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${dlName.replace(/[^\w.-]+/g, "_")}.html`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    openQuotationPage(html, dlName);
   }, [ar, item, shownAll, checkedBids, fetchedCode, tier, group?.locationLabel, logoByBid]);
 
   /**
@@ -915,6 +892,9 @@ export function RequestsWorkspace() {
     );
   }
 
+  /** The supplier on screen: the one picked, else the newest bidder (the app's rule: no «All»). */
+  const activeSupplier = suppliers.find((s) => s.key === supplierKey) ?? suppliers[0] ?? null;
+
   return (
     // ── The page ends at the fold (owner, 2026-08-25) ──────────────────────────────────────────
     // The negative margins are gone with them: they existed to cancel the padding `wide` put around
@@ -929,17 +909,41 @@ export function RequestsWorkspace() {
        still `fullBleed`, so this scroller is exactly the viewport under the header — the header and
        the nav stay put, and there is only ever ONE bar on screen. */
     <div {...pin("requests-workspace")} className="flex h-full min-h-0 flex-col overflow-y-auto">
-      <RequestRail
-        tiles={tiles}
-        activeKey={resolved.groupId}
-        onPick={pickGroup}
-        onDismiss={dismissTile}
-      />
+      {view === "suppliers" ? (
+        <SupplierRail
+          suppliers={suppliers}
+          activeKey={activeSupplier?.key ?? null}
+          onPick={setSupplierKey}
+          onRequests={() => setView("requests")}
+          // The newest requests' first pictures, one per request: a fixed picture, not the one
+          // on screen.
+          requestMachines={groups.flatMap((g) => railMachines(g, ar).filter((m) => m.url).slice(0, 1)).slice(0, 3)}
+        />
+      ) : (
+        <RequestRail
+          tiles={tiles}
+          activeKey={resolved.groupId}
+          onPick={pickGroup}
+          onDismiss={dismissTile}
+          trailing={suppliers.length > 0 ? <SuppliersTile suppliers={suppliers} onPress={() => setView("suppliers")} /> : null}
+        />
+      )}
 
-
-      {/* The same cap and the same gutter every page takes — so a renter moving from /create to
-          /requests finds the content starting on the same line. */}
+      {view === "suppliers" && activeSupplier ? (
+        <SuppliersView
+          supplier={activeSupplier}
+          groups={groups}
+          verified={tier === "verified"}
+          unreadByBid={unreadByBid}
+          onOpenRequest={(groupId) => {
+            setView("requests");
+            pickGroup(groupId);
+          }}
+        />
+      ) : (
       <div className={`mx-auto w-full ${PAGE_MAX} ${PAGE_X} mt-2 flex flex-col pb-8`}>
+        {/* The same cap and the same gutter every page takes — so a renter moving from /create to
+          /requests finds the content starting on the same line. */}
         {/* ── The row above the panel (owner, 2026-08-27) ─────────────────────────────────────────
             Three things, and the tabs are the middle one so they sit under the eye rather than off
             at the leading edge.
@@ -1181,6 +1185,7 @@ export function RequestsWorkspace() {
           </div>
         )}
       </div>
+      )}
 
       {toast && (
         <div className="fixed inset-x-0 bottom-28 z-[70] mx-auto w-fit rounded-full bg-navy px-4 py-2 text-meta font-semibold text-white">

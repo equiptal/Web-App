@@ -30,7 +30,9 @@ import { CheckIcon, CityTag, DocIcon, EyeIcon, PinIcon, SHOP_PAGE, ShopLogo, Sho
 export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (name: string) => void }) {
   const t = useT();
   const [detail, setDetail] = useState<StoreDetail | null>(null);
-  const [error, setError] = useState(false);
+  /** `notLive`: the store exists but its owner has no live package (backend `STORE_NOT_LIVE`, E9019,
+   *  alignment 1.10). Said as such, with no Retry: retrying cannot change it. */
+  const [error, setError] = useState<false | "load" | "notLive">(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [icons, setIcons] = useState<Record<string, string>>({});
 
@@ -56,13 +58,17 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
     setDetail(null);
     const ctrl = new AbortController();
     fetch(`/api/stores/${encodeURIComponent(id)}`, { cache: "no-store", signal: ctrl.signal })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
+      .then(async (r) => {
+        if (r.ok) return r.json();
+        const body = (await r.json().catch(() => null)) as { backendCode?: string } | null;
+        throw new Error(body?.backendCode === "E9019" ? "notLive" : "load");
+      })
       .then((d: StoreDetail) => {
         setDetail(d);
         onTitle?.(d.name);
       })
       .catch((e) => {
-        if (e?.name !== "AbortError") setError(true);
+        if (e?.name !== "AbortError") setError(e?.message === "notLive" ? "notLive" : "load");
       });
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,10 +79,12 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
       <div className={`${SHOP_PAGE} pt-6`}>
         <div className="rounded-shop-card border border-shop-line bg-white p-8 text-center text-shop-body text-shop-ink-3">
           <Icon name="error_outline" size={22} className="mx-auto mb-2" />
-          <p>{t.store.error}</p>
-          <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
-            {t.store.retry}
-          </button>
+          <p>{error === "notLive" ? t.store.notLive : t.store.error}</p>
+          {error === "load" && (
+            <button onClick={() => setReloadKey((k) => k + 1)} className={btn("secondary", "sm", { className: "mt-3" })}>
+              {t.store.retry}
+            </button>
+          )}
         </div>
       </div>
     );

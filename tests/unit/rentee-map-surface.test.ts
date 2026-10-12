@@ -692,6 +692,10 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
     expect(props.sort()).toEqual([
       "bid",
       "canOpenMachine",
+      // `companyDraft` and its two callbacks joined on 2026-10-12 (option 3A): papers ticked in the
+      // Company documents panel, reviewed and sent in the conversation. The draft travels DOWN; the
+      // callbacks REPORT (done, and which papers are still waiting) and move nothing on the map.
+      "companyDraft",
       "dealRoomId",
       "draft",
       "draftBusy",
@@ -702,13 +706,22 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       // carries nothing back: the renter closing the dock must stay closed, and a tab press still
       // moves nothing on the surface.
       "initialOpen",
+      // `machineLabel` joined on 2026-10-11 (multi-item decision 6): the machine being negotiated,
+      // named under the supplier. It travels DOWN and carries nothing back; what moves the map now is
+      // the page's machine bar, a route change, never a setter handed to this dock.
+      "machineLabel",
       "onCancelDraft",
+      "onCompanyAsks",
+      "onCompanyDraftDone",
       "onConfirmDraft",
       // `onOpenCompanyDocs` joined on 2026-08-19 with the dock's ⋮ kebab. It is a REPORT, not a
       // handle: the dock says the renter asked for the firm's papers and this surface decides that
       // the answer is V9's panel. The rule below still holds — no setter crosses the boundary.
       "onOpenCompanyDocs",
       "onOpenMachine",
+      // `onOpenMachineDocs` joined on 2026-10-12: the ask bar's «Equipment docs» lands on the
+      // machine's DOCUMENTS tab. Same shape as `onOpenMachine`, an id up and nothing down.
+      "onOpenMachineDocs",
       "onOutstandingAsks",
       "sendNonce",
       "typeWord",
@@ -748,10 +761,17 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
        fails it. */
     expect(dock.match(/<RequestCard/g)).toHaveLength(2);
     expect(dock.match(/onOpenMachine=\{onOpenMachine\}/g)).toHaveLength(2);
-    // Eight mentions in all: the prop declaration, the destructure, the resolver that decides whether
-    // a press is offered at all, its dependency, and the two `prop={prop}` pairs above. Anything
-    // more is a second consumer, which is what this line exists to catch.
-    expect(dock.match(/onOpenMachine/g)).toHaveLength(8);
+    // Eight mentions for the cards: the prop declaration, the destructure, the resolver that decides
+    // whether a press is offered at all, its dependency, and the two `prop={prop}` pairs above.
+    // 🔴 Seven more since 2026-10-11 (app release #548, alignment 1.1 and 1.3), each a press on
+    // something that NAMES the machine, never the tab strip: the renter's ask bubble (gate + press),
+    // a paper row on the supplier's answer when the fleet holds no file (gate + press), and the ask
+    // bar's «Equipment docs» hand-off to the machine's own documents (gate, press, and the ask bar's
+    // condition for drawing it). Anything beyond these is a new consumer, which is what this catches.
+    // 🔴 Four more on 2026-10-12, all `onOpenMachineDocs` (the pattern matches it as a prefix): its
+    // declaration, the doc link to this prop, the destructure, and the «Equipment docs» press.
+    // And two in the gate that sends the INBOX (no map) to its papers dialog instead of a machine.
+    expect(dock.match(/onOpenMachine/g)).toHaveLength(21);
   });
 
   it("declares callbacks that REPORT or ACT, and none that hands out map state", () => {
@@ -765,6 +785,9 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       // that stood the dock in a column is the only thing that knows what closing it means, and on
       // the map the prop is absent, so the ✕ there still keeps `setOpen(false)`.
       "onClose",
+      // The company draft's end and the waiting papers, reported up (option 3A, 2026-10-12).
+      "onCompanyAsks",
+      "onCompanyDraftDone",
       "onConfirmDraft",
       // Reports that the renter asked for the company's papers, and names no surface — the workspace
       // answers it with V9's panel, and the dock cannot tell it to do anything else.
@@ -774,6 +797,7 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       // dock is on, so no id crosses this boundary either.
       "onOpenEquipment",
       "onOpenMachine",
+      "onOpenMachineDocs",
       "onOutstandingAsks",
     ]);
     // The outstanding-ask report's whole vocabulary is still a set of opaque strings: it carries no

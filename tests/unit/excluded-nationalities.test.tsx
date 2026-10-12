@@ -111,6 +111,17 @@ describe("what is posted", () => {
     expect(hydrateExcluded(item.operator.nationality, item.operator.nationalityCustom).picked.sort()).toEqual(["Indian", "Syrian"]);
   });
 
+  it("drops a single agent nationality, which may be an inverted «not X» (alignment 1.11)", () => {
+    for (const li of [
+      { operator_included: true, operator_nationality: "Syrian" },
+      { operator_included: true, operator_nationality: "excluded", operator_nationality_custom: " " },
+    ]) {
+      const item = agentOutputToDraft({ line_items: [{ category: "Excavator", ...li }] } as never).items[0];
+      expect(item.operator.nationality).toBeNull();
+      expect(item.operator.nationalityCustom).toBeNull();
+    }
+  });
+
   it("a past request used as a template keeps its list", () => {
     const terms = machineTermsOfRequestItem({ operatorIncluded: "YES", operatorNationality: "excluded", operatorNationalityCustom: "Sudanese" });
     expect(terms.operator.nationalityCustom).toBe("Sudanese");

@@ -12,7 +12,7 @@ import { readInboxChatSummaries } from "@/lib/chat/inbox-chat-summary";
 import type { BidCard } from "@/lib/contract/bids";
 import type { InboxBid } from "@/lib/contract/inbox";
 import type { RequestRecord } from "@/lib/contract/requests";
-import { inboxPreview, inboxTimeLabel, type InboxChatSummary } from "@/lib/contract/inbox-chat";
+import { inboxPreviewLine, inboxTimeLabel, type InboxChatSummary } from "@/lib/contract/inbox-chat";
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
 import { durationDaysBetween } from "@/lib/pricing/rental";
 import { pin } from "@/lib/uiPins";
@@ -325,12 +325,7 @@ export function InboxView() {
     const unread = b.unreadCount > 0;
     const active = b.bidId === openBidId;
     const preview = chat
-      ? inboxPreview({
-          text: chat.text,
-          isMine: chat.isMine,
-          youPrefix: L("You: ", "أنت: "),
-          updateLabel: L("Update in the deal room", "تحديث في غرفة التفاوض"),
-        })
+      ? inboxPreviewLine(chat, L)
       : [b.equipmentName || b.request.equipmentSummary, b.currentPrice != null ? `${nf(b.currentPrice)} ${L("SAR", "ر.س")}` : null]
           .filter(Boolean)
           .join(" · ");

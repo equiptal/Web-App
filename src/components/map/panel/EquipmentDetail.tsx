@@ -200,7 +200,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
      placeholder, with `(0, 0)` for coordinates, reading on the card as though somebody had named the
      place. The web cannot tell a placeholder NAME from a real one — but it can tell that this yard
      resolved to no position at all, and a yard that cannot be placed has nothing to say about where
-     the machine is. So the name is withheld and the cell says «Location not specified» on its own.
+     the machine is. So the name is withheld and the cell says «No yard yet» on its own.
 
      ⚠️ «Placed» is deliberately **a point OR a distance**, not a point alone. The platform can know
      how far a yard is without publishing where it is, and `yard-card.test.tsx` has always fixed a
@@ -415,7 +415,7 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
                         <span className="bm-eq-kmu">{L("km from your project", "كم من مشروعك")}</span>
                       </span>
                     ) : (
-                      <span className="bm-eq-kmu">{L("Location not specified", "الموقع غير محدّد")}</span>
+                      <span className="bm-eq-kmu">{L("No yard yet", "لا توجد ساحة بعد")}</span>
                     )}
                     {/* The yard itself, which is what the colour is ABOUT. */}
                     {yard && <span className="mp-yard">{yard}</span>}
@@ -424,7 +424,8 @@ export function EquipmentDetail({ machine, request, ar, L, onBack, onRequest, as
                         unanswered, never refused (AC-20). */}
                     {yardState != null && yardState !== "ok" && (
                       <span className="mp-yard-badge">
-                        {yardState === "asked" ? L("Asked", "طُلب") : L("Not confirmed", "غير مؤكّدة")}
+                        {/* Names WHAT was asked (owner, 2026-10-12). ~~«Asked»~~ alone. */}
+                        {yardState === "asked" ? L("Availability asked", "طُلب تأكيد التوفّر") : L("Not confirmed", "غير مؤكّدة")}
                       </span>
                     )}
                     {yardState != null && (

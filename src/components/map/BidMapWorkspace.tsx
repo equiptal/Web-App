@@ -48,6 +48,7 @@ import { durationDaysBetween } from "@/lib/pricing/rental";
 // the hover box on each marker. Two calls would be two answers waiting to differ (RM3-AC-19).
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
 import { CompanyPanel, EquipmentDetail, type PanelRequestDraft } from "@/components/map/panel";
+import type { CompanyDocKey } from "@/components/map/panel/machine-panel-model";
 import {
   markYardExplained,
   yardExplainedBefore,
@@ -142,6 +143,9 @@ export interface BidMapWorkspaceProps {
   openCompanyDocs?: boolean;
   /** Arriving from a chat icon: the dock opens with the surface (owner, 2026-08-26). */
   openChat?: boolean;
+  /** The machine being negotiated, under the supplier's name in the chat; also hides the chat's own
+   *  machine tabs, since the page's machine bar moves the whole map (multi-item decision 6). */
+  chatMachineLabel?: string | null;
 }
 
 
@@ -154,6 +158,7 @@ export function BidMapWorkspace({
   onOpenCompanyDocs,
   openCompanyDocs = false,
   openChat = false,
+  chatMachineLabel = null,
 }: BidMapWorkspaceProps) {
   const t = useT();
   const { locale } = useLocale();
@@ -184,6 +189,8 @@ export function BidMapWorkspace({
    * quietly re-target every panel opened for the rest of the visit.
    */
   const [openedForDocuments, setOpenedForDocuments] = useState(false);
+  /** Bumped by the chat's «Equipment docs», so a detail already open remounts on its documents tab. */
+  const [docsNonce, setDocsNonce] = useState(0);
   const documentsDeepLinkUsed = useRef(false);
   /** V9 — the company panel, which takes over the same way. */
   const [companyOpen, setCompanyOpen] = useState(openCompanyDocs);
@@ -197,6 +204,11 @@ export function BidMapWorkspace({
   /** V12 — the ask the renter has COMPOSED and not yet sent (RM3-AC-17). The dock renders it as a
    *  draft card; the lifecycle that moves it is `composeDraft`/`cancelDraft`/`confirmDraft` below. */
   const [pendingDraft, setPendingDraft] = useState<RenteeRequestDraft | null>(null);
+  /** Company papers ticked in the side panel and staged for the chat, by the CHAT's keys (option 3A,
+   *  2026-10-12). The dock draws the draft and sends it; this only holds it. */
+  const [companyDraft, setCompanyDraft] = useState<string[] | null>(null);
+  /** The company papers asked for and still waiting, as the dock reads them, for the panel's rows. */
+  const [companyAsked, setCompanyAsked] = useState<ReadonlySet<string>>(() => new Set<string>());
   /**
    * The staged ask as the TRANSITION reads it, mirrored beside the state that renders it.
    *
@@ -739,6 +751,18 @@ export function BidMapWorkspace({
     [canOpenMachineFromChat, openMachine],
   );
 
+  /** The chat's «Equipment docs»: the same open, landing on the DOCUMENTS tab (owner, 2026-10-12:
+   *  ~~it opened the machine tab~~, and the papers are the thing he asked for). */
+  const openMachineDocsFromChat = useCallback(
+    (equipmentId: string) => {
+      if (!canOpenMachineFromChat(equipmentId)) return;
+      openMachineFromChat(equipmentId);
+      setOpenedForDocuments(true);
+      setDocsNonce((n) => n + 1);
+    },
+    [canOpenMachineFromChat, openMachineFromChat],
+  );
+
   /**
    * **Read this firm's papers** — the chat dock's kebab entry (owner, 2026-08-19).
    *
@@ -968,6 +992,7 @@ export function BidMapWorkspace({
           // `EquipmentDocuments` is already wired inside it as the second tab.
           <div className="bm-takeover">
             <EquipmentDetail
+              key={docsNonce}
               machine={detailMachine}
               request={bid}
               ar={ar}
@@ -1150,6 +1175,7 @@ export function BidMapWorkspace({
                   // The yard card's press. The LAYER it opens is this component's (see `onYardPress`),
                   // because the detail panel opens the same one and replaces this list to do it.
                   onYardPress={onYardPress}
+                  onAskAvailability={(m) => composeDraft(composeMachineRequest("availability", m.equipmentId))}
                   // …and the same composer read for the other verb: a card whose «اطلب التأكيد» is
                   // already out shows it as asked instead of offering to ask again (owner, 2026-08-10).
                   askPending={(m) => askPending(composeMachineRequest("availability", m.equipmentId))}
@@ -1223,6 +1249,9 @@ export function BidMapWorkspace({
             ar={ar}
             L={L}
             onBack={() => setCompanyOpen(false)}
+            // The panel speaks its own keys and the chat its own; only the VAT paper differs.
+            onAsk={(keys) => setCompanyDraft(keys.map((k) => (k === "vat" ? "vat_cert" : k)))}
+            asked={new Set([...companyAsked].map((k) => (k === "vat_cert" ? "vat" : k)) as CompanyDocKey[])}
           />
         )}
       </aside>
@@ -1235,6 +1264,7 @@ export function BidMapWorkspace({
         <ChatDock
           bid={bid}
           initialOpen={openChat}
+          machineLabel={chatMachineLabel}
           groupKey={requestGroupKey}
           // The room as the SENDER knows it — the bid's own, or the one the first ask created. The
           // dock otherwise waits for `GET /received-bids` to mention a room that already exists, and
@@ -1267,10 +1297,15 @@ export function BidMapWorkspace({
           onConfirmDraft={confirmDraft}
           onCancelDraft={cancelDraft}
           draftBusy={sender.busy}
+          // The side panel's company ask, reviewed and sent in the conversation (option 3A).
+          companyDraft={companyDraft}
+          onCompanyDraftDone={() => setCompanyDraft(null)}
+          onCompanyAsks={setCompanyAsked}
           // A card names a machine, and pressing it opens that machine — the owner's reason for the
           // card. The predicate travels with the handler because only this component knows which of
           // the fleet's machines the offer actually names, and therefore which have a detail.
           onOpenMachine={openMachineFromChat}
+          onOpenMachineDocs={openMachineDocsFromChat}
           canOpenMachine={canOpenMachineFromChat}
         />
       )}

@@ -79,7 +79,8 @@ describe("the robot arm is off every no-artwork fallback", () => {
     "components/workspace/RequestRail.tsx",
     "components/workspace/CircleArt.tsx",
     "components/workspace/RequestDetailsModal.tsx",
-    "components/workspace/ItemTier.tsx",
+    /* ~~ItemTier.tsx~~: the Items row draws no icon at all since 2026-10-11 (multi-item decision 3:
+       pictures only, an empty photo-ground circle where there is none). */
     "components/create/MachineCard.tsx",
     "components/create/RequestsRail.tsx",
     /* The bid map's ASK CARD (owner, 2026-09-22: *"the euqipment must show the image or the

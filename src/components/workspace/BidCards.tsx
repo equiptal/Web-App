@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
-import { btn } from "@/lib/ds";
+import { btn, cx } from "@/lib/ds";
 import { JOIN_URL } from "@/lib/config/store-links";
 // Both were written and tested for the bid list this workspace retired, and have had no caller since
 // (owner, 2026-08-25). The rules did not stop being true when their surface went away.
@@ -70,6 +70,33 @@ const BAND_LABEL = (t: ReturnType<typeof useT>, s: RenteeBandState): string => (
  * today. The money itself is `computeQuoteTotals`, the same assembly the deal room and the quotation
  * use — the three surfaces cannot drift because they are one calculation.
  */
+/**
+ * **What a card is ABOUT when the supplier is already the page** (owner, 2026-10-11, multi-item
+ * decision 5): in suppliers mode every card is one supplier's, so its identity row names the MACHINE
+ * (its own picture and name) instead of him. `line` replaces the subtext when given.
+ */
+export interface BidSubject {
+  name: string;
+  imageUrl: string | null;
+  imageIsPhoto: boolean;
+}
+
+/** The request facts a card prices against, per bid, when one row holds bids on several requests. */
+export interface BidContext {
+  durationDays: number | null;
+  startDate: string | null;
+  mobByRentee?: boolean | null;
+  demobByRentee?: boolean | null;
+  budget?: BidBudget | null;
+}
+
+/** One run of cards in the row: bids on ONE request. A `header` draws them in a light-blue panel. */
+export interface BidCardGroup {
+  key: string;
+  header: ReactNode | null;
+  bidIds: string[];
+}
+
 export function BidCards({
   bids,
   checked,
@@ -84,6 +111,10 @@ export function BidCards({
   showLarger = false,
   onShowLarger,
   onToggle,
+  subjectByBid,
+  contextByBid,
+  groups,
+  selectable = true,
 }: {
   bids: WorkspaceBid[];
   /** The bids ticked for the quotation download. */
@@ -114,6 +145,14 @@ export function BidCards({
   showLarger?: boolean;
   onShowLarger?: () => void;
   onToggle: (bidId: string) => void;
+  /** Suppliers mode: the machine each card is about, drawn where the supplier's name goes. */
+  subjectByBid?: Record<string, BidSubject>;
+  /** Suppliers mode: each card's own request facts, since the row spans several requests. */
+  contextByBid?: Record<string, BidContext>;
+  /** Suppliers mode: the row in runs, one per request; a run with a header is a light-blue panel. */
+  groups?: BidCardGroup[];
+  /** Whether the card carries the «include in the download» tick. Off in suppliers mode. */
+  selectable?: boolean;
 }) {
   const t = useT();
 
@@ -154,6 +193,27 @@ export function BidCards({
       </div>
     );
   }
+
+  const tile = (b: WorkspaceBid) => {
+    const ctx = contextByBid?.[b.card.id];
+    return (
+      <BidCardTile
+        key={b.card.id}
+        bid={b}
+        selected={checked.has(b.card.id)}
+        unread={unreadByBid[b.card.id] ?? 0}
+        submission={submissionsByBid[b.card.id] ?? null}
+        durationDays={ctx ? ctx.durationDays : durationDays}
+        startDate={ctx ? ctx.startDate : startDate}
+        mobByRentee={ctx ? ctx.mobByRentee ?? null : mobByRentee}
+        demobByRentee={ctx ? ctx.demobByRentee ?? null : demobByRentee}
+        budget={ctx ? ctx.budget ?? null : budget}
+        subject={subjectByBid?.[b.card.id] ?? null}
+        selectable={selectable}
+        onSelect={() => onToggle(b.card.id)}
+      />
+    );
+  };
 
   return (
     /* ── A ROW you travel sideways, and the COLUMN carries its height (owner, 2026-09-09) ────────
@@ -196,21 +256,28 @@ export function BidCards({
       {...pin("workspace-bid-cards")}
       className="flex items-stretch gap-5 overflow-x-auto overflow-y-clip p-3"
     >
-      {bids.map((b) => (
-        <BidCardTile
-          key={b.card.id}
-          bid={b}
-          selected={checked.has(b.card.id)}
-          unread={unreadByBid[b.card.id] ?? 0}
-          submission={submissionsByBid[b.card.id] ?? null}
-          durationDays={durationDays}
-          startDate={startDate}
-          mobByRentee={mobByRentee}
-          demobByRentee={demobByRentee}
-          budget={budget}
-          onSelect={() => onToggle(b.card.id)}
-        />
-      ))}
+      {groups
+        ? groups.map((g) => (
+            /* ── Bids on ONE request, side by side (owner, 2026-10-11, multi-item decision 5) ──────
+               A run with a header is the app's light-blue panel; a single bid gets the same padding
+               and an empty band of the header's height, so EVERY card in the row is the same size
+               and starts on the same line, inside a panel or not. */
+            <div
+              key={g.key}
+              className={cx("flex flex-none flex-col gap-2 rounded-lg p-2.5", g.header ? "bg-action/10" : "")}
+            >
+              {/* One line (owner, 2026-10-12): «One request · 2 bids ›». ~~A 40px band holding a
+                  small request card~~, which left white space above every card in the row. */}
+              <div className="flex h-5 min-w-0 items-center">{g.header}</div>
+              <div className="flex flex-1 items-stretch gap-5">
+                {g.bidIds.map((id) => {
+                  const b = bids.find((x) => x.card.id === id);
+                  return b ? tile(b) : null;
+                })}
+              </div>
+            </div>
+          ))
+        : bids.map(tile)}
     </div>
   );
 }
@@ -225,6 +292,8 @@ function BidCardTile({
   mobByRentee,
   demobByRentee,
   budget,
+  subject = null,
+  selectable = true,
   onSelect,
 }: {
   bid: WorkspaceBid;
@@ -236,6 +305,8 @@ function BidCardTile({
   mobByRentee?: boolean | null;
   demobByRentee?: boolean | null;
   budget?: BidBudget | null;
+  subject?: BidSubject | null;
+  selectable?: boolean;
   onSelect: () => void;
 }) {
   const t = useT();
@@ -478,6 +549,7 @@ function BidCardTile({
               download contains, so it has to be reachable by keyboard and readable by a screen
               reader without any of that being rebuilt by hand. `accent-brand` paints the native
               control in the app's orange, which is all the styling it needs. */}
+{selectable && (
           <input
             type="checkbox"
             checked={selected}
@@ -485,6 +557,7 @@ function BidCardTile({
             aria-label={L(`Include ${card.supplierName} in the download`, `أدرج ${card.supplierName} في التنزيل`)}
             className="size-3.5 flex-none cursor-pointer accent-brand"
           />
+          )}
           <Icon name={offline ? "drive_file_move" : "verified_user"} size={14} />
           {offline ? t.workspace.sourceOfflineLong : t.workspace.sourceAppLong}
         </span>
@@ -492,11 +565,21 @@ function BidCardTile({
       </header>
 
       <div {...pin("bid-card-footer")} className="flex flex-none items-center gap-3 px-3.5 py-2.5">
-        <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-navy text-body font-semibold text-white">
-          {card.supplierName.trim().charAt(0).toUpperCase() || "?"}
-        </span>
+        {subject ? (
+          /* Suppliers mode: the machine's own picture where his initial goes (decision 5). */
+          <span className="grid h-10 w-10 flex-none place-items-center overflow-hidden rounded-full bg-photo-ground">
+            {subject.imageUrl && (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={subject.imageUrl} alt="" className={cx("h-full w-full", subject.imageIsPhoto ? "object-cover" : "scale-[1.34] object-contain")} />
+            )}
+          </span>
+        ) : (
+          <span className="grid h-10 w-10 flex-none place-items-center rounded-full bg-navy text-body font-semibold text-white">
+            {card.supplierName.trim().charAt(0).toUpperCase() || "?"}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-subhead font-extrabold leading-[1.15] text-navy">{card.supplierName}</div>
+          <div className="truncate text-subhead font-extrabold leading-[1.15] text-navy">{subject ? subject.name : card.supplierName}</div>
           {/* 🔴 **THE CITY, AND WHAT THE BID COVERS** (owner, 2026-09-23, on «Supplier · Riyadh
               · 8 km»: *"make it, only city and offers x units if multi unit instead of this 2 units
               badge"*).

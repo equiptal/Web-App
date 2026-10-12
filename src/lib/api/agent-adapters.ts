@@ -475,10 +475,13 @@ function toItem(li: RFQLineItem, idx: number): EquipmentItem {
     operator: {
       ...defaultOperatorDetails(),
       nightShift: li.night_shift_required ?? false,
-      nationality: li.operator_nationality ?? null,
-      // The excluded list travels with its mode (Mansour, 2026-10-09). Only for `excluded`: a single
-      // stated nationality has no list.
-      nationalityCustom: li.operator_nationality === "excluded" ? li.operator_nationality_custom ?? null : null,
+      /* 🔴 ONLY the excluded shape is copied (alignment 1.11, 2026-10-11). The agent had no idea of
+         «not»: «operator not Syrian» could come back as `"Syrian"`, and copying it saved the renter's
+         answer inverted (c-hub then printed «Syrian»). A single value is dropped and the renter picks
+         from the list; `excluded` arrives with its list from Mansour since 2026-10-09. */
+      ...(li.operator_nationality === "excluded" && (li.operator_nationality_custom ?? "").trim()
+        ? { nationality: "excluded", nationalityCustom: li.operator_nationality_custom!.trim() }
+        : { nationality: null, nationalityCustom: null }),
       certificate: agentCert, // AC-24/50: operator license level(s) (multi-select)
       certByAgent: agentCert.length > 0, // agent set it → project-level Safety cert won't override
       // AC-24: F.A.T split — who covers the operator's Food vs Accommodation & Transport. Mansour now
