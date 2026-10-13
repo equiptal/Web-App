@@ -7,6 +7,7 @@ every session and this file is not.
 Read the entries that touch the surface you are changing. Nearly every one records a trap, a
 reversal, or the reason an odd-looking line is load-bearing.
 
+- **2026-10-13 - The create card's machine photograph no longer sticks on the next tab.** In a multi-machine AI request the excavator stayed on the walk-behind roller's tab although the type, size and taxonomy URL were all the roller's (checked: `/agents/taxonomy` gives each subtype its own photograph). One `<img>` served every tab, and a browser keeps showing the old picture until the new `src` loads; these files are ~4 MB with no cache header, so on a slow line the first picture stayed. `key={photo}` mounts a fresh element per URL. Files: `src/components/create/MachineCard.tsx`, `tests/unit/machine-card-photo-key.test.ts`. ⚠️ Not reproduced on the owner's line; the mechanism is the HTML pending-request rule. The real cost is the 4 MB PNGs: a backend/admin resize is the lasting fix.
 - **2026-10-06 - Backend copy (notification titles and bodies) follows the in-app language, not the
   browser's. On `staging` (`d4d9d3a5`); header toggle part BUILT, NOT committed.** An Arabic UI showed «New off-platform bid» in the home bubble:
   `localeFromRequest` read only `Accept-Language`, while the language choice lives in `localStorage`,

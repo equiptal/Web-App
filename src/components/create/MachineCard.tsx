@@ -302,6 +302,12 @@ export function MachineCard({
           {photo && !photoBroken ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
+              /* 🔴 Keyed by the URL (owner, 2026-10-13: *"the excavator stays on every machine"*).
+                 One `<img>` serves every tab, and a browser keeps drawing the OLD picture until the
+                 new `src` has loaded (HTML «pending request»). These files are ~4 MB each, so on a
+                 slow line the first machine's photograph sat on the next ones. A new element per
+                 URL drops the old picture at once and shows the ground until the right one lands. */
+              key={photo}
               src={photo}
               alt=""
               draggable={false}
