@@ -1,0 +1,329 @@
+name: Deploy Web-App to AWS ECS
+
+# Renter web (Next.js SSR) on ECS Fargate. Manual runs only: choose the environment
+# and the git ref. Images are tagged with the full commit SHA (ECR tags are immutable).
+#
+# Order: build (skipped when the SHA's image already exists) -> render the new image
+# into the latest task definition -> deploy the service.
+#
+# Only the image changes in the task definition; everything else is carried over from
+# the latest revision, which Terraform owns. The service ignores task_definition in
+# Terraform, so a later `terraform apply` does not roll back. A failed rollout is rolled
+# back by the ECS circuit breaker; to undo a healthy-but-wrong release, re-run with the
+# previous good SHA as `ref` (its image is reused, nothing is rebuilt).
+#
+# Configuration lives in the GitHub Environments aws-staging / aws-production
+# (variables + secrets); there is no repository-level fallback by design.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        default: staging
+        options:
+          - staging
+          - prod
+      ref:
+        description: "Optional git ref to deploy (branch, tag, or full 40-char SHA). Leave empty to use the triggering ref. prod only accepts commits on main."
+        required: false
+        type: string
+        default: ""
+
+# Only what OIDC + checkout need. Nothing else.
+permissions:
+  id-token: write
+  contents: read
+
+# One in-flight deploy per environment. Never cancel a run that may already be
+# mid-rollout, queue it instead. staging and prod are independent groups.
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    environment:
+      name: ${{ inputs.environment == 'prod' && 'aws-production' || 'aws-staging' }}
+
+    env:
+      TARGET_ENV: ${{ inputs.environment }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+      TASK_DEFINITION: ${{ vars.TASK_DEFINITION }}
+      CONTAINER_NAME: ${{ vars.CONTAINER_NAME }}
+
+    steps:
+      # ---------------------------------------------------------------------
+      # 1. Checkout the requested ref (defaults to the triggering ref).
+      # ---------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.ref != '' && inputs.ref || github.ref }}
+          fetch-depth: 0 # the prod check needs origin/main's history
+
+      # The commit actually checked out, not github.sha: with `ref` set (or a push
+      # landing between trigger and checkout) the two differ, and the image tag and
+      # the summary must name what was built.
+      - name: Resolve deployed commit SHA
+        id: sha
+        run: |
+          set -euo pipefail
+          FULL_SHA="$(git rev-parse HEAD)"
+          echo "sha=${FULL_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Deploying commit ${FULL_SHA}: $(git log -1 --format=%s)"
+
+      # ---------------------------------------------------------------------
+      # 2. Pre-flight: config completeness, environment-suffix guard, and for
+      #    prod, the commit must be on main. Runs BEFORE any build and before
+      #    any AWS call. Aggregates every problem into a single failure message.
+      # ---------------------------------------------------------------------
+      - name: Validate configuration
+        env:
+          # Presence-only checks. Never echoed.
+          DEPLOY_ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          MAPS_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+          STREAM_KEY: ${{ secrets.NEXT_PUBLIC_STREAM_API_KEY }}
+          OS_APP_URL: ${{ vars.NEXT_PUBLIC_OS_APP_URL }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          set -uo pipefail
+          ERRORS=""
+
+          REQUIRED="AWS_REGION ECS_CLUSTER ECR_REPOSITORY ECS_SERVICE TASK_DEFINITION CONTAINER_NAME"
+          SUFFIXED="ECS_CLUSTER ECR_REPOSITORY ECS_SERVICE TASK_DEFINITION CONTAINER_NAME"
+
+          # --- required, non-empty (whitespace counts as empty) -------------
+          # `${!NAME-}` (not `${!NAME}`) so an unset variable is reported by the
+          # aggregated message below instead of aborting on `set -u`.
+          for NAME in $REQUIRED; do
+            VALUE="$(printf '%s' "${!NAME-}" | tr -d '[:space:]')"
+            if [ -z "$VALUE" ]; then
+              ERRORS="${ERRORS}\n  - variable ${NAME} is empty or unset"
+            fi
+          done
+          if [ -z "$(printf '%s' "${DEPLOY_ROLE_ARN-}" | tr -d '[:space:]')" ]; then
+            ERRORS="${ERRORS}\n  - secret AWS_DEPLOY_ROLE_ARN is empty or unset"
+          fi
+          # Inlined into the bundle at build time: a missing value ships a broken build.
+          if [ -z "$(printf '%s' "${MAPS_KEY-}" | tr -d '[:space:]')" ]; then
+            ERRORS="${ERRORS}\n  - secret NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is empty or unset"
+          fi
+          if [ -z "$(printf '%s' "${STREAM_KEY-}" | tr -d '[:space:]')" ]; then
+            ERRORS="${ERRORS}\n  - secret NEXT_PUBLIC_STREAM_API_KEY is empty or unset"
+          fi
+          if [ -z "$(printf '%s' "${OS_APP_URL-}" | tr -d '[:space:]')" ]; then
+            ERRORS="${ERRORS}\n  - variable NEXT_PUBLIC_OS_APP_URL is empty or unset"
+          fi
+
+          # --- environment-suffix guard ------------------------------------
+          # Catches a staging run that resolved prod values (or vice versa).
+          if [ "$TARGET_ENV" = "prod" ]; then SUFFIX="-prod"; else SUFFIX="-staging"; fi
+          for NAME in $SUFFIXED; do
+            VALUE="${!NAME-}"
+            case "$VALUE" in
+              *"$SUFFIX") : ;;
+              "") : ;;  # already reported as empty above
+              *) ERRORS="${ERRORS}\n  - ${NAME}='${VALUE}' does not end with '${SUFFIX}' (target environment: ${TARGET_ENV})" ;;
+            esac
+          done
+
+          # --- prod deploys only commits that are on main ------------------
+          # GitHub's branch rules check the branch the run was started from, not
+          # the `ref` input; this stops an unmerged branch reaching prod through
+          # `ref`. Older main commits pass, so redeploying a previous release works.
+          if [ "$TARGET_ENV" = "prod" ] && ! git merge-base --is-ancestor "$SHA" origin/main 2>/dev/null; then
+            ERRORS="${ERRORS}\n  - commit ${SHA} is not on main (prod only deploys commits merged into main)"
+          fi
+
+          if [ -n "$ERRORS" ]; then
+            echo "::error::Pre-flight validation failed for environment '${TARGET_ENV}':"
+            printf 'Pre-flight validation failed:%b\n' "$ERRORS"
+            echo ""
+            echo "Set variables/secrets under Settings -> Environments -> ${{ inputs.environment == 'prod' && 'aws-production' || 'aws-staging' }}."
+            exit 1
+          fi
+
+          echo "Pre-flight OK for '${TARGET_ENV}' (all values present, suffix '${SUFFIX}' consistent)."
+
+      # ---------------------------------------------------------------------
+      # 3. AWS auth (OIDC, short-lived).
+      # ---------------------------------------------------------------------
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-duration-seconds: 3600
+
+      # Pre-flight part two: the target AWS resources actually exist. Read-only.
+      - name: Verify AWS targets exist
+        run: |
+          set -uo pipefail
+          ERRORS=""
+
+          if ! aws ecs describe-clusters --clusters "$ECS_CLUSTER" \
+               --query 'clusters[?status==`ACTIVE`].clusterName' --output text 2>/dev/null | grep -qx "$ECS_CLUSTER"; then
+            ERRORS="${ERRORS}\n  - ECS cluster '${ECS_CLUSTER}' not found or not ACTIVE in ${AWS_REGION}"
+          fi
+          if ! aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1; then
+            ERRORS="${ERRORS}\n  - ECR repository '${ECR_REPOSITORY}' not found in ${AWS_REGION}"
+          fi
+          ACTIVE_SVC="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[?status==`ACTIVE`].serviceName' --output text 2>/dev/null || true)"
+          if [ "$ACTIVE_SVC" != "$ECS_SERVICE" ]; then
+            ERRORS="${ERRORS}\n  - ECS service '${ECS_SERVICE}' not ACTIVE in cluster '${ECS_CLUSTER}'"
+          fi
+          CONTAINERS="$(aws ecs describe-task-definition --task-definition "$TASK_DEFINITION" \
+            --query 'taskDefinition.containerDefinitions[].name' --output text 2>/dev/null || true)"
+          if [ -z "$CONTAINERS" ]; then
+            ERRORS="${ERRORS}\n  - task definition family '${TASK_DEFINITION}' has no ACTIVE revision in ${AWS_REGION}"
+          elif ! printf '%s' "$CONTAINERS" | tr '\t' '\n' | grep -qx "$CONTAINER_NAME"; then
+            ERRORS="${ERRORS}\n  - container '${CONTAINER_NAME}' not present in '${TASK_DEFINITION}' (found: ${CONTAINERS})"
+          fi
+
+          if [ -n "$ERRORS" ]; then
+            echo "::error::AWS target verification failed:"
+            printf 'AWS target verification failed:%b\n' "$ERRORS"
+            exit 1
+          fi
+
+          echo "AWS targets verified."
+
+      # Record the revision running BEFORE we change anything, for the summary.
+      - name: Capture current task definition revision
+        id: current
+        run: |
+          set -uo pipefail
+          TD="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+                  --query 'services[0].taskDefinition' --output text 2>/dev/null || true)"
+          echo "revision=${TD##*/}" >> "$GITHUB_OUTPUT"
+
+      # ---------------------------------------------------------------------
+      # 4. Build and publish, tagged with the full SHA. ECR tags are immutable,
+      #    so an image that already exists for this SHA (re-run, redeploy of an
+      #    older release) is reused, never rebuilt or overwritten.
+      # ---------------------------------------------------------------------
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+      - name: Check for existing image
+        id: image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          set -euo pipefail
+          echo "uri=${ECR_REGISTRY}/${ECR_REPOSITORY}:${SHA}" >> "$GITHUB_OUTPUT"
+          if aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$SHA" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.image.outputs.exists == 'false'
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      # NEXT_PUBLIC_* are inlined into the bundle at build time, so each environment
+      # builds its own image. Server-side variables come from SSM / Secrets Manager
+      # at container start and are not build arguments.
+      - name: Build and push image
+        if: steps.image.outputs.exists == 'false'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          provenance: false
+          tags: ${{ steps.image.outputs.uri }}
+          build-args: |
+            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+            NEXT_PUBLIC_STREAM_API_KEY=${{ secrets.NEXT_PUBLIC_STREAM_API_KEY }}
+            NEXT_PUBLIC_OS_APP_URL=${{ vars.NEXT_PUBLIC_OS_APP_URL }}
+          cache-from: type=gha,scope=web-app-${{ inputs.environment }}
+          cache-to: type=gha,scope=web-app-${{ inputs.environment }},mode=min
+
+      # ---------------------------------------------------------------------
+      # 5. Render -> deploy. Only the container image changes; every other field
+      #    (secrets, env, cpu/memory, logging, ports) is carried over from the
+      #    latest revision.
+      # ---------------------------------------------------------------------
+      - name: Download current task definition
+        run: |
+          set -euo pipefail
+          aws ecs describe-task-definition --task-definition "$TASK_DEFINITION" \
+            --query taskDefinition > task-definition.json
+
+      - name: Render new image into the task definition
+        id: td
+        uses: aws-actions/amazon-ecs-render-task-definition@8d79160660ad39c402a16e5fc7cd2a32e8f7d6b7 # v1.9.1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.image.outputs.uri }}
+
+      - name: Deploy service
+        id: deploy
+        uses: aws-actions/amazon-ecs-deploy-task-definition@a00d4d57ac0de1a99b39fe469f3d898d38717c2b # v2.6.4
+        with:
+          task-definition: ${{ steps.td.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          # Fail fast. Without this the action waits the 30-minute default while
+          # the ECS circuit breaker grinds through retries and rollback.
+          wait-for-minutes: 15
+
+      # ---------------------------------------------------------------------
+      # 6. Always leave a traceable record, success or failure.
+      # ---------------------------------------------------------------------
+      - name: Write deployment summary
+        if: always()
+        env:
+          GH_ENVIRONMENT: ${{ inputs.environment == 'prod' && 'aws-production' || 'aws-staging' }}
+          DEPLOYED_REF: ${{ inputs.ref != '' && inputs.ref || github.ref_name }}
+          IMAGE_TAG: ${{ steps.sha.outputs.sha }}
+          IMAGE: ${{ steps.image.outputs.uri }}
+          REUSED: ${{ steps.image.outputs.exists }}
+          PREV: ${{ steps.current.outputs.revision }}
+          NEW: ${{ steps.deploy.outputs.task-definition-arn }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -uo pipefail
+          nr() { if [ -z "${1:-}" ]; then printf 'not resolved'; else printf '%s' "$1"; fi; }
+          built() { case "${1:-}" in true) printf 'reused' ;; false) printf 'built' ;; *) printf 'n/a' ;; esac; }
+
+          {
+            echo "## Deployment summary"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Outcome | \`${JOB_STATUS}\` |"
+            echo "| Target environment | \`$(nr "$TARGET_ENV")\` |"
+            echo "| GitHub Environment | \`$(nr "$GH_ENVIRONMENT")\` |"
+            echo "| Deployed ref | \`$(nr "$DEPLOYED_REF")\` |"
+            echo "| Commit (image tag) | \`$(nr "$IMAGE_TAG")\` |"
+            echo "| Image | \`$(nr "$IMAGE")\` ($(built "$REUSED")) |"
+            echo "| ECS cluster / service | \`$(nr "${ECS_CLUSTER-}")\` / \`$(nr "${ECS_SERVICE-}")\` |"
+            echo "| Previous revision | \`$(nr "$PREV")\` |"
+            echo "| New revision | \`$(nr "${NEW##*/}")\` |"
+            echo "| Triggered by | \`${GITHUB_ACTOR}\` |"
+            echo "| Run ID | \`${GITHUB_RUN_ID}\` |"
+            echo ""
+            if [ "${JOB_STATUS}" != "success" ]; then
+              echo "> Run did not succeed. If the deploy step did not run, the service was **not** updated and is"
+              echo "> still on the previous revision above. A failed rollout is rolled back by the ECS circuit"
+              echo "> breaker. To undo a release, re-run with the previous good SHA as \`ref\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

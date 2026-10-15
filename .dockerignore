@@ -1,0 +1,17 @@
+.git
+.github
+.claude
+.impeccable
+node_modules
+.next
+.next-*
+.env*
+!.env.example
+tests
+test-results
+playwright-report
+docs
+prototypes
+*.md
+Dockerfile
+.dockerignore
