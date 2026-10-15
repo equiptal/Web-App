@@ -35,26 +35,6 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-
-  /**
-   * **`/go/subscription` forwards to the app's subscription page** (2026-10-15).
-   *
-   * Meta (WhatsApp templates, ads) refuses link shorteners, and `moedatech.chottu.link` counts as
-   * one, so Meta gets this own-domain URL and the ChottuLink link does the app opening. The app
-   * itself only opens `moedatech.chottu.link` links, so the hop cannot be skipped.
-   *
-   * ⚠️ Not `permanent`: a 308 is cached by browsers for good, so a later change of target would not
-   * reach anyone who tapped it once.
-   */
-  async redirects() {
-    return [
-      {
-        source: "/go/subscription",
-        destination: "https://moedatech.chottu.link/subscription",
-        permanent: false,
-      },
-    ];
-  },
 };
 
 export default nextConfig;
