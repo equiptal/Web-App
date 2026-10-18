@@ -101,6 +101,29 @@ export function chatAskDeclined(messages: readonly ChatAskMessage[], askId: stri
   return messages.some((m) => m.quoted_message_id === askId && isAskDecline(m));
 }
 
+/**
+ * The company papers the supplier has SENT in this chat, key to file url, the newest file winning.
+ * A named file (`docKey`) fills its own paper; an older, unnamed one fills every paper its ask named.
+ * A chat reply files nothing on the firm's profile, so the company read never sees it: without this,
+ * the documents panel kept saying «no document yet» and offered the ask again (CEX-171071).
+ */
+export function companyDocsReceived<M extends ChatAskMessage>(
+  messages: readonly M[],
+  urlOf: (m: M) => string | null,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const m of messages) {
+    const ask = chatAskFor(m, messages);
+    const keys = ask ? companyDocKeysOf(ask) : null;
+    if (!keys || isAskDecline(m)) continue;
+    const url = urlOf(m);
+    if (!url) continue;
+    const key = answerDocKeyOf(m);
+    for (const k of key ? [key] : keys) out.set(k, url);
+  }
+  return out;
+}
+
 /** A quotation ask still waiting for its file: the ask bar then shows Quotation as asked. */
 export function hasOpenQuoteRequest(messages: readonly ChatAskMessage[]): boolean {
   return messages.some((m) => isQuoteRequest(m) && !chatAskAnswered(messages, m.id));

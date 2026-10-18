@@ -17,12 +17,12 @@
  * change it just wire to new buttons."*
  *
  * Pressing «اطلب سعراً أقل» used to `push('/deal-room/[id]')` and leave the renter looking at a room
- * he had not asked to read, with the act he *had* asked for one more press away. It now pushes
- * `?act=counter` / `?act=accept`, which the deal-room page feeds to `DealRoom` as `initialFlow` and
- * which seeds **the room's own `openFlow(mode)`** — the same function its own two buttons call, with
- * its own guards intact (nothing opens while `busy` or before the room loads, and Accept still needs
- * the room's `canAccept`; blocked, the renter simply lands on the room and its existing strip says
- * why). Not one line of the flow is copied or re-implemented here: this file only names the mode.
+ * he had not asked to read. It then pushed `?act=counter` / `?act=accept`, which still drew that
+ * room under the sheet and left him on it afterwards. Since 2026-10-18 (the room view is retired) it
+ * opens `CounterSheet` in place with `initialFlow`, which seeds **the room's own `openFlow(mode)`**
+ * with its own guards intact (nothing opens while `busy` or before the room loads, and Accept still
+ * needs the room's `canAccept`; refused, the sheet simply closes). Not one line of the flow is
+ * copied or re-implemented here: this file only names the mode.
  *
  * ── SHAPE: the v3 prototype's footer, plus a breakdown that opens OVER it ────────────────────────
  * A fixed 76px slab: the rate at hero size with its unit, the negotiation state under it, «عرض
@@ -48,8 +48,9 @@
  * line, and negotiating is what creates the room (004a §4.5) — never opening this surface.
  */
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { CounterSheet } from "@/components/deal-room/CounterSheet";
+import { fetchDealRoom, withdrawAcceptance } from "@/lib/api/client";
 import { ensureDealRoom } from "@/lib/chat/ensure-deal-room";
 import { bucketBidTerms, type BidCard } from "@/lib/contract/bids";
 import { priceFooterModel } from "@/lib/contract/price-footer";
@@ -76,7 +77,7 @@ export interface PriceFooterProps {
    * the negotiate"*).
    *
    * 🔴 **A variant, never a second component.** Everything that matters here is the hand-off:
-   * `?act=counter` / `?act=accept` seeds the deal room's own `openFlow` with its own guards intact,
+   * the sheet's `initialFlow` seeds the deal room's own `openFlow` with its own guards intact,
    * and this file's header is explicit that re-implementing that flow would put two negotiation
    * surfaces over one room. A slim COPY would have had to copy the hand-off with it.
    *
@@ -86,12 +87,15 @@ export interface PriceFooterProps {
   slim?: boolean;
   mobByRentee?: boolean | null;
   demobByRentee?: boolean | null;
+  /** The bid moved (a counter sent, an accept, a withdrawal): the host refetches it. */
+  onChanged?: () => void;
 }
 
-export function PriceFooter({ bid, durationDays, startDate = null, slim = false, mobByRentee = null, demobByRentee = null }: PriceFooterProps) {
+export function PriceFooter({ bid, durationDays, startDate = null, slim = false, mobByRentee = null, demobByRentee = null, onChanged }: PriceFooterProps) {
   const t = useT();
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
+  /** The three-step sheet, open over this screen. */
+  const [sheet, setSheet] = useState<{ roomId: string; flow: "counter" | "take" } | null>(null);
   /** The breakdown popover. Closed on every mount: it explains the figure, it is not the figure. */
   const [expanded, setExpanded] = useState(false);
 
@@ -128,6 +132,44 @@ export function PriceFooter({ bid, durationDays, startDate = null, slim = false,
    *  binding, so the difference still has a single reader in this file. */
   const unitsDiffer = model.unitsDiffer;
   const canAccept = termConflicts === 0 && !unitsDiffer;
+  /**
+   * He has already accepted: nothing left to counter or accept here (smoke, CEX-171071 — both acts
+   * stayed on the bar after the accept). The bid card's own rule (`status === "ACCEPTED"` or a survey
+   * win). ⚠️ Not `dealRoomStatus`: the bid read leaves it null, so awaiting and closed cannot be told
+   * apart here, and the state line says only what is true of both.
+   */
+  const accepted = bid.status === "ACCEPTED" || bid.wonViaSurvey === true;
+  /**
+   * The ROOM's phase, read only once he has accepted: it is what tells «waiting for the supplier»
+   * (withdrawable) from a closed deal, and the bid read leaves `dealRoomStatus` null. The app's map
+   * footer loads its room for the same reason (`bid_map_negotiation_scope.dart`).
+   */
+  const [roomStatus, setRoomStatus] = useState<string | null>(null);
+  const [withdrawing, setWithdrawing] = useState(false);
+  useEffect(() => {
+    setRoomStatus(null);
+    if (!accepted || !bid.dealRoomId) return;
+    let live = true;
+    fetchDealRoom(bid.dealRoomId)
+      .then((r) => { if (live) setRoomStatus(r.status ?? null); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [accepted, bid.dealRoomId]);
+  const awaiting = accepted && roomStatus === "AWAITING_SUPPLIER_CONFIRMATION";
+
+  /** «Withdraw acceptance» — the app's map footer fires it straight, with no confirm of its own. */
+  async function withdraw() {
+    if (withdrawing || !bid.dealRoomId) return;
+    setWithdrawing(true);
+    try {
+      await withdrawAcceptance(bid.dealRoomId);
+      onChanged?.();
+    } catch {
+      window.alert(t.priceFooter.withdrawFailed);
+    } finally {
+      setWithdrawing(false);
+    }
+  }
 
   /**
    * Money — **Latin digits, in both locales** (`formatSar`, `rental.ts:290`).
@@ -185,7 +227,7 @@ export function PriceFooter({ bid, durationDays, startDate = null, slim = false,
    * Hand off to the deal room **with the act attached**.
    *
    * Without a room this is one of exactly three acts allowed to create one (004a §4.5) — which is
-   * why the id is resolved here and not left to the destination: `?act=` is meaningless until the
+   * why the id is resolved here and not left to the sheet: `initialFlow` is meaningless until the
    * room it addresses exists.
    */
   // The bid card's rental-row label (`BidCards.tsx`), off the same figures.
@@ -200,8 +242,15 @@ export function PriceFooter({ bid, durationDays, startDate = null, slim = false,
     setBusy(true);
     try {
       const roomId = await ensureDealRoom(bid.id, bid.dealRoomId);
-      router.push(`/deal-room/${encodeURIComponent(roomId)}?act=${act}`);
-    } catch {
+      // 🔴 **The sheet opens HERE, over this screen** (owner, 2026-10-18: the room view is retired;
+      // what is left is the chat and the three-step sheet). ~~`router.push("/deal-room/{id}?act=")`~~
+      // drew the old room under the sheet and left the renter on it after a sent counter or an accept.
+      // ⚠️ Accept opens as «take» — the offer card's own path: the accept sheet when the room agrees
+      // everything matches, else the sheet on HIS offer behind the binding warning, as the app's
+      // footer does. Plain `accept` closed in silence whenever the room's price check said no (the
+      // last two rounds differ), which this bar cannot see (smoke, 2026-10-18).
+      setSheet({ roomId, flow: act === "accept" ? "take" : "counter" });
+    } finally {
       setBusy(false);
     }
   }
@@ -218,6 +267,9 @@ export function PriceFooter({ bid, durationDays, startDate = null, slim = false,
 
           The lines are the BID CARD's, per machine with the count applied once at the foot, and the
           note under the overall total is the bid card's own sentence. Three surfaces, one reading. */}
+      {/* The wait, on its own line ABOVE the bar, as the app's map footer draws it (`_waitingLine`):
+          a status names a condition and sits apart from the control that ends it. */}
+      {awaiting && <div className="bm-foot-wait">{t.priceFooter.waitingSupplier}</div>}
       <div className="bm-foot-bar">
         <div className="bm-foot-figs">
           <div {...pin("price-footer-rate")} className="bm-foot-rate">
@@ -239,6 +291,7 @@ export function PriceFooter({ bid, durationDays, startDate = null, slim = false,
             >
               {expanded ? t.priceFooter.hideDetails : t.priceFooter.showDetails}
             </button>
+            <span className="bm-foot-vat">{t.priceFooter.exclVat}</span>
           </div>
         </div>
         {/* COUNTER is always available. ACCEPT appears only when there is nothing left to settle —
@@ -254,10 +307,18 @@ export function PriceFooter({ bid, durationDays, startDate = null, slim = false,
 
             Hidden rather than disabled, per the owner: a greyed Accept invites a press that cannot
             land, and the reason lives two screens away. Counter is the act that resolves the block. */}
-        <button {...pin("price-footer-counter")} type="button" className="bm-foot-cta" onClick={() => void handOff("counter")} disabled={busy}>
-          {t.priceFooter.counterPrice}
-        </button>
-        {canAccept && (
+        {awaiting ? (
+          <button type="button" className="bm-foot-cta" onClick={() => void withdraw()} disabled={withdrawing}>
+            {withdrawing ? t.priceFooter.withdrawing : t.priceFooter.withdraw}
+          </button>
+        ) : accepted ? (
+          <span className="bm-foot-done">{t.priceFooter.accepted}</span>
+        ) : (
+          <button {...pin("price-footer-counter")} type="button" className="bm-foot-cta" onClick={() => void handOff("counter")} disabled={busy}>
+            {t.priceFooter.counterPrice}
+          </button>
+        )}
+        {!accepted && canAccept && (
           <button {...pin("price-footer-approve")} type="button" className="bm-foot-cta is-confirm" onClick={() => void handOff("accept")} disabled={busy}>
             {t.priceFooter.confirmPrice}
           </button>
@@ -313,6 +374,13 @@ export function PriceFooter({ bid, durationDays, startDate = null, slim = false,
             </div>
           )}
         </div>
+      )}
+      {sheet && (
+        <CounterSheet
+          roomId={sheet.roomId}
+          flow={sheet.flow}
+          onExit={() => { setSheet(null); onChanged?.(); }}
+        />
       )}
     </footer>
   );

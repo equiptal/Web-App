@@ -10,7 +10,7 @@
  * So the footer **shows figures and hands off**: the figures come from `computeDealTotals` — the one
  * function the deal-room bar, the quotation and the signed PDF all price from, which is what makes
  * "every figure matches the existing bar for the same room" (RM3-AC-24) true by construction rather
- * than by inspection. Negotiate/accept navigates to `/deal-room/[dealRoomId]`.
+ * than by inspection. Negotiate/accept open the room's three-step sheet in place (`CounterSheet`).
  *
  * ── The two numbers that are both correct (004a §4a.4) ───────────────────────────────────────────
  * | Surface | Number | Meaning |

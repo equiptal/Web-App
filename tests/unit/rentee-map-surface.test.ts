@@ -712,6 +712,8 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       "machineLabel",
       "onCancelDraft",
       "onCompanyAsks",
+      // The papers the supplier SENT in the chat, reported up so the panel's rows fill (CEX-171071).
+      "onCompanyDocsReceived",
       "onCompanyDraftDone",
       "onConfirmDraft",
       // `onOpenCompanyDocs` joined on 2026-08-19 with the dock's ⋮ kebab. It is a REPORT, not a
@@ -787,6 +789,8 @@ describe("the chat dock's tab strip touches no map state (RM3-AC-49)", () => {
       "onClose",
       // The company draft's end and the waiting papers, reported up (option 3A, 2026-10-12).
       "onCompanyAsks",
+      // The papers the supplier SENT in the chat, reported up so the panel's rows fill (CEX-171071).
+      "onCompanyDocsReceived",
       "onCompanyDraftDone",
       "onConfirmDraft",
       // Reports that the renter asked for the company's papers, and names no surface — the workspace

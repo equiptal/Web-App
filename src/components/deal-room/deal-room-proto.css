@@ -862,7 +862,6 @@
 /* The quotation, from step ③ (app parity: the renter reads the position back before sending it). */
 .ng-quote { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 12px; border: 1px solid var(--border-hair); border-radius: 10px; background: var(--surface); font-family: inherit; font-size: 12.5px; font-weight: 800; color: var(--navy); cursor: pointer; }
 .ng-quote:hover { background: var(--surface-alt); }
-.ng-ack { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; font-size: 12.5px; font-weight: 600; color: var(--navy); }
 .ng-err { margin-top: 8px; font-size: 12.5px; font-weight: 700; color: var(--danger); }
 
 /* ── footer ─────────────────────────────────────────────────────────────────────────────────────
@@ -1051,6 +1050,10 @@
 .dlproto .oc.mine .oc-was { color: var(--danger-soft); }
 .dlproto .oc.mine .oc-cur, .dlproto .oc.mine .oc-u, .dlproto .oc.mine .oc-pu { color: rgba(255, 255, 255, 0.8); }
 .dlproto .oc-pu { flex: 1; min-width: 0; font-size: 10.5px; font-weight: 700; color: var(--muted); white-space: nowrap; overflow: hidden; }
+/* «excl. VAT» as a soft grey tag (owner's pick from the app's placement sheet, CEX-171071). On a dark
+   or solid surface (the price bar, your own offer) it turns to a translucent white chip. */
+.dlproto .vat-tag { display: inline-block; margin-inline-start: 6px; padding: 2px 7px; border-radius: 6px; font-size: 10px; font-weight: 700; line-height: 1.3; color: var(--muted); background: color-mix(in srgb, var(--muted) 12%, transparent); vertical-align: middle; }
+.dlproto .oc.mine .vat-tag, .dlproto .pb-src .vat-tag { color: var(--surface); background: color-mix(in srgb, var(--surface) 18%, transparent); }
 .dlproto .oc-det { flex: none; display: inline-flex; align-items: center; padding: 4px 0; background: none; border: 0; font: inherit; font-size: 11px; font-weight: 700; color: var(--action); cursor: pointer; }
 .dlproto .oc-det .material-icons-outlined { font-size: 15px; }
 .dlproto .oc.mine .oc-det { color: var(--surface); }

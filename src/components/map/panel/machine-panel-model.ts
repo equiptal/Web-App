@@ -1753,6 +1753,8 @@ export interface CompanyDocInput {
   /** True for a paper the issuer reissues every year (a VAT certificate) — shown instead of an expiry. */
   renewsAnnually?: boolean;
   downloadUrl?: string | null;
+  /** The supplier sent it in the chat; it is not on the firm's file, so it is never «verified». */
+  viaChat?: boolean;
 }
 
 /** The company as this panel needs it. Structurally satisfiable from a `BidCard`'s `verified` +
@@ -1789,6 +1791,15 @@ export function companyDocRows(source: CompanyDocsSource): CompanyDocRow[] {
         status: "missing" as const,
         statusLine: { en: "no document yet", ar: "لا يوجد مستند بعد" },
         downloadUrl: null,
+      };
+    }
+    if (input.viaChat) {
+      return {
+        key,
+        label,
+        status: "on_file" as const,
+        statusLine: { en: "sent in the chat", ar: "أُرسل في المحادثة" },
+        downloadUrl: input.downloadUrl ?? null,
       };
     }
     const status: CompanyDocStatus = source.verified ? "verified" : "on_file";

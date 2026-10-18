@@ -48,7 +48,7 @@ import { durationDaysBetween } from "@/lib/pricing/rental";
 // the hover box on each marker. Two calls would be two answers waiting to differ (RM3-AC-19).
 import { equipmentCardModel } from "@/components/map/equipment-card-model";
 import { CompanyPanel, EquipmentDetail, type PanelRequestDraft } from "@/components/map/panel";
-import type { CompanyDocKey } from "@/components/map/panel/machine-panel-model";
+import type { CompanyDocInput, CompanyDocKey } from "@/components/map/panel/machine-panel-model";
 import {
   markYardExplained,
   yardExplainedBefore,
@@ -116,6 +116,8 @@ export interface BidMapWorkspaceProps {
   request: RequestRecord | null;
   /** Drives the fleet cache invalidation on the falling edge — see the effect below. */
   refreshing: boolean;
+  /** The price bar's sheet or withdrawal moved the bid: the page refetches it. */
+  onBidChanged?: () => void;
   /** The machine selection, exposed upward for anything outside this panel that needs it. */
   onSelectMachine?: (equipmentId: string | null) => void;
   /**
@@ -153,6 +155,7 @@ export function BidMapWorkspace({
   bid,
   request,
   refreshing,
+  onBidChanged,
   onSelectMachine,
   onRequestSent,
   onOpenCompanyDocs,
@@ -209,6 +212,8 @@ export function BidMapWorkspace({
   const [companyDraft, setCompanyDraft] = useState<string[] | null>(null);
   /** The company papers asked for and still waiting, as the dock reads them, for the panel's rows. */
   const [companyAsked, setCompanyAsked] = useState<ReadonlySet<string>>(() => new Set<string>());
+  /** The company papers the supplier sent in the chat, key to file url, as the dock reads them. */
+  const [companyReceived, setCompanyReceived] = useState<ReadonlyMap<string, string>>(() => new Map());
   /**
    * The staged ask as the TRANSITION reads it, mirrored beside the state that renders it.
    *
@@ -791,6 +796,16 @@ export function BidMapWorkspace({
     () => companyPanelSource(selectedBidId ? companyDocsByBid[selectedBidId] ?? null : null, bid),
     [companyDocsByBid, selectedBidId, bid],
   );
+  /** A paper sent in the chat fills its row when the firm's file has none (CEX-171071): the chat reply
+   *  files nothing on the profile, so the read alone kept the row at «no document yet» and askable. */
+  const panelDocs = useMemo(() => {
+    const docs: Partial<Record<CompanyDocKey, CompanyDocInput>> = { ...companySource.docs };
+    for (const [k, url] of companyReceived) {
+      const key = (k === "vat_cert" ? "vat" : k) as CompanyDocKey;
+      if (!docs[key]?.present) docs[key] = { present: true, downloadUrl: url, viaChat: true };
+    }
+    return docs;
+  }, [companySource.docs, companyReceived]);
 
   /* ── V3 · the counts ───────────────────────────────────────────────────────────────────────────
      Computed ONLY once the fleet has arrived. Three numbers, one derivation (`unitCounts`):
@@ -1226,6 +1241,7 @@ export function BidMapWorkspace({
               startDate={requestStartDate}
               mobByRentee={item?.mobilizationByRentee ?? null}
               demobByRentee={item?.demobilizationByRentee ?? null}
+              onChanged={onBidChanged}
             />
           </>
         ) : (
@@ -1245,7 +1261,7 @@ export function BidMapWorkspace({
             // the panel can never name the firm differently from the header two lines above it.
             companyName={companySource.companyName ?? bid.supplierName}
             verified={companySource.verified}
-            docs={companySource.docs}
+            docs={panelDocs}
             ar={ar}
             L={L}
             onBack={() => setCompanyOpen(false)}
@@ -1301,6 +1317,7 @@ export function BidMapWorkspace({
           companyDraft={companyDraft}
           onCompanyDraftDone={() => setCompanyDraft(null)}
           onCompanyAsks={setCompanyAsked}
+          onCompanyDocsReceived={setCompanyReceived}
           // A card names a machine, and pressing it opens that machine — the owner's reason for the
           // card. The predicate travels with the handler because only this component knows which of
           // the fleet's machines the offer actually names, and therefore which have a detail.

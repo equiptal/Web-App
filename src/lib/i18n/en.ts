@@ -1716,15 +1716,25 @@ export const en = {
     // "Details" + chevron left the reader to decode the arrow.
     showDetails: "Show details",
     hideDetails: "Hide details",
+    // The rate is always before VAT (CEX-171071), as a soft grey tag beside the details link.
+    exclVat: "excl. VAT",
+    // In place of Counter and Accept once the renter has accepted (CEX-171071 smoke).
+    accepted: "You accepted this offer",
+    // The app's own words for the wait after an accept and its way out (`dealCardWaitingSupplier`,
+    // `dealCtaWithdrawAcceptance`).
+    waitingSupplier: "Waiting for supplier response",
+    withdraw: "Withdraw acceptance",
+    withdrawing: "Withdrawing…",
+    withdrawFailed: "Couldn't withdraw right now: please try again",
     // The footer's two ways in, named by INTENT rather than by destination (owner, 2026-08-11).
     // ~~"Negotiate" / "Continue in the deal room"~~ — both described the room the renter arrives in,
     // which he has not seen yet and cannot want; these describe what he is about to do with the price
     // in front of him. "Counter this price" is the owner's own wording (2026-08-11); the Arabic pair
     // «اطلب سعراً أقل» / «اعتمد» is the app's, verbatim.
     //
-    // Both now land in `/deal-room/[id]?act=…`, which opens the room's OWN three-step flow on
-    // arrival. The price is still settled in exactly one place (004a §4a.2) — this only removes the
-    // second press that used to stand between the renter and the sheet he had already asked for.
+    // Both open the room's OWN three-step sheet in place, over the map or the inbox (2026-10-18; it
+    // was `/deal-room/[id]?act=…`, which drew the retired room under it). The price is still settled
+    // in exactly one place (004a §4a.2).
     counterPrice: "Counter this price",
     // "Accept", not "Approve" (owner, 2026-08-11). The Arabic keeps the app's «اعتمد», but in
     // English this button and the deal room's own are one act reached from two surfaces, and the

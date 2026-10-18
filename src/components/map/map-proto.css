@@ -2267,7 +2267,7 @@ main:has(.bidmap) > .page-back-bar {
    way into the negotiation was somewhere he was not standing.
 
    ⚠️ **Only the geometry and the edge move.** Same component, same figures, same `canAccept`
-   gate, same breakdown, same `?act=` hand-off — the header of `PriceFooter.tsx` says why a second
+   gate, same breakdown, same sheet hand-off — the header of `PriceFooter.tsx` says why a second
    copy of any of that would be wrong.
 
    ⚠️ **`border-block-start` becomes `border-block-end`**, because the slab is now the ceiling of
@@ -2318,6 +2318,14 @@ main:has(.bidmap) > .page-back-bar {
 /* The source line and the way into the arithmetic, on one line under the rate. */
 .bidmap .bm-foot-meta { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
 .bidmap .bm-foot-src { font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.62); line-height: 1.6; }
+/* «excl. VAT»: the soft grey tag, in its on-dark form (translucent white), as on the deal room's bar. */
+.bidmap .bm-foot-vat { white-space: nowrap; padding: 2px 7px; border-radius: 6px; font-size: 10px; font-weight: 700; line-height: 1.3; color: var(--surface); background: color-mix(in srgb, var(--surface) 18%, transparent); }
+/* In place of the two acts once he has accepted: a state, not a control. */
+.bidmap .bm-foot-done { font-size: 11.5px; font-weight: 700; color: rgba(255, 255, 255, 0.85); }
+/* The wait after an accept, a line of its own above the bar (the app's `_waitingLine`): a muted dot
+   and the words, never a control. */
+.bidmap .bm-foot-wait { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.62); }
+.bidmap .bm-foot-wait::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
 /* A text LINK naming the state it moves to («إخفاء التفاصيل»), not a button with a chevron: it sits
    inches from two real acts and must not carry a control's weight beside them. */
 .bidmap .bm-foot-det {

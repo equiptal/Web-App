@@ -167,6 +167,27 @@ const TERM_EVENT_MARKERS: Record<string, string[]> = {
 };
 
 /**
+ * Who acted on a term event: the caller's name the backend puts before the action words. Every term
+ * event is authored by `system_bot`, so this name is the only record of WHICH party it was. Null
+ * when the payload is not a term event or the text carries no name.
+ */
+export function termEventActor(text: string, custom: unknown): string | null {
+  if (!custom || typeof custom !== "object") return null;
+  const c = custom as Record<string, unknown>;
+  const type = typeof c.type === "string" ? c.type : "";
+  const markers = TERM_EVENT_MARKERS[type];
+  if (!markers) return null;
+  if (typeof c.termKey !== "string" || !c.termKey) return null;
+  let cut = text.length;
+  for (const m of markers) {
+    const i = text.indexOf(m);
+    if (i >= 0 && i < cut) cut = i;
+  }
+  if (cut === text.length) return null;
+  return text.slice(0, cut).trim() || null;
+}
+
+/**
  * A term event (`counter`, `term_accepted`, `term_updated`, `term_reopened`) from its `custom`
  * payload rather than its text. A port of the app's `localizedTermEventFromMeta`: the backend writes
  * these lines in fixed ARABIC, so the term is read off `termKey` and only the caller's name is cut
@@ -174,21 +195,11 @@ const TERM_EVENT_MARKERS: Record<string, string[]> = {
  * {@link dealSystemLine}.
  */
 export function termEventLine(text: string, custom: unknown, L: (en: string, ar: string) => string): string | null {
-  if (!custom || typeof custom !== "object") return null;
-  const c = custom as Record<string, unknown>;
-  const type = typeof c.type === "string" ? c.type : "";
-  const markers = TERM_EVENT_MARKERS[type];
-  if (!markers) return null;
-  const termKey = typeof c.termKey === "string" ? c.termKey : "";
-  if (!termKey) return null;
-  let cut = text.length;
-  for (const m of markers) {
-    const i = text.indexOf(m);
-    if (i >= 0 && i < cut) cut = i;
-  }
-  if (cut === text.length) return null;
-  const name = text.slice(0, cut).trim();
+  const name = termEventActor(text, custom);
   if (!name) return null;
+  const c = custom as Record<string, unknown>;
+  const type = c.type as string;
+  const termKey = c.termKey as string;
   const term = chatCardTermLabel(termKey, [], isAr(L));
   switch (type) {
     case "counter": return L(`${name} countered ${term}`, `${name} قدّم عرضًا مضادًا على ${term}`);

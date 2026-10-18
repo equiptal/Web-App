@@ -196,6 +196,8 @@ describe("the wiring itself — the endpoint must have a caller", () => {
     expect(host).toContain("companyPanelSource");
     // The old wiring, verbatim: the `docs` prop must not be the presence-only literal again.
     expect(host).not.toMatch(/docs=\{companyDocs\}/);
-    expect(host).toMatch(/docs=\{companySource\.docs\}/);
+    // The read's rows, with a paper sent in the chat filling a row the read left empty (CEX-171071).
+    expect(host).toMatch(/docs=\{panelDocs\}/);
+    expect(host).toMatch(/\{ \.\.\.companySource\.docs \}/);
   });
 });

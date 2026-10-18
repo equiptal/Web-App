@@ -15,7 +15,7 @@ import { pin } from "@/lib/uiPins";
  */
 export function OfferChatCard({
   mine, title, rate, currency, unitSuffix, previousRate, perUnit, time, superseded = false,
-  details, detailsLabel, footer, status,
+  details, detailsLabel, footer, status, exVat,
 }: {
   mine: boolean;
   title: string;
@@ -29,6 +29,8 @@ export function OfferChatCard({
   previousRate: string | null;
   /** «per unit» on a multi-unit offer, null on one unit. */
   perUnit: string | null;
+  /** «excl. VAT», drawn as a soft grey tag beside the per-unit word: the rate is always before VAT. */
+  exVat?: string;
   time: string;
   /** An older offer: faded to 60%. */
   superseded?: boolean;
@@ -56,7 +58,7 @@ export function OfferChatCard({
           <span className="oc-rate">{rate}</span>
           <span className="oc-u">{unitSuffix}</span>
         </span>
-        <span className="oc-pu">{perUnit}</span>
+        <span className="oc-pu">{perUnit}{exVat && <span className="vat-tag">{exVat}</span>}</span>
         {details && detailsLabel && (
           <button type="button" className="oc-det" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
             {detailsLabel}

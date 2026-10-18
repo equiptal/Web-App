@@ -94,12 +94,13 @@ import {
   chatCardOfMessage,
   chatCardTime,
   chatEventLine,
+  chatCardTermLabel,
   requestRepliesByRef,
   requestThreadCards,
 } from "@/lib/contract/deal-rounds";
 import { roundOverride, type DealRound } from "@/lib/contract/deal-rounds";
 import { computeDealTotals, type DealRoomView } from "@/lib/contract/deal-room";
-import { dealSystemEventIcon, dealSystemLine } from "@/lib/contract/deal-system-event";
+import { dealSystemEventIcon, dealSystemLine, termEventActor } from "@/lib/contract/deal-system-event";
 import { OPENING_OFFER_KEY, offerFooterFor, offerThread, previousOfferRate, type ThreadEntry } from "@/lib/contract/offer-thread";
 import {
   COMPANY_DOC_KEYS,
@@ -117,6 +118,7 @@ import {
   quoteAskState,
   type AskPillState,
   openCompanyDocAsks,
+  companyDocsReceived,
   answerDocKeyOf,
   isAskDecline,
   isQuoteRequest,
@@ -305,6 +307,9 @@ export interface ChatDockProps {
   /** The company papers asked for in this conversation and still waiting, reported up for the panel's
    *  rows. Same silence rule as {@link onOutstandingAsks}. */
   onCompanyAsks?: (keys: ReadonlySet<string>) => void;
+  /** The company papers the supplier has sent in this chat, key to file url, for the panel's rows.
+   *  Same silence rule as {@link onOutstandingAsks}. */
+  onCompanyDocsReceived?: (docs: ReadonlyMap<string, string>) => void;
   /**
    * Open the machine a request card names (the owner's reason for the card, 2026-08-10: a supplier
    * reading an ask should land on the machine he has to act on). Omitted makes every card inert, which
@@ -344,6 +349,7 @@ export function ChatDock({
   companyDraft = null,
   onCompanyDraftDone,
   onCompanyAsks,
+  onCompanyDocsReceived,
   onConfirmDraft,
   onCancelDraft,
   draftBusy = false,
@@ -718,6 +724,17 @@ export function ChatDock({
     onCompanyAsks(new Set(openCompanyKeys ? openCompanyKeys.split(",") : []));
   }, [onCompanyAsks, openCompanyKeys, loadedRoomId, anchorRoomId, messages.length]);
 
+  // The company papers he has sent here, which the company read does not see. The same silence rule.
+  const receivedCompanyDocs = useMemo(
+    () => companyDocsReceived(messages, (m) => dockMessageView(m).attachments.find((a) => a.url)?.url ?? null),
+    [messages],
+  );
+  useEffect(() => {
+    if (!onCompanyDocsReceived) return;
+    if (!dockMayReportAsks({ loadedRoomId, anchorRoomId, messageCount: messages.length })) return;
+    onCompanyDocsReceived(receivedCompanyDocs);
+  }, [onCompanyDocsReceived, receivedCompanyDocs, loadedRoomId, anchorRoomId, messages.length]);
+
   /** The document vocabulary. ONE table, in `request-card.ts`, since `/deal-room/[id]` renders the
    *  same chips off the same channel (owner, 2026-08-11) — never the raw key, and never two words
    *  for one paper on two surfaces. */
@@ -808,6 +825,30 @@ export function ChatDock({
         }),
     [preRoomOpening, messages, activeRoomId, loadedRoomId, openingRound, roomStatus],
   );
+  /** Consecutive «term accepted» events by one party read as ONE pill (CEX-171071): accepting
+   *  three terms posted three stacked lines. The first of a run carries every term key; the rest
+   *  render nothing. ⚠️ The party is the NAME in the text (`termEventActor`), never the Stream
+   *  author: the backend posts every term event as `system_bot`, so grouping by author would fold
+   *  the renter's acceptance into the supplier's. */
+  const termAcceptRuns = useMemo(() => {
+    const lead = new Map<string, string[]>();
+    const folded = new Set<string>();
+    let run: { id: string; actor: string } | null = null;
+    for (const e of thread.entries) {
+      const m = e.kind === "message" ? e.message : null;
+      const card = m ? chatCardOfMessage(m) : null;
+      if (!m || card?.type !== "term_accepted") { run = null; continue; }
+      const actor = termEventActor(m.text ?? "", m.custom) ?? "";
+      if (run && actor && run.actor === actor) {
+        lead.get(run.id)!.push(card.termKey);
+        folded.add(m.id);
+      } else {
+        run = { id: m.id, actor };
+        lead.set(m.id, [card.termKey]);
+      }
+    }
+    return { lead, folded };
+  }, [thread.entries]);
   const iHaveCountered = thread.entries.some((e) => e.kind === "offer" && e.round.role === "rentee");
   /** Counter or Accept from a card. With no room yet the press is the negotiate act that creates
    *  it, through `deliver`, which posts nothing here and hands back the new room's id. */
@@ -858,6 +899,9 @@ export function ChatDock({
     if (!round) return null;
     const units = round.rentalUnits ?? activeRoom?.numberOfUnits ?? 1;
     const perUnit = units > 1 ? L("per unit", "للوحدة") : null;
+    // The rate is always before VAT; said on the card, or a supplier who typed his price incl. VAT
+    // reads a different number here with nothing to explain it (CEX-171071).
+    const exVat = L("excl. VAT", "بدون ضريبة");
     const time = chatCardTime(e.at, ar);
     const unitSuffix = unitSuffixOf(round.priceUnit ?? activeRoom?.priceUnit ?? null);
     if (e.kind === "accepted") {
@@ -872,6 +916,7 @@ export function ChatDock({
           unitSuffix={unitSuffix}
           previousRate={null}
           perUnit={perUnit}
+          exVat={exVat}
           time={time}
           details={offerDetails(round)}
           detailsLabel={L("Details", "التفاصيل")}
@@ -927,6 +972,7 @@ export function ChatDock({
         unitSuffix={unitSuffix}
         previousRate={prev == null ? null : fmtRate(prev)}
         perUnit={perUnit}
+        exVat={exVat}
         time={time}
         superseded={!isLatest}
         details={isLatest ? offerDetails(round) : null}
@@ -1921,6 +1967,17 @@ export function ChatDock({
                 if (card?.type === RENTEE_REQUEST_REPLY_CARD_TYPE && replyFoldsIntoAsk(answeredRefs, card.reply)) {
                   return null;
                 }
+                if (termAcceptRuns.folded.has(m.id)) return null;
+                const acceptedRun = termAcceptRuns.lead.get(m.id);
+                if (card && acceptedRun && acceptedRun.length > 1) {
+                  const names = acceptedRun.map((k) => chatCardTermLabel(k, [], ar));
+                  return (
+                    <div key={m.id} {...pin("chat-dock-event")} className="bm-chat-pill" title={chatCardTime(m.created_at, ar)}>
+                      <span className="material-icons-outlined" aria-hidden="true">check_circle</span>
+                      <span className="bm-chat-pill-t">{L(`Terms accepted: ${names.join(", ")}`, `تم قبول البنود: ${names.join("، ")}`)}</span>
+                    </div>
+                  );
+                }
                 if (card) {
                   // EVERY other custom type renders as a card — the negotiation vocabulary and the
                   // supplier's reply that could not be paired with its ask alike. Never a bare grey
@@ -2284,7 +2341,9 @@ export function ChatDock({
         >
           <div className="askpick">
             {COMPANY_DOC_KEYS.map((k) => {
-              const doc = companyDocs?.bidId === activeBidKey ? companyDocs.payload.documents.find((d) => d.documentKey === k) : undefined;
+              const read = companyDocs?.bidId === activeBidKey ? companyDocs.payload.documents.find((d) => d.documentKey === k) : undefined;
+              const sentUrl = receivedCompanyDocs.get(k);
+              const doc = read ?? (sentUrl ? { downloadUrl: sentUrl } : undefined);
               const asked = askedCompany.has(k);
               const loading = companyDocs?.bidId !== activeBidKey;
               return (

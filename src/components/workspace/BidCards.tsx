@@ -691,7 +691,13 @@ function BidCardTile({
         >
           <div className="min-w-0 flex-1">
             <div className="text-body font-extrabold leading-none text-navy">{headlineLabel}</div>
-            {basis && <div className="mt-1.5 text-label font-semibold leading-none text-muted">{basis}</div>}
+            {/* The headline rate is always before VAT, and the card said so nowhere above the fold: a
+                supplier who typed 13,500 incl. VAT showed here as 11,739 with no word on it
+                (CEX-171071). A soft grey tag after the basis (owner's pick). */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-label font-semibold leading-none text-muted">
+              {basis && <span>{basis}</span>}
+              <span className="rounded-md bg-muted/10 px-1.5 py-0.5">{L("excl. VAT", "بدون ضريبة")}</span>
+            </div>
           </div>
           <div className="flex flex-none items-baseline gap-1.5">
             {/* ── Above or below YOUR budget (owner, 2026-09-28: *"on each bid show arrow above or

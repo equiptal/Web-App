@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Dropdown } from "@/components/Dropdown";
 import { Dialog, DialogButton } from "@/components/Dialog";
 import { Icon } from "@/components/Icon";
 import { useRouter } from "next/navigation";
@@ -635,7 +634,7 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
     setBusy(true);
     try {
       // App parity (accept-all-terms): submit the locally-collected term resolutions together with the
-      // accept. contractType is chosen on the flow's Summary step (defaults to "formal"). Send the
+      // accept. contractType is always "formal", as the app sends it (no picker since 2026-10-18). Send the
       // accepted rental count as agreedUnits (the app sends it — records the count for multi-unit /
       // partial-fulfilment requests instead of defaulting to the full offer).
       //
@@ -869,8 +868,6 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
       onClose={closeFlow}
       onCounter={submitCounter}
       onAccept={doAccept}
-      // Accept from the counter's review step goes through the accept flow, gate and all.
-      onAcceptInstead={() => setFlowMode("accept")}
       takeTheirOffer={taking}
       onOpenQuotation={openQuotation}
     />
@@ -1048,6 +1045,8 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
             <span className="dot" />
             {closed ? L("Agreed", "متفق عليه") : room.myTurn ? L("Supplier's counter", "عرض المورد المقابل") : L("Supplier's offer", "عرض المورد الافتتاحي")}
             {units > 1 ? ` · ${priceAll ? L("all units", "للكل") : L("per unit", "للوحدة")}` : ""}
+            {/* The rate is always before VAT (CEX-171071): a soft grey tag (owner's pick). */}
+            <span className="vat-tag">{L("excl. VAT", "بدون ضريبة")}</span>
           </div>
           <div className="pb-hero">
             <span className="n">{nf(priceAll ? rate * units : rate)}</span>
@@ -1490,7 +1489,7 @@ function CounterFlow({
   mode, room, ar, L, busy, error,
   resolutions, onResolveLocal, onReopenLocal, unresolvedCount,
   periodLabel, periods, hasDuration, units, messages, onClose, onCounter, onAccept,
-  onAcceptInstead, onOpenQuotation, takeTheirOffer = false,
+  onOpenQuotation, takeTheirOffer = false,
 }: {
   mode: "counter" | "accept";
   room: DealRoomView;
@@ -1513,16 +1512,6 @@ function CounterFlow({
     rentalUnits?: number; mobUnits?: number; demobUnits?: number; mobExcluded?: boolean; demobExcluded?: boolean;
   }) => void;
   onAccept: (contractType: string) => void;
-  /**
-   * «Accept offer» from the REVIEW step of a counter (app parity, 2026-09-18: accept stands beside
-   * send when everything matches — they are different acts and neither stands in for the other).
-   *
-   * ⚠️ It hands the decision back to the ROOM rather than calling `onAccept` here, so the press lands
-   * on the accept flow's binding-commitment gate. Accepting is the one act on this sheet the renter
-   * is warned about, and reaching it through a button that skipped the warning would be the sheet
-   * deciding he had already read it.
-   */
-  onAcceptInstead?: () => void;
   /** The room's own quotation, from step ③ — the same document its CTA opens, never a second one. */
   onOpenQuotation?: () => void;
   /** Seed the draft from the SUPPLIER's latest round rather than the live one (app `takeTheirOffer`). */
@@ -1556,7 +1545,11 @@ function CounterFlow({
   /** The round the draft starts from: the live one, or HIS when the renter is taking his offer. */
   const seedRound = takeTheirOffer ? supRound ?? latestRound : latestRound;
   // Accept is gated behind a binding-commitment warning first (app parity). Counter skips it.
-  const [bindingOk, setBindingOk] = useState(mode === "counter");
+  // The binding warning stands before every ACCEPT the renter starts: the accept sheet, and «Accept»
+  // on the supplier's offer card in the chat, which opens this sheet on HIS offer (`takeTheirOffer`).
+  // ~~`mode === "counter"` alone~~ let that card accept with no warning at all (smoke, CEX-171071);
+  // the app's `_handleAccept(takeTheirOffer: true)` shows it first. «Counter this price» has none.
+  const [bindingOk, setBindingOk] = useState(mode === "counter" && !takeTheirOffer);
   const [page, setPage] = useState(0); // 0 = Terms, 1 = Price, 2 = Summary
   /**
    * The paper's zoom on the desk. **Opens at 1** (owner, 2026-09-23: *"make it zoomed at 100% on
@@ -1575,7 +1568,6 @@ function CounterFlow({
   const [rateStr, setRateStr] = useState(seedRate ? String(seedRate) : "");
   const [mobStr, setMobStr] = useState(seedMob ? String(seedMob) : "");
   const [demobStr, setDemobStr] = useState(seedDemob ? String(seedDemob) : "");
-  const [contractType, setContractType] = useState(room.contractType ?? "formal");
   const [ack, setAck] = useState(false);
 
   // deal-room/negotiation — per-type unit counts (cap = requested; mob/demob ≤ rental) + leg exclusion.
@@ -1746,14 +1738,6 @@ function CounterFlow({
     return parts.length < 2 ? null : parts.join(" × ");
   };
 
-  const CONTRACT_TYPES: { value: string; label: string }[] = [
-    { value: "formal", label: L("Formal contract", "عقد رسمي") },
-    { value: "simple", label: L("Simple agreement", "اتفاق مبسّط") },
-    { value: "platform", label: L("Platform terms", "شروط المنصّة") },
-    { value: "direct", label: L("Direct", "مباشر") },
-    { value: "none", label: L("No contract", "بدون عقد") },
-  ];
-
   // Binding-commitment warning before the accept flow.
   if (!bindingOk) {
     return (
@@ -1793,7 +1777,8 @@ function CounterFlow({
      anyone who means to settle the price first. ~~`page === 1 ? unresolvedCount === 0 : true`.~~ */
   const canNext = page === 0 ? (editable ? rateValid : true) : true;
   // A settled room is read all the way through and sends nothing at the end of it.
-  const canSubmit = settled ? false : editable ? rateValid : ack;
+  // Only a counter is SUBMITTED from the footer; accepting is the green button's own press.
+  const canSubmit = !settled && editable && rateValid;
 
   /**
    * Has the renter actually moved anything? App parity: `CounterDraft.hasChanges`, against the LIVE
@@ -1812,9 +1797,7 @@ function CounterFlow({
     demobExcluded !== (seedRound?.demobExcluded ?? room.demobExcluded);
   const hasSomethingToSend = draftChanged || Object.keys(resolutions).length > 0;
   const doSubmit = () =>
-    editable
-      ? onCounter({ rate, mobPrice: mob || undefined, demobPrice: demob || undefined, rentalUnits, mobUnits: Math.min(mobUnitsN, rentalUnits), demobUnits: Math.min(demobUnitsN, rentalUnits), mobExcluded, demobExcluded })
-      : onAccept(contractType);
+    onCounter({ rate, mobPrice: mob || undefined, demobPrice: demob || undefined, rentalUnits, mobUnits: Math.min(mobUnitsN, rentalUnits), demobUnits: Math.min(demobUnitsN, rentalUnits), mobExcluded, demobExcluded });
 
   // ── quotation-paper helpers (classic terms table + payment card + دليل البنود) ──
   const PAY_KEYS = new Set(["payment_terms", "payment_method"]);
@@ -2637,27 +2620,6 @@ function CounterFlow({
                 );
               })()}
 
-
-              {mode === "accept" && (
-                <div style={{ marginTop: 12 }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: "var(--navy-mid)" }}>{L("Contract type", "نوع العقد")}</span>
-                  <div style={{ marginTop: 5 }}>
-                    <Dropdown
-                      label={L("Contract type", "نوع العقد")}
-                      placeholder="—"
-                      value={contractType}
-                      onChange={setContractType}
-                      options={CONTRACT_TYPES.map((c) => ({ value: c.value, label: c.label }))}
-                    />
-                  </div>
-                </div>
-              )}
-              {mode === "accept" && (
-                <label className="ng-ack">
-                  <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} style={{ marginTop: 2 }} />
-                  {L("I confirm the agreed rate and terms.", "أؤكّد السعر والشروط المتفق عليها.")}
-                </label>
-              )}
               {error && <p className="ng-err">{error}</p>}
             </div>
           )}
@@ -2716,11 +2678,17 @@ function CounterFlow({
           {page > 0 && (
             <button type="button" className="ng-back" disabled={busy} onClick={() => setPage((p) => (p - 1) as 0 | 1 | 2)}>{L("Back", "رجوع")}</button>
           )}
-          {!settled && allMatched && onAcceptInstead && (
-            <button type="button" className="ng-accept" disabled={busy} onClick={editable ? onAcceptInstead : () => setPage(2)}>✓ {L("Accept offer", "قبول العرض")}</button>
-          )}
-          {!settled && !editable && !onAcceptInstead && page === 2 && (
-            <button type="button" className="ng-accept" disabled={busy || !canSubmit} onClick={doSubmit}>✓ {L("Accept offer", "قبول العرض")}</button>
+          {/* 🔴 **The green button SENDS, from any step, on either sheet** (app parity, owner
+              2026-10-18: «match the app»; the app's `_accept` in `negotiation_sheet.dart`, which
+              both its counter and accept sheets fire directly). Accept stands beside send when
+              everything matches: they are different acts and neither stands in for the other.
+              ~~The counter sheet handed over to the accept flow, and the accept sheet jumped to the
+              review step, where a contract-type picker and a second «I confirm» box stood before a
+              second press.~~ That last press was the one that sent nothing (CEX-171071). The app has
+              no picker and no second box, and its counter sheet accepts without the binding warning,
+              which only guards the price bar's Accept. The contract is always "formal". */}
+          {!settled && allMatched && (
+            <button type="button" className="ng-accept" disabled={busy} onClick={() => onAccept("formal")}>✓ {L("Accept offer", "قبول العرض")}</button>
           )}
           {/* ⚠️ Grey on the LAST step when there is nothing to send, so the refusal is visible before
               it is pressed — and still PRESSABLE, so pressing it says why rather than doing nothing.

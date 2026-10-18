@@ -12,16 +12,15 @@ import { fetchDealRoom } from "@/lib/api/client";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
 
-/** /deal-room/[id] — the deal room (web-app/request-details-bids): price card + live chat. */
+/** /deal-room/[id] — the negotiation sheet's deep link (`?act=`); with no act, a forward to the chat. */
 export default function DealRoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { locale } = useLocale();
-  const [title, setTitle] = useState("");
   return (
-    <AppShell title={title || (locale === "ar" ? "غرفة الصفقة" : "Deal Room")}>
+    <AppShell title={locale === "ar" ? "غرفة الصفقة" : "Deal Room"}>
       {/* Suspense boundary: the gate reads `useSearchParams`, which needs one. */}
       <Suspense fallback={null}>
-        <DealRoomGate id={id} onTitle={setTitle} />
+        <DealRoomGate id={id} />
       </Suspense>
     </AppShell>
   );
@@ -43,7 +42,7 @@ function initialFlowOf(act: string | null): "counter" | "accept" | undefined {
 
 /** Public web has no route gate, but a deal room needs a session — so a signed-out visitor gets the
  *  auth modal opened in place (per the design), with a sign-in prompt behind it. */
-function DealRoomGate({ id, onTitle }: { id: string; onTitle: (t: string) => void }) {
+function DealRoomGate({ id }: { id: string }) {
   const initialFlow = initialFlowOf(useSearchParams().get("act"));
   const { status } = useSession();
   const { openAuth } = useAuthGate();
@@ -76,9 +75,20 @@ function DealRoomGate({ id, onTitle }: { id: string; onTitle: (t: string) => voi
      negotiation moved to the three-styles sheet. So arriving here with no act to perform is
      arriving at a screen with no job: it forwards to the conversation, beside the supplier's yards.
 
-     The two ACTS keep the route, because the sheet is what they open and the sheet lives here. */
+     The two ACTS keep the route (notifications link `?act=counter` / `?act=accept`), but only for
+     the SHEET. 🔴 ~~`<DealRoom initialFlow>`~~ drew the full room under it, and the room stayed on
+     screen after a sent counter, a successful accept, or an accept the room's gate refused (owner,
+     2026-10-18: *"retire this view, we have the chat on the map, the chat in the inbox, or the 3
+     sheets of negotiating only"*). Sheet-only now, and whatever ends it forwards to the chat. */
   if (!initialFlow) return <RetiredRoom id={id} />;
-  return <DealRoom id={id} onTitle={onTitle} initialFlow={initialFlow} />;
+  return <RoomSheet id={id} initialFlow={initialFlow} />;
+}
+
+/** The sheet alone, over the shell; when it is done (closed, sent, accepted or refused), the chat. */
+function RoomSheet({ id, initialFlow }: { id: string; initialFlow: "counter" | "accept" }) {
+  const [done, setDone] = useState(false);
+  if (done) return <RetiredRoom id={id} />;
+  return <DealRoom id={id} initialFlow={initialFlow} sheetOnly onExit={() => setDone(true)} />;
 }
 
 /**

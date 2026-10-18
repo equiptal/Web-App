@@ -259,6 +259,7 @@ function BidEquipment({ bidId, onRequestId }: { bidId: string; onRequestId: (id:
       bid={bid}
       request={request}
       refreshing={refreshing}
+      onBidChanged={() => void load(true)}
       // `?company=1` — the renter asked for this firm's papers somewhere else and arrives already
       // wanting them (owner, 2026-08-19). The deal room's «Company details» is the caller: its own
       // documents modal is withdrawn, so the one surface for a company's papers is V9's panel here.

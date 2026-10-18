@@ -96,15 +96,14 @@ describe("the footer", () => {
   });
 
   /* ⚠️ Accept stands BESIDE send when everything matches: they are different acts and neither stands
-     in for the other. It hands back to the room so the press lands on the binding-commitment gate
-     rather than skipping it. */
-  it("offers accept beside send on a matched review, through the accept flow's own gate", () => {
+     in for the other. One press accepts, on either sheet, as in the app (2026-10-18); the binding
+     warning guards the price bar's Accept, which is where the app puts it too. */
+  it("offers accept beside send when everything matches, and one press accepts", () => {
     const foot = FLOW.slice(FLOW.indexOf('className="ng-foot"'));
-    expect(foot).toContain("onAcceptInstead");
     expect(foot).toContain("allMatched");
-    expect(SRC).toContain('onAcceptInstead={() => setFlowMode("accept")}');
-    // Never a direct accept from the counter sheet — that is the press the warning exists for.
-    expect(foot).not.toMatch(/onAccept\(/);
+    // One press accepts, from either sheet, as the app's `_accept` does (owner, 2026-10-18).
+    expect(foot).toMatch(/onClick=\{\(\) => onAccept\("formal"\)\}/);
+    expect(foot.match(/onAccept\(/g)).toHaveLength(1);
   });
 
   /* 🔴 **THE `‹ step ›` SWITCHER IS WITHDRAWN** (app parity, 2026-09-19: *"in the footer can't we get
@@ -507,7 +506,7 @@ describe("what the rebuild did NOT change", () => {
   /* A settled room still opens the sheet, read-only, and says why in its header (2026-09-08). */
   it("still reads a settled room through, and sends nothing from it", () => {
     expect(FLOW).toContain("const settled = settledNote != null");
-    expect(FLOW).toContain("const canSubmit = settled ? false");
+    expect(FLOW).toContain("const canSubmit = !settled");
     expect(FLOW).toContain('className={`ng-hnote');
   });
 

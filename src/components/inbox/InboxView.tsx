@@ -228,6 +228,14 @@ export function InboxView() {
       .catch(() => { if (active) setCardFailed(true); });
     return () => { active = false; };
   }, [openBidId]);
+  /** The price bar's sheet or withdrawal moved the open bid: read it again, in place. */
+  const refreshCard = () => {
+    const id = openBidId;
+    if (!id) return;
+    fetchBidDetail(id)
+      .then((r) => { if (cardBidId.current === id) { setCard(r.bid); setCardReq(r.request); } })
+      .catch(() => {});
+  };
 
   const statusLabel = (b: InboxBid) => {
     if (b.supplierStarted) return L("New message", "رسالة جديدة");
@@ -479,6 +487,7 @@ export function InboxView() {
                 slim
                 durationDays={cardDurationDays}
                 startDate={cardReq?.startDate ?? null}
+                onChanged={refreshCard}
               />
             }
           />
