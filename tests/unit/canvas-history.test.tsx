@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { CreateSurface } from "@/components/CreateSurface";
 import { confirmedProject, makeAgentDraft, makeItem, renderCanvas } from "../setup/canvas";
@@ -63,6 +63,29 @@ describe("the history chain has three stops (MREQ-AC-06/07)", () => {
     expect(handle.store().state.phase).toBe("wizard");
     expect(handle.store().state.readyToSend).toBe(false);
     expect(screen.getByText("The equipment")).toBeTruthy();
+  });
+
+  it("Back after a post starts a fresh request, never re-sends the posted one (app parity)", async () => {
+    const handle = await surface({ prepare: answered });
+    const prev = globalThis.fetch;
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).includes("/api/requests")
+        ? new Response(JSON.stringify({ requestId: "R-1", requestIds: ["R-1"], requestUuids: ["u-1"] }), { status: 201, headers: { "content-type": "application/json" } })
+        : prev(input, init),
+    );
+    await handle.run(async () => {
+      await handle.store().actions.submit();
+    });
+    await handle.run(() => handle.store().actions.setShareOnPost(true));
+    expect(handle.store().state.phase).toBe("confirmation");
+
+    await pop(handle, 2);
+
+    const s = handle.store().state;
+    expect(s.phase).toBe("intake");
+    expect(s.draft).toBeNull();
+    expect(s.requestUuids).toEqual([]);
+    expect(s.shareOnPost).toBe(false);
   });
 
   it("Forward from intake lands back on the canvas", async () => {

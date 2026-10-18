@@ -1448,7 +1448,14 @@ export function RfqProvider({ children }: { children: ReactNode }) {
       const target = e.state && typeof (e.state as { rfqOrd?: unknown }).rfqOrd === "number" ? ((e.state as { rfqOrd: number }).rfqOrd) : 0;
       poppingRef.current = true;
       const s = stateRef.current;
-      if (target >= 1 && s.draft) {
+      /* 🔴 A POSTED request is never resumed (owner, 2026-10-14, app parity). Back from the
+         confirmation used to put the sent draft back on the canvas while the share card still held
+         the posted request's id, so Send re-shared the OLD link: no new request, no update, «nothing
+         happens». The app leaves for My Requests on a post (`context.go`) and changes a posted
+         request only through its own Edit, so Back here starts a fresh request instead. */
+      if (s.phase === "confirmation") {
+        dispatch({ t: "RESET" });
+      } else if (target >= 1 && s.draft) {
         dispatch({ t: "RESUME_WIZARD" });
         dispatch({ t: "SET_READY_TO_SEND", value: target >= 2 });
       } else {
