@@ -7,7 +7,7 @@
 
 
 import { mapBidLiveStatus, type BidLiveStatus } from "@/lib/contract/bid-live-status";
-import { companyBrandName, companyNamePartsOf, counterpartyDisplayName } from "@/lib/contract/counterparty-name";
+import { companyBrandName, companyNamePartsOf } from "@/lib/contract/counterparty-name";
 import { mediaUrl } from "@/lib/contract/stores";
 import { isHiddenTermKey } from "@/lib/contract/term-visibility";
 import { excludedOfItem, excludedOfTerm, excludedValueText } from "@/lib/contract/nationality";
@@ -1154,18 +1154,10 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     // every shape that can carry it lives in `readSupplierCompanyId`, shared with `mapReceivedBids`:
     // ONE counterparty key needs one derivation, or the chat dock's anchor and its rows disagree.
     supplierCompanyId: readSupplierCompanyId(raw),
-    /* The registration's order, then the person — `counterparty-name.ts`, which is the backend's
-       rule and the app's. `readSupplierDisplayName` runs the SAME function over the flat
-       received-bids shape, so one surface can no longer name the firm while another names the member.
-       ⚠️ The backend's own `supplierDisplayName` sits BELOW the four columns: it resolves the
-       company row ahead of the profile, which is the order this rule inverts. */
-    supplierName:
-      counterpartyDisplayName({
-        ...companyNamePartsOf(sup),
-        personName: [s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" "),
-      }) ||
-      s(raw.supplierDisplayName) ||
-      "Supplier",
+    /* The registration's order, then the backend's resolved name, then the person —
+       `supplierDisplayNameOf`, which `readSupplierDisplayName` runs over the flat received-bids
+       shape too, so one surface can no longer name the firm while another names the member. */
+    supplierName: supplierDisplayNameOf(raw, sup),
     verified: supVerified,
     rating: n(sup.rating) ?? n(prof.rating),
     distanceKm,
@@ -1353,15 +1345,30 @@ export function readSupplierCompanyId(raw: Record<string, unknown>): string | nu
  * dealing with; the individual who typed the bid is not a party to anything.
  */
 export function readSupplierDisplayName(raw: Record<string, unknown>): string {
-  // The SAME rule `mapBid` runs, over the flat received-bids shape: `companyNamePartsOf` reads the
-  // nested profile shapes AND the object itself, which is what the spread projections carry.
-  const sup = obj(raw.supplier);
+  return supplierDisplayNameOf(raw, obj(raw.supplier));
+}
+
+/**
+ * The ONE order, for both projections: the firm off the payload, then the BACKEND's resolved
+ * `supplierDisplayName`, then the person.
+ *
+ * 🔴 **The person used to outrank the backend's answer** (2026-10-18, supplier circles and inbox
+ * showing «habiballa awab» for the firm «banana»). It rode inside `counterpartyDisplayName` as its
+ * last fallback, so it won BEFORE `supplierDisplayName` was read. received-bids resolves the name
+ * server-side and then DELETES `supplier.company`, so on a firm whose name lives on its company row
+ * the web had no firm left to find and printed the raw user's first and last name, while the
+ * backend had sent «banana» all along. Verified on staging by the backend (all 46 bids name the
+ * firm on both endpoints); the bid list kept the company row, which is why the card was right.
+ * `submittedByName` (the colleague who sent a firm's bid) is never read as the supplier.
+ */
+function supplierDisplayNameOf(raw: Record<string, unknown>, sup: Record<string, unknown>): string {
   const person = [s(sup.firstName), s(sup.lastName)].filter(Boolean).join(" ");
   // `||` at every step, never `??`: an absent first and last name joins to the EMPTY STRING, which
   // `??` would keep and print as a nameless chip.
   return (
-    counterpartyDisplayName({ ...companyNamePartsOf(sup), personName: person }) ||
+    companyBrandName(companyNamePartsOf(sup)) ||
     s(raw.supplierDisplayName) ||
+    person ||
     s(raw.supplierName) ||
     "Supplier"
   );
