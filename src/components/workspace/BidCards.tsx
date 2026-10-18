@@ -264,11 +264,12 @@ export function BidCards({
                and starts on the same line, inside a panel or not. */
             <div
               key={g.key}
-              className={cx("flex flex-none flex-col gap-2 rounded-lg p-2.5", g.header ? "bg-action/10" : "")}
+              className={cx("flex flex-none flex-col gap-1 rounded-lg p-1.5", g.header ? "bg-action/10" : "")}
             >
-              {/* One line (owner, 2026-10-12): «One request · 2 bids ›». ~~A 40px band holding a
-                  small request card~~, which left white space above every card in the row. */}
-              <div className="flex h-5 min-w-0 items-center">{g.header}</div>
+              {/* One line (owner, 2026-10-12): «Multi-equipment request · bids on 2 ›». ~~A 40px band
+                  holding a small request card~~, which left white space above every card in the row.
+                  🔴 THINNER (owner, 2026-10-18): 6 + 14 + 4 = 24px above every card, was 10 + 20 + 8 = 38. */}
+              <div className="flex h-3.5 min-w-0 items-center">{g.header}</div>
               <div className="flex flex-1 items-stretch gap-5">
                 {g.bidIds.map((id) => {
                   const b = bids.find((x) => x.card.id === id);
@@ -446,6 +447,21 @@ function BidCardTile({
       ? t.workspace.rentalRowDays.replace("{n}", String(rental.billable))
       : t.workspace.rentalRowCustom;
   const basis = divisorNote(card.priceUnit, L);
+  /** The size chip's words: the first note on the card, every note in the hover sentence. */
+  const sizeChip = (() => {
+    const n = card.sizeNote;
+    if (!n) return null;
+    const size = n.size ? (ar ? n.size.ar : n.size.en) : null;
+    const sentence = (k: typeof n.kind) =>
+      k === "unknown" ? t.workspace.sizeNoteUnknown
+      : k === "smaller" ? (size ? fmt(t.workspace.sizeNoteSmaller, { size }) : t.workspace.sizeNoteSmallerGeneric)
+      : size ? fmt(t.workspace.sizeNoteLarger, { size }) : t.workspace.sizeNoteLargerGeneric;
+    const short =
+      n.kind === "unknown" ? t.workspace.sizeChipUnknown
+      : n.kind === "smaller" ? (size ? fmt(t.workspace.sizeChipSmaller, { size }) : t.workspace.sizeChipSmallerGeneric)
+      : size ? fmt(t.workspace.sizeChipLarger, { size }) : t.workspace.sizeChipLargerGeneric;
+    return { kind: n.kind, short, full: n.kinds.map(sentence).join(". ") };
+  })();
   /**
    * `computeCycleTotals` is deliberately NOT called here any more.
    *
@@ -652,8 +668,27 @@ function BidCardTile({
             words and made this row taller than the one it pairs with; the figures live behind
             «View», on the verification map, where they can be acted on. */}
         <DialGlyph slices={checkSlices(equipmentChecks)} />
-        <span className="flex-1 text-body font-semibold text-navy">{t.workspace.equipmentAndDocs}</span>
-        <span className="text-label font-semibold text-info">{L("View", "عرض")} ›</span>
+        <span className="flex-none text-body font-semibold text-navy">{t.workspace.equipmentAndDocs}</span>
+        {/* ── A machine here is not the size asked for (owner, 2026-10-18) ──────────────────────
+            The app's size strip, folded into the row it is about so the card keeps its height: a
+            row of cards stretches to the tallest, so one extra line would grow them all. A short chip
+            at the scale's smallest step (11px; the lint allows nothing smaller); the app's full sentence on hover and for screen readers. Blue larger,
+            amber smaller, grey unknown. */}
+        <span className="flex min-w-0 flex-1 justify-end">
+          {sizeChip && (
+            <span
+              title={sizeChip.full}
+              aria-label={sizeChip.full}
+              className={cx(
+                "truncate rounded-md px-1.5 py-0.5 text-label font-semibold leading-tight",
+                sizeChip.kind === "larger" ? "bg-action/10 text-action" : sizeChip.kind === "smaller" ? "bg-warn-soft text-warn" : "bg-muted/10 text-muted",
+              )}
+            >
+              {sizeChip.short}
+            </span>
+          )}
+        </span>
+        <span className="flex-none text-label font-semibold text-info">{L("View", "عرض")} ›</span>
       </button>
 
       {/* Terms: the dial says how much of them this supplier answered — never how good the offer is. */}

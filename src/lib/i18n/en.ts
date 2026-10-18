@@ -1899,7 +1899,19 @@ export const en = {
     viewRequests: "Requests",
     supplierBidsAcross: "{b} bids across {r} requests",
     supplierOneBid: "1 bid",
-    oneRequestBids: "One request · {n} bids",
+    oneRequestBids: "Multi-equipment request · bids on {n}",
+    // The size note on a bid card's «Equipment & docs» row (CEX size work, 2026-10-18): a short chip
+    // on the card, the app's full strip sentence on hover (`bidLargerSizeStrip` and its siblings).
+    sizeChipLarger: "{size}, larger",
+    sizeChipLargerGeneric: "Larger size",
+    sizeChipSmaller: "{size}, smaller",
+    sizeChipSmallerGeneric: "Smaller size",
+    sizeChipUnknown: "Size unknown",
+    sizeNoteLarger: "This bid includes a {size} machine, larger than your request",
+    sizeNoteLargerGeneric: "This bid includes a machine larger than your request",
+    sizeNoteSmaller: "This bid includes a {size} machine, smaller than your request",
+    sizeNoteSmallerGeneric: "This bid includes a machine smaller than your request",
+    sizeNoteUnknown: "The size of a machine in this bid is not known yet",
     supplierChat: "All chats",
     supplierNoBids: "No bids from this supplier on your current requests",
     // Read off the bid's copy of the request terms, not derived from the rental type.

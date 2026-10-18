@@ -421,6 +421,9 @@ export interface BidCard {
    *  shipped its footer band, and read by nothing here — so the bid card could not tell a live
    *  negotiation from a closed one. `RenteeBandState` splits three ways on it. */
   dealRoomStatus: string | null;
+  /** Whether a machine in this bid differs in SIZE from the one asked for (`bidSizeNote`); null when
+   *  nothing does. Off the bid list's `capacitySizeRelation` + `sizeMismatch`. */
+  sizeNote?: BidSizeNote | null;
   expired: boolean;
   /** Free-text note the supplier attached to this bid (app: BidModel.note). */
   note: string | null;
@@ -840,6 +843,49 @@ function buildBidTerms(raw: Record<string, unknown>, eqVerified: boolean, requir
  *  resolves itself: that surface is addressable by `bidId` alone (RM3-AC-01, V1), so it cannot go
  *  through `mapBidList` — there is no request id to list by. Same parser, so one bid can never read
  *  differently on its own route than it does in the list. */
+/**
+ * **A machine in this bid is not the size asked for** — the app's two strips on its bid card
+ * (`LargerSizeStrip`, `SizeMismatchStrip` in `v3_bid_card.dart`), read off the server, never worked
+ * out here:
+ *
+ *  - `capacitySizeRelation` `larger` / `mixed` → `larger` (a bigger machine was offered).
+ *  - `sizeMismatch` `unknown` → ops marked a machine «size unknown» AFTER the bid was sent.
+ *  - `sizeMismatch` `smaller` → the supplier made a machine smaller after bidding.
+ *
+ * ⚠️ A mismatch outranks `larger`: it is news about a bid already read, where `larger` was true from
+ * the start. Both sentences ride along so a card that shows one note can still say both on hover.
+ *
+ * `size` is the app's `_differentSizeName`: the first offered machine whose size name differs from
+ * the request's, or null (the sentence then goes generic). `unknown` names no size, by definition.
+ */
+export interface BidSizeNote {
+  kind: "larger" | "smaller" | "unknown";
+  size: { en: string; ar: string } | null;
+  /** Both strips' kinds when the bid carries both (larger AND a mismatch); `kind` is the first. */
+  kinds: ("larger" | "smaller" | "unknown")[];
+}
+
+export function bidSizeNote(raw: Record<string, unknown>): BidSizeNote | null {
+  const rel = s(raw.capacitySizeRelation ?? raw.capacity_size_relation)?.toLowerCase();
+  const mis = s(raw.sizeMismatch ?? raw.size_mismatch)?.toLowerCase();
+  const kinds: BidSizeNote["kinds"] = [];
+  if (mis === "unknown" || mis === "smaller") kinds.push(mis);
+  if (rel === "larger" || rel === "mixed") kinds.push("larger");
+  if (kinds.length === 0) return null;
+  const rq = (raw.request ?? {}) as Record<string, unknown>;
+  const item = ((Array.isArray(rq.equipmentItems) ? rq.equipmentItems : []) as Record<string, unknown>[])[0] ?? {};
+  const requested = s(item.capacityName)?.trim() ?? null;
+  const requestedAr = s(item.capacityNameAr)?.trim() ?? null;
+  let size: BidSizeNote["size"] = null;
+  for (const u of mapOfferedUnits(raw.offeredUnitsDetail ?? raw.offered_units_detail) ?? []) {
+    const en = u.measurementName?.trim() || u.measurementNameAr?.trim() || null;
+    if (!en || en === requested || (u.measurementNameAr?.trim() && u.measurementNameAr.trim() === requestedAr)) continue;
+    size = { en, ar: u.measurementNameAr?.trim() || en };
+    break;
+  }
+  return { kind: kinds[0], size: kinds[0] === "unknown" ? null : size, kinds };
+}
+
 export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard {
   const sup = (raw.supplier ?? {}) as Record<string, unknown>;
   const prof = (sup.supplierProfile ?? {}) as Record<string, unknown>;
@@ -1183,6 +1229,7 @@ export function mapBid(raw: Record<string, unknown>, expired: boolean): BidCard 
     conflictCount: n(raw.conflictCount) ?? 0,
     dealRoomId: s(raw.dealRoomId),
     dealRoomStatus: s(raw.dealRoomStatus ?? raw.deal_room_status),
+    sizeNote: bidSizeNote(raw),
     expired: expired || raw.isExpired === true || raw.status === "EXPIRED",
     note: s(raw.note),
     requiredCerts,
