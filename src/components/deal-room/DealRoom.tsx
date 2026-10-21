@@ -29,6 +29,10 @@ import { renderQuotationSection, wrapQuotationPage } from "@/lib/quotation/rende
 import "@/components/deal-room/deal-room-proto.css";
 import { computeQuoteTotals, computeRentalTotal, divisorNote } from "@/lib/pricing/rental";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
+
+/** PostHog failure reason: the backend's code, never its sentence (which can carry names). */
+const failCode = (e: unknown) => (e instanceof ApiError ? e.backendCode ?? e.kind : "unknown");
 import { excludedLabel, excludedOfItem, excludedOfTerm, excludedValueText } from "@/lib/contract/nationality";
 
 // The attachment shape is the SHARED one — this surface and the map's chat dock read the same
@@ -209,9 +213,11 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
     setReleasing(true);
     try {
       await releaseDeal(id);
+      track("deal_reopened", { deal_room_id: id, role: "rentee" });
       setReleaseOpen(false);
       await loadRoom();
     } catch (e) {
+      track("deal_reopen_failed", { deal_room_id: id, role: "rentee", failure_reason: failCode(e) });
       setReleaseErr(e instanceof ApiError ? e.message : L("Couldn't reopen the deal. Please try again.", "تعذّر إعادة فتح الصفقة. حاول مرة أخرى."));
     } finally {
       setReleasing(false);
@@ -229,9 +235,12 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
     setCancelling(true);
     try {
       await closeDealRoom(id, reasonText);
+      // The app's name. The reason is the renter's own words, so it is not sent.
+      track("deal_room_closed", { deal_room_id: id, role: "rentee" });
       setCancelOpen(false);
       await loadRoom();
     } catch (e) {
+      track("deal_room_close_failed", { deal_room_id: id, role: "rentee", failure_reason: failCode(e) });
       setCancelErr(errMsg(e, L("Couldn't cancel the deal. Please try again.", "تعذّر إلغاء الصفقة. حاول مرة أخرى.")));
     } finally {
       setCancelling(false);
@@ -246,8 +255,15 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
     setWithdrawing(true);
     try {
       await withdrawAcceptance(id);
+      track("acceptance_withdrawn", { deal_room_id: id, role: "rentee", surface: "deal_room" });
       await loadRoom();
     } catch (e) {
+      track("acceptance_withdraw_failed", {
+        deal_room_id: id,
+        role: "rentee",
+        surface: "deal_room",
+        failure_reason: failCode(e),
+      });
       window.alert(errMsg(e, L("Couldn't withdraw right now: please try again.", "تعذّر سحب القبول الآن: حاول مرة أخرى.")));
     } finally {
       setWithdrawing(false);
@@ -337,6 +353,7 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
       }
       const w = window.open("", "_blank");
       if (!w) {
+        track("quotation_open_failed", { deal_room_id: id, failure_reason: "popup_blocked" });
         setQuoteErr(L("Allow pop-ups to open the quotation.", "اسمح بالنوافذ المنبثقة لفتح عرض السعر."));
         return;
       }
@@ -344,7 +361,15 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
       // columns would print the last agreement under a heading the renter just read a counter on.
       w.document.write(buildQuotationHtml(room, q, rentee, ar, L, liveRoundOf(room, messages)));
       w.document.close();
+      // The app's name and keys.
+      track("deal_room_quotation_viewed", {
+        deal_room_id: id,
+        role: "rentee",
+        room_status: room.status,
+        surface: "deal_room",
+      });
     } catch (e) {
+      track("quotation_open_failed", { deal_room_id: id, failure_reason: failCode(e) });
       setQuoteErr(errMsg(e, L("Couldn’t load the quotation.", "تعذّر تحميل عرض السعر.")));
     } finally {
       setQuoteBusy(false);
@@ -353,7 +378,23 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
 
   useEffect(() => {
     let active = true;
-    fetchDealRoom(id).then((d) => active && setRoom(d)).catch(() => active && setError(true));
+    fetchDealRoom(id)
+      .then((d) => {
+        if (!active) return;
+        // The app's name and keys; once per room opened, not on the 15s refresh.
+        track("deal_room_viewed", {
+          deal_room_id: id,
+          role: "rentee",
+          room_status: d.status,
+          source: "deal_room",
+        });
+        setRoom(d);
+      })
+      .catch((e) => {
+        if (!active) return;
+        track("deal_room_load_failed", { deal_room_id: id, failure_reason: failCode(e) });
+        setError(true);
+      });
     return () => {
       active = false;
     };
@@ -618,11 +659,26 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
         rentalUnits: next.rentalUnits, mobUnits: next.mobUnits, demobUnits: next.demobUnits,
         mobExcluded: next.mobExcluded, demobExcluded: next.demobExcluded,
       });
+      track("counter_offer_submitted", {
+        deal_room_id: id,
+        role: "rentee",
+        updates_count: updates.length,
+        price_unit: room.priceUnit ?? "PER_DAY",
+        has_mob_price: next.mobPrice != null,
+        has_demob_price: next.demobPrice != null,
+      });
       setResolutions({});
       await loadRoom();
       setFlowMode(null);
       if (sheetOnly) onExit?.();
     } catch (e) {
+      // The app's name; `counter_type` as the app spells this path.
+      track("counter_offer_failed", {
+        deal_room_id: id,
+        role: "rentee",
+        counter_type: "with_rate",
+        failure_reason: failCode(e),
+      });
       setCounterErr(errMsg(e, L("Couldn’t send your counter: please try again.", "تعذّر إرسال عرضك المقابل: حاول مرة أخرى.")));
     } finally {
       setBusy(false);
@@ -657,11 +713,28 @@ export function DealRoom({ id, onTitle, initialFlow, sheetOnly = false, onExit }
         mobUnits: (lp?.mobExcluded ?? room.mobExcluded) ? undefined : lp?.mobUnits ?? room.mobUnits ?? undefined,
         demobUnits: (lp?.demobExcluded ?? room.demobExcluded) ? undefined : lp?.demobUnits ?? room.demobUnits ?? undefined,
       });
+      // A renter's accept waits for the supplier's confirm, so this is the renter's half, not
+      // the app's `deal_confirmed` (which the supplier sends when the deal closes).
+      track("deal_accepted", {
+        deal_room_id: id,
+        role: "rentee",
+        action: "accept_all_terms",
+        contract_type: contractType,
+        took_supplier_offer: Boolean(taking),
+      });
       setResolutions({});
       await loadRoom();
       setFlowMode(null);
       if (sheetOnly) onExit?.();
     } catch (e) {
+      // The app's name and keys for the renter's accept failing.
+      track("bid_acceptance_failed", {
+        deal_room_id: id,
+        role: "rentee",
+        action: "accept_all_terms",
+        contract_type: contractType,
+        failure_reason: failCode(e),
+      });
       window.alert(errMsg(e, L("Couldn’t accept right now: please try again.", "تعذّر القبول الآن: حاول مرة أخرى.")));
     } finally {
       setBusy(false);

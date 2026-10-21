@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui";
 import { RestoreAccountPrompt } from "./RestoreAccountPrompt";
 import type { RenterUser } from "@/lib/contract/auth";
 import { authSubmit, type AuthTone } from "@/components/auth/AuthPanel";
+import { track } from "@/lib/analytics";
 
 const OTP_FONT: React.CSSProperties = { fontFamily: "var(--font-plex), monospace" };
 
@@ -122,6 +123,9 @@ export function CodeEntry({
     setBusy(true);
     const r = await postAuth("/api/auth/verify", { ...verifyPayload, code });
     setBusy(false);
+    // PostHog, the app's names. `needs_signup` tells a new person from a returning one.
+    if (r.ok) track("otp_verified", { needs_signup: Boolean(r.data.needsSignup) });
+    else track("otp_failed", { step: "verify", failure_reason: r.kind });
     if (r.ok) {
       if (r.data.needsSignup) {
         onNeedsSignup?.(String(r.data.onboardingToken ?? ""), typeof r.data.email === "string" ? r.data.email : null);
@@ -144,6 +148,8 @@ export function CodeEntry({
     setErr(null);
     setResent(false);
     const r = await postAuth("/api/auth/resend", resendPayload); // AC-12: no cooldown; same identity
+    if (r.ok) track("otp_resent", {});
+    else track("otp_failed", { step: "resend", failure_reason: r.kind });
     if (r.ok) {
       setResent(true);
       resetBoxes();

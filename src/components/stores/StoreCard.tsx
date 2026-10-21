@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLocale, useT } from "@/lib/i18n";
 import type { StoreCard as StoreCardData } from "@/lib/contract/stores";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 import { PinIcon, ShopLogo, ShopPhoto, VerifiedDot } from "@/components/stores/shop";
 
 /**
@@ -56,7 +57,11 @@ export function StoreCard({ store }: { store: StoreCardData }) {
     const city = eq.city ?? store.city;
     return (
       <div {...pin("store-card-equipment")} className="overflow-hidden rounded-shop-card border border-shop-line bg-white">
-        <Link href={`/equipment/${encodeURIComponent(eq.id)}?storeId=${encodeURIComponent(store.id)}`} className="block text-shop-ink">
+        <Link
+          href={`/equipment/${encodeURIComponent(eq.id)}?storeId=${encodeURIComponent(store.id)}`}
+          onClick={() => track("store_machine_opened", { store_id: store.id, equipment_id: eq.id, surface: "store_card" })}
+          className="block text-shop-ink"
+        >
           <div className="relative aspect-[16/11] w-full bg-shop-fill">
             <ShopPhoto src={eq.photoUrl} alt={label} />
             {store.isVerified && (
@@ -127,6 +132,8 @@ export function StoreCard({ store }: { store: StoreCardData }) {
     <Link
       {...pin("store-card")}
       href={`/stores/${store.id}`}
+      // PostHog, the app's name.
+      onClick={() => track("store_card_tapped", { store_id: store.id, is_verified: store.isVerified })}
       className="block overflow-hidden rounded-shop-card border border-shop-line bg-white text-shop-ink"
     >
       {/* The tile is the mark. White, because a logo is drawn for paper and most of these carry their

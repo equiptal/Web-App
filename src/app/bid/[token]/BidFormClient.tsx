@@ -13,6 +13,7 @@ import { computeBidQuality } from "@/lib/contract/bid-quality";
 import { latinDigits, partyToken } from "@/lib/contract/labels";
 import { BID_FORM_CSS } from "@/components/bid/bidFormStyles";
 import { equipmentIcon } from "@/components/requests/EquipImg";
+import { track } from "@/lib/analytics";
 
 /**
  * web-app/006 — PUBLIC supplier bid form (spec "Layout B": supplier-bid-v2.html). An off-platform
@@ -251,8 +252,18 @@ export default function BidFormClient({ token }: { token: string }) {
         }
         setAnswers(init);
         setContract(Object.fromEntries(d.contractTerms.map((c) => [c.key, true])));
+        // The app's name. An anonymous supplier: no person, so the link is the only source.
+        track("bid_viewed", { source: "bid_link", item_count: d.items.length });
       })
-      .catch(() => alive && setNotFound(true))
+      .catch((e) => {
+        if (!alive) return;
+        track("bid_view_failed", {
+          source: "bid_link",
+          error_code: e instanceof ApiError ? e.backendCode ?? e.kind : "unknown",
+          status: e instanceof ApiError ? e.status ?? null : null,
+        });
+        setNotFound(true);
+      })
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [token]);
@@ -432,10 +443,21 @@ export default function BidFormClient({ token }: { token: string }) {
           return all.length ? all.map((d) => ({ key: d.key, type: d.type as CompanyDocKind, filename: d.filename ?? undefined })) : undefined;
         })(),
       });
+      // The app's name. ⚠️ Sent on the API's answer; the app sends it on the confirm tap.
+      track("bid_submitted", {
+        source: "bid_link",
+        item_count: data.items.filter((it) => !isExcluded(it)).length,
+        vat_included: vatIncluded,
+      });
       setSubmitted(true);
       window.scrollTo(0, 0);
     } catch (e) {
       setSubmitting(false);
+      track("bid_submission_failed", {
+        source: "bid_link",
+        error_code: e instanceof ApiError ? e.backendCode ?? e.kind : "unknown",
+        status: e instanceof ApiError ? e.status ?? null : null,
+      });
       // Refresh the form — a race (another supplier's units got accepted while this form was open) moves
       // the cap, so reloading re-applies each item's `remainingUnits` (stepper max, defaults, fully-covered).
       fetchBidFormData(token).then((d) => setData(d)).catch(() => {});

@@ -11,6 +11,7 @@ import { bidColumnToComputed, type PreferencePreset, type RankedBid } from "@/li
 import { buildItemComparison } from "@/lib/contract/comparison";
 import type { WorkspaceBid } from "@/lib/contract/workspace";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 /**
  * ── The assistant, under the comparison (owner, 2026-09-07) ──────────────────────────────────────
@@ -83,9 +84,12 @@ export function AiRankPanel({
     setBusy(true);
     setFailed(false);
     setPreset(p);
+    // The app's assistant names. The preset is an enum, never free text.
+    track("ai_assistant_message_sent", { kind: "preset", preset: p, bid_count: bids.length });
     try {
       const res = await recommendBids({ bids: computed(), preference: { preset: p } });
       if (!res.agent || !res.result) {
+        track("ai_assistant_failed", { kind: "preset", failure_reason: "no_result" });
         setFailed(true);
         return;
       }
@@ -96,6 +100,7 @@ export function AiRankPanel({
         note: rec?.reasons?.[0]?.text ?? res.result.interpretation ?? null,
       });
     } catch {
+      track("ai_assistant_failed", { kind: "preset", failure_reason: "error" });
       setFailed(true);
     } finally {
       setBusy(false);
@@ -108,9 +113,12 @@ export function AiRankPanel({
     setBusy(true);
     setFailed(false);
     setText("");
+    // Never the message itself: free text stays out of analytics.
+    track("ai_assistant_message_sent", { kind: "question", bid_count: bids.length });
     try {
       const res = await askBids({ message, bids: computed(), current_ranking: order });
       if (!res.agent || !res.result) {
+        track("ai_assistant_failed", { kind: "question", failure_reason: "no_result" });
         setFailed(true);
         return;
       }
@@ -119,6 +127,7 @@ export function AiRankPanel({
       setTurns((prev) => [...prev, { me: message, reply: r.reply, reading: r.interpretation }]);
       onRanking({ bidId: r.pick_bid_id, note: r.reply });
     } catch {
+      track("ai_assistant_failed", { kind: "question", failure_reason: "error" });
       setFailed(true);
     } finally {
       setBusy(false);

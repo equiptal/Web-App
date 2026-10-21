@@ -10,12 +10,13 @@ import type { SubtypeAttachmentOption } from "@/lib/contract/app";
 import { requestedMinYear } from "@/lib/contract/bids";
 import { SAFETY_CERTIFICATES, normalizeSafetyCert, type SafetyCertificate } from "@/lib/contract/options";
 import { taxName, type Taxonomy } from "@/lib/contract/taxonomy";
-import { fetchTaxonomy, updateRequest } from "@/lib/api/client";
+import { ApiError, fetchTaxonomy, updateRequest } from "@/lib/api/client";
 import { type RequestRecord } from "@/lib/contract/requests";
 import { budgetLabel } from "@/lib/contract/request-fields";
 import "@/components/requests/requests-proto.css";
 import { CARD_FOOTER, btn } from "@/lib/ds";
 import { ExcludedNationalities } from "@/components/create/ExcludedNationalities";
+import { track } from "@/lib/analytics";
 
 /** The create flow's own picker, and it takes no store — `value`, `label`, `onChange` and nothing else. */
 const MapLocationPicker = dynamic(() => import("@/components/shared/GoogleMapLocationPicker"), { ssr: false });
@@ -475,8 +476,18 @@ export function EditRequestModal({ r, ar, L, onClose, onSaved, siblingIds }: { r
         delete shared.equipmentItems;
         if (Object.keys(shared).length) await Promise.all(siblingIds.map((sid) => updateRequest(sid, shared).catch(() => {})));
       }
+      // The app's name; only the changed field NAMES, never their values.
+      track("request_edited", {
+        request_id: r.id,
+        changed_fields: Object.keys(patch as Record<string, unknown>),
+        group_size: (siblingIds?.length ?? 0) + 1,
+      });
       onSaved();
-    } catch {
+    } catch (e) {
+      track("request_edit_failed", {
+        request_id: r.id,
+        error_code: e instanceof ApiError ? (e.backendCode ?? e.kind) : "unknown",
+      });
       setBusy(false);
     }
   }

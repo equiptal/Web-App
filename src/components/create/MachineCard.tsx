@@ -45,6 +45,7 @@ import {
   type RequiredGap,
 } from "@/lib/contract";
 import { MachineGlyph } from "@/components/MachineGlyph";
+import { track } from "@/lib/analytics";
 
 /**
  * The title of an overlay control, carrying its star and, once it has refused, the word.
@@ -1340,6 +1341,8 @@ function UnavailableCard({ item, label }: { item: EquipmentItem; label: string }
 
   const askUs = () => {
     const msg = fmt(t.step2.noMatch.whatsappMessage, { item: item.rawLabel ?? label });
+    // PostHog, the app's name. The machine's words stay in WhatsApp, not here.
+    track("support_whatsapp_tapped", { surface: "no_match_machine", custom_line: custom });
     window.open(`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank", "noopener");
     actions.requestSourcing(item.id);
   };

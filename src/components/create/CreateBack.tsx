@@ -11,6 +11,7 @@ import { useT } from "@/lib/i18n";
 import { previousPath } from "@/lib/nav-trail";
 import { useRfq } from "@/lib/store/rfq-store";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 /**
  * Back on the INTAKE, drawn inside the work column rather than by the shell.
@@ -131,6 +132,7 @@ export function CreateBack() {
         <button
           onClick={() => {
             setConfirmLeave(false);
+            track("request_abandoned", {});
             actions.goIntake();
           }}
           className={btn("primary", "md", { className: "transition" })}

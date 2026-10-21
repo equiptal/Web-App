@@ -35,6 +35,7 @@ import {
   recentSupportError,
   type IntercomServerIdentity,
 } from "@/lib/support/intercom";
+import { track } from "@/lib/analytics";
 
 type IntercomFn = ((...args: unknown[]) => void) & { q?: unknown[][]; c?: (args: unknown[]) => void };
 
@@ -57,8 +58,11 @@ declare global {
  * rather than starting a second thread beside it. Silent when Intercom has not loaded — blocked, or
  * still in flight — rather than throwing at a renter who pressed a support link.
  */
-export function openSupportMessenger(): void {
+export function openSupportMessenger(trigger?: unknown): void {
   const pressedAt = Date.now();
+  // `unknown`, not `string`: the profile's row passes this straight as an `onClick`, so a click
+  // event arrives here. Only a string names a door.
+  lastTrigger = typeof trigger === "string" ? trigger : "support_link";
   try {
     window.Intercom?.("update", chatContext(window.location.pathname, window.location.search));
     window.Intercom?.("show");
@@ -85,10 +89,15 @@ export function openSupportMessenger(): void {
 let lastShownAt = 0;
 let fallbackToAnonymous: (() => void) | null = null;
 const SHOW_TIMEOUT_MS = 2000;
+/** Which door opened the messenger, for PostHog; read and cleared by `onShow`. */
+let lastTrigger: string | null = null;
 
 function watchShow(api: IntercomFn): void {
   api("onShow", () => {
     lastShownAt = Date.now();
+    // PostHog, the app's name and key. Intercom's own surfaces (a push, a tour) leave it `unknown`.
+    track("intercom_chat_opened", { trigger_point: lastTrigger ?? "unknown" });
+    lastTrigger = null;
   });
 }
 
@@ -521,7 +530,7 @@ function Launcher({ unread }: { unread: number }) {
       moved.current = false;
       return;
     }
-    openSupportMessenger();
+    openSupportMessenger("chat_bubble");
   }, []);
 
   if (!INTERCOM_APP_ID) return null;

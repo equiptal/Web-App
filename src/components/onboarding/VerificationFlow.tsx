@@ -16,6 +16,7 @@ import { CompanyDocsConfirmDialog } from "./CompanyDocsConfirmDialog";
 import type { VerificationStatus } from "@/lib/contract/onboarding";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 const ACCEPT = "image/jpeg,image/png,image/webp,application/pdf";
 
@@ -205,15 +206,29 @@ export function VerificationFlow() {
     try {
       const result = await uploadCompanyPile(files, sessionRef.current);
       sessionRef.current = result.session;
+      /* PostHog: the app's `company_docs_upload_*` names and keys — the same pile, sent to the
+         same review, so one funnel covers the app, the web and Supplier OS. */
       if (!result.ok) {
+        track("company_docs_upload_failed", {
+          doc_count: files.length,
+          failure_reason: "upload",
+          partial_failure: true,
+          failed_count: result.failedIndexes.size,
+        });
         setFailedIndexes(result.failedIndexes);
         setErr(p.errors.partial);
         return;
       }
+      track("company_docs_upload_submitted", { doc_count: files.length });
       setFailedIndexes(new Set());
       setSent(true); // AC-13 — terminal state, the form is gone
     } catch (e) {
       const reason = e instanceof Error ? e.message : "";
+      track("company_docs_upload_failed", {
+        doc_count: files.length,
+        failure_reason: reason || "unknown",
+        partial_failure: false,
+      });
       setErr(
         reason === "offline"
           ? v.errors.offline

@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui";
 import type { EquipmentCard, StoreDetail, TaxonomyNode } from "@/lib/contract/stores";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 import { CheckIcon, CityTag, DocIcon, EyeIcon, PinIcon, SHOP_PAGE, ShopLogo, ShopPhoto, VerifiedDot } from "@/components/stores/shop";
 
 /**
@@ -64,11 +65,16 @@ export function StoreDetailSurface({ id, onTitle }: { id: string; onTitle?: (nam
         throw new Error(body?.backendCode === "E9019" ? "notLive" : "load");
       })
       .then((d: StoreDetail) => {
+        // The app's name and keys.
+        track("store_viewed", { store_id: id, is_verified: d.isVerified });
         setDetail(d);
         onTitle?.(d.name);
       })
       .catch((e) => {
-        if (e?.name !== "AbortError") setError(e?.message === "notLive" ? "notLive" : "load");
+        if (e?.name === "AbortError") return;
+        const reason = e?.message === "notLive" ? "notLive" : "load";
+        track("store_view_failed", { store_id: id, failure_reason: reason });
+        setError(reason);
       });
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -212,6 +218,8 @@ function EquipmentTile({
     <Link
       {...pin("store-equipment-card")}
       href={`/equipment/${encodeURIComponent(eq.id)}?storeId=${encodeURIComponent(storeId)}`}
+      // PostHog, the app's name and keys.
+      onClick={() => track("store_machine_opened", { store_id: storeId, equipment_id: eq.id, surface: "store_page" })}
       className="block overflow-hidden rounded-shop-card border border-shop-line bg-white text-shop-ink transition hover:border-shop-amber"
     >
       <div className="relative aspect-[16/11] w-full bg-shop-fill">

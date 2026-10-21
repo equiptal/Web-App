@@ -60,6 +60,7 @@ import { btn, cx } from "@/lib/ds";
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
 import { BIDS_POLL_MS, useLiveTick } from "@/lib/live/useLiveTick";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 type Tab = "cards" | "compare";
 
@@ -434,7 +435,10 @@ export function RequestsWorkspace() {
     if (url.search !== before) window.history.replaceState(window.history.state, "", url.toString());
   }, [entered, resolved.itemId, tab]);
 
-  const pickGroup = useCallback((groupId: string) => setWanted({ groupId, itemId: null, bidId: null }), []);
+  const pickGroup = useCallback((groupId: string) => {
+    track("request_card_tapped", { request_id: groupId, surface: "workspace_rail" });
+    setWanted({ groupId, itemId: null, bidId: null });
+  }, []);
   const pickItem = useCallback((id: string) => setWanted((w) => ({ groupId: w.groupId, itemId: id, bidId: null })), []);
   /* ~~`pickBid` — the comparison's chosen supplier.~~ Gone with the picker itself (owner,
      2026-09-04): the table no longer asks for a supplier, and the map it leads to carries every
@@ -517,6 +521,7 @@ export function RequestsWorkspace() {
         if (blocking) setToast(cancelBlockedReason(blocking.status, ar));
         return;
       }
+      track("request_cancel_tapped", { request_id: g.id, surface: "workspace_rail" });
       setCancelError(null);
       setCancelled(false);
       setCancelling(g);
@@ -540,8 +545,10 @@ export function RequestsWorkspace() {
     setCancelError(null);
     try {
       await Promise.all(cancellableItems(g.items).map((i) => cancelRequest(i.id)));
+      track("request_cancelled", { request_id: g.id, surface: "workspace_rail" });
       setCancelled(true);
     } catch {
+      track("request_cancel_failed", { request_id: g.id, surface: "workspace_rail" });
       setCancelError(ar ? "لم يتمّ الإجراء. حاول مجددًا." : "That didn’t go through. Try again.");
     } finally {
       setCancelBusy(false);
@@ -803,9 +810,12 @@ export function RequestsWorkspace() {
 
     const w = window.open("", "_blank");
     if (!w) {
+      track("comparison_report_export_failed", { request_id: item.id, bid_count: shown.length, failure_reason: "popup_blocked" });
       setToast(t.workspace.exportPopupBlocked);
       return;
     }
+    // The app's name for the same sheet.
+    track("comparison_report_exported", { request_id: item.id, bid_count: shown.length });
     w.document.write(html);
     w.document.close();
     w.focus();

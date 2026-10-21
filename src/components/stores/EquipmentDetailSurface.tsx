@@ -13,6 +13,7 @@ import type { EquipmentDetail, StoreDetail } from "@/lib/contract/stores";
 import { cityCentroid } from "@/lib/contract/saudi-cities";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 import {
   CameraIcon,
   CheckIcon,
@@ -89,9 +90,14 @@ export function EquipmentDetailSurface({
     const qs = storeId ? `?storeId=${encodeURIComponent(storeId)}` : "";
     fetch(`/api/equipment/${encodeURIComponent(id)}${qs}`, { cache: "no-store", signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error())))
-      .then((d: EquipmentDetail) => setEq(d))
+      .then((d: EquipmentDetail) => {
+        track("equipment_viewed", { equipment_id: id, store_id: storeId ?? null });
+        setEq(d);
+      })
       .catch((e) => {
-        if (e?.name !== "AbortError") setError(true);
+        if (e?.name === "AbortError") return;
+        track("equipment_view_failed", { equipment_id: id, store_id: storeId ?? null });
+        setError(true);
       });
     return () => ctrl.abort();
   }, [id, storeId, reloadKey]);
@@ -155,7 +161,9 @@ export function EquipmentDetailSurface({
    */
   const supplierId = eq?.supplierId ?? store?.supplierId ?? null;
   const supplierName = store?.name ?? eq?.storeName ?? null;
-  const requestThis = () =>
+  const requestThis = () => {
+    // PostHog, the app's name: the press, before the sign-in gate (a guest's press counts too).
+    track("equipment_direct_request_tapped", { equipment_id: id, store_id: ownerStoreId ?? null });
     requireAuth(() => {
       void (async () => {
         let sid = supplierId;
@@ -194,6 +202,7 @@ export function EquipmentDetailSurface({
         router.push(`/create?${qs.toString()}`);
       })();
     });
+  };
 
   if (error) {
     return (

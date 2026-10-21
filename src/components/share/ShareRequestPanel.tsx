@@ -52,6 +52,7 @@ import {
   type Compose,
   type EmailProvider,
 } from "@/lib/composeEmail";
+import { track } from "@/lib/analytics";
 
 /**
  * *Share this request* — one panel, wherever a request is shared.
@@ -1259,6 +1260,9 @@ export function ShareRequestPanel({
        */
       const outcome = await shareRequestEmail(id, reachable.map((x) => x.id), body);
       setConfirming(false);
+      if (outcome.sent === false && outcome.reason !== "PREVIEW") {
+        track("request_bid_link_share_failed", { request_id: id, channel: "email", failure_reason: outcome.reason });
+      }
       /* ⚠️ A PREVIEW cannot come back on this call — we never ask for one — but the type still
          admits it, so it is refused here rather than assumed away. */
       setMailer(outcome.sent === false && outcome.reason === "PREVIEW" ? null : outcome);
@@ -1404,6 +1408,16 @@ export function ShareRequestPanel({
         setCopiedMessage(true);
         setTimeout(() => setCopiedMessage(false), 2400);
       }
+    }
+
+    // PostHog, the app's name. `ok` is whether anyone was reached or a channel was opened for him.
+    if (ch !== "none") {
+      track("request_bid_link_shared", {
+        request_id: id,
+        channel: ch,
+        recipients: reached,
+        ok: reached > 0 || handedOff,
+      });
     }
 
     // Cumulative, because a second press is a second channel, not a correction of the first.
@@ -1625,6 +1639,7 @@ export function ShareRequestPanel({
                  * *More* does.
                  */
                 void navigator.clipboard?.writeText(shareUrl).catch(() => {});
+                track("request_bid_link_shared", { request_id: uuid, channel: "copy", ok: true });
                 setCopied(true);
                 setTimeout(() => setCopied(false), 1600);
               }}

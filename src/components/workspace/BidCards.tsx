@@ -22,6 +22,7 @@ import { SharedBidSubmissionModal } from "@/components/requests/SharedBidSubmiss
 import type { LinkBidSubmission } from "@/lib/contract/link-bids";
 import { termsDial, type WorkspaceBid } from "@/lib/contract/workspace";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 /**
  * The band's glyph per state (app parity, `renteeBandGlyph`).
@@ -504,6 +505,7 @@ function BidCardTile({
   const [sheetRoom, setSheetRoom] = useState<string | null>(null);
 
   const openRoom = () => {
+    track("offer_tapped", { bid_id: card.id, action: "chat" });
     router.push(`/bids/${encodeURIComponent(card.id)}/equipment?chat=1`);
   };
 
@@ -532,6 +534,7 @@ function BidCardTile({
        later caller would otherwise inherit a call that 404s in silence. */
     if (offline) return;
     if (countering) return;
+    track("offer_tapped", { bid_id: card.id, action: "counter" });
     setCountering(true);
     try {
       setSheetRoom(await ensureDealRoom(card.id, card.dealRoomId ?? null));
@@ -654,6 +657,7 @@ function BidCardTile({
         type="button"
         onClick={(e) => {
           e.stopPropagation();
+          track("offer_tapped", { bid_id: card.id, action: "equipment" });
           router.push(`/bids/${encodeURIComponent(card.id)}/equipment`);
         }}
         className="flex min-h-[var(--control-lg)] flex-none items-center gap-3 border-t border-border px-3.5 py-2 text-start transition-colors hover:bg-surface2/40"

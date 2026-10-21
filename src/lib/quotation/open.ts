@@ -1,4 +1,5 @@
 import type { QuotationRentee } from "@/lib/quotation/bid-quotation";
+import { track } from "@/lib/analytics";
 
 /**
  * The quotation's two browser ends, shared by the workspace's two download buttons: requests mode
@@ -44,6 +45,8 @@ export function quotationRentee(u: MeUser, verified: boolean, ar: boolean): Quot
  */
 export function openQuotationPage(html: string, dlName: string): void {
   const w = window.open("", "_blank");
+  // PostHog, the app's name, sent here once for both workspace buttons rather than at each caller.
+  track("quotation_pdf_downloaded", { delivery: w ? "tab" : "file_download" });
   if (w) {
     w.document.write(html);
     w.document.close();

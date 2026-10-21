@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type { RenterTier, RenterUser } from "@/lib/contract/auth";
+import posthog from "posthog-js";
+import { POSTHOG_KEY } from "@/lib/analytics";
 
 /**
  * Renter session (web-app/001). Hydrates from `GET /api/auth/session` (httpOnly token cookies set by
@@ -93,6 +95,20 @@ export function SessionProvider({
     void refresh();
   }, [refresh]);
 
+  /**
+   * **PostHog identity follows the session** (2026-10-21). The id is the backend `users.id` as a
+   * string, exactly what the mobile app passes to `Posthog().identify` and what Supplier OS sends,
+   * so one person's app, web and OS events join on one PostHog person. Another user signing in on
+   * this browser is reset first, or their events would merge into the previous person.
+   */
+  const userId = user ? String(user.id) : null;
+  useEffect(() => {
+    if (!POSTHOG_KEY || userId === null) return;
+    if (posthog.get_distinct_id() === userId) return;
+    if (posthog._isIdentified()) posthog.reset();
+    posthog.identify(userId, { uses_web_app: true });
+  }, [userId]);
+
   const signIn = useCallback((u: RenterUser) => {
     setUser(u);
     setStatus("authed");
@@ -104,6 +120,8 @@ export function SessionProvider({
     } catch {
       /* even if the server call fails, drop the local session */
     }
+    // Unlink this browser from the person, so whoever signs in next is not merged into them.
+    if (POSTHOG_KEY) posthog.reset();
     setUser(null);
     setStatus("anon");
   }, []);

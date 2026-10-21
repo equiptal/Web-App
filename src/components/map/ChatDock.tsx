@@ -148,6 +148,7 @@ import {
 } from "@/lib/contract/request-card";
 import { useLocale, useT } from "@/lib/i18n";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 import "@/components/deal-room/deal-room-proto.css";
 
 /** Refresh cadence for the REST unread + tab list. Deliberately slower than the deal room's 15s room
@@ -570,6 +571,7 @@ export function ChatDock({
         channel.on("message.new", onNew);
       } catch {
         /* chat unavailable — the tab still composes, and the rest of the surface is unaffected */
+        if (!cancelled) track("deal_room_load_failed", { deal_room_id: watchRoomId, stage: "chat_connect" });
       }
     })();
     return () => {
@@ -584,6 +586,18 @@ export function ChatDock({
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages, open]);
+
+  /* PostHog, the app's name: once each time the renter is LOOKING at a conversation (open, on a
+     tab with a room). A tab switch is a new view; a re-render is not. */
+  useEffect(() => {
+    if (!open || !activeRoomId) return;
+    track("deal_room_viewed", {
+      deal_room_id: activeRoomId,
+      role: "rentee",
+      source: initialOpen ? "chat_link" : embedded ? "inbox" : "chat_dock",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, activeRoomId]);
 
   /* ── READ, when he is looking at it (app parity, `deal_chat_controller.dart` `markRead`) ──────────
      The unread badges are Stream's own read state (`getUnreadCounts` on the backend), and nothing on
@@ -607,7 +621,11 @@ export function ChatDock({
     fetchDealRoom(activeRoomId)
       .then((r) => { if (live) setRoom(r); })
       // No room means no offer buttons and no opening card; the conversation itself is unaffected.
-      .catch(() => { if (live) setRoom(null); });
+      .catch(() => {
+        if (!live) return;
+        track("deal_room_load_failed", { deal_room_id: activeRoomId, stage: "room" });
+        setRoom(null);
+      });
     return () => { live = false; };
   }, [activeRoomId, messages.length, roomTick]);
 
@@ -1237,6 +1255,7 @@ export function ChatDock({
     try {
       // Extra data rides on the message root, where the app reads it (`extraData['kind']`).
       const ok = await deliver(async (channel) => { await channel.sendMessage(fields as Parameters<Channel["sendMessage"]>[0]); });
+      trackMessage(ok, "request_card", false);
       if (!ok) setFileErr(L("The request couldn't be sent", "تعذّر إرسال الطلب"));
       return ok;
     } finally {
@@ -1260,6 +1279,7 @@ export function ChatDock({
           if (draft) await sendRenteeRequest(roomId, draft);
         }
       });
+      trackMessage(ok, "request_card", false);
       if (ok) setAskPicker(null);
       else setFileErr(L("The request couldn't be sent", "تعذّر إرسال الطلب"));
     } finally {
@@ -1439,13 +1459,31 @@ export function ChatDock({
     setCancelling(true);
     try {
       await closeDealRoom(roomId, reasonText);
+      // The app's name. The reason is the renter's own words, so it is not sent.
+      track("deal_room_closed", { deal_room_id: roomId, role: "rentee", surface: "chat_dock" });
       setCancelOpen(false);
       refresh();
     } catch {
+      track("deal_room_close_failed", { deal_room_id: roomId, role: "rentee", surface: "chat_dock" });
       setCancelErr(L("Couldn't cancel the deal. Please try again.", "تعذّر إلغاء الصفقة. حاول مرة أخرى."));
     } finally {
       setCancelling(false);
     }
+  }
+
+  /**
+   * PostHog for one send, the app's `deal_room_message_sent` keys (plus `_failed`, which the app
+   * does not have). Called by each sender with the seam's answer; never the message text.
+   */
+  function trackMessage(ok: boolean, attachmentType: string | null, hasText: boolean) {
+    track(ok ? "deal_room_message_sent" : "deal_room_message_failed", {
+      deal_room_id: active?.dealRoomId ?? null,
+      bid_id: active?.bidId ?? null,
+      role: "rentee",
+      has_attachment: attachmentType !== null && attachmentType !== "request_card",
+      attachment_type: attachmentType,
+      has_text: hasText,
+    });
   }
 
   async function deliver(post: (channel: Channel, roomId: string) => Promise<void>): Promise<boolean> {
@@ -1524,7 +1562,9 @@ export function ChatDock({
     /* ⚠️ Cleared only if it is still the line that went. The field stays LIVE during the flight
        now, so a renter who kept typing must not have those keystrokes wiped by an answer to the
        message before them. */
-    if (await deliver(async (channel) => { await channel.sendMessage({ text: body }); })) {
+    const sent = await deliver(async (channel) => { await channel.sendMessage({ text: body }); });
+    trackMessage(sent, null, true);
+    if (sent) {
       setText((prev) => (prev.trim() === body ? "" : prev));
     }
     focusComposer();
@@ -1565,6 +1605,7 @@ export function ChatDock({
     // The composer's line rides along as the caption, exactly as it does in the deal room.
     const caption = text;
     const sent = await deliver((channel) => sendChatAttachment(channel, file, verdict.kind, caption));
+    trackMessage(sent, verdict.kind, caption.trim() !== "");
     setUploading(false);
     if (sent) setText((prev) => (prev === caption ? "" : prev));
     else setFileErr(chatSendFailure("attachment", L));
@@ -1577,6 +1618,7 @@ export function ChatDock({
     setFileErr(null);
     setUploading(true);
     const sent = await deliver((channel) => sendChatVoiceNote(channel, file));
+    trackMessage(sent, "voice", false);
     setUploading(false);
     if (!sent) setFileErr(chatSendFailure("voice", L));
   }

@@ -57,6 +57,7 @@ import { priceFooterModel } from "@/lib/contract/price-footer";
 import { computeQuoteTotals, legDisplay } from "@/lib/pricing/rental";
 import { fmt, useT } from "@/lib/i18n";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 
 export interface PriceFooterProps {
@@ -163,8 +164,10 @@ export function PriceFooter({ bid, durationDays, startDate = null, slim = false,
     setWithdrawing(true);
     try {
       await withdrawAcceptance(bid.dealRoomId);
+      track("acceptance_withdrawn", { deal_room_id: bid.dealRoomId, bid_id: bid.id, role: "rentee", surface: "price_footer" });
       onChanged?.();
     } catch {
+      track("acceptance_withdraw_failed", { deal_room_id: bid.dealRoomId, bid_id: bid.id, role: "rentee", surface: "price_footer" });
       window.alert(t.priceFooter.withdrawFailed);
     } finally {
       setWithdrawing(false);
@@ -239,6 +242,8 @@ export function PriceFooter({ bid, durationDays, startDate = null, slim = false,
 
   async function handOff(act: "counter" | "accept") {
     if (busy) return;
+    // The press that opens the negotiate sheet; the sheet's own send reports the outcome.
+    track(act === "accept" ? "accept_tapped" : "counter_offer_tapped", { bid_id: bid.id, surface: "price_footer" });
     setBusy(true);
     try {
       const roomId = await ensureDealRoom(bid.id, bid.dealRoomId);

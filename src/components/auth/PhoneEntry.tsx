@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { PUBLIC_WEB_ENABLED } from "@/lib/flags";
 import { authField, authFoot, authLabel, authSub, authSubmit, authTitle, type AuthTone } from "@/components/auth/AuthPanel";
+import { track } from "@/lib/analytics";
 
 export const SAUDI_DIAL = "+966";
 
@@ -72,6 +73,9 @@ export function PhoneEntry({
     const phone = `${dial}${digits.replace(/\D/g, "")}`;
     const r = await postAuth("/api/auth/request-code", { phone, countryCode: dial, otpMethod: "SMS" });
     setBusy(false);
+    // PostHog, the app's names. The dial code only, never the number.
+    if (r.ok) track("otp_requested", { method: "sms", country_code: dial });
+    else track("otp_failed", { step: "request", method: "sms", failure_reason: r.kind });
     if (r.ok) onCodeSent(phone, { method: "SMS" });
     else setErr(r.kind);
   };

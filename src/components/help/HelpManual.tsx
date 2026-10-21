@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui";
 import { useLocale, useT } from "@/lib/i18n";
 import { SUPPORT_WHATSAPP_NUMBER } from "@/lib/config/support";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 /**
  * ── The manual (owner, 2026-09-06) ───────────────────────────────────────────────────────────────
@@ -131,6 +132,8 @@ export function HelpManual({ open, onClose }: { open: boolean; onClose: () => vo
             href={`https://wa.me/${SUPPORT_WHATSAPP_NUMBER}`}
             target="_blank"
             rel="noopener noreferrer"
+            // PostHog, the app's name.
+            onClick={() => track("support_whatsapp_tapped", { surface: "help_manual" })}
             className="flex items-center gap-2.5 rounded-sm px-1 py-1.5 transition hover:bg-surface2/70"
           >
             <span className="grid size-8 flex-none place-items-center rounded-md bg-ok-soft text-ok">

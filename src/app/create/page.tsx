@@ -14,6 +14,7 @@ import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { useStartRequestGate } from "@/lib/access/start-request-gate";
 import { useT } from "@/lib/i18n";
 import { safeStoreUrl } from "@/lib/app-handoff";
+import { track } from "@/lib/analytics";
 
 /**
  * /create — the RFQ creation flow (web-app/002), reached from the home's Create-request entry and
@@ -31,6 +32,7 @@ export default function CreatePage() {
       <Suspense fallback={null}>
         <DirectRequestGate />
         <FirstRequestGate />
+        <RequestStartedEvent />
       </Suspense>
       <AppShell title={t.shell.request}>
         {/* Store «Request now» handoff to the app: QR popup, in-app screen or phone banner. */}
@@ -42,6 +44,24 @@ export default function CreatePage() {
       </AppShell>
     </RfqProvider>
   );
+}
+
+/**
+ * PostHog `request_started`, the app's name, once per visit to /create. `source` says which door:
+ * a store's «Request» (`supplierId` in the URL) or the plain create flow.
+ */
+function RequestStartedEvent() {
+  const params = useSearchParams();
+  const sent = useRef(false);
+  useEffect(() => {
+    if (sent.current) return;
+    sent.current = true;
+    track("request_started", {
+      source: params.get("supplierId") ? "direct_supplier" : "create_page",
+      is_trial: params.get("mode") === "trial",
+    });
+  }, [params]);
+  return null;
 }
 
 /**

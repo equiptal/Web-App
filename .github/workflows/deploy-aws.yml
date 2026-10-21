@@ -251,6 +251,7 @@ jobs:
             NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
             NEXT_PUBLIC_STREAM_API_KEY=${{ secrets.NEXT_PUBLIC_STREAM_API_KEY }}
             NEXT_PUBLIC_OS_APP_URL=${{ vars.NEXT_PUBLIC_OS_APP_URL }}
+            NEXT_PUBLIC_POSTHOG_KEY=${{ vars.NEXT_PUBLIC_POSTHOG_KEY }}
           cache-from: type=gha,scope=web-app-${{ inputs.environment }}
           cache-to: type=gha,scope=web-app-${{ inputs.environment }},mode=min
 

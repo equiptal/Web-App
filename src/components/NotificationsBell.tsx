@@ -13,6 +13,7 @@ import {
 } from "@/lib/api/client";
 import { notificationHref, type NotificationItem, type NotificationFilter } from "@/lib/contract/notifications";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 /**
  * Top-bar notifications bell (app parity). Distinct from the inbox icon (deal-room unread). The badge
@@ -120,6 +121,13 @@ export function NotificationsBell() {
     }
     setOpen(false);
     const href = notificationHref(n);
+    // PostHog, the app's name and keys. The route only, never the title or body.
+    track("notification_tapped", {
+      notification_type: n.type,
+      routed_to: href ? href.split("?")[0] : "none",
+      from_state: "foreground",
+      surface: "bell",
+    });
     if (href) router.push(href);
   };
 

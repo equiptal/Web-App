@@ -12,6 +12,7 @@ import { BELL_ANCHOR_ID, OPEN_BELL_EVENT, relativeTime } from "@/components/Noti
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useSession } from "@/lib/session";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 /**
  * ── The home page's notification bubble (owner, 2026-09-05) ──────────────────────────────────────
@@ -160,6 +161,13 @@ export function HomeNotificationBubble() {
   const open = () => {
     markNotificationRead(latest.id).catch(() => {});
     rememberDismissed(userId, latest.id);
+    // PostHog, the app's name and keys.
+    track("notification_tapped", {
+      notification_type: latest.type,
+      routed_to: href ? href.split("?")[0] : "none",
+      from_state: "foreground",
+      surface: "home_bubble",
+    });
     if (href) router.push(href);
     setLatest(null);
   };

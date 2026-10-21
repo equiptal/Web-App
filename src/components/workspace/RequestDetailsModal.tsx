@@ -21,6 +21,7 @@ import { ConfirmCancelModal, EditRequestModal } from "@/components/requests/Requ
 import { ACTIONS, btn, cx } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
 import { MachineGlyph } from "@/components/MachineGlyph";
+import { track } from "@/lib/analytics";
 
 /** What the share sheet needs about this request's public bid link. */
 export interface ShareLinkMeta {
@@ -230,6 +231,7 @@ export function RequestDetailsModal({
   /** Edit opens the same form the detail page used — the record has to be fetched in full first. */
   const openEdit = async () => {
     if (!subject || loadingEdit) return;
+    track("request_edit_tapped", { request_id: subject.id, surface: "details_modal" });
     // Already fetched for the detail rows above — opening the form must not go and get it again.
     const held = records[subject.id];
     if (held) {
@@ -267,13 +269,20 @@ export function RequestDetailsModal({
     try {
       const report = await cancelRequests([subject.id]);
       if (!report.refused.length) {
+        track("request_cancelled", { request_id: subject.id, surface: "details_modal" });
         setCancelled(true);
         return;
       }
+      track("request_cancel_failed", {
+        request_id: subject.id,
+        surface: "details_modal",
+        refused_count: report.refused.length,
+      });
       setCancelRetry(cancelRetryWorthIt(report));
       setCancelError(cancelFailureLine(report, ar, "request"));
     } catch {
       /* `cancelRequests` answers a report for every refusal, so this is the unreadable case only. */
+      track("request_cancel_failed", { request_id: subject.id, surface: "details_modal", refused_count: null });
       setCancelRetry(true);
       setCancelError(L("That didn’t go through. Try again.", "لم يتمّ الإجراء. حاول مجددًا."));
     } finally {
@@ -365,7 +374,10 @@ export function RequestDetailsModal({
             {actions.canCancel && (
               <button
                 type="button"
-                onClick={() => setConfirmCancel(true)}
+                onClick={() => {
+                  track("request_cancel_tapped", { request_id: subject?.id ?? null, surface: "details_modal" });
+                  setConfirmCancel(true);
+                }}
                 className="me-auto text-body font-semibold text-danger underline-offset-4 transition hover:underline"
               >
                 {t.workspace.cancelRequest}

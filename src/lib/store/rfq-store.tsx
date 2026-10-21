@@ -43,6 +43,7 @@ import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
 import { TRIAL_REQUESTS_ENABLED } from "@/lib/flags";
 import { noteSupportError } from "@/lib/support/intercom";
+import { track } from "@/lib/analytics";
 
 export type Phase = "intake" | "processing" | "wizard" | "confirmation";
 
@@ -1092,6 +1093,9 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
       const s = getState();
       dispatch({ t: "PROCESS_START" });
       const startedAt = Date.now();
+      // PostHog, the app's assistant names: the parse turned the renter's text into a draft, or failed.
+      const drafted = (tier: number, itemCount: number) =>
+        track("ai_assistant_request_drafted", { tier, item_count: itemCount, has_files: s.files.length > 0 });
 
       const decision = decideTier({
         text: s.text,
@@ -1115,6 +1119,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
             quantity: i.quantity,
           })));
           await holdProcessing(startedAt);
+          drafted(0, draft.items.length);
           dispatch({ t: "PROCESS_SUCCESS", draft });
           return;
         }
@@ -1124,7 +1129,9 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           const quick = await processQuick({ text: s.text });
           if (!quick.fallback && quick.line_items?.length) {
             await holdProcessing(startedAt);
-            dispatch({ t: "PROCESS_SUCCESS", draft: quickItemsToDraft(quick, s.taxonomy, s.text) });
+            const quickDraft = quickItemsToDraft(quick, s.taxonomy, s.text);
+            drafted(1, quickDraft.items.length);
+            dispatch({ t: "PROCESS_SUCCESS", draft: quickDraft });
             return;
           }
           // Fell back: straight on to the job path below, with nothing shown to the renter. They
@@ -1134,6 +1141,7 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
         const draft = await processRfq({ text: s.text, files: s.files, simulateError: s.simulateError });
         // Almost always a no-op here: this path has spent seconds already.
         await holdProcessing(startedAt);
+        drafted(2, draft.items.length);
         dispatch({ t: "PROCESS_SUCCESS", draft });
       } catch (e) {
         // Floored too: a failure that flashes past is a failure the renter cannot read.
@@ -1143,6 +1151,10 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           e instanceof ApiError
             ? { detail: e.detail, backendCode: e.backendCode, backendStatus: e.backendStatus, status: e.status, details: e.details }
             : null;
+        track("ai_assistant_failed", {
+          error_code: detail?.backendCode ?? (e instanceof ApiError ? e.kind : "unknown"),
+          status: detail?.status ?? null,
+        });
         dispatch({ t: "PROCESS_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
       }
     },
@@ -1151,7 +1163,11 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
     resumeWizard: () => dispatch({ t: "RESUME_WIZARD" }),
     goIntake: () => dispatch({ t: "GO_INTAKE" }),
     resumeDraft: () => dispatch({ t: "RESUME_DRAFT" }),
-    openSection: (section: Section | null) => dispatch({ t: "OPEN_SECTION", section }),
+    openSection: (section: Section | null) => {
+      // The app's `request_progress`: which part of the request the renter moved to.
+      if (section) track("request_progress", { trigger: "step_changed", current_step_name: section });
+      dispatch({ t: "OPEN_SECTION", section });
+    },
     goItem: (index: number) => dispatch({ t: "GO_ITEM", index }),
     setChargedDaysUnderstood: (value: boolean) => dispatch({ t: "SET_CHARGED_DAYS_UNDERSTOOD", value }),
     setReadyToSend: (value: boolean) => dispatch({ t: "SET_READY_TO_SEND", value }),
@@ -1272,6 +1288,15 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
           trialExpiresAt,
         });
         const posted = { requestId, requestUuids: requestUuids ?? [] };
+        // The app's name. Sent on the API's answer, not the tap.
+        track("request_submitted", {
+          request_id: requestId ?? null,
+          request_ids: requestIds ?? (requestId ? [requestId] : []),
+          item_count: finalItems.length,
+          is_direct: !!direct,
+          is_trial: !!(TRIAL_REQUESTS_ENABLED && s.isTrial),
+          edited_from_draft: editedFromDraft,
+        });
 
         if (s.draft.rfqId && editedFromDraft) {
           const patch = draftToRfqCorrection(
@@ -1288,6 +1313,12 @@ function makeActions(dispatch: React.Dispatch<Action>, getState: () => RfqState)
             : null;
         // So a renter who opens support within the minute arrives with the refusal attached.
         noteSupportError(`post_request: ${detail?.backendCode ?? (e instanceof ApiError ? e.kind : "unknown")}`);
+        track("request_submission_failed", {
+          error_code: detail?.backendCode ?? (e instanceof ApiError ? e.kind : "unknown"),
+          status: detail?.status ?? null,
+          item_count: finalItems.length,
+          is_direct: !!direct,
+        });
         dispatch({ t: "SUBMIT_ERROR", kind: e instanceof ApiError ? e.kind : "unknown", detail });
         return null;
       }

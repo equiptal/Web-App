@@ -5,6 +5,7 @@ import { postAuth, type AuthKind, type OtpChannel } from "./authClient";
 import { useT } from "@/lib/i18n";
 import { Icon } from "@/components/ui";
 import { authField, authFoot, authLabel, authSub, authSubmit, authTitle, type AuthTone } from "@/components/auth/AuthPanel";
+import { track } from "@/lib/analytics";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -48,6 +49,9 @@ export function EmailEntry({
     setBusy(true);
     const r = await postAuth("/api/auth/request-code", { otpEmail: v, otpMethod: "EMAIL" });
     setBusy(false);
+    // PostHog, the app's names. Never the address.
+    if (r.ok) track("otp_requested", { method: "email" });
+    else track("otp_failed", { step: "request", method: "email", failure_reason: r.kind });
     if (r.ok) onCodeSent(v, { method: "EMAIL", email: v });
     else setErr(r.kind);
   };

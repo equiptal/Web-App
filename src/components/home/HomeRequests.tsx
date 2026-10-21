@@ -19,6 +19,7 @@ import { btn, CARD, cx } from "@/lib/ds";
 import { fmt, useLocale, useT } from "@/lib/i18n";
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 /**
  * **Five and five** (owner, 2026-08-29).
@@ -221,6 +222,8 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
     return g ? { group: g, share: openShare } : null;
   }, [groups, overlay.value, openShare]);
   const showDetails = (group: RequestGroup, share: boolean) => {
+    // The app's names: a row opens the request, the share icon opens it on the share sheet.
+    track("request_card_tapped", { request_id: group.id, surface: "home", opened_share: share });
     setOpenShare(share);
     overlay.open(group.id);
   };
@@ -604,9 +607,16 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
       // a real state: one item accepted, the others still open.
       const report = await cancelRequests(cancellableItems(g.items).map((i) => i.id));
       if (!report.refused.length) {
+        track("request_cancelled", { request_id: g.id, surface: "home", cancelled_count: report.cancelled });
         setCancelled(true);
         return;
       }
+      track("request_cancel_failed", {
+        request_id: g.id,
+        surface: "home",
+        cancelled_count: report.cancelled,
+        refused_count: report.refused.length,
+      });
       setCancelRetry(cancelRetryWorthIt(report));
       setCancelError(cancelFailureLine(report, ar));
       /* A partial success is a real change to the table, so it redraws BEHIND the open dialog —
@@ -615,6 +625,7 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
       if (report.cancelled > 0) reload();
     } catch {
       /* `cancelRequests` does not throw for a refusal; this is the unreadable case. */
+      track("request_cancel_failed", { request_id: g.id, surface: "home", refused_count: null });
       setCancelRetry(true);
       setCancelError(L("That didn’t go through. Try again.", "لم يتمّ الإجراء. حاول مجددًا."));
     } finally {
@@ -846,7 +857,15 @@ export function HomeRequests({ hideHeading, onCount }: { hideHeading?: boolean; 
                               the dashboard at all. Both are destructive-looking, so both are
                               labelled for what they actually do. */}
                           {canCancel && cancellableItems([it]).length > 0 ? (
-                            <RowAction icon="close" label={t.home.reqCancel} tone="danger" onPress={() => setCancelling(g)} />
+                            <RowAction
+                              icon="close"
+                              label={t.home.reqCancel}
+                              tone="danger"
+                              onPress={() => {
+                                track("request_cancel_tapped", { request_id: g.id, surface: "home" });
+                                setCancelling(g);
+                              }}
+                            />
                           ) : (
                             <RowAction icon="close" label={L("Remove from this list", "إزالة من هذه القائمة")} onPress={() => askDismiss(g)} />
                           )}

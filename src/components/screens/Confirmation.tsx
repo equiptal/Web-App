@@ -8,6 +8,7 @@ import { postableItems } from "@/lib/contract";
 import { fetchRequestSubmissions, bidShareUrl, setBidDeadline, setShareLinkLogo } from "@/lib/api/client";
 import { ShareForBidsSheet } from "@/components/requests/ShareForBidsSheet";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 /**
  * AC-42 confirmation — "Your request is live" (prototype: Request Sent). Animated success hero,
@@ -88,7 +89,7 @@ export function Confirmation() {
   const flash = (msg: string) => { setToast(msg); if (copyTimer.current) clearTimeout(copyTimer.current); copyTimer.current = setTimeout(() => setToast(null), 2200); };
   const onCopy = () => {
     if (!shareUrl) return;
-    navigator.clipboard?.writeText(shareUrl).then(() => { setCopied(true); flash(L("Link copied to clipboard", "تم نسخ الرابط")); setTimeout(() => setCopied(false), 2000); }).catch(() => {});
+    navigator.clipboard?.writeText(shareUrl).then(() => { track("request_bid_link_shared", { request_id: reqUuid ?? null, channel: "copy", surface: "confirmation", ok: true }); setCopied(true); flash(L("Link copied to clipboard", "تم نسخ الرابط")); setTimeout(() => setCopied(false), 2000); }).catch(() => {});
   };
   // Land on the multi-item GROUP detail (resolves the whole group from this member request id) so the
   // post-submit view matches the request-details screen — not the single-request page.

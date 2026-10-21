@@ -11,6 +11,7 @@ import { COUNTRY_CODES, SAUDI_DIAL } from "@/components/auth/PhoneEntry";
 import type { RenterUser } from "@/lib/contract/auth";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 interface Opt {
   value: string;
@@ -177,6 +178,13 @@ export function OnboardingForm({
     void load("/api/master-data/job-titles", setJobs);
   }, [locale]);
 
+  // PostHog, the app's onboarding names. `path` tells the email-first create from the profile step.
+  const onboardingPath = phoneVerify ? "complete_signup" : "profile_complete";
+  useEffect(() => {
+    track("onboarding_started", { path: onboardingPath });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -200,6 +208,13 @@ export function OnboardingForm({
     // Case 1: the phone must be VERIFIED (inline) before the account can be created.
     if (phoneVerify && !phoneVerified) next_fe.phone = o.errors.phone;
     if (Object.keys(next_fe).length) {
+      // The field NAMES that were refused, never their values.
+      track("onboarding_failed", {
+        path: onboardingPath,
+        step: "validation",
+        failure_reason: "invalid_fields",
+        invalid_fields: Object.keys(next_fe),
+      });
       setFe(next_fe);
       return;
     }
@@ -218,6 +233,8 @@ export function OnboardingForm({
         whatsapp: whatsapp.trim() || undefined,
       });
       setBusy(false);
+      if (cr.ok) track("onboarding_completed", { path: onboardingPath, is_company: isCompany });
+      else track("onboarding_failed", { path: onboardingPath, step: "submit", failure_reason: cr.kind });
       if (!cr.ok) {
         // Phone-specific errors show by the phone field (with the sign-in link for phone_taken);
         // phone_not_verified also drops the ✓ so they re-verify. Others surface at the top.
@@ -250,15 +267,18 @@ export function OnboardingForm({
       });
     } catch {
       setBusy(false);
+      track("onboarding_failed", { path: onboardingPath, step: "submit", failure_reason: "offline" });
       setErr(o.errors.offline); // AC-23
       return;
     }
     setBusy(false);
     if (!res.ok) {
       const d = (await res.json().catch(() => ({}))) as { detail?: string };
+      track("onboarding_failed", { path: onboardingPath, step: "submit", failure_reason: `http_${res.status}` });
       setErr(d.detail || o.errors.submit);
       return;
     }
+    track("onboarding_completed", { path: onboardingPath, is_company: isCompany });
     await refresh(); // AC-05: session tier guest→basic, unblocks canCreate
     if (onDone) {
       onDone(); // modal flow: caller closes + continues (e.g. auto-submit the RFQ)

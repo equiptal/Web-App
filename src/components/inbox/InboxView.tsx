@@ -16,6 +16,7 @@ import { inboxPreviewLine, inboxTimeLabel, type InboxChatSummary } from "@/lib/c
 import { useUrlOverlay } from "@/lib/nav/useUrlOverlay";
 import { durationDaysBetween } from "@/lib/pricing/rental";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 import "@/components/map/map-proto.css";
 
 /**
@@ -346,7 +347,11 @@ export function InboxView() {
         {...pin("inbox-row")}
         key={b.bidId}
         type="button"
-        onClick={() => openBid(b.bidId)}
+        onClick={() => {
+          // PostHog, the app's name.
+          track("offer_tapped", { bid_id: b.bidId, surface: "inbox" });
+          openBid(b.bidId);
+        }}
         aria-current={active ? "true" : undefined}
         /* A card of its own, the app's `_InboxCard` (owner, 2026-09-29, the app's inbox as the
            reference). ~~A leaf of the tree with no box, the site card as the box.~~ */

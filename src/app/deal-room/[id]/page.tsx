@@ -9,6 +9,7 @@ import { useSession } from "@/lib/session";
 import { useAuthGate } from "@/components/auth/AuthGate";
 import { DealRoom } from "@/components/deal-room/DealRoom";
 import { fetchDealRoom } from "@/lib/api/client";
+import { track } from "@/lib/analytics";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
 
@@ -108,7 +109,9 @@ function RetiredRoom({ id }: { id: string }) {
         if (!live) return;
         router.replace(room.bidId ? `/bids/${encodeURIComponent(room.bidId)}/equipment?chat=1` : "/requests");
       } catch {
-        if (live) router.replace("/requests");
+        if (!live) return;
+        track("deal_room_load_failed", { deal_room_id: id, stage: "retired_room_forward" });
+        router.replace("/requests");
       }
     })();
     return () => {

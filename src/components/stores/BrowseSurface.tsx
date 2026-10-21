@@ -9,6 +9,7 @@ import { StoreCard } from "@/components/stores/StoreCard";
 import type { StoreCard as StoreCardData, TaxonomyNode } from "@/lib/contract/stores";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 import { PinIcon } from "@/components/stores/shop";
 
 /**
@@ -110,6 +111,8 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [expanded, setExpanded] = useState(false);
+  /** The last search/filter set reported to PostHog, so a page turn or a retry is not a new search. */
+  const trackedQuery = useRef<string | null>(null);
 
   // Master data for the filters (cities + taxonomy tree). Both BFF routes answer a guest from the
   // app's PUBLIC twins now, so the City filter and the category pills are the same controls signed in
@@ -206,6 +209,21 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
         // ~~A page beyond the first ADDS, deduplicated by id.~~ One page at a time now, so a row that
         // appears on both pages (page 1 merges the featured suppliers in) is simply a row on each.
         setStores(rows);
+        /* PostHog, the app's names: once per SETTLED search or filter set (the debounce has already
+           run), on page one. Never the typed words: only whether there were any and how long. */
+        const key = `${debounced.trim()}|${city}|${categoryId}`;
+        if (page === 1 && key !== "||" && trackedQuery.current !== key) {
+          trackedQuery.current = key;
+          const props = {
+            surface: "browse",
+            has_query: debounced.trim() !== "",
+            query_length: debounced.trim().length,
+            city_filter: city !== "",
+            category_id: categoryId || null,
+            result_count: rows.length,
+          };
+          track(debounced.trim() ? "search_performed" : "browse_filter_applied", props);
+        }
         /* A FULL page means there is probably another; a short one is the end.
          *
          * The backend's own `meta.totalPages` would say so exactly, and cannot reach us: both call
@@ -216,7 +234,9 @@ export function BrowseSurface({ title, previewCount }: { title?: string; preview
         setMore(rows.length >= PAGE_SIZE);
       })
       .catch((e) => {
-        if (e?.name !== "AbortError") setError(true);
+        if (e?.name === "AbortError") return;
+        track("browse_load_failed", { surface: "browse", page });
+        setError(true);
       })
       .finally(() => setLoadingMore(false));
     return () => ctrl.abort();

@@ -35,6 +35,32 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
+  /**
+   * **PostHog reverse proxy** (2026-10-21), as PostHog's Next.js guide sets it up
+   * (`src/instrumentation-client.ts`). Ad blockers drop `*.posthog.com`; through our own domain
+   * the events arrive. Under `/api` because the middleware matcher skips `/api`.
+   */
+  async rewrites() {
+    return [
+      {
+        source: "/api/ingest/static/:path*",
+        destination: "https://us-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/api/ingest/array/:path*",
+        destination: "https://us-assets.i.posthog.com/array/:path*",
+      },
+      { source: "/api/ingest/:path*", destination: "https://us.i.posthog.com/:path*" },
+    ];
+  },
+
+  /**
+   * ⚠️ Required by the proxy above: PostHog's endpoints end in a slash (`/e/`) and Next's default
+   * 308 to the slashless URL breaks them. Side effect, app wide: a URL typed with a trailing slash
+   * is no longer redirected to the one without.
+   */
+  skipTrailingSlashRedirect: true,
 };
 
 export default nextConfig;

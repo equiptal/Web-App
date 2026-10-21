@@ -15,6 +15,7 @@ import { EMAIL_FIRST_AUTH_ENABLED } from "@/lib/flags";
 import { Icon } from "@/components/ui";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
+import { track } from "@/lib/analytics";
 
 /** Mask a stored email for display: `mahmoud@gmail.com` → `m•••@gmail.com`. */
 function maskEmail(e: string): string {
@@ -138,6 +139,8 @@ function AccountFlow({ onCreated, onAbandon, title, subtitle, postHeadline, post
    * harmless either way.
    */
   const abandon = async () => {
+    // PostHog, the app's name: closed at this phase without finishing.
+    track("onboarding_abandoned", { last_step_name: phase });
     if (status === "authed") {
       try { await signOut(); } catch { /* the close still has to happen */ }
     }
