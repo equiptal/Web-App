@@ -31,6 +31,8 @@ export function MachineBar({ machines, currentBidId }: { machines: SupplierMachi
 
   return (
     <div {...pin("machine-bar")} className="flex flex-none items-center gap-2 overflow-x-auto border-b border-border bg-surface px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* The row had no title and read as unexplained chips (owner, 2026-10-24, option A). */}
+      <span className="flex-none text-label font-semibold text-muted">{L("His bids on this request", "عروضه على هذا الطلب")}</span>
       {machines.filter((m) => m.bidId != null).map((m) => {
         const here = m.bidId === currentBidId;
         const name = ar ? m.nameAr : m.name;
@@ -58,7 +60,8 @@ export function MachineBar({ machines, currentBidId }: { machines: SupplierMachi
             <span className="flex min-w-0 flex-col">
               <span className="max-w-[200px] truncate text-meta font-semibold text-navy">
                 {name}
-                {m.qty > 1 && <span className="font-extrabold text-muted"> ×{m.qty}</span>}
+                {/* What the renter ASKED for, not what he offers: «×2» beside his price read as either. */}
+                {m.qty > 1 && <span className="font-normal text-muted"> · {L(`${m.qty} requested`, `المطلوب ${m.qty}`)}</span>}
               </span>
               <span className="text-label font-semibold text-muted">
                 {m.price != null
