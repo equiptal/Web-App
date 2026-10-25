@@ -325,6 +325,12 @@ export interface RfqDraft {
    * again after a reload.
    */
   touchedFields?: string[];
+  /**
+   * The machines already offered machine 1's clicked answers (`inheritFromFirstItem`), so the copy
+   * happens once, the first time each is opened (owner, 2026-10-23). Web-only, persisted with the
+   * draft so a reload does not copy over answers he has since changed.
+   */
+  inheritedItems?: string[];
 
   /**
    * PROJ - the dotted paths a PROJECT filled, so the canvas can say where a value came from.

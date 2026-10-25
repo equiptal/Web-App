@@ -274,7 +274,9 @@ export function agentOutputToDraft(out: RFQAgentOutput, opts: { renterSaidOperat
        nothing, while missing the one that does costs the whole point of this. */
     if (guessed(idx, "mobilization_by_rentee")) assumedFields.push("preferences.delivery", `line_items[${it.id}].delivery`);
     if (guessed(idx, "demobilization_by_rentee")) assumedFields.push("preferences.return", `line_items[${it.id}].return`);
-    if (guessed(idx, "diesel_included")) assumedFields.push("preferences.fuel", `line_items[${it.id}].fuel`);
+    // ⚠️ `.fuel_responsibility`, the key the canvas records the answer under (`MachineCard`). It was
+    // `.fuel`, which nothing on the canvas reads, so this guess was never demoted (2026-10-24).
+    if (guessed(idx, "diesel_included")) assumedFields.push("preferences.fuel", `line_items[${it.id}].fuel_responsibility`);
     if (guessed(idx, "fuel_type_preference") || li.fuel_type_match === "defaulted") {
       assumedFields.push(`line_items[${it.id}].fuel_type`);
     }

@@ -362,9 +362,11 @@ export function applyMachineTerms(
       next.returnOverride = terms.returnOverride ?? next.returnOverride;
       filled.push(`line_items[${item.id}].return`);
     }
-    if (next.fuelResponsibilityOverride == null || guessed("fuel")) {
+    // ⚠️ `fuel_responsibility`, the canvas's key: as `fuel` the guess check never matched the agent's
+    // mark and «From your project» never showed on this field (2026-10-24).
+    if (next.fuelResponsibilityOverride == null || guessed("fuel_responsibility") || assumed.has("preferences.fuel")) {
       next.fuelResponsibilityOverride = terms.fuelResponsibilityOverride ?? next.fuelResponsibilityOverride;
-      filled.push(`line_items[${item.id}].fuel`);
+      filled.push(`line_items[${item.id}].fuel_responsibility`);
     }
     if (next.safetyCertsOverride == null && terms.safetyCertsOverride) {
       next.safetyCertsOverride = [...terms.safetyCertsOverride];

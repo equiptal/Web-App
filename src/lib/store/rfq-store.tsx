@@ -38,6 +38,7 @@ import type { SiteLocation, ProjectDefaults, ProjectSummary } from "@/lib/contra
 import type { PaymentTerm } from "@/lib/contract/options";
 import { projectTitle, filingFor } from "@/lib/contract/project";
 import { applyProjectDefaults, applyMachineTerms, machineTermsOf } from "@/lib/contract/project-apply";
+import { inheritFromFirstItem } from "@/lib/contract/item-inherit";
 import { blankTerms, type MachineTerms } from "@/lib/contract/work-order";
 import { draftToRfqCorrection } from "@/lib/api/agent-adapters";
 import { useSession } from "@/lib/session";
@@ -610,10 +611,17 @@ export function reducer(state: RfqState, a: Action): RfqState {
       return { ...state, draftPrompt: false, phase: "wizard", error: null };
     case "OPEN_SECTION":
       return { ...state, activeSection: a.section };
-    case "GO_ITEM":
+    case "GO_ITEM": {
       // The canvas always opens a new item on its equipment panel — the site and schedule are
       // request-wide, so there is nothing item-specific behind the other two.
-      return { ...state, itemIndex: Math.max(0, a.index), activeSection: "equipment" };
+      const opened = { ...state, itemIndex: Math.max(0, a.index), activeSection: "equipment" as const };
+      // The first time a machine past the first is opened, it takes machine 1's clicked answers
+      // where its own words and his own clicks say nothing (`item-inherit.ts`, owner 2026-10-23).
+      const live = state.draft?.items.filter((i) => !i.removed) ?? [];
+      const target = live[Math.min(opened.itemIndex, Math.max(0, live.length - 1))];
+      if (!state.draft || !target || opened.itemIndex === 0) return opened;
+      return { ...opened, draft: inheritFromFirstItem(state.draft, target.id, state.agentOrigin?.items ?? []) };
+    }
     case "SET_CHARGED_DAYS_UNDERSTOOD":
       return { ...state, chargedDaysUnderstood: a.value };
     case "SET_READY_TO_SEND":

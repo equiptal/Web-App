@@ -343,10 +343,13 @@ describe("the bar for the next machine is this machine", () => {
     const handle = await renderCanvas(<Canvas />, {
       draft: twoItems(),
       prepare: (store) => {
+        // Machine 2 is opened BEFORE machine 1 is answered: opening it is when machine 1's clicked
+        // answers are carried over (`item-inherit.ts`, 2026-10-23), and this case is about the review
+        // gate, so there must be nothing to carry.
+        store.actions.goItem(1);
         store.actions.touchField("line_items[a0].equipment_year");
         store.actions.touchField("line_items[a0].safety_certificates");
         store.actions.setChargedDaysUnderstood(true);
-        store.actions.goItem(1);
       },
     });
 

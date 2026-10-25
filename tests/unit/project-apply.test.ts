@@ -341,6 +341,21 @@ describe("a template term over a guessed one", () => {
     expect(next.items[0].fuelResponsibilityOverride).toBe("supplier");
   });
 
+  /* 2026-10-24: the per-machine fuel key was `.fuel` here and in the agent's mark, while the canvas
+     records and reads `.fuel_responsibility` - so a per-machine guess was never demoted and the
+     field never read «From your project». One key now, the canvas's. */
+  it("fills over a per-machine fuel guess, and the canvas reads it as the project's", () => {
+    const base = blankDraft();
+    const draft: RfqDraft = { ...base, items: [guessedItem()], assumedFields: ["line_items[i1].fuel_responsibility"] };
+
+    const { draft: next, filled } = applyMachineTerms(draft, supplierTerms, { project: base.project, items: draft.items });
+    expect(next.items[0].fuelResponsibilityOverride).toBe("supplier");
+    expect(filled).toContain("line_items[i1].fuel_responsibility");
+    expect(
+      fieldSource({ current: "supplier", key: "line_items[i1].fuel_responsibility", draft: next, seeded: true, projectFields: filled }),
+    ).toBe("project");
+  });
+
   it("leaves a STATED delivery alone", () => {
     // "we'll collect it ourselves" — their own words about THIS request beat a standing site term.
     const base = blankDraft();
