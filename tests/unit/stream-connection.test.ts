@@ -32,6 +32,10 @@ const stream = vi.hoisted(() => ({
   disconnects: 0,
   /** When false, a connect stays pending until the test settles it — i.e. the renter is still waiting. */
   auto: true,
+  /** When false, a disconnect's socket close stays pending until the test lands it (Stream waits up
+   *  to a second for the close frame, then resets the token manager). */
+  autoClose: true,
+  closes: [] as (() => void)[],
 }));
 
 vi.mock("stream-chat", () => {
@@ -45,7 +49,10 @@ vi.mock("stream-chat", () => {
     },
     disconnectUser() {
       stream.disconnects += 1;
-      return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        stream.closes.push(resolve);
+        if (stream.autoClose) resolve();
+      });
     },
     channel: () => ({ watch: () => Promise.resolve() }),
   };
@@ -65,6 +72,8 @@ beforeEach(() => {
   stream.connects.length = 0;
   stream.disconnects = 0;
   stream.auto = true;
+  stream.autoClose = true;
+  stream.closes.length = 0;
 });
 
 describe("leaseStream — unmount DURING connect (the regression)", () => {
@@ -222,6 +231,29 @@ describe("leaseStream — the reference-count contract", () => {
     const retry = m.leaseStream();
     await expect(retry.connect("u1", "token-2")).resolves.toBeTruthy();
     expect(stream.connects).toHaveLength(2);
+  });
+
+  it("the next surface connects only after the last one's disconnect has finished (inbox to map chat)", async () => {
+    const m = await load();
+    const inbox = m.leaseStream();
+    await inbox.connect("u1", "token-1");
+
+    // The renter leaves the inbox chat; Stream is still waiting for the socket to close.
+    stream.autoClose = false;
+    inbox.release();
+    await flush();
+    expect(stream.disconnects).toBe(1);
+
+    // The map's chat mounts inside that window.
+    const map = m.leaseStream();
+    const p = map.connect("u1", "token-2");
+    await flush();
+    // Connecting now would be wiped by the disconnect's late token reset, so it waits.
+    expect(stream.connects).toHaveLength(1);
+
+    stream.closes[0]();
+    await expect(p).resolves.toBeTruthy();
+    expect(stream.connects.map((c) => c.token)).toEqual(["token-1", "token-2"]);
   });
 
   it("a different user drops the stale session rather than handing back someone else's client", async () => {

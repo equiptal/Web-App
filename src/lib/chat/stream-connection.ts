@@ -32,6 +32,16 @@ export function dealRoomChannelId(dealRoomId: string): string {
 let refCount = 0;
 let connecting: Promise<StreamChat> | null = null;
 let connectedUserId: string | null = null;
+/**
+ * The last `disconnectUser()`, until it has finished. **A new connect waits for it** (2026-10-24).
+ *
+ * Stream's disconnect clears the user at once but waits up to a second for the socket to close, and
+ * only then runs `tokenManager.reset()`. Leaving the inbox chat for the map's (or the negotiation
+ * sheet for the chat) released the last reference and the next surface connected inside that second:
+ * the late reset wiped its new token, the socket never authenticated, `watch()` was never sent, and
+ * the chat showed no messages, no asks, and refused every send without an error.
+ */
+let disconnecting: Promise<void> = Promise.resolve();
 
 /**
  * Connect (or join an existing connection) and take a reference. **Every successful call must be
@@ -48,12 +58,12 @@ export async function acquireStream(userId: string, token: string): Promise<Stre
     connecting = null;
     connectedUserId = null;
     refCount = 0;
-    void stale.then((c) => c.disconnectUser()).catch(() => {});
+    disconnecting = stale.then((c) => c.disconnectUser()).catch(() => {});
   }
   if (!connecting) {
     connectedUserId = userId;
     const client = StreamChat.getInstance(STREAM_API_KEY);
-    connecting = client.connectUser({ id: userId }, token).then(() => client);
+    connecting = disconnecting.then(() => client.connectUser({ id: userId }, token)).then(() => client);
   }
   const pending = connecting;
   try {
@@ -80,7 +90,7 @@ export function releaseStream(): void {
   const pending = connecting;
   connecting = null;
   connectedUserId = null;
-  void pending?.then((c) => c.disconnectUser()).catch(() => {});
+  if (pending) disconnecting = pending.then((c) => c.disconnectUser()).catch(() => {});
 }
 
 /** What {@link StreamLease.connect} rejects with when the lease was released mid-flight. Not a
