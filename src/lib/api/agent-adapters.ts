@@ -285,6 +285,15 @@ export function agentOutputToDraft(out: RFQAgentOutput, opts: { renterSaidOperat
     }
   });
 
+  /* The budget the renter TYPED lands in the machine's own «Budget» box (owner, 2026-10-25). It used
+     to stop at `preferences.budgetSar`, whose request-wide field has been hidden and unsent since
+     2026-09-27, so «my budget is 20k» was read and then shown nowhere and sent nowhere. One line only:
+     across several machines the figure is most likely a total, and splitting it would be invention. */
+  const header = out.rfq_header ?? {};
+  if (items.length === 1 && header.budget_ceiling != null && header.budget_ceiling > 0) {
+    items[0].targetPriceSar = header.budget_ceiling;
+  }
+
   return {
     rfqId: out.rfq_id ?? null, // A5: anchor for the web_review correction fired at submit
     assumedFields: [...new Set(assumedFields)],

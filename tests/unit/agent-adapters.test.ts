@@ -339,3 +339,25 @@ describe("draftToRfqCorrection — reverse mapper (A5)", () => {
     expect(patch.line_items[0].capacity).toBe("20 ton");
   });
 });
+
+describe("agentOutputToDraft: the typed budget reaches the machine's own box", () => {
+  const withBudget = (lines: object[], budget: number | null) => ({
+    ok: true,
+    data: { id: "j", status: "done", result: { rfq_header: { budget_ceiling: budget }, line_items: lines, missing_required_fields: [] } },
+  });
+
+  it("puts it on the one machine", () => {
+    const d = agentOutputToDraft(extractAgentOutput(withBudget([confidentLine], 20000)));
+    expect(d.items[0].targetPriceSar).toBe(20000);
+  });
+
+  it("leaves several machines empty, since the figure is most likely a total", () => {
+    const d = agentOutputToDraft(extractAgentOutput(withBudget([confidentLine, confidentLine], 20000)));
+    expect(d.items.map((i) => i.targetPriceSar ?? null)).toEqual([null, null]);
+  });
+
+  it("sets nothing when no budget was read", () => {
+    const d = agentOutputToDraft(extractAgentOutput(withBudget([confidentLine], null)));
+    expect(d.items[0].targetPriceSar ?? null).toBeNull();
+  });
+});
