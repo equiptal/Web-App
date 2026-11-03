@@ -758,3 +758,29 @@ describe("`partial` — he sent something other than what was asked", () => {
     expect(view.status).toEqual({ tone: "answered", label: "Answered — his file now shows it" });
   });
 });
+
+describe("a document ask answered by a file in the chat (owner, 2026-11-04)", () => {
+  const doc = postedSubject(posted({ kind: "document", docTypes: ["istimara"] }));
+  const sent = { L: EN, machine: () => machine(), sentInChat: (ref: string) => ref === "RQ-7F3A" };
+
+  it("reads «Sent in the chat» instead of waiting when there is no reply card", () => {
+    expect(requestCardView(doc, ctx(sent)).status).toEqual({ tone: "answered", label: "Sent in the chat" });
+    expect(requestCardView(doc, ctx({ ...sent, L })).status).toEqual({ tone: "answered", label: "أُرسل في المحادثة" });
+    expect(requestCardView(doc, ctx({ L: EN, machine: () => machine() })).status).toEqual({ tone: "waiting", label: "Waiting for his answer" });
+  });
+
+  it("lets a real reply card win, and touches no other kind", () => {
+    const replied = requestCardView(
+      doc,
+      ctx({ ...sent, reply: () => ({ resolution: "declined" as const }) }),
+    );
+    expect(replied.status?.label).not.toBe("Sent in the chat");
+    const availability = requestCardView(postedSubject(posted()), ctx(sent));
+    expect(availability.status).toEqual({ tone: "waiting", label: "Waiting for his answer" });
+  });
+
+  it("leaves the file's verdict first: a machine holding the paper reads answered from the file", () => {
+    const onFile = requestCardView(doc, ctx({ ...sent, machine: () => machine({ documentKeys: [{ type: "istimara" }] }) }));
+    expect(onFile.status).toEqual({ tone: "answered", label: "Answered — his file now shows it" });
+  });
+});

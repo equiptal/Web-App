@@ -122,6 +122,7 @@ import {
   answerDocKeyOf,
   isAskDecline,
   isQuoteRequest,
+  renteeAskSentInChat,
 } from "@/lib/contract/chat-asks";
 import { canonicalDocType, composeAvailabilityRequest, isAskOutstanding } from "@/lib/contract/rentee-request";
 import { isDealActionMessage } from "@/lib/contract/inbox-chat";
@@ -721,7 +722,22 @@ export function ChatDock({
     return () => window.clearTimeout(timer);
   }, [open, cueRef]);
 
-  const outstandingAsks = useMemo(() => outstandingAskIdentities(threadCards), [threadCards]);
+  /** The refs of document asks he answered with a FILE replying to the ask's message, with no reply
+   *  card (owner, 2026-11-04). `threadCards` is one-to-one with `messages`, so the index is the ask's
+   *  message. A reply card still wins where both exist (the readers check `repliesByRef` first). */
+  const sentInChatRefs = useMemo(() => {
+    const out = new Set<string>();
+    threadCards.forEach((c, i) => {
+      if (c.ask?.kind === "document" && renteeAskSentInChat(messages, messages[i].id)) out.add(c.ask.ref);
+    });
+    return out;
+  }, [threadCards, messages]);
+
+  // An ask sent in the chat is no longer with the supplier, so it no longer blocks asking again.
+  const outstandingAsks = useMemo(
+    () => outstandingAskIdentities(threadCards.filter((c) => !(c.ask && sentInChatRefs.has(c.ask.ref)))),
+    [threadCards, sentInChatRefs],
+  );
 
   useEffect(() => {
     if (!onOutstandingAsks) return;
@@ -782,6 +798,7 @@ export function ChatDock({
       fleetKnown: active?.bidId === bid.id && fleet != null,
       machine: machineOf,
       reply: (ref: string) => repliesByRef.get(ref) ?? null,
+      sentInChat: (ref: string) => sentInChatRefs.has(ref),
       docLabel,
       // No handler means no press, whatever the fleet holds — the card must not offer an affordance
       // this host cannot honour.
@@ -794,7 +811,7 @@ export function ChatDock({
          the same name the dock's header prints two rows above the card. */
       companyName: activeRow?.supplierName ?? (active?.bidId === bid.id ? bid.supplierName : null),
     }),
-    [L, active?.bidId, activeRow?.supplierName, bid.id, bid.supplierName, fleet, machineOf, fleetHas, repliesByRef, docLabel, onOpenMachine, canOpenMachine, typeWord],
+    [L, active?.bidId, activeRow?.supplierName, bid.id, bid.supplierName, fleet, machineOf, fleetHas, repliesByRef, sentInChatRefs, docLabel, onOpenMachine, canOpenMachine, typeWord],
   );
 
   /* ── offers in the chat (alignment 1.2, the app's `offer_thread.dart`) ──────────────────────────
@@ -1114,7 +1131,8 @@ export function ChatDock({
   const renteeAskBubble = (m: ChatMsg, a: RenteeRequestCardPayload, mine: boolean) => {
     const answer = repliesByRef.get(a.ref)?.resolution ?? null;
     const foot =
-      answer == null ? <AskStatus icon="schedule" label={L("Awaiting reply", "بانتظار الرد")} tone="muted" />
+      answer == null && a.kind === "document" && sentInChatRefs.has(a.ref) ? <AskStatus icon="check_circle" label={L("Sent in the chat", "أُرسل في المحادثة")} tone="ok" />
+      : answer == null ? <AskStatus icon="schedule" label={L("Awaiting reply", "بانتظار الرد")} tone="muted" />
       : answer === "provided" ? <AskStatus icon="check_circle" label={L("Replied", "تم الرد")} tone="ok" />
       : answer === "partial" ? <AskStatus icon="hourglass_top" label={L("Partly answered", "ردّ جزئي")} tone="warn" />
       : <AskStatus icon="block" label={L("Not available", "غير متوفر")} tone="bad" />;

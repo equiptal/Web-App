@@ -96,6 +96,15 @@ export function chatAskAnswered(messages: readonly ChatAskMessage[], askId: stri
   return sent == null || keys.every((k) => sent.has(k));
 }
 
+/**
+ * A renter's machine document ask (`rentee_request`, kind `document`) answered in the chat: a reply
+ * to the ask's message (`askMessageId`) carries a FILE, filed nowhere on the machine (owner,
+ * 2026-11-04, the app's same rule). The caller checks the kind; a real reply card still wins.
+ */
+export function renteeAskSentInChat(messages: readonly ChatAskMessage[], askMessageId: string): boolean {
+  return messages.some((m) => m.quoted_message_id === askMessageId && hasAttachment(m));
+}
+
 /** Declined = the supplier replied «Not available» to `askId`. */
 export function chatAskDeclined(messages: readonly ChatAskMessage[], askId: string): boolean {
   return messages.some((m) => m.quoted_message_id === askId && isAskDecline(m));

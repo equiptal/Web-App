@@ -9,6 +9,7 @@ import {
   availabilityAskState,
   companyAskState,
   quoteAskState,
+  renteeAskSentInChat,
 } from "@/lib/contract/chat-asks";
 
 /**
@@ -86,5 +87,17 @@ describe("what each ask pill shows", () => {
     expect(availabilityAskState([{ confirmed: false, asked: false }, { confirmed: true, asked: false }])).toBe("idle");
     expect(availabilityAskState([{ confirmed: false, asked: true }, { confirmed: true, asked: false }])).toBe("waiting");
     expect(availabilityAskState([{ confirmed: true, asked: true }, { confirmed: true, asked: false }])).toBe("answered");
+  });
+});
+
+describe("a machine document ask sent in the chat (owner, 2026-11-04)", () => {
+  const ask = { id: "m1", text: "I need the Istimara for this equipment" };
+
+  it("counts only a FILE replying to the ask's own message", () => {
+    expect(renteeAskSentInChat([ask], "m1")).toBe(false);
+    expect(renteeAskSentInChat([ask, { id: "t", quoted_message_id: "m1", text: "tomorrow" }], "m1")).toBe(false);
+    expect(renteeAskSentInChat([ask, { id: "f", attachments: [{ type: "file" }] }], "m1")).toBe(false);
+    expect(renteeAskSentInChat([ask, file("f", "other")], "m1")).toBe(false);
+    expect(renteeAskSentInChat([ask, file("f", "m1")], "m1")).toBe(true);
   });
 });

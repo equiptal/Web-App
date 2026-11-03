@@ -115,6 +115,11 @@ export interface RequestCardCtx {
     resolution: RenteeRequestResolution;
     deliveredTypes?: readonly string[] | null;
   } | null;
+  /**
+   * Whether the supplier sent a file in the chat as a reply to this `ref`'s ask message, with no
+   * reply card (owner, 2026-11-04). Read only for a `document` ask with no reply; omitted means no.
+   */
+  sentInChat?: (ref: string) => boolean;
   /** A wire document type → the renter's word for it, so a chip never reads `operating_license`. */
   docLabel?: (docType: string) => string;
   /**
@@ -381,6 +386,10 @@ export function requestCardView(
            card it sat on already has «Cancel» and «Send the request» under it, so the line described
            the two buttons beneath it and cost the card a row and a dashed rule. A SENT card keeps its
            waiting line, which is news rather than an instruction. */
+        // No reply card, but he sent the file in the chat as a reply to this ask (owner, 2026-11-04).
+        if (!draft && !answer && subject.kind === "document" && subject.ref && ctx.sentInChat?.(subject.ref)) {
+          return { tone: "answered", label: L("Sent in the chat", "أُرسل في المحادثة") };
+        }
         return draft ? null : { tone: "waiting", label: L("Waiting for his answer", "بانتظار ردّه") };
     }
   })();
