@@ -73,12 +73,16 @@ export function validateCompanyPileFile(file: File): PileFileReject | null {
   return null;
 }
 
-async function presign(files: File[]): Promise<{ submissionId: string; uploads: PileUploadTarget[] }> {
+async function presign(
+  files: File[],
+  scanAttemptId?: string,
+): Promise<{ submissionId: string; uploads: PileUploadTarget[] }> {
   const res = await fetch("/api/verification/pile/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       files: files.map((f) => ({ name: f.name, type: f.type, size: f.size })),
+      scanAttemptId,
     }),
   });
   if (!res.ok) {
@@ -110,8 +114,15 @@ async function complete(submissionId: string, uploads: PileUploadTarget[]): Prom
  * Throws (rather than returning `ok: false`) only when nothing could be attempted at all: a file the
  * lane will not take, or a presign that failed. A failed PUT is reported through `failedIndexes`,
  * because the session behind it is still worth keeping.
+ *
+ * `scanAttemptId` is the browser's upload check for this pile (CC-12), sent on a NEW presign only;
+ * a reused session was already presigned with whatever it had then.
  */
-export async function uploadCompanyPile(files: File[], prior?: PileSession): Promise<PileResult> {
+export async function uploadCompanyPile(
+  files: File[],
+  prior?: PileSession,
+  scanAttemptId?: string,
+): Promise<PileResult> {
   if (!files.length) throw new Error("no_files");
   if (files.length > COMPANY_PILE_MAX_FILES) throw new Error("too_many_files");
   for (const f of files) {
@@ -127,7 +138,7 @@ export async function uploadCompanyPile(files: File[], prior?: PileSession): Pro
 
   const session: PileSession = canReuse
     ? { ...prior, uploadedIndexes: new Set(prior.uploadedIndexes) }
-    : { ...(await presign(files)), signature, uploadedIndexes: new Set<number>() };
+    : { ...(await presign(files, scanAttemptId)), signature, uploadedIndexes: new Set<number>() };
 
   if (session.uploads.length !== files.length) throw new Error("presign_count_mismatch");
 

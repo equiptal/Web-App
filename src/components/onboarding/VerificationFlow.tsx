@@ -13,6 +13,8 @@ import {
   type PileSession,
 } from "@/lib/api/company-pile";
 import { CompanyDocsConfirmDialog } from "./CompanyDocsConfirmDialog";
+import { CompanyCheckLine } from "./CompanyCheckLine";
+import { useCompanyCheck } from "@/lib/upload-check/useCompanyCheck";
 import type { VerificationStatus } from "@/lib/contract/onboarding";
 import { btn } from "@/lib/ds";
 import { pin } from "@/lib/uiPins";
@@ -57,6 +59,11 @@ interface DocsOnFile {
  * ⚠️ **A failed upload must never navigate or re-read the status.** Less dangerous than it was
  * (nothing has flipped `supplierStatus` by then any more) but still wrong: re-reading mid-failure
  * throws away the presign session the retry needs to re-send only the files that failed.
+ *
+ * ⚠️ **The upload check is help, never a gate** (company doc check CC-12). When it is on for this
+ * renter it starts on the first file added, reads the pile in the background and draws one line
+ * under the files: the required papers it did not find and its warnings. Send never waits for it
+ * and never depends on it; with the check off, refused or failed the page is exactly as before.
  */
 export function VerificationFlow() {
   const t = useT();
@@ -83,6 +90,9 @@ export function VerificationFlow() {
   const sessionRef = useRef<PileSession | undefined>(undefined);
 
   const [askConfirm, setAskConfirm] = useState(false);
+
+  // Only while the form is on screen: a sent pile, or a status with no form, closes the check.
+  const company = useCompanyCheck(files, !sent && (status === "none" || status === "rejected"));
 
   /**
    * What the reviewer said, for a renter who is here because their last attempt was refused. Read
@@ -204,7 +214,8 @@ export function VerificationFlow() {
     setBusy(true);
     setErr(null);
     try {
-      const result = await uploadCompanyPile(files, sessionRef.current);
+      // The check that read this pile, so the backend can tie it to the Relay pile (CC-07 guards it).
+      const result = await uploadCompanyPile(files, sessionRef.current, company.check?.checkId ?? undefined);
       sessionRef.current = result.session;
       /* PostHog: the app's `company_docs_upload_*` names and keys — the same pile, sent to the
          same review, so one funnel covers the app, the web and Supplier OS. */
@@ -262,6 +273,8 @@ export function VerificationFlow() {
       void send();
       return;
     }
+    // What still waits for the check's start delay goes now, so the pile has a check id to send.
+    company.resume();
     setAskConfirm(true);
   };
 
@@ -446,6 +459,8 @@ export function VerificationFlow() {
             })}
           </ul>
         )}
+
+        {files.length > 0 && <CompanyCheckLine check={company.check} s={p.check} locale={locale} />}
 
         <SectionHeader title={p.optionalSection} pill={p.optionalPill} tone="warn" />
         <div className="grid grid-cols-2 gap-2">

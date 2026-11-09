@@ -1287,6 +1287,34 @@ export const en = {
           "You belong to a company you do not own. Only its owner submits it for verification.",
       },
       unloadWarning: "Your documents are still uploading. Leave this page and they won't be sent.",
+      /**
+       * The upload check's line under the pile (company doc check CC-12). Words only: the check
+       * sends codes. The missing-paper lines are the app's `scanMissingCompany` / `scanMissingSub`
+       * / `scanAllFound`, string for string. Never red, never blocking: Send always works.
+       */
+      check: {
+        checking: "Checking for the required documents",
+        allFound: "Every required document is here, ready to send",
+        missingOne: "We did not find {names}, which is required to register",
+        missingMany: "We did not find {names}, which are required to register",
+        missingSubOne: "You can still send, but you may be asked for it later",
+        missingSubTwo: "You can still send, but you may be asked for them later",
+        missingSubMany: "You can still send, but you may be asked for them later",
+        namesJoin: " and ",
+        paperCr: "Commercial registration",
+        paperVat: "VAT registration certificate",
+        paperAddress: "National address",
+        // The same papers inside a sentence («Your commercial registration seems to …»).
+        inlineCr: "commercial registration",
+        inlineVat: "VAT registration certificate",
+        inlineAddress: "national address",
+        noteExpired: "Your {paper} seems to have expired on {date}. Upload the renewed one if you have it",
+        noteUnclearNumber: "We could not read the {paper} number clearly. A clearer photo helps",
+        noteNameMismatch:
+          "The company name on the VAT paper looks different from the CR. Make sure both are for the same company",
+        noteCrOnPlatform: "A company with this CR is already on Moedatech. If you work there, ask its owner to add you",
+        noteFileSeenElsewhere: "This file was already sent from another account. Our team will review it",
+      },
     },
   },
   profile: {

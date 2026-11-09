@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-authed";
+import { isUuid } from "@/lib/api/upload-check-server";
 
 /**
  * POST /api/verification/pile/presign — open a company-documents pile and get presigned PUTs.
@@ -24,6 +25,12 @@ import { withAuthedBackend, appAuthErrorResponse } from "@/lib/api/app-backend-a
  * lands as an equipment-shaped row tagged `metadata.origin: "COMPANY_DOCS"` and waits for an
  * operator's "Run company check" — needs Relay changes to accept a web source and gains nothing.
  * See docs/implementation-plans/company-docs-pile-web/tickets.md §0.
+ *
+ * ⚠️ **`scanAttemptId` is the one field passed through** (company doc check CC-12): the id of the
+ * upload check that read this pile in the browser, so the backend can tie the check to the Relay
+ * pile. Only a UUID string goes on; anything else is dropped and the pile goes unlinked, as before.
+ * The browser can name any id here, and that is safe because the guard is the BACKEND's: it links
+ * only a check of the same user and the same lane (CC-07).
  */
 const PILE_SOURCE = "web_company_submission";
 const PILE_DOC_LANE = "company";
@@ -36,6 +43,7 @@ export async function POST(req: Request) {
     /* empty */
   }
   const files = Array.isArray(body.files) ? body.files : [];
+  const scanAttemptId = isUuid(body.scanAttemptId) ? body.scanAttemptId : undefined;
 
   return withAuthedBackend(req, async (call) => {
     try {
@@ -43,7 +51,7 @@ export async function POST(req: Request) {
         "/suppliers/me/relay-submissions/presign",
         {
           method: "POST",
-          body: JSON.stringify({ files, source: PILE_SOURCE, docLane: PILE_DOC_LANE }),
+          body: JSON.stringify({ files, source: PILE_SOURCE, docLane: PILE_DOC_LANE, scanAttemptId }),
         },
       );
       return NextResponse.json({
