@@ -46,10 +46,14 @@ export function checkView(check: CheckSnapshot): CheckView {
       return [paper, s === "present" ? "found" : s === "missing" ? "missing" : "unchecked"];
     }),
   ) as Record<RequiredPaper, CardState>;
-  const missing = REQUIRED_PAPERS.filter((paper) => cards[paper] === "missing");
+  // Named in the order the cards show them (the app's), not the contract's.
+  const missing = SHOWN.filter((paper) => cards[paper] === "missing");
   const unchecked = REQUIRED_PAPERS.some((paper) => cards[paper] === "unchecked");
   return { phase: "done", cards, missing, unchecked, notes: p.notes };
 }
+
+/** The order the cards show: the app's (`ScanLane.company`) and this page's tiles, not the contract's. */
+const SHOWN: readonly RequiredPaper[] = ["cr", "address", "vat"];
 
 const EXAMPLE: Record<RequiredPaper, string> = {
   cr: "/check-examples/co-cr.webp",
@@ -83,7 +87,7 @@ export function CompanyCheckLine({
   return (
     <div className="flex flex-col gap-2" data-testid="company-check">
       <Banner view={view} s={s} />
-      {REQUIRED_PAPERS.map((paper) => (
+      {SHOWN.map((paper) => (
         <PaperCard key={paper} paper={paper} state={view.cards[paper]} s={s} />
       ))}
       {view.notes.map((n, i) => {
@@ -139,7 +143,10 @@ function Banner({ view, s }: { view: CheckView; s: CheckStrings }) {
     ok: "border-ok/30 bg-ok-soft",
     muted: "border-border bg-surface2",
   }[tone];
+  // Icons take the base colour; TEXT takes the deep one (`--warn` is fill-only, `--ok` is too light
+  // on its own soft fill for 13px text).
   const fg = { info: "text-info", warn: "text-warn", ok: "text-ok", muted: "text-muted" }[tone];
+  const ink = { info: "text-navy", warn: "text-warn-deep", ok: "text-ok-deep", muted: "text-navy" }[tone];
   const bar = { info: "bg-info", warn: "bg-warn", ok: "bg-ok", muted: "bg-muted" }[tone];
   const width = phase === "preparing" ? "w-1/3" : phase === "checking" ? "w-2/3" : "w-full";
   const steps = [
@@ -159,7 +166,7 @@ function Banner({ view, s }: { view: CheckView; s: CheckStrings }) {
           <MIcon name="progress_activity" size={20} className={`mt-0.5 flex-none motion-safe:animate-spin ${fg}`} />
         )}
         <div className="min-w-0">
-          <p className={`text-body font-semibold ${phase === "done" && tone !== "muted" ? fg : "text-navy"}`}>{title}</p>
+          <p className={`text-body font-semibold ${ink}`}>{title}</p>
           <p className="mt-0.5 text-meta text-muted">{sub}</p>
         </div>
       </div>
@@ -186,8 +193,8 @@ function PaperCard({ paper, state, s }: { paper: RequiredPaper; state: CardState
   const [icon, text, fg] = {
     waiting: [null, s.cardWaiting, "text-muted"],
     checking: ["progress_activity", s.cardChecking, "text-info"],
-    found: ["check_circle", s.cardFound, "text-ok"],
-    missing: ["error_outline", s.cardMissing, "text-warn"],
+    found: ["check_circle", s.cardFound, "text-ok-deep"],
+    missing: ["error_outline", s.cardMissing, "text-warn-deep"],
     unchecked: ["help_outline", s.cardUnchecked, "text-muted"],
   }[state] as [string | null, string, string];
   // The example picture says what the paper looks like; grey until the check finds it (the app's).

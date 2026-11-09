@@ -191,7 +191,7 @@ describe("CompanyCheckLine", () => {
     });
     const { container } = render(<CompanyCheckLine check={check} s={s} locale="en" />);
     expect(
-      screen.getByText("We did not find VAT registration certificate and National address, which are required to register"),
+      screen.getByText("We did not find National address and VAT registration certificate, which are required to register"),
     ).toBeTruthy();
     expect(states(container)).toEqual({ cr: "found", vat: "missing", address: "missing" });
   });
