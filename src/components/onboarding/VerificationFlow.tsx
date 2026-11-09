@@ -13,7 +13,7 @@ import {
   type PileSession,
 } from "@/lib/api/company-pile";
 import { CompanyDocsConfirmDialog } from "./CompanyDocsConfirmDialog";
-import { CompanyCheckLine } from "./CompanyCheckLine";
+import { CompanyCheckLine, checkView } from "./CompanyCheckLine";
 import { useCompanyCheck } from "@/lib/upload-check/useCompanyCheck";
 import type { VerificationStatus } from "@/lib/contract/onboarding";
 import { btn } from "@/lib/ds";
@@ -93,6 +93,10 @@ export function VerificationFlow() {
 
   // Only while the form is on screen: a sent pile, or a status with no form, closes the check.
   const company = useCompanyCheck(files, !sent && (status === "none" || status === "rejected"));
+  // With a check on the pile, its paper cards stand in for the three reference tiles, and a paper
+  // it did not find turns Send into «Send anyway» (the app's scan sheet). Never disabled by it.
+  const checkShown = files.length > 0 && company.check !== null;
+  const checkMissing = checkShown && company.check ? checkView(company.check).missing.length > 0 : false;
 
   /**
    * What the reviewer said, for a renter who is here because their last attempt was refused. Read
@@ -374,11 +378,13 @@ export function VerificationFlow() {
             is validated per document type in the browser, so a checkmark on one tile would be a false
             positive for every other the moment any file is added. */}
         <SectionHeader title={p.requiredSection} pill={p.requiredPill} tone="danger" />
-        <div className="grid grid-cols-3 gap-2">
-          <InfoTile icon="description" title={p.reqCr} />
-          <InfoTile icon="location_on" title={p.reqNationalAddress} />
-          <InfoTile icon="receipt_long" title={p.reqVat} />
-        </div>
+        {!checkShown && (
+          <div className="grid grid-cols-3 gap-2">
+            <InfoTile icon="description" title={p.reqCr} />
+            <InfoTile icon="location_on" title={p.reqNationalAddress} />
+            <InfoTile icon="receipt_long" title={p.reqVat} />
+          </div>
+        )}
 
         {/* The one actionable control. */}
         <div
@@ -460,7 +466,7 @@ export function VerificationFlow() {
           </ul>
         )}
 
-        {files.length > 0 && <CompanyCheckLine check={company.check} s={p.check} locale={locale} />}
+        {checkShown && <CompanyCheckLine check={company.check} s={p.check} locale={locale} />}
 
         <SectionHeader title={p.optionalSection} pill={p.optionalPill} tone="warn" />
         <div className="grid grid-cols-2 gap-2">
@@ -484,7 +490,7 @@ export function VerificationFlow() {
           className={btn("primary", "lg", { full: true, className: "flex transition" })}
         >
           {!busy && <Icon name={failedIndexes.size > 0 ? "refresh" : "send"} size={18} />}
-          {busy ? v.submitting : p.submit}
+          {busy ? v.submitting : checkMissing && failedIndexes.size === 0 ? p.check.sendAnyway : p.submit}
         </button>
         {failedIndexes.size > 0 && !busy && (
           <p className="mt-2 text-center text-meta text-muted">

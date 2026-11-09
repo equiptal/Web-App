@@ -1293,7 +1293,25 @@ export const en = {
        * / `scanAllFound`, string for string. Never red, never blocking: Send always works.
        */
       check: {
+        // The check's banner and paper cards, worded as the app's scan sheet (`scan*` strings).
+        preparing: "Preparing your files",
+        preparingSub: "A moment",
         checking: "Checking for the required documents",
+        checkingSub: "A few seconds",
+        unchecked: "We could not run the quick check, send and our team will verify your documents",
+        reviewSub: "Final review within 24 to 48 hours",
+        stepPrepare: "Preparing files",
+        stepCheck: "Checking the required documents",
+        stepReady: "Ready to send",
+        cardWaiting: "Waiting for the check",
+        cardChecking: "Checking",
+        cardFound: "Looks like it is here",
+        cardMissing: "Required document, add it now or send and you may be asked for it later",
+        cardUnchecked: "Not checked, our team will verify it",
+        hintCr: "Valid, and in the company's name",
+        hintVat: "From the Zakat, Tax and Customs Authority",
+        hintAddress: "An address proof from the National Address",
+        sendAnyway: "Send anyway",
         allFound: "Every required document is here, ready to send",
         missingOne: "We did not find {names}, which is required to register",
         missingMany: "We did not find {names}, which are required to register",

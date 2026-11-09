@@ -76,7 +76,8 @@ async function renderWithFile() {
   return view;
 }
 
-const sendButton = () => screen.getByRole("button", { name: /Send documents/ }) as HTMLButtonElement;
+// «Send anyway» while the check names a paper missing, «Send documents» otherwise.
+const sendButton = () => screen.getByRole("button", { name: /Send documents|Send anyway/ }) as HTMLButtonElement;
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -99,6 +100,23 @@ describe("the check on the verification page", () => {
     await renderWithFile();
     expect(screen.getByText(s.noteCrOnPlatform)).toBeTruthy();
     expect(sendButton().disabled).toBe(false);
+  });
+
+  it("Given a missing paper, Then Send reads «Send anyway», stays enabled, and the cards replace the reference tiles", async () => {
+    stubNetwork();
+    h.check = answered();
+    await renderWithFile();
+    const btn = screen.getByRole("button", { name: new RegExp(s.sendAnyway) }) as HTMLButtonElement;
+    expect(btn.disabled).toBe(false);
+    expect(screen.queryByText(en.verify.pile.reqCr)).toBeNull();
+  });
+
+  it("Given no check, Then the reference tiles stay and Send reads as before", async () => {
+    stubNetwork();
+    h.check = null;
+    await renderWithFile();
+    expect(screen.getByText(en.verify.pile.reqCr)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Send documents/ })).toBeTruthy();
   });
 
   it("Given a check, When the pile is sent, Then its id goes to the presign as scanAttemptId", async () => {
@@ -128,29 +146,42 @@ describe("the check on the verification page", () => {
 });
 
 describe("CompanyCheckLine", () => {
-  it("Given a check still reading, Then the grey checking line; past its budget, nothing", () => {
-    const running: CheckSnapshot = { mode: "on", checkId: CHECK, answered: false, timedOut: false, progress: null };
-    const { rerender } = render(<CompanyCheckLine check={running} s={s} locale="en" />);
+  const states = (container: HTMLElement) =>
+    Object.fromEntries(
+      [...container.querySelectorAll("[data-paper]")].map((el) => [el.getAttribute("data-paper"), el.getAttribute("data-state")]),
+    );
+
+  it("Given files being prepared, then read, Then the banner and every card follow; past its budget, «not checked», never missing", () => {
+    const preparing: CheckSnapshot = { mode: "on", checkId: null, answered: false, timedOut: false, progress: null };
+    const { container, rerender } = render(<CompanyCheckLine check={preparing} s={s} locale="en" />);
+    expect(screen.getByText(s.preparing)).toBeTruthy();
+    expect(states(container)).toEqual({ cr: "waiting", vat: "waiting", address: "waiting" });
+    rerender(<CompanyCheckLine check={{ ...preparing, checkId: CHECK }} s={s} locale="en" />);
     expect(screen.getByText(s.checking)).toBeTruthy();
-    rerender(<CompanyCheckLine check={{ ...running, timedOut: true }} s={s} locale="en" />);
-    expect(screen.queryByText(s.checking)).toBeNull();
+    expect(states(container)).toEqual({ cr: "checking", vat: "checking", address: "checking" });
+    rerender(<CompanyCheckLine check={{ ...preparing, checkId: CHECK, timedOut: true }} s={s} locale="en" />);
+    expect(screen.getByText(s.unchecked)).toBeTruthy();
+    expect(states(container)).toEqual({ cr: "unchecked", vat: "unchecked", address: "unchecked" });
+    expect(screen.queryByText(s.cardMissing)).toBeNull();
   });
 
-  it("Given a failed check, Then nothing", () => {
+  it("Given a failed check, Then «could not check» and no paper called missing", () => {
     const { container } = render(<CompanyCheckLine check={answered({ status: "failed" })} s={s} locale="en" />);
-    expect(container.textContent).toBe("");
+    expect(screen.getByText(s.unchecked)).toBeTruthy();
+    expect(Object.values(states(container)).every((v) => v === "unchecked")).toBe(true);
   });
 
-  it("Given only an unknown note code and nothing missing, Then nothing shows and nothing breaks", () => {
+  it("Given only an unknown note code, Then no warning shows and nothing breaks", () => {
     const check = answered({
       papers: [{ paper: "cr", state: "not_checked" }],
       notes: [{ code: "from_a_later_server", paper: "cr" }],
     });
     const { container } = render(<CompanyCheckLine check={check} s={s} locale="en" />);
-    expect(container.textContent).toBe("");
+    expect(states(container).cr).toBe("unchecked");
+    expect(container.querySelectorAll("p.bg-warn-soft").length).toBe(0);
   });
 
-  it("Given two missing papers, Then both are named in one line", () => {
+  it("Given two missing papers, Then both are named in one line and their cards say missing", () => {
     const check = answered({
       papers: [
         { paper: "cr", state: "present" },
@@ -158,10 +189,24 @@ describe("CompanyCheckLine", () => {
         { paper: "address", state: "missing" },
       ],
     });
-    render(<CompanyCheckLine check={check} s={s} locale="en" />);
+    const { container } = render(<CompanyCheckLine check={check} s={s} locale="en" />);
     expect(
       screen.getByText("We did not find VAT registration certificate and National address, which are required to register"),
     ).toBeTruthy();
+    expect(states(container)).toEqual({ cr: "found", vat: "missing", address: "missing" });
+  });
+
+  it("Given every paper found, Then the banner says ready and every card found", () => {
+    const check = answered({
+      papers: [
+        { paper: "cr", state: "present" },
+        { paper: "vat", state: "present" },
+        { paper: "address", state: "present" },
+      ],
+    });
+    const { container } = render(<CompanyCheckLine check={check} s={s} locale="en" />);
+    expect(screen.getByText(s.allFound)).toBeTruthy();
+    expect(states(container)).toEqual({ cr: "found", vat: "found", address: "found" });
   });
 
   it("words every note in EN and AR, the date Gregorian with Latin digits, no trailing period", () => {
